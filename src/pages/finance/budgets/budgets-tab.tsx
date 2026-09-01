@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import {
   useGetBudgetsQuery, useGetBudgetQuery, useGetBudgetVarianceQuery, useGetBudgetHeatmapQuery, useGetFiscalYearsQuery,
   useCreateBudgetMutation, useUpdateBudgetMutation, useSetBudgetLinesMutation, useApproveBudgetMutation, useDeleteBudgetMutation,

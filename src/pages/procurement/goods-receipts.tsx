@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import {
   useCreateGoodsReceiptMutation, useGetGoodsReceiptQuery, useGetGoodsReceiptsQuery,
   useGetPurchaseOrderQuery, usePostGoodsReceiptMutation, useUpdateGoodsReceiptMutation,

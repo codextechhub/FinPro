@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney, toKobo } from "@/utils/money";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { useGetPaymentDetailQuery, useAllocatePaymentMutation } from "@/redux/services/finance/ar-api";
 import { DocumentVoidAction } from "./document-void-action";
 

@@ -13,7 +13,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/st
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import {
   useGetChartOfAccountsQuery, useCreateAccountMutation, useGetAccountDetailQuery, useGetAccountActivityQuery, useUpdateAccountMutation,
 } from "@/redux/services/finance/setup-api";

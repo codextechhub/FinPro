@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { DOCUMENT_VOID_CONFIG, voidDocumentLabel } from "./document-void-config";
 
 describe("document void actions", () => {

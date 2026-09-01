@@ -11,7 +11,7 @@ import {
   LoadingState, toArray,
 } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import {
   useGetVendorAssessmentsQuery, useGetVendorPerformanceQuery,
 } from "@/redux/services/procurement/procurement-ext-api";

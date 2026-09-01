@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import {
   useCreatePurchaseOrderMutation, useGetPurchaseOrderQuery,

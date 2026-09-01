@@ -11,7 +11,7 @@ import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState, EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { useGetInvoiceDetailQuery, useRemindInvoiceMutation } from "@/redux/services/finance/ar-api";
 import { openInvoiceDocument } from "@/utils/finance-documents";
 import { RecordPaymentModal } from "./record-payment-modal";

@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import { usePermissions } from "@/hooks/use-permissions";
 import {

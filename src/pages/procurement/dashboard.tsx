@@ -13,7 +13,7 @@ import {
 import { useCan } from "@/components/finance-ui/can";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { useGetProcurementDashboardQuery } from "@/redux/services/procurement/procurement-ext-api";
 import { routesPath } from "@/routes/routes-path";
 import { currencySymbol, formatMoney, toNaira } from "@/utils/money";

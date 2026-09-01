@@ -26,7 +26,7 @@ import {
   useRetryDocumentEmailMutation,
   useSendDocumentEmailMutation,
 } from "@/redux/services/finance/ar-api";
-import type { PermissionCode } from "@/permissions";
+import type { PermissionCode } from "../../permissions";
 import type { DocumentDelivery } from "@/redux/services/finance/ar-types";
 
 const MAX_NOTE = 1000;

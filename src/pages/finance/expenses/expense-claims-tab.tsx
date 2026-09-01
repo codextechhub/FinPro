@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { openAttachment } from "@/utils/attachment-download";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import {

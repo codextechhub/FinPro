@@ -11,7 +11,7 @@ import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { useGetJournalQuery, useReverseJournalMutation, useSubmitJournalMutation } from "@/redux/services/finance/gl-api";
 import { DocumentVoidAction } from "../receivables/document-void-action";
 

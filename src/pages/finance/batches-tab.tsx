@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { isStripped } from "@/utils/fls";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { useGetPayoutBatchesQuery, useGetPayoutBatchesSummaryQuery, useCreatePayoutBatchMutation, useGetPayoutBatchQuery, useSubmitPayoutBatchMutation, useSubmitPayoutBatchForApprovalMutation } from "@/redux/services/payments/payments-api";
 import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
 import type { PayoutBatchSummary, PayoutInstruction, PayoutBatchItemPayload } from "@/redux/services/payments/payments-types";

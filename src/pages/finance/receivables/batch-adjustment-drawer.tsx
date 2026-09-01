@@ -18,7 +18,7 @@ import { SearchSelect } from "@/components/custom/search-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { gatedBatchRows, isBatchGateRefusal } from "./adjustment-approval";
 import { useAdjustmentGate } from "./use-adjustment-gate";
 import {

@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Can } from "./can";
 import { ConfirmActionModal } from "./confirm-action-modal";
-import type { PermissionCode } from "@/permissions";
+import type { PermissionCode } from "../../permissions";
 import { cn } from "@/lib/utils";
 
 interface ActionButtonProps {

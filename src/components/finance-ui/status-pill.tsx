@@ -3,7 +3,6 @@
 // states, etc.) onto the app's existing Badge variants. Unknown statuses still
 // render, humanised, with a neutral variant - never a crash.
 
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 type BadgeVariant = "default" | "success" | "active" | "inactive" | "pending" | "rejected" | "suspended";
@@ -91,12 +90,36 @@ export function statusLabel(status: string): string {
   return LABEL_BY_STATUS[token] ?? humanise(status);
 }
 
+// Renders its own pill rather than delegating to the host's Badge.
+//
+// The two applications' Badge components share a name and not a variant set:
+// this package needs "suspended", which one of them does not define. Depending
+// on a host primitive for the package's own presentation means the package
+// only renders correctly where that host happens to agree - so it owns the
+// styling instead. The classes match the console's Badge, so nothing changes
+// visually there.
+const PILL_CLASS: Record<BadgeVariant, string> = {
+  default:   "bg-primary text-primary-foreground",
+  success:   "bg-green-01/10 text-green-01-text",
+  active:    "bg-green-01/10 text-green-01-text",
+  inactive:  "bg-gray-05/10 text-gray-06-text",
+  pending:   "bg-yellow-01/10 text-yellow-01-text",
+  rejected:  "bg-destructive/10 text-error-text",
+  suspended: "bg-orange-500/10 text-yellow-01-text",
+};
+
 export function StatusPill({ status, className }: { status?: string | null; className?: string }) {
   if (!status) return <span className="text-gray-05">-</span>;
-  const variant = statusVariant(status);
   return (
-    <Badge variant={variant} className={cn("font-mont", className)}>
+    <span
+      className={cn(
+        "inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-md",
+        "border-transparent px-2 py-0.5 font-mont text-xs font-medium whitespace-nowrap",
+        PILL_CLASS[statusVariant(status)],
+        className,
+      )}
+    >
       {statusLabel(status)}
-    </Badge>
+    </span>
   );
 }

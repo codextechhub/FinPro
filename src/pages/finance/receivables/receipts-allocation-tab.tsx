@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { useGetPaymentsQuery, useGetPaymentSummaryQuery } from "@/redux/services/finance/ar-api";
 import type { Payment } from "@/redux/services/finance/ar-types";
 import { openPaymentReceipt } from "@/utils/finance-documents";

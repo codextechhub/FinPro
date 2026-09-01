@@ -10,7 +10,7 @@ import { DataTable, StatusPill, FormDrawer, FormField, AccountPicker, toArray, t
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { useGetTaxCodesQuery, useUpsertTaxCodeMutation } from "@/redux/services/finance/setup-api";
 import type { TaxCode } from "@/redux/services/finance/setup-types";
 import { taxCodeFormValues, taxCodeUpsertPayload } from "./tax-code-form";

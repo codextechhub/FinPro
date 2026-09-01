@@ -8,7 +8,7 @@ import { DataTable, StatusPill, FormDrawer, FormField, toArray, type Column } fr
 import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { useGetCostCentersQuery, useCreateCostCenterMutation } from "@/redux/services/finance/setup-api";
 import type { CostCenter } from "@/redux/services/finance/setup-types";
 

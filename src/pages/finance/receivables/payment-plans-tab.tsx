@@ -21,7 +21,7 @@ import { SearchSelect } from "@/components/custom/search-select";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import {
   useGetPaymentPlansQuery, useCreatePaymentPlanMutation, useActivatePaymentPlanMutation,
   useCancelPaymentPlanMutation, useRecordPaymentMutation,

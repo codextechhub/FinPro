@@ -62,9 +62,22 @@ export interface HostExportProps {
   defaultName?: string;
   className?: string;
   variant?: "white" | "outline" | "default";
+  /** Which type family the control renders in, where a host has more than one.
+   *  A host with a single typeface ignores it. */
+  typeface?: "geist" | "app";
   /** When set, the control is disabled and this is its tooltip. A screen that
    *  cannot be exported yet says why, rather than offering a silent no-op. */
   disabledReason?: string;
+}
+
+/** What a screen passes to the host's avatar. `fallbackClassName` styles the
+ *  initials shown when there is no photograph - a host without photos ignores
+ *  it, but must accept it rather than fail to compile. */
+export interface HostAvatarProps {
+  name?: string;
+  userId?: string | number;
+  className?: string;
+  fallbackClassName?: string;
 }
 
 export interface HostContract {
@@ -84,7 +97,7 @@ export interface HostContract {
    *  is host-bound: the console reads staff photos from its media service, and
    *  a school app has its own people and its own source. A package that
    *  imported one app's photo query would carry that app's API into the other. */
-  UserAvatar: ComponentType<{ name?: string; userId?: string | number; className?: string }>;
+  UserAvatar: ComponentType<HostAvatarProps>;
   /** Set the surrounding application's page title. Each app owns its own
    *  header, so the package asks rather than reaches. */
   useDashboardTitle(title: string): void;
@@ -94,8 +107,6 @@ export interface HostContract {
   useDirectory(): HostQueryResult<HostPerson>;
   /** The application's own logo. */
   AppLogo: ComponentType<{ animate?: boolean; className?: string }>;
-  /** Scroll the sidebar so the active item is visible. */
-  revealActiveSidebarItem(el: HTMLElement, rememberedScroll: number | null | undefined): void;
 }
 
 import * as host from "@xvs-host";
@@ -107,6 +118,5 @@ const _satisfies: HostContract = host;
 void _satisfies;
 
 export const {
-  useBranches, useDirectory, AppLogo, revealActiveSidebarItem, QuickExportButton,
-  UserAvatar, useDashboardTitle,
+  useBranches, useDirectory, AppLogo, QuickExportButton, UserAvatar, useDashboardTitle,
 } = host;

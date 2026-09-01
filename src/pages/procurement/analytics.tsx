@@ -4,7 +4,7 @@
 // Every screen gates on procurement.report.view (the backend view enforces it too).
 import { EmptyState, ForbiddenState, useActiveEntity } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { ProcurementShell } from "./procurement-shell";
 import type { SectionProps } from "./analytics/helpers";
 import { DEFAULT_ANALYTICS_SECTION, type AnalyticsSection } from "./console-sections";

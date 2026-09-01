@@ -1,4 +1,4 @@
-import { P, type PermissionCode } from "@/permissions";
+import { P, type PermissionCode } from "../../../permissions";
 import type { VoidableArResource } from "@/redux/services/finance/ar-api";
 
 export type VoidableDocumentType = "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "CONCESSION";

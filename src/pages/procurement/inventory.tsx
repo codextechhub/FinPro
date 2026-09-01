@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import {
   useGetStockItemsQuery, useGetStockItemQuery, useGetStockSummaryQuery,
   useGetStockMovementsQuery, useCreateStockItemMutation, useUpdateStockItemMutation,

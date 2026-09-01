@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import rootReducer from "@/redux/features/root-reducer";
 import { Can } from "@/components/finance-ui/can";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import {
   ContractRenewButton,
   InvoiceVarianceOverrideAction,

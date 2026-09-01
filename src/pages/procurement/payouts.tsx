@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { ProcurementShell } from "./procurement-shell";
 import { DataTable, Money, StatusPill, ActionButton, toArray, useActiveEntity, type Column } from "@/components/finance-ui";
 import { EmptyState, LoadingState } from "@/components/finance-ui/states";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { isStripped } from "@/utils/fls";
 import {
   useGetPayoutsQuery, useGetPayoutBatchesQuery, useSubmitPayoutBatchMutation, useGetSettlementReconciliationQuery,

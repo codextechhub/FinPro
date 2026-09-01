@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { useAppSelector } from "@/redux/store";
 import {
   useCreateVendorInvoiceMutation, useGetProcurementSettingsQuery,

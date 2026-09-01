@@ -18,7 +18,7 @@ import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { isStripped } from "@/utils/fls";
 import {
   useGetVirtualAccountsQuery, useCreateVirtualAccountMutation,

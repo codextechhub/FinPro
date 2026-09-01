@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { SearchSelect } from "@/components/custom/search-select";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { formatMoney } from "@/utils/money";
 import {
   useCreateCategoryMutation,

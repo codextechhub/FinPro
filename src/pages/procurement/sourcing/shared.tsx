@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Textarea } from "@/components/ui/textarea";
 import { ActionButton, StatusPill } from "@/components/finance-ui";
 import { cn } from "@/lib/utils";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   useGetRfqsQuery, useGetRfqQuery, useGetQuotationsQuery, useGetQuotationQuery,

@@ -10,7 +10,7 @@ import { DataTable, StatusPill, FormModal, FormField, type Column } from "@/comp
 import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { useGetEntitiesQuery, useCreateEntityMutation } from "@/redux/services/finance/entity-api";
 import { useGetCurrenciesQuery } from "@/redux/services/finance/setup-api";
 import type { LedgerEntity } from "@/redux/services/finance/entity-types";

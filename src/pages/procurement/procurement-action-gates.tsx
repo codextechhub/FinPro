@@ -1,7 +1,7 @@
 import { ActionButton } from "@/components/finance-ui/action-button";
 import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 
 export function ContractRenewButton({ onClick }: { onClick: () => void }) {
   return (

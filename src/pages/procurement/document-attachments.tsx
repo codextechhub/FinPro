@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { PermissionCode } from "@/permissions";
+import type { PermissionCode } from "../../permissions";
 import type { DocumentAttachment } from "@/redux/services/procurement/procurement-types";
 import { openAttachment } from "@/utils/attachment-download";
 

@@ -33,7 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers } from "./close-checklist";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import {
   useCloseFiscalYearMutation,
   useClosePeriodMutation,

@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { SearchSelect } from "@/components/custom/search-select";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { useGetCollectionsQuery, useGetCollectionsSummaryQuery, useInitiateCollectionMutation, useVerifyCollectionMutation } from "@/redux/services/payments/payments-api";
 import { useGetInvoicesQuery } from "@/redux/services/finance/ar-api";
 import type { Collection } from "@/redux/services/payments/payments-types";

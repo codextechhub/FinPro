@@ -36,7 +36,7 @@ import {
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { isStripped } from "@/utils/fls";
 import {
   useGetBankAccountsQuery, useGetBankAccountQuery, useCreateBankAccountMutation,

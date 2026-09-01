@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { isStripped } from "@/utils/fls";
 import {
   useGetPayrollRunsQuery, useGetPayrollSummaryQuery, useGetPayrollRunQuery, usePostPayrollRunMutation,

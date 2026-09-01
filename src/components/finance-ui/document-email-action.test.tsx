@@ -43,7 +43,7 @@ vi.mock("@/hooks/use-permissions", () => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { DocumentEmailAction } from "./document-email-action";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { bookingDateFor } from "@/utils/posting-window";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import {
   useGetBankAccountsQuery, useGetBankAccountQuery, useGetStatementLinesQuery,
   useGetBookLinesQuery, useAutoReconcileMutation, useMatchStatementLineMutation,

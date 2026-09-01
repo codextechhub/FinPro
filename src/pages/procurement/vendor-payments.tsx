@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { cn } from "@/lib/utils";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import {
   useCancelVendorPaymentMutation, useCreateVendorPaymentMutation,
   useGetVendorPaymentEligibleInvoicesQuery, useGetVendorPaymentQuery,

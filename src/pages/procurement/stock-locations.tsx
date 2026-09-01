@@ -22,7 +22,7 @@ import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import {
   useCreateStockLocationMutation, useGetStockBalancesQuery, useGetStockLocationsQuery,
   useUpdateStockLocationMutation,

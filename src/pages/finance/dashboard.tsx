@@ -18,7 +18,7 @@ import {
 } from "@/components/finance-ui";
 import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/states";
 import { useCan } from "@/components/finance-ui/can";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";

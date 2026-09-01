@@ -18,7 +18,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useActionParam } from "@/hooks/use-action-param";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { useGetJournalsQuery, useGetJournalSummaryQuery } from "@/redux/services/finance/gl-api";
 import type { JournalListItem, JournalSource, JournalStatus } from "@/redux/services/finance/gl-types";
 import { DirectEntryDrawer } from "./direct-entry-drawer";

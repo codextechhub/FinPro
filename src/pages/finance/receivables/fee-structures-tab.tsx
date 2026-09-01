@@ -25,7 +25,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { apiErrorMessage } from "@/utils/api-errors";
 import { formatMoney } from "@/utils/money";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import {
   useGetFeeStructuresQuery, useGetFeeStructureQuery, useCreateFeeStructureMutation,
   useUpdateFeeStructureMutation, useDuplicateFeeStructureMutation,

@@ -12,7 +12,7 @@ import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { P } from "@/permissions";
+import { P } from "../../../permissions";
 import { useGetCurrenciesQuery, useGetFxRatesQuery, useCreateFxRateMutation } from "@/redux/services/finance/setup-api";
 import type { Currency, FxRate } from "@/redux/services/finance/setup-types";
 

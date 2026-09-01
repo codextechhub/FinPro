@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { isStripped } from "@/utils/fls";
-import { P } from "@/permissions";
+import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import { useGetPayoutsQuery, useGetPayoutsSummaryQuery, useInitiatePayoutMutation } from "@/redux/services/payments/payments-api";
 import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
