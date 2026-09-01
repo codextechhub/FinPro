@@ -59,6 +59,22 @@ A host must provide:
 A host must also register this package's API slices and reducers in its own
 store.
 
+## Before a third product adopts this
+
+**Check its permission code numbering against `permissions.ts` first.** Nothing
+enforces separation, and a clash is silent.
+
+The console and the school app had independently given the SAME numbers to
+DIFFERENT permissions - `100601` meant `platform.audit.view` here and
+`school.fees.view` there. Harmless while the two apps were separate; the moment
+both tables merged in one app the number was ambiguous, and one product's screen
+would have gated on the other's permission. Five were renumbered on this side in
+September 2026, each staying inside its own module range (`1xxxxx` platform,
+`2xxxxx` finance, `7xxxxx` procurement, `8xxxxx` payments).
+
+Watch for the quieter version too: two NAMES for one code and one key, which is
+how a permission audit reports a gated screen as ungated.
+
 ## What must not be tidied
 
 **Finance reads a blank branch inclusively; procurement reads it exclusively.**
