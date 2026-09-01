@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useGetTeamMembersQuery } from "@/redux/services/dashboard/team-mgt-api";
-import type { TeamMember } from "@/redux/services/dashboard/dashboard-types";
+import { useDirectory } from "../../host";
+import type { HostPerson } from "../../host";
 import { returnInitial } from "@/utils/helpers";
 
 /** Backend user FKs serialize as numbers; normalize everything to a string key. */
@@ -17,15 +17,15 @@ const toKey = (id: UserId): string => (id == null ? "" : String(id));
  * pragmatic resolver - see project_workflow_module memory.
  */
 export function useUserDirectory() {
-  const { data, isLoading } = useGetTeamMembersQuery({ page: 1, page_size: 500 });
+  const { data, isLoading } = useDirectory();
 
   const byId = useMemo(() => {
-    const map = new Map<string, TeamMember>();
-    for (const u of data?.data ?? []) map.set(String(u.id), u);
+    const map = new Map<string, HostPerson>();
+    for (const u of data ?? []) map.set(String(u.id), u);
     return map;
   }, [data]);
 
-  const get = (id: UserId): TeamMember | undefined => {
+  const get = (id: UserId): HostPerson | undefined => {
     const key = toKey(id);
     return key ? byId.get(key) : undefined;
   };

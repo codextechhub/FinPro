@@ -399,7 +399,7 @@ function useMovementLocation(entity: string, item: StockItemDetail) {
 
   const selected = balances.find((row) => String(row.location_id) === locationId) ?? null;
   // Availability is the store's, not the entity's. Reading the roll-up is exactly
-  // what let one campus issue against stock standing at another.
+  // what let one branch issue against stock standing at another.
   const onHand = multi ? num(selected?.on_hand_qty) : num(item.on_hand_qty);
   const stockValue = multi ? (selected?.stock_value ?? 0) : item.stock_value;
 

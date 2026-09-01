@@ -27,9 +27,8 @@ import {
   useCreateStockLocationMutation, useGetStockBalancesQuery, useGetStockLocationsQuery,
   useUpdateStockLocationMutation,
 } from "@/redux/services/procurement/procurement-ext-api";
-import { useGetBranchesQuery } from "@/redux/services/dashboard/school-mgt-api";
 import type { StockBalance, StockLocation } from "@/redux/services/procurement/procurement-types";
-import { getTenantSlug } from "@/utils/tenant-context";
+import { useBranches } from "../../host";
 import { apiFieldError } from "@/utils/api-errors";
 import { ProcurementShell } from "./procurement-shell";
 import { EmptyPanel, Field } from "./sourcing/shared";
@@ -59,7 +58,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
   const [update, { isLoading: updating }] = useUpdateStockLocationMutation();
 
   const total = data?.pagination?.totalItems ?? rows.length;
-  // A school already running two campuses came through the migration with every
+  // A school already running two branches came through the migration with every
   // item sitting at one store. Nothing can move it automatically - the remedy is
   // operational - so say so where they can act on it.
   const singleStore = !isLoading && !isError && total === 1;
@@ -81,7 +80,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
       header: "Location",
       cell: (l) => <div className="min-w-40"><p className="font-semibold">{l.name}</p><p className="mt-0.5 font-mont text-xs text-gray-05">{l.code}</p></div>,
     },
-    { header: "Campus", cell: (l) => l.branch_name || <span className="text-gray-05">Entity-wide</span> },
+    { header: "Branch", cell: (l) => l.branch_name || <span className="text-gray-05">Entity-wide</span> },
     { header: "Default", cell: (l) => (l.is_default ? <StatusPill status="DEFAULT" /> : <span className="text-gray-05">-</span>) },
     { header: "Status", cell: (l) => <StatusPill status={l.is_active ? "ACTIVE" : "INACTIVE"} /> },
     { header: "Created", cell: (l) => shortDate(l.created_at) },
@@ -164,9 +163,8 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
   // Branches live behind school management, which a stock manager may not hold.
   // When we cannot read them the field is simply absent and the store is
   // entity-wide, which is a valid answer rather than missing data.
-  const slug = getTenantSlug();
-  const branchQ = useGetBranchesQuery({ slug: slug!, params: { page_size: 100 } }, { skip: !slug });
-  const branches = useMemo(() => toArray(branchQ.data?.data), [branchQ.data]);
+  const branchQ = useBranches();
+  const branches = useMemo(() => toArray(branchQ.data), [branchQ.data]);
   const branchesReadable = !branchQ.isError && (branchQ.isLoading || branches.length > 0);
 
   const dirty = !initial
@@ -230,12 +228,12 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
         </FormField>
       </div>
       {branchesReadable && (
-        <FormField label="Campus">
+        <FormField label="Branch">
           <NativeSelect value={branch} disabled={branchQ.isLoading} onChange={(e) => setBranch(e.target.value)}>
             <option value="">Entity-wide</option>
             {branches.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
           </NativeSelect>
-          <span className="mt-1 block font-mont text-[11px] leading-5 text-gray-05">Goods received at this campus land in this store by default.</span>
+          <span className="mt-1 block font-mont text-[11px] leading-5 text-gray-05">Goods received at this branch land in this store by default.</span>
         </FormField>
       )}
       <FormField label="Description">
@@ -279,7 +277,7 @@ function LocationBalancesDrawer({ location, entity, currency, onClose }: {
         <div className="space-y-5">
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">
             <Field label="Code" value={location.code} />
-            <Field label="Campus" value={location.branch_name || "Entity-wide"} />
+            <Field label="Branch" value={location.branch_name || "Entity-wide"} />
             <Field label="Default" value={location.is_default ? "Yes" : "No"} />
             <Field label="Status" value={location.is_active ? "Active" : "Inactive"} />
             <Field label="Description" value={location.description || "-"} />

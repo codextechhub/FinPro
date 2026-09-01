@@ -15,12 +15,12 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { AppLogo } from "@/components/app-logo";
+import { AppLogo } from "../../host";
 import { NavMain } from "@/components/nav-main";
 import { usePermissions } from "@/hooks/use-permissions";
 import { routesPath } from "@/routes/routes-path";
 import type { ConsoleNavGroup, ConsoleNavItem } from "./console-nav";
-import { revealActiveSidebarItem } from "@/components/sidebar-navigation";
+import { revealActiveSidebarItem } from "../../host";
 
 // Each console page mounts its own shell, so the sidebar remounts on every
 // in-console navigation - which would reset its scroll to the top. Remember the
