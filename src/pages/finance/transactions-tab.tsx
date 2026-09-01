@@ -7,7 +7,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDownLeft, ArrowUpRight, Receipt, Banknote } from "lucide-react";
 import { DataTable, Money, KpiCard, DetailDrawer, toArray, type Column } from "@/components/finance-ui";
-import { QuickExportButton } from "@/components/custom/quick-export-drawer";
+import { QuickExportButton } from "../../host";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";

@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { Plus, Layers, Banknote } from "lucide-react";
 import { DataTable, Money, MoneyInput, DetailDrawer, FormField, VendorPicker, AccountPicker, PostingRecap, KpiCard, toArray, type Column, type RecapRow } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
-import { QuickExportButton } from "@/components/custom/quick-export-drawer";
+import { QuickExportButton } from "../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";

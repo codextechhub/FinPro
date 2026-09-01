@@ -21,7 +21,7 @@ import {
   AccountPicker, TaxCodePicker, CostCenterPicker, BankAccountPicker, toArray, type Column,
   PostingDateField,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
-import { QuickExportButton } from "@/components/custom/quick-export-drawer";
+import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-debounce";

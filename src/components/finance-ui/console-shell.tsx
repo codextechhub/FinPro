@@ -13,7 +13,7 @@
 //     rather than the console name.
 
 import { useLocation } from "react-router";
-import { useDashboardTitle } from "@/components/layout/dashboard-header";
+import { useDashboardTitle } from "../../host";
 import { activeNavTitle, type ConsoleNavGroup } from "./console-nav";
 
 interface ConsoleShellProps {

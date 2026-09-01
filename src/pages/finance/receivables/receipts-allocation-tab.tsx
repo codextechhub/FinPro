@@ -9,7 +9,7 @@ import { Search, Plus, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, toArray, type Column } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
-import { QuickExportButton } from "@/components/custom/quick-export-drawer";
+import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-debounce";

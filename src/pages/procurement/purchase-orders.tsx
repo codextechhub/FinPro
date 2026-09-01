@@ -15,7 +15,7 @@ import {
   FormField, InfoHint, LoadingState, StatCard, StatusPill, toArray, useActiveEntity, useCan, type Column,
 } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
-import { QuickExportButton } from "@/components/custom/quick-export-drawer";
+import { QuickExportButton } from "../../host";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
