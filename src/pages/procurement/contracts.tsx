@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { P } from "../../permissions";
+import { useCan } from "@/components/finance-ui/can";
 import {
   useGetContractsQuery, useGetContractQuery, useGetContractsSummaryQuery,
   useGetContractLinkedPosQuery, useCreateContractMutation, useUpdateContractMutation,
@@ -55,6 +56,10 @@ function ExpiredOverlay() {
 
 export default function ContractsPage() {
   const { code: entity, currency } = useActiveEntity();
+  // Asked before the tables below fetch on mount. A finance grant does not
+  // carry procurement.contract.view with it, and without this the screen
+  // opened on a pair of 403s and a red toast.
+  const canPROC_VIEW_CONTRACTS = useCan().can(P.PROC_VIEW_CONTRACTS);
   const [tab, setTab] = useState("");
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -88,6 +93,7 @@ export default function ContractsPage() {
   ];
 
   if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view its contracts." /></PageShell></ProcurementShell>;
+  if (!canPROC_VIEW_CONTRACTS) return <ProcurementShell><PageShell><EmptyState title="No contracts access" message="This screen needs procurement.contract.view." /></PageShell></ProcurementShell>;
 
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">

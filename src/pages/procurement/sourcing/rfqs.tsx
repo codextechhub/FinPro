@@ -16,7 +16,7 @@ import {
   LoadingState, Money, MoneyInput, StatCard, StatusPill, ActionButton, emptyLine, toArray,
   useActiveEntity, type Column, type DocLine,
 } from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,6 +54,10 @@ function RfqStatusPill({ status }: { status: string }) {
 
 export default function RfqsPage() {
   const { code: entity, currency } = useActiveEntity();
+  // Asked before the tables below fetch on mount. A finance grant does not
+  // carry procurement.rfq.view with it, and without this the screen
+  // opened on a pair of 403s and a red toast.
+  const canPROC_VIEW_RFQS = useCan().can(P.PROC_VIEW_RFQS);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -95,6 +99,7 @@ export default function RfqsPage() {
   ];
 
   if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view its RFQs." /></PageShell></ProcurementShell>;
+  if (!canPROC_VIEW_RFQS) return <ProcurementShell><PageShell><EmptyState title="No RFQs access" message="This screen needs procurement.rfq.view." /></PageShell></ProcurementShell>;
 
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">

@@ -80,6 +80,10 @@ function percent(value: string | number | null | undefined) {
 
 export default function PurchaseOrdersPage() {
   const { code: entity, currency } = useActiveEntity();
+  // Asked before the tables below fetch on mount. A finance grant does not
+  // carry procurement.purchase_order.view with it, and without this the screen
+  // opened on a pair of 403s and a red toast.
+  const canPROC_VIEW_PURCHASE_ORDERS = useCan().can(P.PROC_VIEW_PURCHASE_ORDERS);
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<number | null>(() => (
     sourceDocumentIdFromParams(searchParams)
@@ -131,6 +135,7 @@ export default function PurchaseOrdersPage() {
   ];
 
   if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view its purchase orders." /></PageShell></ProcurementShell>;
+  if (!canPROC_VIEW_PURCHASE_ORDERS) return <ProcurementShell><PageShell><EmptyState title="No purchase orders access" message="This screen needs procurement.purchase_order.view." /></PageShell></ProcurementShell>;
 
   return (
     <ProcurementShell>

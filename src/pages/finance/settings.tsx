@@ -87,7 +87,16 @@ const ACCOUNT_DESCRIPTIONS: Record<string, string> = {
 export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SECTION }: {
   section?: FinanceSettingsSection;
 }) {
-  const activeSection = SECTIONS.some((item) => item.key === section) ? section : "overview";
+  // Entities are administered where they are created. A product that keeps a
+  // single set of books grants nobody finance.entity.create, does not mount the
+  // section, and must not be offered it here either: the list and the overview
+  // card both led to a 404, which reads as a broken screen rather than as a
+  // section this product does not have.
+  const { hasPermission } = usePermissions();
+  const sections = hasPermission(P.FIN_CREATE_ENTITY)
+    ? SECTIONS
+    : SECTIONS.filter((item) => item.key !== "entities");
+  const activeSection = sections.some((item) => item.key === section) ? section : "overview";
   const active = useActiveEntity();
 
   return (
@@ -97,7 +106,7 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
         description="Manage the structure, defaults and controls behind each set of books. Operational work stays in the main Finance menu."
         basePath={F.SETTINGS}
         activeSection={activeSection}
-        sections={SECTIONS}
+        sections={sections}
         scopeLabel={active.entity ? `${active.entity.code} · ${active.entity.name}` : "Select an entity"}
       >
         {activeSection === "overview" ? <Overview entity={active.entity} /> : null}

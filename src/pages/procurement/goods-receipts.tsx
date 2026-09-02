@@ -9,7 +9,7 @@ import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LoadingState,
   PostingRecap, StatusPill, toArray, useActiveEntity, type Column,
   PostingDateField,} from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +43,10 @@ function shortDate(value?: string | null) {
 
 export default function GoodsReceiptsPage() {
   const { code: entity, currency } = useActiveEntity();
+  // Asked before the tables below fetch on mount. A finance grant does not
+  // carry procurement.goods_receipt.view with it, and without this the screen
+  // opened on 403s and a red toast.
+  const canPROC_VIEW_GOODS_RECEIPTS = useCan().can(P.PROC_VIEW_GOODS_RECEIPTS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   useActionParam("new", () => setCreating(true));
@@ -64,6 +68,9 @@ export default function GoodsReceiptsPage() {
 
   if (!entity) {
     return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view goods receipts." /></PageShell></ProcurementShell>;
+  }
+  if (!canPROC_VIEW_GOODS_RECEIPTS) {
+    return <ProcurementShell><PageShell><EmptyState title="No goods receipts access" message="This screen needs procurement.goods_receipt.view." /></PageShell></ProcurementShell>;
   }
 
   return (

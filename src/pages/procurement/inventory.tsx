@@ -15,7 +15,7 @@ import {
   LoadingState, Money, MoneyInput, PostingRecap, Segmented, StatCard, StatusPill, toArray,
   useActiveEntity, type Column, type RecapRow,
   PostingDateField,} from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -79,6 +79,10 @@ export default function InventoryPage({ section = DEFAULT_INVENTORY_SECTION }: {
   section?: InventorySection;
 }) {
   const { code: entity, currency } = useActiveEntity();
+  // Asked before the tables below fetch on mount. A finance grant does not
+  // carry procurement.stock.view with it, and without this the screen
+  // opened on 403s and a red toast.
+  const canPROC_VIEW_STOCK = useCan().can(P.PROC_VIEW_STOCK);
 
   if (!entity) {
     return (
@@ -88,6 +92,9 @@ export default function InventoryPage({ section = DEFAULT_INVENTORY_SECTION }: {
         </PageShell>
       </ProcurementShell>
     );
+  }
+  if (!canPROC_VIEW_STOCK) {
+    return <ProcurementShell><PageShell><EmptyState title="No inventory access" message="This screen needs procurement.stock.view." /></PageShell></ProcurementShell>;
   }
   if (section === "movements") return <MovementsSection entity={entity} currency={currency} />;
   if (section === "locations") return <LocationsSection entity={entity} currency={currency} />;

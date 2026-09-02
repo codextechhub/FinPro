@@ -25,6 +25,7 @@ import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt"
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { P } from "../../permissions";
+import { useCan } from "@/components/finance-ui/can";
 import { useAppSelector } from "@/redux/store";
 import {
   useCreateRequisitionMutation, useGetCatalogItemsQuery,
@@ -72,6 +73,10 @@ function age(value?: string | null) {
 
 export default function RequisitionsPage() {
   const { code: entity, currency } = useActiveEntity();
+  // Asked before the tables below fetch on mount. A finance grant does not
+  // carry procurement.requisition.view with it, and without this the screen
+  // opened on a pair of 403s and a red toast.
+  const canPROC_VIEW_REQUISITIONS = useCan().can(P.PROC_VIEW_REQUISITIONS);
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<number | null>(() => (
     sourceDocumentIdFromParams(searchParams)
@@ -154,6 +159,7 @@ export default function RequisitionsPage() {
   );
 
   if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view its requisitions." /></PageShell></ProcurementShell>;
+  if (!canPROC_VIEW_REQUISITIONS) return <ProcurementShell><PageShell><EmptyState title="No requisitions access" message="This screen needs procurement.requisition.view." /></PageShell></ProcurementShell>;
 
   return (
     <ProcurementShell>
