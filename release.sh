@@ -49,6 +49,13 @@ fi
 echo "==> checking the package boundary"
 node check-boundary.mjs
 
+# The boundary check reads the source; this one reads what a CONSUMER gets.
+# v0.1.0 passed every typecheck, build and test in both applications and still
+# broke the console's finance area on open, because its exports map pointed at
+# files that do not exist. Nothing else in the pipeline asks that question.
+echo "==> checking the public subpaths resolve"
+node check-exports.mjs
+
 echo "==> tagging $VERSION"
 git tag -a "$VERSION" -m "$MESSAGE"
 git push -q origin "$VERSION"
