@@ -1,0 +1,5 @@
+# The package is consumed as SOURCE: both applications alias into src/ and
+# resolve its imports against their own dependency tree, so this checkout has
+# no install of its own. A stray node_modules/ here (npx leaves one behind)
+# also blocks release.sh, which refuses to tag a dirty tree.
+node_modules/
