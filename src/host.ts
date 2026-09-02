@@ -107,6 +107,18 @@ export interface HostContract {
   useDirectory(): HostQueryResult<HostPerson>;
   /** The application's own logo. */
   AppLogo: ComponentType<{ animate?: boolean; className?: string }>;
+  /** An extra section on Setup -> Entities, below the caller's own books.
+   *
+   *  The platform console shows a roll-call there: every tenant on the
+   *  platform and whether its books exist. A product built for ONE tenant has
+   *  no such view and supplies a component that renders nothing.
+   *
+   *  In the contract rather than the package because the gate is host-bound.
+   *  The key is `platform.schools.view`, and its frontend code is 100101 in
+   *  the console and 100101 in the school app too - pointing at a completely
+   *  different permission. A package that hard-coded the number would gate the
+   *  console correctly and the school app on its dashboard permission. */
+  PlatformLedgerInventory: ComponentType;
 }
 
 import * as host from "@xvs-host";
@@ -119,4 +131,5 @@ void _satisfies;
 
 export const {
   useBranches, useDirectory, AppLogo, QuickExportButton, UserAvatar, useDashboardTitle,
+  PlatformLedgerInventory,
 } = host;

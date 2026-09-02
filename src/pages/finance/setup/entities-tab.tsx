@@ -11,6 +11,7 @@ import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { P } from "../../../permissions";
+import { PlatformLedgerInventory } from "../../../host";
 import { useGetEntitiesQuery, useCreateEntityMutation } from "@/redux/services/finance/entity-api";
 import { useGetCurrenciesQuery } from "@/redux/services/finance/setup-api";
 import type { LedgerEntity } from "@/redux/services/finance/entity-types";
@@ -44,6 +45,13 @@ export function EntitiesTab() {
       <DataTable columns={columns} rows={rows} rowKey={(e) => e.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch}
         emptyTitle="No entities" emptyMessage="Create a ledger entity to begin." />
+
+      {/* The table above is the caller's OWN books. A platform operator also
+          needs the roll-call: which tenants have books at all. That section is
+          supplied by the host, because the permission gating it is host-bound
+          (see HostContract.PlatformLedgerInventory). A single-tenant product
+          renders nothing here. */}
+      <PlatformLedgerInventory />
 
       <CreateEntityModal open={creating} onClose={() => setCreating(false)} />
     </div>
