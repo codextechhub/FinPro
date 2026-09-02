@@ -24,8 +24,32 @@ export function resolveActiveEntityCode(
   requestedCode: string | null,
   entities: LedgerEntity[],
 ): string | null {
-  if (!requestedCode) return selectedCode;
-  return entities.some((entity) => entity.code === requestedCode) ? requestedCode : null;
+  // Nothing resolves until the list is in: returning a code here would send it
+  // to the backend before we know the caller may read it.
+  if (entities.length === 0) return null;
+
+  const known = (code: string | null) =>
+    code !== null && entities.some((entity) => entity.code === code);
+
+  // An explicit ?entity= wins, but only if it is one of theirs. A code that is
+  // not resolves to null rather than falling back, so a shared or edited URL
+  // fails visibly instead of quietly showing a different school's books.
+  if (requestedCode) return known(requestedCode) ? requestedCode : null;
+
+  // The stored choice is only honoured while it is still one of theirs.
+  //
+  // It used to be returned unchecked, and that is what put a code belonging to
+  // another tenant on every request: the backend refused each one with a 404
+  // ("Resource not found"), because resolve_entity only matches within the
+  // caller's own tenant. The console never showed it because its EntitySelect
+  // corrects the stored code on mount; an app that does not render the switcher
+  // - a school has one set of books, so there is nothing to switch - had
+  // nothing to correct it.
+  if (known(selectedCode)) return selectedCode;
+
+  // Otherwise take the only sensible default. A school has exactly one set of
+  // books, so this is the answer rather than a guess.
+  return entities[0].code;
 }
 
 /**
