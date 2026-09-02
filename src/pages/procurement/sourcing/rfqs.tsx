@@ -74,8 +74,8 @@ export default function RfqsPage() {
     () => ({ entity: entity!, page, ...(status ? { status } : {}), ...(debounced ? { q: debounced } : {}) }),
     [entity, page, status, debounced],
   );
-  const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetRfqsQuery(params, { skip: !entity });
-  const { data: summaryData, isLoading: summaryLoading } = useGetRfqSummaryQuery({ entity: entity! }, { skip: !entity });
+  const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetRfqsQuery(params, { skip: !entity || !canPROC_VIEW_RFQS });
+  const { data: summaryData, isLoading: summaryLoading } = useGetRfqSummaryQuery({ entity: entity! }, { skip: !entity || !canPROC_VIEW_RFQS });
   const rows = toArray(data?.data);
   const summary = summaryData?.data;
 

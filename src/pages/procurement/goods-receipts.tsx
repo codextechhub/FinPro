@@ -52,7 +52,7 @@ export default function GoodsReceiptsPage() {
   useActionParam("new", () => setCreating(true));
   const [page, setPage] = useState(1);
   const { data, isLoading, isFetching, isError, refetch } = useGetGoodsReceiptsQuery(
-    { entity: entity!, page }, { skip: !entity },
+    { entity: entity!, page }, { skip: !entity || !canPROC_VIEW_GOODS_RECEIPTS },
   );
   const rows = toArray(data?.data);
   const pg = data?.pagination;

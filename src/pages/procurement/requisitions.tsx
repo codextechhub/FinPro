@@ -103,10 +103,10 @@ export default function RequisitionsPage() {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   }), [entity, page, status, debouncedSearch]);
   const { currentData: data, isLoading, isFetching, isError, refetch } = useGetRequisitionsQuery(
-    params, { skip: !entity },
+    params, { skip: !entity || !canPROC_VIEW_REQUISITIONS },
   );
   const { data: summaryData, isLoading: summaryLoading } = useGetRequisitionSummaryQuery(
-    { entity: entity! }, { skip: !entity },
+    { entity: entity! }, { skip: !entity || !canPROC_VIEW_REQUISITIONS },
   );
   const rows = toArray(data?.data);
   const pg = data?.pagination;

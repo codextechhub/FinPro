@@ -77,8 +77,8 @@ export default function ContractsPage() {
     ...(tab === "EXPIRING" ? { expiring: 1 } : tab ? { status: tab } : {}),
     ...(debounced ? { q: debounced } : {}),
   }), [entity, page, tab, debounced]);
-  const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetContractsQuery(params, { skip: !entity });
-  const { data: summaryData, isLoading: summaryLoading } = useGetContractsSummaryQuery({ entity: entity! }, { skip: !entity });
+  const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetContractsQuery(params, { skip: !entity || !canPROC_VIEW_CONTRACTS });
+  const { data: summaryData, isLoading: summaryLoading } = useGetContractsSummaryQuery({ entity: entity! }, { skip: !entity || !canPROC_VIEW_CONTRACTS });
   const rows = toArray(data?.data);
   const summary = summaryData?.data;
 

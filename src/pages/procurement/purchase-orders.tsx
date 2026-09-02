@@ -110,10 +110,10 @@ export default function PurchaseOrdersPage() {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   }), [entity, page, status, debouncedSearch]);
   const { currentData: data, isLoading, isFetching, isError, refetch } = useGetPurchaseOrdersQuery(
-    params, { skip: !entity },
+    params, { skip: !entity || !canPROC_VIEW_PURCHASE_ORDERS },
   );
   const { data: summaryData, isLoading: summaryLoading } = useGetPurchaseOrderSummaryQuery(
-    { entity: entity! }, { skip: !entity },
+    { entity: entity! }, { skip: !entity || !canPROC_VIEW_PURCHASE_ORDERS },
   );
   const rows = toArray(data?.data);
   const summary = summaryData?.data;
