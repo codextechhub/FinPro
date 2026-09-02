@@ -112,7 +112,14 @@ const TABS = [
 export default function PayrollPage() {
   const { code: entity, currency } = useActiveEntity();
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("runs");
+  // Every payroll key is restricted, because a payroll run carries what each
+  // named person is paid. Plenty of finance users legitimately hold none of
+  // them, and the tabs below fetch on mount, so without this the screen opened
+  // on a pair of 403s and a red toast rather than saying what it needs.
+  const { can } = useCan();
+  const canPayroll = can(P.FIN_VIEW_PAYROLL);
   if (!entity) return <FinanceShell><PageShell><EmptyState title="Select an entity" /></PageShell></FinanceShell>;
+  if (!canPayroll) return <FinanceShell><PageShell><EmptyState title="No payroll access" message="Payroll needs finance.payrollrun.view. It is a restricted grant, because a run carries what each named person is paid." /></PageShell></FinanceShell>;
 
   return (
     <FinanceShell>

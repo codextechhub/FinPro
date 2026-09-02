@@ -9,6 +9,8 @@ import { useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
 import { DataTable, StatusPill, DetailDrawer, InfoHint, useActiveEntity, type Column } from "@/components/finance-ui";
+import { useCan } from "@/components/finance-ui/can";
+import { P } from "../../permissions";
 import { EmptyState } from "@/components/finance-ui/states";
 import { SearchSelect } from "@/components/custom/search-select";
 import { cn } from "@/lib/utils";
@@ -161,8 +163,13 @@ export default function FinanceAuditPage() {
     ...(presetToDateFrom(datePreset) ? { date_from: presetToDateFrom(datePreset) } : {}),
   }), [entity, page, action, targetType, status, actor, datePreset]);
 
-  const { data, isLoading, isFetching, isError, refetch } = useGetAuditLogQuery(params, { skip: !entity });
-  const { data: facetsData } = useGetAuditFacetsQuery({ entity: entity! }, { skip: !entity });
+  // finance.audit.view is a restricted key, so plenty of legitimate finance
+  // users do not hold it. Asking anyway spent two 403s and a red toast on every
+  // visit; the screen now says who may read the trail instead.
+  const { can } = useCan();
+  const canAudit = can(P.FIN_VIEW_AUDIT);
+  const { data, isLoading, isFetching, isError, refetch } = useGetAuditLogQuery(params, { skip: !entity || !canAudit });
+  const { data: facetsData } = useGetAuditFacetsQuery({ entity: entity! }, { skip: !entity || !canAudit });
   const facets = facetsData?.data;
   const rows = data?.data ?? [];
   const pg = data?.pagination;
@@ -196,6 +203,7 @@ export default function FinanceAuditPage() {
   ];
 
   if (!entity) return <FinanceShell><PageShell><EmptyState title="Select an entity" /></PageShell></FinanceShell>;
+  if (!canAudit) return <FinanceShell><PageShell><EmptyState title="No audit access" message="The finance audit trail needs finance.audit.view, which is a restricted grant." /></PageShell></FinanceShell>;
 
   return (
     <FinanceShell>

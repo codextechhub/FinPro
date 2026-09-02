@@ -7,6 +7,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, BookCheck } from "lucide-react";
 import { DetailDrawer, MoneyInput, Money, AccountPicker, CostCenterPicker, toArray, PostingDateField,} from "@/components/finance-ui";
+import { useCan } from "@/components/finance-ui/can";
+import { P } from "../../../permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -26,7 +28,14 @@ export function DirectEntryDrawer({ open, onClose, entity, currency }: {
   const [reference, setReference] = useState("");
   const [rows, setRows] = useState<Row[]>([emptyRow(), emptyRow()]);
   const [post, { isLoading }] = usePostDirectEntryMutation();
-  const { data: dimsData } = useGetDimensionsQuery({ entity });
+  // Analytical dimensions are optional: a product that does not use them grants
+  // nobody finance.dimension.view, and asking anyway answered 403 on every
+  // visit to this screen - a red toast for a field the caller was never going
+  // to be offered. No key, no request, and the dimension columns simply are not
+  // there.
+  const { can } = useCan();
+  const canDimensions = can(P.FIN_VIEW_DIMENSIONS);
+  const { data: dimsData } = useGetDimensionsQuery({ entity }, { skip: !canDimensions });
   const dims = toArray<Dimension>(dimsData?.data).filter((d) => d.is_active);
 
   const totalDebit = rows.reduce((s, r) => s + (r.side === "debit" ? r.amountKobo : 0), 0);

@@ -117,6 +117,13 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
 }
 
 function Overview({ entity }: { entity: ReturnType<typeof useActiveEntity>["entity"] }) {
+  // Administering entities is a platform act, not a tenant one: a product whose
+  // customer keeps a single set of books never mounts the section and grants
+  // nobody finance.entity.create. The card was offered there anyway and led to
+  // a 404. Gated on the key that decides whether entities are administered
+  // here at all, rather than on the key to read the one you already have.
+  const { hasPermission } = usePermissions();
+  const administersEntities = hasPermission(P.FIN_CREATE_ENTITY);
   return (
     <div className="space-y-5">
       <SettingsSectionHeader title="Configuration overview" description="Start with the legal entity and fiscal calendar, then review the controls that drive posting." />
@@ -130,7 +137,9 @@ function Overview({ entity }: { entity: ReturnType<typeof useActiveEntity>["enti
         </SettingsPanel>
       )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <SettingsOverviewCard icon={Building2} title="Entities" description="Create and review the independent sets of books owned by this tenant." to={`${F.SETTINGS}/entities`} status="Available" tone="ready" />
+        {administersEntities && (
+          <SettingsOverviewCard icon={Building2} title="Entities" description="Create and review the independent sets of books owned by this tenant." to={`${F.SETTINGS}/entities`} status="Available" tone="ready" />
+        )}
         <SettingsOverviewCard icon={CalendarRange} title="Fiscal calendar" description="Open fiscal years, manage posting periods and control the close." to={`${F.SETTINGS}/fiscal-calendar`} status={entity ? "Configured" : "Select entity"} tone={entity ? "ready" : "attention"} />
         <SettingsOverviewCard icon={BookOpenCheck} title="Accounting defaults" description="Review the control accounts currently resolved by finance posting services." to={`${F.SETTINGS}/accounting`} status="Review" tone="attention" />
         <SettingsOverviewCard icon={FileCog} title="Documents" description="Manage collection defaults, reminders, fee structures and document policies." to={`${F.SETTINGS}/documents`} status="Mixed" />
