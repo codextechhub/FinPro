@@ -9,11 +9,13 @@ export interface SectionProps {
   currency?: string | null;
 }
 
-// ── Report table typography. These raw <th>/<td> tables reuse the house
-//    DataTable chrome (headCls/cellCls) so Analytics matches the other menus.
-//    Raw cells must also replicate the padding/height that shadcn TableHead
-//    (h-10 px-2) and TableCell (p-2) supply in DataTable - otherwise the rows
-//    collapse to the text height. So: TH gets h-10, TD gets py-2. ───────────
+/**
+ * ── Report table typography. These raw <th>/<td> tables reuse the house
+ *    DataTable chrome (headCls/cellCls) so Analytics matches the other menus.
+ *    Raw cells must also replicate the padding/height that shadcn TableHead
+ *    (h-10 px-2) and TableCell (p-2) supply in DataTable - otherwise the rows
+ *    collapse to the text height. So: TH gets h-10, TD gets py-2. ───────────
+ */
 export const TH = `${headCls} h-10 px-3 text-left`;
 export const THR = `${TH} text-right`;
 export const TD = `${cellCls} px-3 py-2`;

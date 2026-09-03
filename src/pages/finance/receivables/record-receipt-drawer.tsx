@@ -1,7 +1,9 @@
-// Record receipt (Step 1 of 2) - capture the payment, then hand off to the
-// allocation drawer. A right-side drawer matching the prototype: customer / date /
-// method / amount / bank account / reference, with a live "Posting on receipt"
-// preview (Dr bank · Cr AR) before you continue to allocation. Naira → integer kobo.
+/**
+ * Record receipt (Step 1 of 2) - capture the payment, then hand off to the
+ * allocation drawer. A right-side drawer matching the prototype: customer / date /
+ * method / amount / bank account / reference, with a live "Posting on receipt"
+ * preview (Dr bank · Cr AR) before you continue to allocation. Naira → integer kobo.
+ */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { toKobo } from "@/utils/money";

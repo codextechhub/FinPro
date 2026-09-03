@@ -1,9 +1,11 @@
-// The caller's own tenant structures, shared by every module that files a row
-// against a branch.
-//
-// Deliberately not under finance/ or dashboard/: branches belong to the tenant,
-// not to whichever console happens to need them first. Payroll is the first
-// screen to ask; procurement will be the second.
+/**
+ * The caller's own tenant structures, shared by every module that files a row
+ * against a branch.
+ *
+ * Deliberately not under finance/ or dashboard/: branches belong to the tenant,
+ * not to whichever console happens to need them first. Payroll is the first
+ * screen to ask; procurement will be the second.
+ */
 
 import { baseApi } from "@/redux/services/base-api";
 import type { ApiEnvelope } from "@/redux/services/finance/api-types";

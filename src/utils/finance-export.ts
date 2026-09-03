@@ -1,11 +1,13 @@
-// Authenticated file download for the finance report ?export= endpoints. The
-// API is bearer-authenticated, so a plain <a href> can't carry the token - we
-// fetch the attachment with the Authorization header and save the blob.
-//
-// This is a raw fetch, so it sits OUTSIDE RTK Query and gets none of what
-// `baseQuery` adds for free. That is the whole reason for the tenant handling
-// below: these endpoints require `?tenant=`, baseApi stamps it on every request
-// it makes, and a hand-rolled fetch that forgets it gets a 400 every time.
+/**
+ * Authenticated file download for the finance report ?export= endpoints. The
+ * API is bearer-authenticated, so a plain <a href> can't carry the token - we
+ * fetch the attachment with the Authorization header and save the blob.
+ *
+ * This is a raw fetch, so it sits OUTSIDE RTK Query and gets none of what
+ * `baseQuery` adds for free. That is the whole reason for the tenant handling
+ * below: these endpoints require `?tenant=`, baseApi stamps it on every request
+ * it makes, and a hand-rolled fetch that forgets it gets a 400 every time.
+ */
 
 import Cookies from "js-cookie";
 import { toast } from "sonner";

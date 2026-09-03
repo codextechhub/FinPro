@@ -1,7 +1,9 @@
-// Vendor Assessment form - a right-side FormDrawer (house convention, not the
-// prototype's centered modal). Records a point-in-time scorecard; the weighted
-// overall score + grade preview mirror the backend exactly. On-Time Delivery is
-// prefilled from the vendor's computed on-time rate (editable).
+/**
+ * Vendor Assessment form - a right-side FormDrawer (house convention, not the
+ * prototype's centered modal). Records a point-in-time scorecard; the weighted
+ * overall score + grade preview mirror the backend exactly. On-Time Delivery is
+ * prefilled from the vendor's computed on-time rate (editable).
+ */
 import { useState } from "react";
 import { toast } from "sonner";
 

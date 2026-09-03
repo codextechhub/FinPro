@@ -1,25 +1,27 @@
-// Whether an AR adjustment posts straight to the ledger or has to be approved.
-//
-// The rule is not the same for all four documents, and that asymmetry is the whole
-// point. A refund moves cash out and a write-off concedes income, so both need a
-// second person at any size. A concession or a credit note gives revenue away, so
-// both need one **at or above the tenant's adjustment threshold** (₦50,000 by
-// default) and post directly below it.
-//
-// So one concession form behaves two ways, and the person filling it in has to know
-// which before they commit - not at submit time, when they have already written the
-// reason and picked the invoice.
-//
-// Two sources, deliberately kept apart:
-//
-//   * **The server's `approval_required`** decides what actually happens. It is on
-//     every adjustment read, it is computed by the same function the post endpoint
-//     calls, and it can never disagree with the refusal.
-//   * **The threshold read off the workflow template** only powers the *label*, on a
-//     form whose document does not exist yet and therefore has no server answer.
-//
-// Never act on the predicted one. If the two disagree the server is right, and the
-// screen should follow it rather than argue.
+/**
+ * Whether an AR adjustment posts straight to the ledger or has to be approved.
+ *
+ * The rule is not the same for all four documents, and that asymmetry is the whole
+ * point. A refund moves cash out and a write-off concedes income, so both need a
+ * second person at any size. A concession or a credit note gives revenue away, so
+ * both need one **at or above the tenant's adjustment threshold** (₦50,000 by
+ * default) and post directly below it.
+ *
+ * So one concession form behaves two ways, and the person filling it in has to know
+ * which before they commit - not at submit time, when they have already written the
+ * reason and picked the invoice.
+ *
+ * Two sources, deliberately kept apart:
+ *
+ *   * **The server's `approval_required`** decides what actually happens. It is on
+ *     every adjustment read, it is computed by the same function the post endpoint
+ *     calls, and it can never disagree with the refusal.
+ *   * **The threshold read off the workflow template** only powers the *label*, on a
+ *     form whose document does not exist yet and therefore has no server answer.
+ *
+ * Never act on the predicted one. If the two disagree the server is right, and the
+ * screen should follow it rather than argue.
+ */
 
 import type { WorkflowTemplate } from "@/redux/services/dashboard/workflow-types";
 

@@ -1,9 +1,11 @@
-// Statement of Changes in Equity - rebuilt to the Vision prototype in the house
-// theme. A matrix: one column per equity component (+ a Total equity column), with the
-// movement walk down the rows - Opening balance → Profit for the period → Contributions
-// → Distributions → Closing balance. Our backend gives each component's net
-// contributions; we split it by sign into the Contributions (in) and Distributions
-// (out) rows. Money + reconciliation come straight from the endpoint; export is real.
+/**
+ * Statement of Changes in Equity - rebuilt to the Vision prototype in the house
+ * theme. A matrix: one column per equity component (+ a Total equity column), with the
+ * movement walk down the rows - Opening balance → Profit for the period → Contributions
+ * → Distributions → Closing balance. Our backend gives each component's net
+ * contributions; we split it by sign into the Contributions (in) and Distributions
+ * (out) rows. Money + reconciliation come straight from the endpoint; export is real.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Download, CheckCircle2, AlertTriangle } from "lucide-react";

@@ -1,15 +1,17 @@
-// How a close-checklist row should be read, and what to say after a close.
-//
-// The checklist has two severities, and drawing them the same way is a real
-// hazard rather than a cosmetic one. `ap_reconciled` blocks: sub-ledger drift
-// means a posting bypassed the sub-ledger and must be found before the period is
-// sealed. `grir_explained` warns: goods received late in the month and not yet
-// billed leave a GR/IR balance *by design*, so failing the close on it would make
-// month-end impossible. The row exists so nobody closes without seeing the number,
-// not to stop them closing.
-//
-// Kept pure and separate from the drawer so both the styling and the post-close
-// message read the same rules.
+/**
+ * How a close-checklist row should be read, and what to say after a close.
+ *
+ * The checklist has two severities, and drawing them the same way is a real
+ * hazard rather than a cosmetic one. `ap_reconciled` blocks: sub-ledger drift
+ * means a posting bypassed the sub-ledger and must be found before the period is
+ * sealed. `grir_explained` warns: goods received late in the month and not yet
+ * billed leave a GR/IR balance *by design*, so failing the close on it would make
+ * month-end impossible. The row exists so nobody closes without seeing the number,
+ * not to stop them closing.
+ *
+ * Kept pure and separate from the drawer so both the styling and the post-close
+ * message read the same rules.
+ */
 
 import type { CloseChecklistItem } from "@/redux/services/finance/setup-types";
 

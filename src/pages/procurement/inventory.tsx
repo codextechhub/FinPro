@@ -266,10 +266,12 @@ function StockItemDrawer({ id, entity, currency, onClose }: { id: number | null;
   </>;
 }
 
-// Where this item actually sits, under the headline totals (which stay the roll-up
-// across every store). Renders nothing at all for a school with one store: the
-// figures above are already the whole answer, and a one-row table under them would
-// only invite the question of what it is for.
+/**
+ * Where this item actually sits, under the headline totals (which stay the roll-up
+ * across every store). Renders nothing at all for a school with one store: the
+ * figures above are already the whole answer, and a one-row table under them would
+ * only invite the question of what it is for.
+ */
 function ItemLocationBreakdown({ itemId, entity, currency }: { itemId: number; entity: string; currency?: string | null }) {
   const { multi } = useStockLocations(entity);
   const { data, isLoading } = useGetStockBalancesQuery(

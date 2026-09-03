@@ -1,20 +1,22 @@
-// The sections each Finance console screen actually has.
-//
-// Same contract as the Procurement equivalent: the route table declares one path
-// per section and the page maps each to a screen, so both need these lists and
-// neither may drift. The pages are lazy, so importing the lists from them would
-// pull their chunks into the entry bundle.
-//
-// Registering `:section` instead matches *any* URL, which leaves the page choosing
-// what is real - a mistyped or retired section then renders the default screen
-// under its own heading instead of saying the address is wrong. With only these
-// declared, an unknown section matches no route and falls through to the app's own
-// 404, outside the console layout.
-//
-// Two of these are reachable but not in the sidebar, and are listed deliberately:
-// `receivables/receipts` (linked as routesPath FINANCE.RECEIPTS_ALLOCATION) and
-// `reports/periods` (the fiscal close workbench). Dropping either would 404 a
-// working screen.
+/**
+ * The sections each Finance console screen actually has.
+ *
+ * Same contract as the Procurement equivalent: the route table declares one path
+ * per section and the page maps each to a screen, so both need these lists and
+ * neither may drift. The pages are lazy, so importing the lists from them would
+ * pull their chunks into the entry bundle.
+ *
+ * Registering `:section` instead matches *any* URL, which leaves the page choosing
+ * what is real - a mistyped or retired section then renders the default screen
+ * under its own heading instead of saying the address is wrong. With only these
+ * declared, an unknown section matches no route and falls through to the app's own
+ * 404, outside the console layout.
+ *
+ * Two of these are reachable but not in the sidebar, and are listed deliberately:
+ * `receivables/receipts` (linked as routesPath FINANCE.RECEIPTS_ALLOCATION) and
+ * `reports/periods` (the fiscal close workbench). Dropping either would 404 a
+ * working screen.
+ */
 
 export const SETUP_SECTIONS = [
   "entities",

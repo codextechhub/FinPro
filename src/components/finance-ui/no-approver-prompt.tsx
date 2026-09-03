@@ -1,32 +1,34 @@
-// <useNoApproverPrompt> - warn at submission when nobody can approve what was
-// just submitted, and offer to continue anyway.
-//
-// A workflow stage that resolves to nobody activates with an empty approver
-// snapshot, and the document *parks*: submitted, waiting, and with no human
-// able to move it. Without this the submit looks like it worked and the
-// document quietly sits there. Every submit-for-approval endpoint now returns
-// an `approval` block saying whether that happened; pass it here.
-//
-// Nothing in this file assumes *how* a stage picks its approvers. The backend
-// sends a ready-made `requirement` sentence describing what would staff it, and
-// that design has now been through one real migration: permission keys were
-// replaced by roles, groups, document-driven rules and organogram seats, and
-// the only thing here that needed touching was the optional key chip. The
-// sentence carried every other case unchanged.
-//
-// The dialog is deliberately blunt about the trade. Continuing takes the
-// document to its terminal state with no second pair of eyes, which on a payout
-// or a purchase order is the entire maker-checker control, so the copy says so
-// rather than reading like a routine confirmation. The backend records who
-// continued and refuses the release outright if anybody can still decide the
-// stage, so a dialog left open while an approver is appointed cannot bypass
-// them.
-//
-//   const { promptIfParked, noApproverDialog } = useNoApproverPrompt();
-//   const res = await submitForApproval(...).unwrap();
-//   promptIfParked(res.data?.approval);
-//   ...
-//   {noApproverDialog}
+/**
+ * <useNoApproverPrompt> - warn at submission when nobody can approve what was
+ * just submitted, and offer to continue anyway.
+ *
+ * A workflow stage that resolves to nobody activates with an empty approver
+ * snapshot, and the document *parks*: submitted, waiting, and with no human
+ * able to move it. Without this the submit looks like it worked and the
+ * document quietly sits there. Every submit-for-approval endpoint now returns
+ * an `approval` block saying whether that happened; pass it here.
+ *
+ * Nothing in this file assumes *how* a stage picks its approvers. The backend
+ * sends a ready-made `requirement` sentence describing what would staff it, and
+ * that design has now been through one real migration: permission keys were
+ * replaced by roles, groups, document-driven rules and organogram seats, and
+ * the only thing here that needed touching was the optional key chip. The
+ * sentence carried every other case unchanged.
+ *
+ * The dialog is deliberately blunt about the trade. Continuing takes the
+ * document to its terminal state with no second pair of eyes, which on a payout
+ * or a purchase order is the entire maker-checker control, so the copy says so
+ * rather than reading like a routine confirmation. The backend records who
+ * continued and refuses the release outright if anybody can still decide the
+ * stage, so a dialog left open while an approver is appointed cannot bypass
+ * them.
+ *
+ *   const { promptIfParked, noApproverDialog } = useNoApproverPrompt();
+ *   const res = await submitForApproval(...).unwrap();
+ *   promptIfParked(res.data?.approval);
+ *   ...
+ *   {noApproverDialog}
+ */
 
 import { useCallback, useState } from "react";
 import { toast } from "sonner";

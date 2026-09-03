@@ -1,7 +1,9 @@
-// <ConfirmActionModal> - confirms a state-changing action (post / reverse /
-// settle / pay / approve) before it hits the action endpoint, in the app's
-// Dialog style. `children` can show the impact (e.g. the journal that will be
-// posted) so the user confirms with full sight of the consequence (spec §5).
+/**
+ * <ConfirmActionModal> - confirms a state-changing action (post / reverse /
+ * settle / pay / approve) before it hits the action endpoint, in the app's
+ * Dialog style. `children` can show the impact (e.g. the journal that will be
+ * posted) so the user confirms with full sight of the consequence (spec §5).
+ */
 
 import {
   Dialog,

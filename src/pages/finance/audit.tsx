@@ -1,9 +1,11 @@
-// Finance audit trail (§6.9) - rebuilt to the Vision prototype in the house
-// theme. The immutable log of every finance mutation for the selected entity:
-// who did what, to which document. Filterable by actor / entity type / action /
-// status / date. Clicking a row opens a detail drawer with the full record and
-// its field-level before/after diff. Export is disabled-with-tooltip until an
-// audit-export service exists (no fake download).
+/**
+ * Finance audit trail (§6.9) - rebuilt to the Vision prototype in the house
+ * theme. The immutable log of every finance mutation for the selected entity:
+ * who did what, to which document. Filterable by actor / entity type / action /
+ * status / date. Clicking a row opens a detail drawer with the full record and
+ * its field-level before/after diff. Export is disabled-with-tooltip until an
+ * audit-export service exists (no fake download).
+ */
 
 import { useMemo, useState } from "react";
 import { Download } from "lucide-react";

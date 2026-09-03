@@ -1,8 +1,10 @@
-// Finance overview (§6.0) - the executive landing screen. Topology ported from
-// the Crestfield Vision design (KPI strip → revenue-vs-budget + aging → trend →
-// overdue/vendor-due → approvals + close → quick actions → recent journals),
-// rendered entirely in the house theme. Every figure is real: one aggregated
-// call to /finance/reports/dashboard/ computes it live from the GL.
+/**
+ * Finance overview (§6.0) - the executive landing screen. Topology ported from
+ * the Crestfield Vision design (KPI strip → revenue-vs-budget + aging → trend →
+ * overdue/vendor-due → approvals + close → quick actions → recent journals),
+ * rendered entirely in the house theme. Every figure is real: one aggregated
+ * call to /finance/reports/dashboard/ computes it live from the GL.
+ */
 
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -118,11 +120,13 @@ function LinkAction({ label, onClick }: { label: string; onClick: () => void }) 
   );
 }
 
-// Fiscal-calendar expiry warning: silent while the runway is healthy, amber while
-// it is running out, destructive once the calendar has lapsed (see
-// fiscal-runway-model for why the difference matters and what each one says).
-// The layout gives the text a 16rem basis so a phone wraps the action onto its own
-// full-width line instead of crushing the message into a narrow column.
+/**
+ * Fiscal-calendar expiry warning: silent while the runway is healthy, amber while
+ * it is running out, destructive once the calendar has lapsed (see
+ * fiscal-runway-model for why the difference matters and what each one says).
+ * The layout gives the text a 16rem basis so a phone wraps the action onto its own
+ * full-width line instead of crushing the message into a narrow column.
+ */
 function FiscalRunwayBanner({ runway, canManage, onManage }: {
   runway: FiscalRunway; canManage: boolean; onManage: () => void;
 }) {

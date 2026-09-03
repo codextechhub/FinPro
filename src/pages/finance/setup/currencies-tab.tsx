@@ -1,8 +1,10 @@
-// Setup → Currencies & FX. Design topology: FX Rates / Currencies tabs; the FX
-// tab has per-pair rate cards (latest + delta + sparkline, computed from the rate
-// history), base/source filters, the rate table, and New FX rate. Currencies tab
-// lists the platform currencies. (No "Sync" - there's no live feed integration;
-// no "captured by" - FxRate has no user field.)
+/**
+ * Setup → Currencies & FX. Design topology: FX Rates / Currencies tabs; the FX
+ * tab has per-pair rate cards (latest + delta + sparkline, computed from the rate
+ * history), base/source filters, the rate table, and New FX rate. Currencies tab
+ * lists the platform currencies. (No "Sync" - there's no live feed integration;
+ * no "captured by" - FxRate has no user field.)
+ */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";

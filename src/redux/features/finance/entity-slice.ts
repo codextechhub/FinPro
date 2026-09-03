@@ -1,10 +1,12 @@
-// Selected ledger entity for the Finance & Procurement consoles.
-//
-// Almost every finance/procurement API call is entity-scoped (?entity=<CODE>),
-// so the chosen entity is global console state. We persist only the CODE (a
-// short stable string that appears verbatim in document numbers); the full
-// entity record is fetched fresh from GET /finance/entities/. This slice is
-// added to redux-persist's whitelist so the choice survives a refresh.
+/**
+ * Selected ledger entity for the Finance & Procurement consoles.
+ *
+ * Almost every finance/procurement API call is entity-scoped (?entity=<CODE>),
+ * so the chosen entity is global console state. We persist only the CODE (a
+ * short stable string that appears verbatim in document numbers); the full
+ * entity record is fetched fresh from GET /finance/entities/. This slice is
+ * added to redux-persist's whitelist so the choice survives a refresh.
+ */
 
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootStateType } from "@/redux/store";

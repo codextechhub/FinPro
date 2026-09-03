@@ -1,8 +1,10 @@
-// Customer / payer detail drawer - three stat cards (Current balance / Lifetime
-// paid / Open invoices) and tabs: Transactions · Statement · Contact. The Customer
-// Statement is a printable statement-of-account document (entity letterhead,
-// customer + period, a debit/credit ledger with opening + closing balance) with
-// Print and Send-to-customer actions. Footer: Run reminders · Record payment.
+/**
+ * Customer / payer detail drawer - three stat cards (Current balance / Lifetime
+ * paid / Open invoices) and tabs: Transactions · Statement · Contact. The Customer
+ * Statement is a printable statement-of-account document (entity letterhead,
+ * customer + period, a debit/credit ledger with opening + closing balance) with
+ * Print and Send-to-customer actions. Footer: Run reminders · Record payment.
+ */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";

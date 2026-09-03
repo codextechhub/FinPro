@@ -1,7 +1,9 @@
-// Shared KPI stat card (spec §4). One card for every procurement console strip:
-// the approved Dashboard `Kpi` look (tinted icon chip top-right, big tabular number,
-// muted sub-line) PLUS the prototype's left tone accent bar. Renders a focusable
-// <button> when `onClick` is set (clickable KPI), else a static <div>.
+/**
+ * Shared KPI stat card (spec §4). One card for every procurement console strip:
+ * the approved Dashboard `Kpi` look (tinted icon chip top-right, big tabular number,
+ * muted sub-line) PLUS the prototype's left tone accent bar. Renders a focusable
+ * <button> when `onClick` is set (clickable KPI), else a static <div>.
+ */
 
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";

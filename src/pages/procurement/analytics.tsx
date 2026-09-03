@@ -1,7 +1,9 @@
-// Procurement Analytics (§6) - thin router/shell over the four read-only report
-// screens (AP Aging, GR/IR & Control, Spend, Vendor Performance). Each section
-// lives in its own file under ./analytics/; this picks one off the :section route.
-// Every screen gates on procurement.report.view (the backend view enforces it too).
+/**
+ * Procurement Analytics (§6) - thin router/shell over the four read-only report
+ * screens (AP Aging, GR/IR & Control, Spend, Vendor Performance). Each section
+ * lives in its own file under ./analytics/; this picks one off the :section route.
+ * Every screen gates on procurement.report.view (the backend view enforces it too).
+ */
 import { EmptyState, ForbiddenState, useActiveEntity } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { P } from "../../permissions";

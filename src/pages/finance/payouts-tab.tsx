@@ -1,13 +1,15 @@
-// Payouts - money out via the payment gateway, rebuilt to the Vision prototype in the
-// house theme: KPIs (settled 7d / pending / failed / count), status + provider filters,
-// a payouts table, a detail drawer with a status timeline and the settlement posting,
-// a New-payout drawer (vendor OR free-form), and a server-side export.
-//
-// Backed by the real model: initiate asks the provider to transfer out (PROCESSING); the
-// ledger entry books on confirmation (webhook / PSP), never here. A payout settles a
-// vendor's payable, so it books a VendorPayment (Dr AP / Cr bank) - the recap mirrors that
-// real journal. Beneficiary name/account are FLS-masked to •••• without
-// payments.payout.view_sensitive. Settlement is webhook-driven - no fake "re-verify".
+/**
+ * Payouts - money out via the payment gateway, rebuilt to the Vision prototype in the
+ * house theme: KPIs (settled 7d / pending / failed / count), status + provider filters,
+ * a payouts table, a detail drawer with a status timeline and the settlement posting,
+ * a New-payout drawer (vendor OR free-form), and a server-side export.
+ *
+ * Backed by the real model: initiate asks the provider to transfer out (PROCESSING); the
+ * ledger entry books on confirmation (webhook / PSP), never here. A payout settles a
+ * vendor's payable, so it books a VendorPayment (Dr AP / Cr bank) - the recap mirrors that
+ * real journal. Beneficiary name/account are FLS-masked to •••• without
+ * payments.payout.view_sensitive. Settlement is webhook-driven - no fake "re-verify".
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useActionParam } from "@/hooks/use-action-param";

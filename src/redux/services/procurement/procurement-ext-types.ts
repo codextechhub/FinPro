@@ -1,13 +1,15 @@
-// Procurement analytics report shapes (§7.5). Money fields are the backend's
-// `{kobo, naira}` pair (same as the vs_finance reports) - read `.kobo`.
-//
-// Branch-scoped reports: when the caller is bound to a branch the backend answers
-// under that branch and adds `unassigned_excluded_count` - how many documents of the
-// report's population sit at entity level (no branch, typically raised before the
-// column existed) and are therefore outside the caller's figures. It is a COUNT, never
-// an amount, because an amount would disclose another scope's spend. The key is ABSENT
-// (not null) for an unbound caller and for a tenant with no branches, so `undefined`
-// means "these figures are the whole story" - hence the optional field, not `| null`.
+/**
+ * Procurement analytics report shapes (§7.5). Money fields are the backend's
+ * `{kobo, naira}` pair (same as the vs_finance reports) - read `.kobo`.
+ *
+ * Branch-scoped reports: when the caller is bound to a branch the backend answers
+ * under that branch and adds `unassigned_excluded_count` - how many documents of the
+ * report's population sit at entity level (no branch, typically raised before the
+ * column existed) and are therefore outside the caller's figures. It is a COUNT, never
+ * an amount, because an amount would disclose another scope's spend. The key is ABSENT
+ * (not null) for an unbound caller and for a tenant with no branches, so `undefined`
+ * means "these figures are the whole story" - hence the optional field, not `| null`.
+ */
 
 import type { ReportMoney } from "../finance/reports-types";
 

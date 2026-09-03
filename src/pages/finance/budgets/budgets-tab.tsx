@@ -1,8 +1,10 @@
-// Budgets & Forecasts - built on the real backend model (account × cost-centre ×
-// period lines), in the house theme. A budget list (Code · Name · FY · Budgeted ·
-// Actual YTD · Consumed · Status), a per-account × per-month variance heatmap, and a
-// drawer that lets you build/edit a DRAFT's lines (auto-coded like an invoice) and,
-// once approved, read its variance. Budget lines are income/expense GLs only.
+/**
+ * Budgets & Forecasts - built on the real backend model (account × cost-centre ×
+ * period lines), in the house theme. A budget list (Code · Name · FY · Budgeted ·
+ * Actual YTD · Consumed · Status), a per-account × per-month variance heatmap, and a
+ * drawer that lets you build/edit a DRAFT's lines (auto-coded like an invoice) and,
+ * once approved, read its variance. Budget lines are income/expense GLs only.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useActionParam } from "@/hooks/use-action-param";

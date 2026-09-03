@@ -1,11 +1,13 @@
-// Fixed Assets, rebuilt to the Vision prototype in the house theme: a register with
-// KPIs + category/status filters, a detail drawer (cost/accum/NBV cards + a yearly
-// depreciation schedule + acquire / depreciate / dispose), an Add-asset drawer, and a
-// period-wide Run-depreciation preview that posts one compound journal.
-//
-// Backed by the real model: straight-line only; the schedule is monthly (rolled up to
-// years for display); depreciation posts per-asset OR period-wide; disposal posts a
-// real gain/loss journal. Acquisition codes the asset (FA document number = its tag).
+/**
+ * Fixed Assets, rebuilt to the Vision prototype in the house theme: a register with
+ * KPIs + category/status filters, a detail drawer (cost/accum/NBV cards + a yearly
+ * depreciation schedule + acquire / depreciate / dispose), an Add-asset drawer, and a
+ * period-wide Run-depreciation preview that posts one compound journal.
+ *
+ * Backed by the real model: straight-line only; the schedule is monthly (rolled up to
+ * years for display); depreciation posts per-asset OR period-wide; disposal posts a
+ * real gain/loss journal. Acquisition codes the asset (FA document number = its tag).
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useActionParam } from "@/hooks/use-action-param";

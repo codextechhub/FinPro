@@ -1,9 +1,11 @@
-// Balance Sheet - rebuilt to the Vision prototype in the house theme. A two-column
-// Statement of Financial Position: Assets on the left; Liabilities & Equity on the
-// right, each grouped into IFRS sections (current / non-current) with subtotals, and
-// a balances banner (Assets = Liabilities + Equity). Rows are IFRS presentation lines
-// from the backend; money + is_balanced come straight from the endpoint; export is the
-// real backend CSV/XLSX/PDF.
+/**
+ * Balance Sheet - rebuilt to the Vision prototype in the house theme. A two-column
+ * Statement of Financial Position: Assets on the left; Liabilities & Equity on the
+ * right, each grouped into IFRS sections (current / non-current) with subtotals, and
+ * a balances banner (Assets = Liabilities + Equity). Rows are IFRS presentation lines
+ * from the backend; money + is_balanced come straight from the endpoint; export is the
+ * real backend CSV/XLSX/PDF.
+ */
 
 import { useMemo, useState } from "react";
 import { Download, CheckCircle2, AlertTriangle } from "lucide-react";

@@ -1,9 +1,11 @@
-// The RTK Query cache tags for this package's services.
-//
-// They belong here for the same reason the permission codes do: they name THIS
-// package's resources. RTK refuses any tag the base api has not declared, so a
-// host spreads these into its own tagTypes rather than transcribing them - a
-// transcription that falls behind is a cache that silently stops invalidating.
+/**
+ * The RTK Query cache tags for this package's services.
+ *
+ * They belong here for the same reason the permission codes do: they name THIS
+ * package's resources. RTK refuses any tag the base api has not declared, so a
+ * host spreads these into its own tagTypes rather than transcribing them - a
+ * transcription that falls behind is a cache that silently stops invalidating.
+ */
 
 export const FINANCE_TAG_TYPES = [
   "Branches",

@@ -1,13 +1,15 @@
-// Pure helpers for the posting window - which dates a document may carry.
-//
-// The backend's `ensure_period_open` guard rejects a posting whose date falls
-// outside an OPEN fiscal period (HTTP 409). GET /finance/posting-window/ exposes
-// the same rule as data so a picker can stop offering those dates in the first
-// place, instead of letting someone fill a whole drawer and fail on submit.
-//
-// Dates are ISO `YYYY-MM-DD` strings throughout. That format sorts
-// lexicographically, so ranges compare with plain string operators - no Date
-// parsing, no timezone drift from `toISOString()` on a local-midnight Date.
+/**
+ * Pure helpers for the posting window - which dates a document may carry.
+ *
+ * The backend's `ensure_period_open` guard rejects a posting whose date falls
+ * outside an OPEN fiscal period (HTTP 409). GET /finance/posting-window/ exposes
+ * the same rule as data so a picker can stop offering those dates in the first
+ * place, instead of letting someone fill a whole drawer and fail on submit.
+ *
+ * Dates are ISO `YYYY-MM-DD` strings throughout. That format sorts
+ * lexicographically, so ranges compare with plain string operators - no Date
+ * parsing, no timezone drift from `toISOString()` on a local-midnight Date.
+ */
 
 import type { PeriodBrief } from "@/redux/services/finance/setup-types";
 
@@ -20,10 +22,10 @@ export interface OpenRange {
 /**
  * Today in the browser's own timezone as `YYYY-MM-DD`.
  *
- * Call this - never hoist it to a module constant. The codebase used to do
- * `const todayISO = new Date().toISOString().slice(0, 10)` at module scope, which
- * freezes at page load (a tab left open overnight defaults to yesterday) and, being
- * UTC, is already the wrong day for anyone west of Greenwich after 00:00 UTC.
+ * Call this - never hoist it to a module constant. `const todayISO = new
+ * Date().toISOString().slice(0, 10)` at module scope freezes at page load, so a
+ * tab left open overnight defaults to yesterday, and being UTC it is already
+ * the wrong day for anyone west of Greenwich after 00:00 UTC.
  */
 export function todayISO(): string {
   const now = new Date();

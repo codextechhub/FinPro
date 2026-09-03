@@ -1,7 +1,9 @@
-// Journal detail drawer - design topology: header (no · date · period · source),
-// four stat cards (Status / Total Dr / Total Cr / Difference), the Dr/Cr lines
-// table with cost centres + totals, a teaching note, and a footer with the author
-// + the safe reversal/void action for this journal's source + Print.
+/**
+ * Journal detail drawer - design topology: header (no · date · period · source),
+ * four stat cards (Status / Total Dr / Total Cr / Difference), the Dr/Cr lines
+ * table with cost centres + totals, a teaching note, and a footer with the author
+ * + the safe reversal/void action for this journal's source + Print.
+ */
 
 import { useState } from "react";
 import { toast } from "sonner";

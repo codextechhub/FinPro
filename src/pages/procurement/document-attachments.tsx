@@ -1,14 +1,16 @@
-// Supplier evidence on a vendor bill or a vendor payment: their invoice PDF, or the
-// receipt they issued. One panel serves both documents, because the rules are the
-// same on either side of the chain and two copies would drift.
-//
-// Deliberately usable on a POSTED document. The formal invoice usually follows the
-// booked charge and the receipt always follows the payment, so a panel that hid
-// itself once the document was posted would collect nothing worth keeping.
-//
-// The gate is the document's own `attach` permission, never `update`: filing the
-// counterparty's paper is not the same authority as rewriting the bill's amounts,
-// and `update` is refused on a posted document anyway.
+/**
+ * Supplier evidence on a vendor bill or a vendor payment: their invoice PDF, or the
+ * receipt they issued. One panel serves both documents, because the rules are the
+ * same on either side of the chain and two copies would drift.
+ *
+ * Deliberately usable on a POSTED document. The formal invoice usually follows the
+ * booked charge and the receipt always follows the payment, so a panel that hid
+ * itself once the document was posted would collect nothing worth keeping.
+ *
+ * The gate is the document's own `attach` permission, never `update`: filing the
+ * counterparty's paper is not the same authority as rewriting the bill's amounts,
+ * and `update` is refused on a posted document anyway.
+ */
 
 import { useRef, useState } from "react";
 import { Download, Paperclip, Trash2, Upload } from "lucide-react";

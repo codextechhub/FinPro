@@ -1,12 +1,14 @@
-// GR/IR's control figures come from the general ledger, which has no branch, so the
-// backend sends null for them to a branch-bound reader rather than compare an
-// entity-wide balance against a branch-only receipt walk.
-//
-// The screen used to read both through `kobo()`, which turns null into 0 - and 0 in the
-// Difference card renders a green "Reconciled". A branch reader was shown a clean bill
-// of health on a number nobody computed, which is exactly the failure the backend
-// withheld them to avoid. These tests hold that shut, and cover the excluded-documents
-// count that says the figures beside it are a subset.
+/**
+ * GR/IR's control figures come from the general ledger, which has no branch, so the
+ * backend sends null for them to a branch-bound reader rather than compare an
+ * entity-wide balance against a branch-only receipt walk.
+ *
+ * Reading both through `kobo()` turns null into 0, and 0 in the Difference card
+ * renders a green "Reconciled": a branch reader shown a clean bill of health on a
+ * number nobody computed, which is exactly the failure the backend withholds them
+ * to avoid. These tests hold that shut, and cover the excluded-documents count
+ * that says the figures beside it are a subset.
+ */
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";

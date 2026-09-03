@@ -1,7 +1,9 @@
-// Lightweight SVG charts in the app's theme (no chart lib). Ported in spirit
-// from the Crestfield design's BarChart/Donut/StatStrip, restyled to our
-// palette/typography. Used on dashboards for real data (aging buckets, income
-// vs expense, spend) - not fabricated trend series.
+/**
+ * Lightweight SVG charts in the app's theme (no chart lib). Ported in spirit
+ * from the Crestfield design's BarChart/Donut/StatStrip, restyled to our
+ * palette/typography. Used on dashboards for real data (aging buckets, income
+ * vs expense, spend) - not fabricated trend series.
+ */
 
 import { useState } from "react";
 

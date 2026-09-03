@@ -1,7 +1,9 @@
-// Cost & Dimension Analysis (analytics slice) - net activity per account, bucketed by one
-// analytical axis: a cost centre or a registered dimension. Reads posted journal lines
-// (the trial balance can't answer "per bucket"). Axis + period + account-type filters,
-// KPIs, a bucket-grouped table with per-bucket subtotals, and the real backend export.
+/**
+ * Cost & Dimension Analysis (analytics slice) - net activity per account, bucketed by one
+ * analytical axis: a cost centre or a registered dimension. Reads posted journal lines
+ * (the trial balance can't answer "per bucket"). Axis + period + account-type filters,
+ * KPIs, a bucket-grouped table with per-bucket subtotals, and the real backend export.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Download } from "lucide-react";

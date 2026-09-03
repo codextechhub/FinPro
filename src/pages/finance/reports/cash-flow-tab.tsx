@@ -1,9 +1,11 @@
-// Cash Flow Statement - rebuilt to the Vision prototype in the house theme. The
-// direct method: every posted journal that touches cash, classified into operating /
-// investing / financing, with each activity broken into its counter-account line items
-// (cash in +, cash out −). Ends on net change reconciling cash at start → cash at end.
-// Money + the reconciliation come straight from the endpoint; export is the real
-// backend CSV/XLSX/PDF.
+/**
+ * Cash Flow Statement - rebuilt to the Vision prototype in the house theme. The
+ * direct method: every posted journal that touches cash, classified into operating /
+ * investing / financing, with each activity broken into its counter-account line items
+ * (cash in +, cash out −). Ends on net change reconciling cash at start → cash at end.
+ * Money + the reconciliation come straight from the endpoint; export is the real
+ * backend CSV/XLSX/PDF.
+ */
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Download, CheckCircle2, AlertTriangle } from "lucide-react";

@@ -22,10 +22,12 @@ function buildUrl(path: string, params: Record<string, string | number | undefin
   return `${cleanBase}${cleanPath}${query ? `?${query}` : ""}`;
 }
 
-// The backend serves print-ready HTML documents (@media print / @page A4); there
-// is no server-side PDF. We fetch the HTML (the endpoint needs the Bearer token,
-// so a plain navigation won't authenticate), open it in a new tab, and trigger
-// the browser's print dialog - from which the user saves as PDF.
+/**
+ * The backend serves print-ready HTML documents (@media print / @page A4); there
+ * is no server-side PDF. We fetch the HTML (the endpoint needs the Bearer token,
+ * so a plain navigation won't authenticate), open it in a new tab, and trigger
+ * the browser's print dialog - from which the user saves as PDF.
+ */
 async function openPrintableDocument(path: string, params: Record<string, string | number | undefined>) {
   // Open the tab synchronously, inside the click gesture - if we opened it after
   // the await, popup blockers would treat it as non-user-initiated and swallow it.

@@ -1,11 +1,13 @@
-// Receivables → Payment Plans. Rebuilt to the Vision prototype in the house theme:
-// a list with progress / next-due / health, an Installment-schedule detail drawer,
-// and a curated New-plan drawer (the prototype's create modal doesn't open) with a
-// live schedule preview. Concessions are a separate screen - not bundled here.
-//
-// A plan is a scheduling overlay on an invoice: installment "paid" status is derived
-// from the invoice's settlement, so the invoice is required, and "Record installment"
-// posts a real receipt against it - the backend auto-advances the plan on settlement.
+/**
+ * Receivables → Payment Plans. Rebuilt to the Vision prototype in the house theme:
+ * a list with progress / next-due / health, an Installment-schedule detail drawer,
+ * and a curated New-plan drawer (the prototype's create modal doesn't open) with a
+ * live schedule preview. Concessions are a separate screen - not bundled here.
+ *
+ * A plan is a scheduling overlay on an invoice: installment "paid" status is derived
+ * from the invoice's settlement, so the invoice is required, and "Record installment"
+ * posts a real receipt against it - the backend auto-advances the plan on settlement.
+ */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";

@@ -299,10 +299,12 @@ function RfqExtensionForm({ rfq, invitation, entity, onClose }: { rfq: RfqDetail
 // (same description + quantity at the same index) - never mis-linked after edits.
 type ReqSnapshot = { requisition_line: number; description: string; quantity: number }[];
 
-// An RFQ is a request sent to invited vendors. This editor adds purchase-eligible
-// vendors (active, not on-hold, KYC ≠ REJECTED) as removable chips. A vendor that has
-// already responded cannot be removed (removing it would strand its quotation), so its
-// ✕ is disabled - matching the backend's responded-vendor protection.
+/**
+ * An RFQ is a request sent to invited vendors. This editor adds purchase-eligible
+ * vendors (active, not on-hold, KYC ≠ REJECTED) as removable chips. A vendor that has
+ * already responded cannot be removed (removing it would strand its quotation), so its
+ * ✕ is disabled - matching the backend's responded-vendor protection.
+ */
 function InviteVendorsEditor({ entity, invited, onChange }: { entity: string; invited: InviteRow[]; onChange: (rows: InviteRow[]) => void }) {
   const { data, isLoading } = useGetVendorsQuery({ entity, page_size: 100 });
   const vendors = toArray(data?.data);

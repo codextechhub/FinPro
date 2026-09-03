@@ -1,7 +1,9 @@
-// Batch generate - raise a posted invoice per customer from a fee structure.
-// Backed by POST /finance/fee-structures/<id>/generate/ (gated on
-// finance.feestructure.generate). Pick a structure, choose all active customers
-// (the common case) and set the dates.
+/**
+ * Batch generate - raise a posted invoice per customer from a fee structure.
+ * Backed by POST /finance/fee-structures/<id>/generate/ (gated on
+ * finance.feestructure.generate). Pick a structure, choose all active customers
+ * (the common case) and set the dates.
+ */
 import { useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";

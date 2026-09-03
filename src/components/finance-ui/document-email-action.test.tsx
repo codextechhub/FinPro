@@ -1,17 +1,19 @@
-// This control puts a document in a paying customer's inbox and cannot be recalled.
-// These tests cover the parts that would be actively harmful if they broke, rather
-// than the parts that merely look wrong:
-//
-//   1. no permission means no button at all - a visible send somebody cannot perform
-//      is the dead-button defect, and here it invites them to email a customer
-//   2. the preview must show the real address BEFORE sending, because the whole
-//      point of the confirmation is that nobody sends blind
-//   3. a customer with no billing email must not be sendable - the server refuses
-//      it, so an enabled button would produce an error where a reason belongs
-//   4. Retry must target the failed DELIVERY, not the document; sending the
-//      document again would work but would lose the link to what failed
-//   5. the statement send must carry the period the reader is looking at, or the
-//      customer receives a statement nobody on this side has seen
+/**
+ * This control puts a document in a paying customer's inbox and cannot be recalled.
+ * These tests cover the parts that would be actively harmful if they broke, rather
+ * than the parts that merely look wrong:
+ *
+ *   1. no permission means no button at all - a visible send somebody cannot perform
+ *      is the dead-button defect, and here it invites them to email a customer
+ *   2. the preview must show the real address BEFORE sending, because the whole
+ *      point of the confirmation is that nobody sends blind
+ *   3. a customer with no billing email must not be sendable - the server refuses
+ *      it, so an enabled button would produce an error where a reason belongs
+ *   4. Retry must target the failed DELIVERY, not the document; sending the
+ *      document again would work but would lose the link to what failed
+ *   5. the statement send must carry the period the reader is looking at, or the
+ *      customer receives a statement nobody on this side has seen
+ */
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";

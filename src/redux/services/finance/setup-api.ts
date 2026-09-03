@@ -1,9 +1,11 @@
-// Setup / master-data reads + month-end close + audit log (vs_finance).
-//   GET  /finance/accounts/         finance.account.view
-//   GET  /finance/periods/          finance.period.view
-//   POST /finance/periods/{id}/close/  finance.period.close
-//   GET  /finance/audit-logs/        finance.audit.view
-//   GET  /finance/currencies|tax-codes|cost-centers  (reference)
+/**
+ * Setup / master-data reads + month-end close + audit log (vs_finance).
+ *   GET  /finance/accounts/         finance.account.view
+ *   GET  /finance/periods/          finance.period.view
+ *   POST /finance/periods/{id}/close/  finance.period.close
+ *   GET  /finance/audit-logs/        finance.audit.view
+ *   GET  /finance/currencies|tax-codes|cost-centers  (reference)
+ */
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";

@@ -1,12 +1,14 @@
-// Settlement - gateway settlement reconciliation (Vision "Settlement Recon"), house theme.
-// A READ-ONLY PSP lens: confirmed collections (in) + paid payouts (out) matched against the
-// entity's imported bank statement lines, by reference then exact amount. Three tabs
-// (Matched / Unsettled / Unmatched bank lines) + KPIs, all on the shared DataTable so the
-// typography matches every other screen. Clicking a row opens a read-only drawer with both
-// sides of the match. "Re-run match" just refetches (recomputed server-side; nothing
-// posted). The Fees column surfaces the PSP fee (gross − net settled) as an OBSERVATION -
-// the authoritative book-vs-bank close lives in Finance → Bank Reconciliation, which is
-// where such a fee gets an adjusting entry.
+/**
+ * Settlement - gateway settlement reconciliation (Vision "Settlement Recon"), house theme.
+ * A READ-ONLY PSP lens: confirmed collections (in) + paid payouts (out) matched against the
+ * entity's imported bank statement lines, by reference then exact amount. Three tabs
+ * (Matched / Unsettled / Unmatched bank lines) + KPIs, all on the shared DataTable so the
+ * typography matches every other screen. Clicking a row opens a read-only drawer with both
+ * sides of the match. "Re-run match" just refetches (recomputed server-side; nothing
+ * posted). The Fees column surfaces the PSP fee (gross − net settled) as an OBSERVATION -
+ * the authoritative book-vs-bank close lives in Finance → Bank Reconciliation, which is
+ * where such a fee gets an adjusting entry.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Download, RefreshCw, ArrowDownLeft, ArrowUpRight } from "lucide-react";

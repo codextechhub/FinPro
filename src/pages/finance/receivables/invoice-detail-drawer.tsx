@@ -1,7 +1,9 @@
-// Invoice detail drawer - design topology: header (no · customer · status), four
-// stat cards (Total / Paid / Balance / Aging), tabbed body (Lines · Payments · GL
-// postings · Reminders · Activity, each with an icon) and a footer (Print PDF · Email
-// invoice · Send reminder · Record payment · Write off).
+/**
+ * Invoice detail drawer - design topology: header (no · customer · status), four
+ * stat cards (Total / Paid / Balance / Aging), tabbed body (Lines · Payments · GL
+ * postings · Reminders · Activity, each with an icon) and a footer (Print PDF · Email
+ * invoice · Send reminder · Record payment · Write off).
+ */
 import { useState } from "react";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";

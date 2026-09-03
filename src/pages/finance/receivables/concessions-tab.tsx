@@ -1,11 +1,13 @@
-// Receivables → Concessions / Waivers. Rebuilt to the Vision prototype in the house
-// theme: KPIs, search + type/status filters, a type-chip table, a detail drawer that
-// recaps the real journal, and a New-concession drawer with an "Enter as" amount/%
-// toggle (percent is of the chosen invoice's balance).
-//
-// A concession reduces a specific posted invoice's balance, so the invoice is
-// required (the prototype's no-invoice scholarship isn't supported by our ledger).
-// Posting is Dr allowance (4910 Discounts & Allowances by default) · Cr AR.
+/**
+ * Receivables → Concessions / Waivers. Rebuilt to the Vision prototype in the house
+ * theme: KPIs, search + type/status filters, a type-chip table, a detail drawer that
+ * recaps the real journal, and a New-concession drawer with an "Enter as" amount/%
+ * toggle (percent is of the chosen invoice's balance).
+ *
+ * A concession reduces a specific posted invoice's balance, so the invoice is
+ * required (the prototype's no-invoice scholarship isn't supported by our ledger).
+ * Posting is Dr allowance (4910 Discounts & Allowances by default) · Cr AR.
+ */
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useActionParam } from "@/hooks/use-action-param";

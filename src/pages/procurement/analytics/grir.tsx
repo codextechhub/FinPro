@@ -1,7 +1,9 @@
-// GR/IR & Control (§6) - goods-received vs invoice-received reconciliation.
-// KPIs + open-GR/IR aging stack come from the GRN-level `grir-aging` report; the
-// table drills to the **PO-line** grain (`grir-lines`) the prototype lists, and each
-// row opens a per-PO-line reconciliation drawer (its linked POSTED GRNs + invoices).
+/**
+ * GR/IR & Control (§6) - goods-received vs invoice-received reconciliation.
+ * KPIs + open-GR/IR aging stack come from the GRN-level `grir-aging` report; the
+ * table drills to the **PO-line** grain (`grir-lines`) the prototype lists, and each
+ * row opens a per-PO-line reconciliation drawer (its linked POSTED GRNs + invoices).
+ */
 import { useState } from "react";
 import { AlertCircle, ArrowLeftRight, CheckCircle2, EyeOff, Inbox } from "lucide-react";
 

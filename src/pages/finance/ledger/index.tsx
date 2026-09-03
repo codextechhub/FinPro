@@ -1,7 +1,9 @@
-// General Ledger / Journal Entries (§6.2) - design topology in the house theme:
-// status tabs with counts, source + period filters, search, a Total-Debit /
-// Created-By table, and a posted-total footer. Read-only list + detail drawer +
-// the Reverse action; Direct Entry is the only raw-lines post ("New journal").
+/**
+ * General Ledger / Journal Entries (§6.2) - design topology in the house theme:
+ * status tabs with counts, source + period filters, search, a Total-Debit /
+ * Created-By table, and a posted-total footer. Read-only list + detail drawer +
+ * the Reverse action; Direct Entry is the only raw-lines post ("New journal").
+ */
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";

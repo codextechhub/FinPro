@@ -1,7 +1,9 @@
-// Receivables → Customer Invoices. Design topology in the house theme: KPI cards
-// (invoiced / collected / collection rate / overdue), status tabs with counts,
-// search, a Customer-avatar table with a derived status pill, and a totals footer.
-// Keeps the detail drawer + the write-off action.
+/**
+ * Receivables → Customer Invoices. Design topology in the house theme: KPI cards
+ * (invoiced / collected / collection rate / overdue), status tabs with counts,
+ * search, a Customer-avatar table with a derived status pill, and a totals footer.
+ * Keeps the detail drawer + the write-off action.
+ */
 
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";

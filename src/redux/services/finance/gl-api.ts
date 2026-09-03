@@ -1,11 +1,13 @@
-// General Ledger RTK Query endpoints (vs_finance, /v1/finance/). Read-only GL +
-// the two sanctioned writes: Direct Entry and journal reversal. There is NO
-// free-form journal editor (spec §1.4).
-//   GET  /finance/journals/                 finance.journal.view
-//   GET  /finance/journals/{id}/            finance.journal.view
-//   POST /finance/journals/{id}/submit/     finance.journal.submit
-//   POST /finance/journals/{id}/reverse/    finance.journal.reverse
-//   POST /finance/direct-entries/           finance.directentry.post
+/**
+ * General Ledger RTK Query endpoints (vs_finance, /v1/finance/). Read-only GL +
+ * the two sanctioned writes: Direct Entry and journal reversal. There is NO
+ * free-form journal editor (spec §1.4).
+ *   GET  /finance/journals/                 finance.journal.view
+ *   GET  /finance/journals/{id}/            finance.journal.view
+ *   POST /finance/journals/{id}/submit/     finance.journal.submit
+ *   POST /finance/journals/{id}/reverse/    finance.journal.reverse
+ *   POST /finance/direct-entries/           finance.directentry.post
+ */
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";

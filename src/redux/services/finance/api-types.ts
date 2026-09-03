@@ -1,11 +1,13 @@
-// Shared response envelopes for the Finance & Procurement consoles.
-//
-// The backend wraps every response in core.response / core.pagination:
-//   • single/object  → { success, message, data }
-//   • paginated list → { success, message, pagination, data: T[] }
-//   • error          → { success:false, message, error } (handled centrally
-//                       in base-api's interceptor)
-// These generics mirror those shapes so each typed endpoint stays terse.
+/**
+ * Shared response envelopes for the Finance & Procurement consoles.
+ *
+ * The backend wraps every response in core.response / core.pagination:
+ *   • single/object  → { success, message, data }
+ *   • paginated list → { success, message, pagination, data: T[] }
+ *   • error          → { success:false, message, error } (handled centrally
+ *                       in base-api's interceptor)
+ * These generics mirror those shapes so each typed endpoint stays terse.
+ */
 
 export interface ApiEnvelope<T> {
   success: boolean;

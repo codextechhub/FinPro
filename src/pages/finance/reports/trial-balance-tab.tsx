@@ -1,10 +1,12 @@
-// Trial Balance - rebuilt to the Vision prototype in the house theme. The TB is the
-// balanced list of every account's net position; it's the input to the Income Statement
-// (income/expense) and Balance Sheet (asset/liability/equity), so an imbalance is
-// investigated before any other statement. KPIs + a period filter + account-type filter +
-// an optional compare-to-prior-period column (fetched as a second real TB call and merged
-// by account). Money + is_balanced come straight from the endpoint; export is the real
-// backend CSV/XLSX/PDF.
+/**
+ * Trial Balance - rebuilt to the Vision prototype in the house theme. The TB is the
+ * balanced list of every account's net position; it's the input to the Income Statement
+ * (income/expense) and Balance Sheet (asset/liability/equity), so an imbalance is
+ * investigated before any other statement. KPIs + a period filter + account-type filter +
+ * an optional compare-to-prior-period column (fetched as a second real TB call and merged
+ * by account). Money + is_balanced come straight from the endpoint; export is the real
+ * backend CSV/XLSX/PDF.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";

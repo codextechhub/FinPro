@@ -1,8 +1,10 @@
-// Receivables → Receipts & Allocation. Customer receipts (manual + gateway) and
-// how much of each is applied to invoices. Prototype shape: KPIs (received today /
-// this week / unallocated / count), status + method filters, an avatar table with
-// each receipt's unallocated amount + status, Export, Record receipt, and a row-
-// click allocation drawer.
+/**
+ * Receivables → Receipts & Allocation. Customer receipts (manual + gateway) and
+ * how much of each is applied to invoices. Prototype shape: KPIs (received today /
+ * this week / unallocated / count), status + method filters, an avatar table with
+ * each receipt's unallocated amount + status, Export, Record receipt, and a row-
+ * click allocation drawer.
+ */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { Search, Plus, Printer } from "lucide-react";

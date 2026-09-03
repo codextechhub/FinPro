@@ -1,7 +1,9 @@
-// <StatusPill status="POSTED" /> - maps the backend's status vocabularies
-// (DocumentStatus, InvoicePaymentStatus, PeriodStatus, payment/collection
-// states, etc.) onto the app's existing Badge variants. Unknown statuses still
-// render, humanised, with a neutral variant - never a crash.
+/**
+ * <StatusPill status="POSTED" /> - maps the backend's status vocabularies
+ * (DocumentStatus, InvoicePaymentStatus, PeriodStatus, payment/collection
+ * states, etc.) onto the app's existing Badge variants. Unknown statuses still
+ * render, humanised, with a neutral variant - never a crash.
+ */
 
 import { cn } from "@/lib/utils";
 
@@ -90,14 +92,16 @@ export function statusLabel(status: string): string {
   return LABEL_BY_STATUS[token] ?? humanise(status);
 }
 
-// Renders its own pill rather than delegating to the host's Badge.
-//
-// The two applications' Badge components share a name and not a variant set:
-// this package needs "suspended", which one of them does not define. Depending
-// on a host primitive for the package's own presentation means the package
-// only renders correctly where that host happens to agree - so it owns the
-// styling instead. The classes match the console's Badge, so nothing changes
-// visually there.
+/**
+ * Renders its own pill rather than delegating to the host's Badge.
+ *
+ * The two applications' Badge components share a name and not a variant set:
+ * this package needs "suspended", which one of them does not define. Depending
+ * on a host primitive for the package's own presentation means the package
+ * only renders correctly where that host happens to agree - so it owns the
+ * styling instead. The classes match the console's Badge, so nothing changes
+ * visually there.
+ */
 const PILL_CLASS: Record<BadgeVariant, string> = {
   default:   "bg-primary text-primary-foreground",
   success:   "bg-green-01/10 text-green-01-text",

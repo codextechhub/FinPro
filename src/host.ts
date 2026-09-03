@@ -1,22 +1,24 @@
-// The host contract.
-//
-// Three things this package needs are real in BOTH products but implemented
-// differently in each, so they cannot live here and cannot be deleted:
-//
-//   branches   - stock locations sit at a branch, and every product that uses
-//                this package has branches. The console reads them from its
-//                tenant-admin service; a school app reads its own.
-//   directory  - approvals are shown against a person's name, so something has
-//                to answer "who works here".
-//   chrome     - the sidebar shows the application's own logo and reveals its
-//                own active item.
-//
-// Each consuming app provides one module satisfying `HostContract`, mapped to
-// the alias `@xvs-host` in its tsconfig, vite and vitest alias tables.
-//
-// `routes-path`, `card-surface`, `helpers` and the rest stay ordinary `@/`
-// imports: they are the same shape in both apps, so a path is contract enough.
-// These three are here because their SHAPE differs, not just their location.
+/**
+ * The host contract.
+ *
+ * Three things this package needs are real in BOTH products but implemented
+ * differently in each, so they cannot live here and cannot be deleted:
+ *
+ *   branches   - stock locations sit at a branch, and every product that uses
+ *                this package has branches. The console reads them from its
+ *                tenant-admin service; a school app reads its own.
+ *   directory  - approvals are shown against a person's name, so something has
+ *                to answer "who works here".
+ *   chrome     - the sidebar shows the application's own logo and reveals its
+ *                own active item.
+ *
+ * Each consuming app provides one module satisfying `HostContract`, mapped to
+ * the alias `@xvs-host` in its tsconfig, vite and vitest alias tables.
+ *
+ * `routes-path`, `card-surface`, `helpers` and the rest stay ordinary `@/`
+ * imports: they are the same shape in both apps, so a path is contract enough.
+ * These three are here because their SHAPE differs, not just their location.
+ */
 
 import type { ComponentType } from "react";
 

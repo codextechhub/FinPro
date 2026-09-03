@@ -1,7 +1,9 @@
-// <FormModal> - a dialog wrapper for create/edit forms. Owns the chrome (title,
-// description, cancel/submit, loading + disabled state); the caller supplies the
-// fields as children and the submit handler. Keeps every create form terse and
-// consistent with the app's Dialog style.
+/**
+ * <FormModal> - a dialog wrapper for create/edit forms. Owns the chrome (title,
+ * description, cancel/submit, loading + disabled state); the caller supplies the
+ * fields as children and the submit handler. Keeps every create form terse and
+ * consistent with the app's Dialog style.
+ */
 
 import {
   Dialog,

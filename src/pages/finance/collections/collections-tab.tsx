@@ -1,17 +1,19 @@
-// Collections - money in via the payment gateway, rebuilt to the Vision prototype in
-// the house theme: KPIs (collected / pending / failed / success rate), status + provider
-// filters, a checkouts table, a detail drawer with a status timeline and the settlement
-// posting (Dr bank/collections, Cr AR), a New-checkout drawer, and a server-side export.
-//
-// Backed by the real model: initiate returns a hosted checkout_url; verify polls the PSP
-// and books a vs_finance receipt when settled. Honest: providers are Paystack (+
-// Fake for testing); no email is sent (Copy link copies the real URL); the receipt
-// journal posts automatically on confirmation - the recap mirrors it, never a 2nd post.
-//
-// Not every row here is a checkout. A transfer into a customer's dedicated virtual
-// account arrives unsolicited and the gateway records it as a collection on the
-// VIRTUAL_ACCOUNT channel, with no link and no payer hand-off - so those rows are
-// tagged, and the drawer tells that story instead of the checkout one.
+/**
+ * Collections - money in via the payment gateway, rebuilt to the Vision prototype in
+ * the house theme: KPIs (collected / pending / failed / success rate), status + provider
+ * filters, a checkouts table, a detail drawer with a status timeline and the settlement
+ * posting (Dr bank/collections, Cr AR), a New-checkout drawer, and a server-side export.
+ *
+ * Backed by the real model: initiate returns a hosted checkout_url; verify polls the PSP
+ * and books a vs_finance receipt when settled. Honest: providers are Paystack (+
+ * Fake for testing); no email is sent (Copy link copies the real URL); the receipt
+ * journal posts automatically on confirmation - the recap mirrors it, never a 2nd post.
+ *
+ * Not every row here is a checkout. A transfer into a customer's dedicated virtual
+ * account arrives unsolicited and the gateway records it as a collection on the
+ * VIRTUAL_ACCOUNT channel, with no link and no payer hand-off - so those rows are
+ * tagged, and the drawer tells that story instead of the checkout one.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useActionParam } from "@/hooks/use-action-param";

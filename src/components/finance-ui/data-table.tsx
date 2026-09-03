@@ -1,7 +1,9 @@
-// <DataTable> - the one list primitive every finance/procurement list screen
-// uses. Column-driven over the app's existing <Table>, with server pagination
-// and all four explicit states (loading / empty / error / forbidden). Filters
-// and toolbars live above it on the page; this owns the table + its footer.
+/**
+ * <DataTable> - the one list primitive every finance/procurement list screen
+ * uses. Column-driven over the app's existing <Table>, with server pagination
+ * and all four explicit states (loading / empty / error / forbidden). Filters
+ * and toolbars live above it on the page; this owns the table + its footer.
+ */
 
 import {
   Table,

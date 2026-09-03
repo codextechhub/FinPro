@@ -1,10 +1,12 @@
-// vs_payments RTK Query endpoints (/v1/payments/). Receivable cash arrives by
-// confirming a Collection (verify), never by a "record receipt" form (spec §1.7).
-//   GET  /payments/collections/              payments.collection.view
-//   POST /payments/collections/              payments.collection.create
-//   GET  /payments/collections/{id}/?verify=1 confirm + book the receipt
-//   POST /payments/virtual-accounts/         payments.virtual_account.create
-//   GET  /payments/payouts/ , /payout-batches/  payments.payout.view (slice 6)
+/**
+ * vs_payments RTK Query endpoints (/v1/payments/). Receivable cash arrives by
+ * confirming a Collection (verify), never by a "record receipt" form (spec §1.7).
+ *   GET  /payments/collections/              payments.collection.view
+ *   POST /payments/collections/              payments.collection.create
+ *   GET  /payments/collections/{id}/?verify=1 confirm + book the receipt
+ *   POST /payments/virtual-accounts/         payments.virtual_account.create
+ *   GET  /payments/payouts/ , /payout-batches/  payments.payout.view (slice 6)
+ */
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";

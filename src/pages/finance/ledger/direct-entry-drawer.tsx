@@ -1,8 +1,10 @@
-// New journal (Direct Entry, §6.2) - the ONLY screen that submits raw debit/credit
-// lines (capital, opening balances, loans, adjustments). A right-side drawer in the
-// prototype style: sectioned header fields, a posting editor with type-to-search
-// account pickers, and a live balance check (Σdebit = Σcredit) before POST. Amounts
-// edited in naira, submitted in kobo.
+/**
+ * New journal (Direct Entry, §6.2) - the ONLY screen that submits raw debit/credit
+ * lines (capital, opening balances, loans, adjustments). A right-side drawer in the
+ * prototype style: sectioned header fields, a posting editor with type-to-search
+ * account pickers, and a live balance check (Σdebit = Σcredit) before POST. Amounts
+ * edited in naira, submitted in kobo.
+ */
 import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, BookCheck } from "lucide-react";

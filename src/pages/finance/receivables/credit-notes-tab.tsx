@@ -1,16 +1,18 @@
-// Receivables → Credit / Debit Notes. Rebuilt to the Vision-Finance-Board
-// prototype in the house theme: a filter-dropdown list (no KPIs), a single-panel
-// detail drawer that recaps the REAL journal as a DR/CR card, and an "Issue note"
-// drawer whose live posting preview mirrors what will post.
-//
-// Honest adaptations vs the mockup:
-//   • our credit/debit note is line-based and requires a GL account, so the
-//     single-amount form carries an explicit Revenue/Income account picker and
-//     submits one line under the hood;
-//   • a debit note increases the receivable and cannot be allocated, so
-//     "Apply to balance" and the auto-allocate toggle show only for credit notes;
-//   • "Issue note" creates then posts - the auto-allocate toggle chooses whether
-//     it lands "Issued" (auto_allocate:false) or is applied oldest-first ("Applied").
+/**
+ * Receivables → Credit / Debit Notes. Rebuilt to the Vision-Finance-Board
+ * prototype in the house theme: a filter-dropdown list (no KPIs), a single-panel
+ * detail drawer that recaps the REAL journal as a DR/CR card, and an "Issue note"
+ * drawer whose live posting preview mirrors what will post.
+ *
+ * Honest adaptations vs the mockup:
+ *   • our credit/debit note is line-based and requires a GL account, so the
+ *     single-amount form carries an explicit Revenue/Income account picker and
+ *     submits one line under the hood;
+ *   • a debit note increases the receivable and cannot be allocated, so
+ *     "Apply to balance" and the auto-allocate toggle show only for credit notes;
+ *   • "Issue note" creates then posts - the auto-allocate toggle chooses whether
+ *     it lands "Issued" (auto_allocate:false) or is applied oldest-first ("Applied").
+ */
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useActionParam } from "@/hooks/use-action-param";

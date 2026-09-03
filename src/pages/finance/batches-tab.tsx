@@ -1,12 +1,14 @@
-// Batches - bulk vendor disbursements (Vision "Bulk Disbursement"), rebuilt in the
-// house theme: KPIs (batches / queued value / completed 7d / drafts), a batches table,
-// a Build-batch drawer (a multi-line vendor editor with per-line WHT + a settlement
-// recap), and a detail drawer with per-item results, Submit and a Bank-file CSV export.
-//
-// Backed by the real model: a batch is many PayoutInstructions; each line settles a
-// vendor's payable on confirmation (Dr AP gross / Cr bank net / Cr WHT payable). Submit
-// dispatches the pending items to the provider; settlement books via webhook/PSP. Honest:
-// "Bank file" is a CSV (no proprietary format); beneficiary details are FLS-masked.
+/**
+ * Batches - bulk vendor disbursements (Vision "Bulk Disbursement"), rebuilt in the
+ * house theme: KPIs (batches / queued value / completed 7d / drafts), a batches table,
+ * a Build-batch drawer (a multi-line vendor editor with per-line WHT + a settlement
+ * recap), and a detail drawer with per-item results, Submit and a Bank-file CSV export.
+ *
+ * Backed by the real model: a batch is many PayoutInstructions; each line settles a
+ * vendor's payable on confirmation (Dr AP gross / Cr bank net / Cr WHT payable). Submit
+ * dispatches the pending items to the provider; settlement books via webhook/PSP. Honest:
+ * "Bank file" is a CSV (no proprietary format); beneficiary details are FLS-masked.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";

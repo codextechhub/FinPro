@@ -1,20 +1,24 @@
-// The permission codes for the screens this package ships.
-//
-// These live here rather than in each application because they describe THIS
-// package's screens: a fee structure, a requisition, a payout. Both products
-// talk to the same backend engines, so the codes are identical in both; keeping
-// two copies in step by hand is how one of them silently stops gating.
-//
-// A host merges these into its own table (see console-fe/src/permissions), so
-// application screens keep reading a single `P`.
+/**
+ * The permission codes for the screens this package ships.
+ *
+ * These live here rather than in each application because they describe THIS
+ * package's screens: a fee structure, a requisition, a payout. Both products
+ * talk to the same backend engines, so the codes are identical in both; keeping
+ * two copies in step by hand is how one of them silently stops gating.
+ *
+ * A host merges these into its own table (see console-fe/src/permissions), so
+ * application screens keep reading a single `P`.
+ */
 
-// Five codes were renumbered on 1 Sep 2026. They collided with school-fe,
-// which had allocated the same numbers to fees and onboarding permissions -
-// harmless while the two apps were separate, ambiguous the moment both tables
-// merged in one app. The numbers are frontend handles; the dotted backend key
-// is the real identity, and none of those changed. Renumbered here rather than
-// in the school app because this package is the newcomer to its numbering
-// space.
+/**
+ * Five codes were renumbered on 1 Sep 2026. They collided with school-fe,
+ * which had allocated the same numbers to fees and onboarding permissions -
+ * harmless while the two apps were separate, ambiguous the moment both tables
+ * merged in one app. The numbers are frontend handles; the dotted backend key
+ * is the real identity, and none of those changed. Renumbered here rather than
+ * in the school app because this package is the newcomer to its numbering
+ * space.
+ */
 
 export const P = {
   FIN_ACQUIRE_FIXED_ASSET: "202422",

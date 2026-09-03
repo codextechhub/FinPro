@@ -1,16 +1,18 @@
-// <DocumentEmailAction /> - send a finance document to its customer, with the
-// recipients shown before it goes and the history of what has already gone.
-//
-// One component for all three documents (invoice, receipt, statement) because they
-// differ only in the URL and the label. Three copies of a confirm-then-send flow is
-// how the three screens would drift apart, and the send is the part that must not:
-// it reaches a paying customer, so it always confirms, always names the address, and
-// never fires straight off a row click.
-//
-// History includes the automatic copy sent when the document posted, so "has this
-// customer been told" is answered here rather than guessed. Failed attempts carry the
-// provider's reason and a Retry, which raises a fresh attempt and leaves the failed
-// one visible - the record of a failure is not something a retry should erase.
+/**
+ * <DocumentEmailAction /> - send a finance document to its customer, with the
+ * recipients shown before it goes and the history of what has already gone.
+ *
+ * One component for all three documents (invoice, receipt, statement) because they
+ * differ only in the URL and the label. Three copies of a confirm-then-send flow is
+ * how the three screens would drift apart, and the send is the part that must not:
+ * it reaches a paying customer, so it always confirms, always names the address, and
+ * never fires straight off a row click.
+ *
+ * History includes the automatic copy sent when the document posted, so "has this
+ * customer been told" is answered here rather than guessed. Failed attempts carry the
+ * provider's reason and a Retry, which raises a fresh attempt and leaves the failed
+ * one visible - the record of a failure is not something a retry should erase.
+ */
 
 import { useState } from "react";
 import { toast } from "sonner";

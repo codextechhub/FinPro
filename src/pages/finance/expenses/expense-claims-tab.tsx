@@ -1,12 +1,14 @@
-// Operations → Expense Claims, rebuilt to the Vision prototype in the house theme:
-// KPIs, a search/status list, and a detail drawer with an approval-workflow
-// stepper, line items (cost center + receipt attachment), and Approve / Reject /
-// Pay / Print actions.
-//
-// Honest adaptations: the prototype's school "Branch" column/filter is dropped
-// (claims are by staff, classified by cost center, which we keep). The 3-step
-// stepper maps to our real states - Submitted (draft) → Approved & accrued
-// (post: Dr expense / Cr accrued reimbursement) → Reimbursed (settle: Cr bank).
+/**
+ * Operations → Expense Claims, rebuilt to the Vision prototype in the house theme:
+ * KPIs, a search/status list, and a detail drawer with an approval-workflow
+ * stepper, line items (cost center + receipt attachment), and Approve / Reject /
+ * Pay / Print actions.
+ *
+ * Honest adaptations: the prototype's school "Branch" column/filter is dropped
+ * (claims are by staff, classified by cost center, which we keep). The 3-step
+ * stepper maps to our real states - Submitted (draft) → Approved & accrued
+ * (post: Dr expense / Cr accrued reimbursement) → Reimbursed (settle: Cr bank).
+ */
 
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";

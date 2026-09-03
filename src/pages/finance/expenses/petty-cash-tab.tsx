@@ -1,11 +1,13 @@
-// Operations → Petty Cash, rebuilt to the Vision prototype in the house theme:
-// a fund-centric float register. Fund selector → KPIs (ceiling / current / spent
-// this week / to replenish) → tabs (Movement register · Vouchers) with
-// Establish float, Replenish and New voucher.
-//
-// Honest adaptations: a fund selector (the prototype shows one fund; we can hold
-// several). The movement register is the petty-cash GL ledger, and "Category" is
-// derived from each journal's counter line (we don't store a category field).
+/**
+ * Operations → Petty Cash, rebuilt to the Vision prototype in the house theme:
+ * a fund-centric float register. Fund selector → KPIs (ceiling / current / spent
+ * this week / to replenish) → tabs (Movement register · Vouchers) with
+ * Establish float, Replenish and New voucher.
+ *
+ * Honest adaptations: a fund selector (the prototype shows one fund; we can hold
+ * several). The movement register is the petty-cash GL ledger, and "Category" is
+ * derived from each journal's counter line (we don't store a category field).
+ */
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";

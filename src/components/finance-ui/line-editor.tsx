@@ -1,7 +1,9 @@
-// <LineEditor> - edits the line items of a document (expense claims, credit
-// notes, …). Each row is description + account + qty + unit price (naira→kobo) +
-// optional tax/cost-centre. The parent maps `account` onto whatever the backend
-// calls it (expense_account / revenue_account). Amounts report in kobo.
+/**
+ * <LineEditor> - edits the line items of a document (expense claims, credit
+ * notes, …). Each row is description + account + qty + unit price (naira→kobo) +
+ * optional tax/cost-centre. The parent maps `account` onto whatever the backend
+ * calls it (expense_account / revenue_account). Amounts report in kobo.
+ */
 
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";

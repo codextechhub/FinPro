@@ -1,7 +1,9 @@
-// <Segmented> - a segmented toggle that reads as a control at first glance: a grey
-// track with a raised white "thumb" on the active option. Used across the finance
-// drawers (note type, refund action, payment-plan frequency…) for one consistent
-// look. Renders its own label with comfortable spacing (don't wrap in FormField).
+/**
+ * <Segmented> - a segmented toggle that reads as a control at first glance: a grey
+ * track with a raised white "thumb" on the active option. Used across the finance
+ * drawers (note type, refund action, payment-plan frequency…) for one consistent
+ * look. Renders its own label with comfortable spacing (don't wrap in FormField).
+ */
 import { cn } from "@/lib/utils";
 
 export function Segmented<T extends string>({ value, onChange, options, label, isDisabled, className }: {

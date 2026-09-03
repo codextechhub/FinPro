@@ -1,7 +1,9 @@
-// Setup → Tax Codes. Design topology: teaching note, type filter, the rate/rules
-// table, and New tax code. Type is derived from the code prefix (VAT/WHT/PAYE…)
-// since the model has no type field; Country/Effective columns are omitted (no
-// data) rather than faked.
+/**
+ * Setup → Tax Codes. Design topology: teaching note, type filter, the rate/rules
+ * table, and New tax code. Type is derived from the code prefix (VAT/WHT/PAYE…)
+ * since the model has no type field; Country/Effective columns are omitted (no
+ * data) rather than faked.
+ */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";

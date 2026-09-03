@@ -1,10 +1,12 @@
-// Tax Remittance / Filing, rebuilt to the Vision prototype in the house theme: KPIs +
-// a filings table (lifecycle Open→Filed→Paid), a detail drawer with a lifecycle stepper
-// and an "on remittance" posting recap, prepare/file/pay flows, a New-obligation drawer,
-// and a printable filing pack.
-//
-// Backed by the real model: prepare_filing accrues from the GL control account; file
-// records the reference (+ optional adjustment); pay posts Dr liability, Cr bank.
+/**
+ * Tax Remittance / Filing, rebuilt to the Vision prototype in the house theme: KPIs +
+ * a filings table (lifecycle Open→Filed→Paid), a detail drawer with a lifecycle stepper
+ * and an "on remittance" posting recap, prepare/file/pay flows, a New-obligation drawer,
+ * and a printable filing pack.
+ *
+ * Backed by the real model: prepare_filing accrues from the GL control account; file
+ * records the reference (+ optional adjustment); pay posts Dr liability, Cr bank.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";

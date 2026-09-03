@@ -1,13 +1,15 @@
-// The published approval rule for one AR adjustment type, for labelling a form.
-//
-// Only ever powers copy and a button label. What actually happens is decided by
-// the document's own `approval_required`, which the server computes with the same
-// function the post endpoint calls - see `adjustment-approval.ts` for why the two
-// are kept apart.
-//
-// One request serves every adjustment screen: the template list is small, cached
-// under the shared `WorkflowTemplates` tag, and already fetched by the workflow
-// console, so opening a concession form usually costs nothing.
+/**
+ * The published approval rule for one AR adjustment type, for labelling a form.
+ *
+ * Only ever powers copy and a button label. What actually happens is decided by
+ * the document's own `approval_required`, which the server computes with the same
+ * function the post endpoint calls - see `adjustment-approval.ts` for why the two
+ * are kept apart.
+ *
+ * One request serves every adjustment screen: the template list is small, cached
+ * under the shared `WorkflowTemplates` tag, and already fetched by the workflow
+ * console, so opening a concession form usually costs nothing.
+ */
 
 import { useMemo } from "react";
 

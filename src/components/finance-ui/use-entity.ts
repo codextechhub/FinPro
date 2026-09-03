@@ -38,13 +38,13 @@ export function resolveActiveEntityCode(
 
   // The stored choice is only honoured while it is still one of theirs.
   //
-  // It used to be returned unchecked, and that is what put a code belonging to
-  // another tenant on every request: the backend refused each one with a 404
-  // ("Resource not found"), because resolve_entity only matches within the
-  // caller's own tenant. The console never showed it because its EntitySelect
-  // corrects the stored code on mount; an app that does not render the switcher
-  // - a school has one set of books, so there is nothing to switch - had
-  // nothing to correct it.
+  // Returned unchecked, it puts a code belonging to another tenant on every
+  // request, and the backend refuses each one with a 404 ("Resource not
+  // found") because resolve_entity only matches within the caller's own
+  // tenant. The console hides that, because its EntitySelect corrects the
+  // stored code on mount; an app that does not render the switcher - a school
+  // has one set of books, so there is nothing to switch - has nothing to
+  // correct it.
   if (known(selectedCode)) return selectedCode;
 
   // Otherwise take the only sensible default. A school has exactly one set of

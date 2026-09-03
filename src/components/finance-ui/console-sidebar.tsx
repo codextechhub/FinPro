@@ -1,12 +1,14 @@
-// The left sidebar for a dedicated console (Finance / Procurement). Mirrors the
-// global AppSidebar's chrome but renders the console's own menu via the shared
-// collapsible NavMain - expand-only parents + leaf links. Replaces the global
-// nav while you're inside the console.
-//
-// There is no way-out row. The mark at the top is already a link home, and the
-// header's search box reaches any screen by name, so a permanent "Back to Home"
-// was a third route to the same place, taking the first slot on every console
-// screen to do it.
+/**
+ * The left sidebar for a dedicated console (Finance / Procurement). Mirrors the
+ * global AppSidebar's chrome but renders the console's own menu via the shared
+ * collapsible NavMain - expand-only parents + leaf links. Replaces the global
+ * nav while you're inside the console.
+ *
+ * There is no way-out row. The mark at the top is already a link home, and the
+ * header's search box reaches any screen by name, so a permanent "Back to Home"
+ * was a third route to the same place, taking the first slot on every console
+ * screen to do it.
+ */
 
 import { useLayoutEffect, useRef } from "react";
 import { Link, useLocation } from "react-router";
@@ -26,10 +28,12 @@ import { routesPath } from "@/routes/routes-path";
 import type { ConsoleNavGroup, ConsoleNavItem } from "./console-nav";
 import { revealActiveSidebarItem } from "./sidebar-navigation";
 
-// Each console page mounts its own shell, so the sidebar remounts on every
-// in-console navigation - which would reset its scroll to the top. Remember the
-// scroll offset per console (module scope survives the remount) and restore it
-// before paint so a click on a item far down the menu keeps the menu in place.
+/**
+ * Each console page mounts its own shell, so the sidebar remounts on every
+ * in-console navigation - which would reset its scroll to the top. Remember the
+ * scroll offset per console (module scope survives the remount) and restore it
+ * before paint so a click on a item far down the menu keeps the menu in place.
+ */
 const scrollByConsole = new Map<string, number>();
 
 export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavGroup[] }) {

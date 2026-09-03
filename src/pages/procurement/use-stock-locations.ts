@@ -1,12 +1,14 @@
-// Stock locations, and the one rule that outranks every other decision about them.
-//
-// A stock location is a place stock physically sits. Most schools have exactly one,
-// and for them the concept must not exist on screen at all: no picker, no column, no
-// "All locations" chip, no empty state. An empty column is worse than no column, and
-// branch-optional and multi-branch schools both have to look finished.
-//
-// So every location-aware surface asks this hook first and renders the control only
-// when `multi` is true. Zero or one active location renders nothing.
+/**
+ * Stock locations, and the one rule that outranks every other decision about them.
+ *
+ * A stock location is a place stock physically sits. Most schools have exactly one,
+ * and for them the concept must not exist on screen at all: no picker, no column, no
+ * "All locations" chip, no empty state. An empty column is worse than no column, and
+ * branch-optional and multi-branch schools both have to look finished.
+ *
+ * So every location-aware surface asks this hook first and renders the control only
+ * when `multi` is true. Zero or one active location renders nothing.
+ */
 import { useMemo } from "react";
 
 import { toArray } from "@/components/finance-ui";

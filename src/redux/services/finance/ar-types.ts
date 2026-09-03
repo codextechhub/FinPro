@@ -363,10 +363,12 @@ export interface CustomerSummary {
   status_counts: Record<string, number>; // ACTIVE / CREDIT / OVERDUE / INACTIVE
 }
 
-// Customer receipts + allocation (Receipts & Allocation screen).
-// REFUNDED: the cash never settled an invoice, but it has since been paid back out,
-// so it is neither allocated nor still available. It used to read as UNALLOCATED,
-// which is how a refunded receipt kept advertising money the customer no longer had.
+/**
+ * Customer receipts + allocation (Receipts & Allocation screen).
+ * REFUNDED: the cash never settled an invoice, but it has since been paid back out,
+ * so it is neither allocated nor still available. Reading as UNALLOCATED is how
+ * a refunded receipt keeps advertising money the customer does not have.
+ */
 export type PaymentAllocationStatus = "ALLOCATED" | "PARTIAL" | "UNALLOCATED" | "REFUNDED";
 
 export interface PaymentSummary {
@@ -486,9 +488,9 @@ export interface FeeStructure {
 /**
  * A submit response: the document, plus whether anybody can actually approve it.
  *
- * Every "submit for approval" endpoint in the product returns this shape. It was
- * previously typed as a bare `ApiEnvelope<Doc>` here, which silently discarded the
- * `approval` block and with it the only warning that a submission has parked.
+ * Every "submit for approval" endpoint in the product returns this shape. Typed
+ * as a bare `ApiEnvelope<Doc>` it silently discards the `approval` block, and
+ * with it the only warning that a submission has parked.
  */
 export type SubmittedDocument<T> = T & { approval?: ApprovalParkState };
 

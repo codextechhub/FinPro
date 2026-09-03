@@ -1,7 +1,9 @@
-// Vendor Performance (§6) - computed delivery/payment behaviour blended with
-// recorded assessment scorecards. On-Time is the computed rate; Quality / Inv.
-// Accuracy / Responsiveness / Grade come from the latest recorded assessment
-// (honest "Not assessed" when none). Row → read-only drawer; gated New Assessment.
+/**
+ * Vendor Performance (§6) - computed delivery/payment behaviour blended with
+ * recorded assessment scorecards. On-Time is the computed rate; Quality / Inv.
+ * Accuracy / Responsiveness / Grade come from the latest recorded assessment
+ * (honest "Not assessed" when none). Row → read-only drawer; gated New Assessment.
+ */
 import { useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, ClipboardCheck, Clock, Plus } from "lucide-react";
 import { useActionParam } from "@/hooks/use-action-param";

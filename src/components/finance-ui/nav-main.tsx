@@ -1,10 +1,12 @@
-// The package's own sidebar navigation.
-//
-// Moved out of console-fe because nothing there used it - only this package
-// did. The two applications each have a component called NavMain and they are
-// not the same component: this one takes navigationKey, the school app's takes
-// groupTitle. Borrowing whichever the host happens to define is how a shared
-// sidebar renders in one product and fails to compile in the other.
+/**
+ * The package's own sidebar navigation.
+ *
+ * Moved out of console-fe because nothing there used it - only this package
+ * did. The two applications each have a component called NavMain and they are
+ * not the same component: this one takes navigationKey, the school app's takes
+ * groupTitle. Borrowing whichever the host happens to define is how a shared
+ * sidebar renders in one product and fails to compile in the other.
+ */
 import { ChevronRight, CircleArrowOutUpRight } from "lucide-react";
 import {
   Collapsible,

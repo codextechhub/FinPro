@@ -1,7 +1,9 @@
-// The branch-scope advisory has to distinguish three states the backend deliberately
-// keeps apart: not narrowed at all (key absent), narrowed with nothing left out (zero),
-// and narrowed with documents left out (a count). Only the third is worth a line, and
-// it must say what was left out - a bare "3 excluded" tells a bursar nothing.
+/**
+ * The branch-scope advisory has to distinguish three states the backend deliberately
+ * keeps apart: not narrowed at all (key absent), narrowed with nothing left out (zero),
+ * and narrowed with documents left out (a count). Only the third is worth a line, and
+ * it must say what was left out - a bare "3 excluded" tells a bursar nothing.
+ */
 
 import { describe, expect, it } from "vitest";
 

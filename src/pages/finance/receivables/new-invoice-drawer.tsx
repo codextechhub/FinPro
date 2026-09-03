@@ -1,7 +1,9 @@
-// New invoice - a right-side drawer matching the detail-drawer structure (header ·
-// sectioned body · pinned footer). Customer/account/tax use the app's SearchSelect
-// (type the name → the list populates). Unit price is entered in naira and sent as
-// integer kobo; "Issue now" posts the AR journal, else it saves a priced draft.
+/**
+ * New invoice - a right-side drawer matching the detail-drawer structure (header ·
+ * sectioned body · pinned footer). Customer/account/tax use the app's SearchSelect
+ * (type the name → the list populates). Unit price is entered in naira and sent as
+ * integer kobo; "Issue now" posts the AR journal, else it saves a priced draft.
+ */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { toKobo } from "@/utils/money";

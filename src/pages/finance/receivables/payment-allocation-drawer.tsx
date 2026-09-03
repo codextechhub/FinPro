@@ -1,8 +1,10 @@
-// Receipt allocation drawer - apply a receipt to the customer's open invoices.
-// "Auto-allocate oldest first" fills the open invoices in age order; uncheck to
-// type an explicit split. The allocation summary tracks Receipt / Allocated /
-// Remainder, and an Allocation-posting recap shows the receipt's GL effect
-// (Dr bank - already debited on the receipt · Cr AR), which balances.
+/**
+ * Receipt allocation drawer - apply a receipt to the customer's open invoices.
+ * "Auto-allocate oldest first" fills the open invoices in age order; uncheck to
+ * type an explicit split. The allocation summary tracks Receipt / Allocated /
+ * Remainder, and an Allocation-posting recap shows the receipt's GL effect
+ * (Dr bank - already debited on the receipt · Cr AR), which balances.
+ */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";

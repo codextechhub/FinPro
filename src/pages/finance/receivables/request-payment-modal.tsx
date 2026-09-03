@@ -1,8 +1,10 @@
-// Request online payment - kick off an invoice-linked gateway collection.
-// Calls POST /payments/collections/ (vs_payments) which creates a CollectionIntent
-// and returns a checkout link. When the customer pays, the webhook books the
-// receipt (Dr bank, Cr AR) and allocates it to THIS invoice automatically - no
-// manual recording. This screen just generates and surfaces the link/reference.
+/**
+ * Request online payment - kick off an invoice-linked gateway collection.
+ * Calls POST /payments/collections/ (vs_payments) which creates a CollectionIntent
+ * and returns a checkout link. When the customer pays, the webhook books the
+ * receipt (Dr bank, Cr AR) and allocates it to THIS invoice automatically - no
+ * manual recording. This screen just generates and surfaces the link/reference.
+ */
 import { useState } from "react";
 import { toast } from "sonner";
 import { Globe, Copy, ExternalLink, Check } from "lucide-react";

@@ -1,15 +1,17 @@
-// Payroll (§6.7), rebuilt to the Vision prototype in the house theme: five tabs -
-// Payroll runs, Employee salaries (the roster), Salary structures, Payslips and
-// Statutory returns. Salaries can be split into tranches via a reusable structure
-// (earning/deduction components as % of gross or basic); PAYE/pension/net are then
-// derived. Per-employee figures are FLS-masked unless the caller holds
-// finance.payrollrun.view_sensitive; runs can be generated from the roster, posted,
-// paid, and each payslip / statutory schedule printed.
-//
-// Honest adaptations: deductions route only to PAYE/pension (the two payables the GL
-// has) - other deduction types (loans/union) are a noted backend expansion. Statutory
-// schedules need per-employee figures, so they're disabled (with a tooltip) without the
-// sensitive grant. PAYE/pension are remitted via Tax Remittance.
+/**
+ * Payroll (§6.7), rebuilt to the Vision prototype in the house theme: five tabs -
+ * Payroll runs, Employee salaries (the roster), Salary structures, Payslips and
+ * Statutory returns. Salaries can be split into tranches via a reusable structure
+ * (earning/deduction components as % of gross or basic); PAYE/pension/net are then
+ * derived. Per-employee figures are FLS-masked unless the caller holds
+ * finance.payrollrun.view_sensitive; runs can be generated from the roster, posted,
+ * paid, and each payslip / statutory schedule printed.
+ *
+ * Honest adaptations: deductions route only to PAYE/pension (the two payables the GL
+ * has) - other deduction types (loans/union) are a noted backend expansion. Statutory
+ * schedules need per-employee figures, so they're disabled (with a tooltip) without the
+ * sensitive grant. PAYE/pension are remitted via Tax Remittance.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useActionParam } from "@/hooks/use-action-param";

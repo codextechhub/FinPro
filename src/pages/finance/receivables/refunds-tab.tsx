@@ -1,16 +1,18 @@
-// Receivables → Refunds & Write-offs. Rebuilt to the Vision prototype in the house
-// theme: 3 KPIs, a type filter, and a UNIFIED table of refunds + write-offs, plus
-// a single "New action" drawer that toggles between refunding a credit balance to
-// the bank and writing off bad debt to expense - each with a live posting preview.
-//
-// Honest adaptations vs the mockup:
-//   • a refund's real journal is Dr customer credit (2140) · Cr Bank - it pays out
-//     the customer's stored credit balance (not an open receivable), capped at the
-//     available credit;
-//   • a write-off is per-invoice in our ledger, so the write-off form picks one of
-//     the customer's open invoices (amount defaults to / caps at its balance);
-//   • refunds and write-offs can either post directly or be submitted into the
-//     shared approval workflow, depending on the school's published templates.
+/**
+ * Receivables → Refunds & Write-offs. Rebuilt to the Vision prototype in the house
+ * theme: 3 KPIs, a type filter, and a UNIFIED table of refunds + write-offs, plus
+ * a single "New action" drawer that toggles between refunding a credit balance to
+ * the bank and writing off bad debt to expense - each with a live posting preview.
+ *
+ * Honest adaptations vs the mockup:
+ *   • a refund's real journal is Dr customer credit (2140) · Cr Bank - it pays out
+ *     the customer's stored credit balance (not an open receivable), capped at the
+ *     available credit;
+ *   • a write-off is per-invoice in our ledger, so the write-off form picks one of
+ *     the customer's open invoices (amount defaults to / caps at its balance);
+ *   • refunds and write-offs can either post directly or be submitted into the
+ *     shared approval workflow, depending on the school's published templates.
+ */
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useActionParam } from "@/hooks/use-action-param";

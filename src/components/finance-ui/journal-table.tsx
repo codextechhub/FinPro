@@ -1,7 +1,9 @@
-// <JournalTable lines={…} /> - the Dr/Cr table shown on every "view journal"
-// drawer. Mirrors vs_finance JournalLineSerializer (debit/credit are integer
-// kobo) and shows column totals with a "Balanced ✓" indicator (Σdebit must
-// equal Σcredit for a valid double-entry posting).
+/**
+ * <JournalTable lines={…} /> - the Dr/Cr table shown on every "view journal"
+ * drawer. Mirrors vs_finance JournalLineSerializer (debit/credit are integer
+ * kobo) and shows column totals with a "Balanced ✓" indicator (Σdebit must
+ * equal Σcredit for a valid double-entry posting).
+ */
 
 import { Check, TriangleAlert } from "lucide-react";
 import {

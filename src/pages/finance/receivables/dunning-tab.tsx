@@ -1,13 +1,15 @@
-// Receivables → Dunning / Reminders. Rebuilt to the Vision prototype in the house
-// theme: aging-bucket KPIs, a Reminder-queue tab (notices + the active cadence) and
-// a Policies tab with a full cadence editor (create/edit policies + stages).
-//
-// "Run reminders now" / "Generate notices" raise the queue of notices (no GL
-// effect); Send dispatches one notice over its stage's channels and flips it to
-// SENT; Cancel withdraws it before it goes out. Send emails a customer, so it
-// confirms first and never fires straight off a row click.
-//
-// A stage's channel is one or more of Email / In-app, stored comma-separated.
+/**
+ * Receivables → Dunning / Reminders. Rebuilt to the Vision prototype in the house
+ * theme: aging-bucket KPIs, a Reminder-queue tab (notices + the active cadence) and
+ * a Policies tab with a full cadence editor (create/edit policies + stages).
+ *
+ * "Run reminders now" / "Generate notices" raise the queue of notices (no GL
+ * effect); Send dispatches one notice over its stage's channels and flips it to
+ * SENT; Cancel withdraws it before it goes out. Send emails a customer, so it
+ * confirms first and never fires straight off a row click.
+ *
+ * A stage's channel is one or more of Email / In-app, stored comma-separated.
+ */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Play, SlidersHorizontal, Trash2, Pencil, Ban, Send } from "lucide-react";

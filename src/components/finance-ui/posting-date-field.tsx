@@ -1,22 +1,24 @@
-// The date field for anything that posts to the general ledger.
-//
-// Use this for a *document* date - invoice date, receipt date, GRN received date,
-// vendor payment date. Those all reach `ensure_period_open` on the backend, which
-// rejects a date outside an OPEN fiscal period with a 409, so the calendar here
-// simply stops offering them.
-//
-// Do NOT use it for dates that never post: due dates, "needed by", "valid until",
-// expected delivery. Those are deliberately in the future, past the end of every
-// open period, and constraining them would break them. Plain <Input type="date"/>
-// stays right for those, and for report filters - you must be able to run a report
-// over a closed period.
-//
-// `notBefore` is the second, separate constraint. An open period answers "may we
-// book on this date at all?"; `notBefore` answers "could this have happened by
-// then?" - a write-off cannot predate its invoice, a refund cannot predate the
-// credit it pays out. The backend enforces it either way (a 409
-// POSTING_BACKDATED), so this exists to stop the user picking the date, not to be
-// the guard.
+/**
+ * The date field for anything that posts to the general ledger.
+ *
+ * Use this for a *document* date - invoice date, receipt date, GRN received date,
+ * vendor payment date. Those all reach `ensure_period_open` on the backend, which
+ * rejects a date outside an OPEN fiscal period with a 409, so the calendar here
+ * simply stops offering them.
+ *
+ * Do NOT use it for dates that never post: due dates, "needed by", "valid until",
+ * expected delivery. Those are deliberately in the future, past the end of every
+ * open period, and constraining them would break them. Plain <Input type="date"/>
+ * stays right for those, and for report filters - you must be able to run a report
+ * over a closed period.
+ *
+ * `notBefore` is the second, separate constraint. An open period answers "may we
+ * book on this date at all?"; `notBefore` answers "could this have happened by
+ * then?" - a write-off cannot predate its invoice, a refund cannot predate the
+ * credit it pays out. The backend enforces it either way (a 409
+ * POSTING_BACKDATED), so this exists to stop the user picking the date, not to be
+ * the guard.
+ */
 
 import { useEffect, useRef } from "react";
 import { DatePickerInput } from "@/components/ui/date-picker-input";

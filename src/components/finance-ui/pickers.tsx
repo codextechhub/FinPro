@@ -1,7 +1,9 @@
-// Entity-scoped reference pickers for create forms - thin wrappers over the
-// app's SearchSelect that load their options from the matching list endpoint and
-// report the selected CODE (the value the backend resolves by). Reused across
-// every finance create form so account/currency/tax selection is consistent.
+/**
+ * Entity-scoped reference pickers for create forms - thin wrappers over the
+ * app's SearchSelect that load their options from the matching list endpoint and
+ * report the selected CODE (the value the backend resolves by). Reused across
+ * every finance create form so account/currency/tax selection is consistent.
+ */
 
 import { SearchSelect } from "@/components/custom/search-select";
 import { useGetAccountsQuery, useGetChartOfAccountsQuery, useGetCurrenciesQuery, useGetTaxCodesQuery, useGetCostCentersQuery } from "@/redux/services/finance/setup-api";

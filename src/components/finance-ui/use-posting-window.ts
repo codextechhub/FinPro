@@ -1,14 +1,16 @@
-// The active entity's posting window - which dates a document may carry.
-//
-// Every document date in Finance and Procurement ends up at the same backend
-// guard: `ensure_period_open` rejects a date outside an OPEN fiscal period with a
-// 409. Without this, a user fills a whole drawer and only then learns the date was
-// never allowed. Read this hook, feed `ranges` to <PostingDateField>, and the
-// calendar stops offering those days at all.
-//
-// Degrades open on purpose: if the window can't be read (no entity yet, a 403, the
-// network), `constrained` is false and every date stays selectable. A permission
-// gap must never lock someone out of a form - the backend guard is still there.
+/**
+ * The active entity's posting window - which dates a document may carry.
+ *
+ * Every document date in Finance and Procurement ends up at the same backend
+ * guard: `ensure_period_open` rejects a date outside an OPEN fiscal period with a
+ * 409. Without this, a user fills a whole drawer and only then learns the date was
+ * never allowed. Read this hook, feed `ranges` to <PostingDateField>, and the
+ * calendar stops offering those days at all.
+ *
+ * Degrades open on purpose: if the window can't be read (no entity yet, a 403, the
+ * network), `constrained` is false and every date stays selectable. A permission
+ * gap must never lock someone out of a form - the backend guard is still there.
+ */
 
 import { useMemo } from "react";
 import { useGetPostingWindowQuery } from "@/redux/services/finance/setup-api";

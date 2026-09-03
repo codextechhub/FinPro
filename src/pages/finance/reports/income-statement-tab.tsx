@@ -1,9 +1,11 @@
-// Income Statement (P&L) - rebuilt to the Vision prototype in the house theme. The
-// P&L is revenue less expenses → net income (which closes to Retained Earnings at
-// year-end). Fiscal-year scoped, with optional Budget + Variance and Prior-year
-// comparison columns (toggled on when the backend has that data). Money + the
-// comparison figures come straight from the endpoint; export is the real backend
-// CSV/XLSX/PDF.
+/**
+ * Income Statement (P&L) - rebuilt to the Vision prototype in the house theme. The
+ * P&L is revenue less expenses → net income (which closes to Retained Earnings at
+ * year-end). Fiscal-year scoped, with optional Budget + Variance and Prior-year
+ * comparison columns (toggled on when the backend has that data). Money + the
+ * comparison figures come straight from the endpoint; export is the real backend
+ * CSV/XLSX/PDF.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Download } from "lucide-react";

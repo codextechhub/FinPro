@@ -1,7 +1,9 @@
-// vs_procurement RTK Query - master data (vendors, categories, catalog) and the
-// Procure-to-Pay chain (requisition → PO → goods receipt → vendor invoice with
-// 3-way match → vendor payment with WHT). Reads gate on *.view; actions on their
-// own rbac_permission. Every call is entity-scoped.
+/**
+ * vs_procurement RTK Query - master data (vendors, categories, catalog) and the
+ * Procure-to-Pay chain (requisition → PO → goods receipt → vendor invoice with
+ * 3-way match → vendor payment with WHT). Reads gate on *.view; actions on their
+ * own rbac_permission. Every call is entity-scoped.
+ */
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";

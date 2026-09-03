@@ -1,16 +1,18 @@
-// <ConsoleShell> - the in-page typography and title frame for the Finance and
-// Procurement consoles. You're "in" a separate console with a Back-to-main
-// link in its sidebar (spec §3). The shared DashboardHeader owns the floating
-// entity switcher so it can sit beneath search without reserving a content row.
-//
-// The surrounding chrome (sidebar, header, session machinery) now comes from
-// the DashboardLayout *route* above this. Two things still belong here, because
-// only the console knows them:
-//   - which sidebar renders is selected by the route's `handle.sidebar`
-//     (finance-routes / procurement-routes), and
-//   - the header title still derives from this console's nav config, pushed up
-//     through the runtime override so the header reflects the current screen
-//     rather than the console name.
+/**
+ * <ConsoleShell> - the in-page typography and title frame for the Finance and
+ * Procurement consoles. You're "in" a separate console with a Back-to-main
+ * link in its sidebar (spec §3). The shared DashboardHeader owns the floating
+ * entity switcher so it can sit beneath search without reserving a content row.
+ *
+ * The surrounding chrome (sidebar, header, session machinery) now comes from
+ * the DashboardLayout *route* above this. Two things still belong here, because
+ * only the console knows them:
+ *   - which sidebar renders is selected by the route's `handle.sidebar`
+ *     (finance-routes / procurement-routes), and
+ *   - the header title still derives from this console's nav config, pushed up
+ *     through the runtime override so the header reflects the current screen
+ *     rather than the console name.
+ */
 
 import { useLocation } from "react-router";
 import { useDashboardTitle } from "../../host";

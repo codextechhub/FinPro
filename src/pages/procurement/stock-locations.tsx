@@ -1,13 +1,15 @@
-// Procurement → Inventory → Locations. The places stock physically sits.
-//
-// Low-traffic admin: a school sets its stores up once and rarely returns. The screen
-// exists because stock is now held per location, and because a two-campus school
-// migrated onto a single `MAIN` store needs somewhere to create the other one.
-//
-// There is deliberately no Transfer button. Moving stock between locations today is
-// an issue at the source and a receipt at the destination, and the receipt re-prices
-// the stock rather than carrying its cost across. A single transfer document is a
-// recorded gap in the backend and will arrive with its own endpoint.
+/**
+ * Procurement → Inventory → Locations. The places stock physically sits.
+ *
+ * Low-traffic admin: a school sets its stores up once and rarely returns. The screen
+ * exists because stock is now held per location, and because a two-campus school
+ * migrated onto a single `MAIN` store needs somewhere to create the other one.
+ *
+ * There is deliberately no Transfer button. Moving stock between locations today is
+ * an issue at the source and a receipt at the destination, and the receipt re-prices
+ * the stock rather than carrying its cost across. A single transfer document is a
+ * recorded gap in the backend and will arrive with its own endpoint.
+ */
 import { useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useActionParam } from "@/hooks/use-action-param";

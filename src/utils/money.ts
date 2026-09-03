@@ -1,13 +1,15 @@
-// Money handling for the Finance & Procurement consoles.
-//
-// NON-NEGOTIABLE RULE (mirrors the backend's vs_finance/money.py):
-// every monetary value crossing the API is an INTEGER number of minor units
-// (kobo) - ₦1 = 100 kobo. We convert once, here, at the UI boundary and never
-// do float arithmetic on money beyond these helpers.
-//
-//   toNaira(kobo)        → major-unit number for display maths only
-//   toKobo(naira)        → integer kobo to submit to the API
-//   formatMoney(kobo)    → "₦1,234,567.00" (grouped, 2dp, currency-aware)
+/**
+ * Money handling for the Finance & Procurement consoles.
+ *
+ * NON-NEGOTIABLE RULE (mirrors the backend's vs_finance/money.py):
+ * every monetary value crossing the API is an INTEGER number of minor units
+ * (kobo) - ₦1 = 100 kobo. We convert once, here, at the UI boundary and never
+ * do float arithmetic on money beyond these helpers.
+ *
+ *   toNaira(kobo)        → major-unit number for display maths only
+ *   toKobo(naira)        → integer kobo to submit to the API
+ *   formatMoney(kobo)    → "₦1,234,567.00" (grouped, 2dp, currency-aware)
+ */
 
 const KOBO_PER_MAJOR = 100;
 

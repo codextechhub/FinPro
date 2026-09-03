@@ -1,13 +1,15 @@
-// Banking & reconciliation (§6.5), redesigned to the Vision prototype in the
-// house theme: KPIs, a bank-accounts table (account number FLS-masked, Primary
-// badge, book balance, last reconciled), and a tabbed detail drawer
-// (Transactions · Statement lines · Statements · Reconciliations · Settings)
-// with Book/Statement/Unreconciled metric cards, Import statement and
-// Auto-reconcile.
-//
-// Honest adaptations: the prototype's "Cash books / petty cash" lives on the
-// separate Petty Cash screen; USD-position / cash-on-hand KPIs (FX + petty cash)
-// are dropped. We store statement *lines*, grouped under imported Statements.
+/**
+ * Banking & reconciliation (§6.5), redesigned to the Vision prototype in the
+ * house theme: KPIs, a bank-accounts table (account number FLS-masked, Primary
+ * badge, book balance, last reconciled), and a tabbed detail drawer
+ * (Transactions · Statement lines · Statements · Reconciliations · Settings)
+ * with Book/Statement/Unreconciled metric cards, Import statement and
+ * Auto-reconcile.
+ *
+ * Honest adaptations: the prototype's "Cash books / petty cash" lives on the
+ * separate Petty Cash screen; USD-position / cash-on-hand KPIs (FX + petty cash)
+ * are dropped. We store statement *lines*, grouped under imported Statements.
+ */
 
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";

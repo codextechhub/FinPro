@@ -1,14 +1,16 @@
-// Needs Attention - inbound provider events that did not make it into the books.
-//
-// When a gateway webhook arrives and the booking fails (most often because no fiscal
-// period is open for today), the processor records the failure and deliberately
-// swallows the exception: the PSP has already been acked and its retries are
-// idempotent, so re-raising would only produce a spurious 500. That is right for the
-// provider and wrong for us - the customer's money has moved and nothing in the
-// console said so. This screen is the "and then somebody notices" half.
-//
-// Replay re-runs the stored event against the body already on file. It is safe to
-// press twice: the confirm services are idempotent on a terminal record.
+/**
+ * Needs Attention - inbound provider events that did not make it into the books.
+ *
+ * When a gateway webhook arrives and the booking fails (most often because no fiscal
+ * period is open for today), the processor records the failure and deliberately
+ * swallows the exception: the PSP has already been acked and its retries are
+ * idempotent, so re-raising would only produce a spurious 500. That is right for the
+ * provider and wrong for us - the customer's money has moved and nothing in the
+ * console said so. This screen is the "and then somebody notices" half.
+ *
+ * Replay re-runs the stored event against the body already on file. It is safe to
+ * press twice: the confirm services are idempotent on a terminal record.
+ */
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";

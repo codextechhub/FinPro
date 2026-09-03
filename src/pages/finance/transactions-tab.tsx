@@ -1,8 +1,10 @@
-// Transactions Log - a unified money-movement feed (Vision "Transactions Log"), house theme.
-// Money IN (collections) + money OUT (payouts) in one paginated read-only ledger, served by
-// the backend /payments/movements/ union (no client-side merge or caps). KPIs from the
-// movements summary; direction / status / provider filters are server-side; a row drawer
-// shows the movement's detail. Payout beneficiary name/account are FLS-masked server-side.
+/**
+ * Transactions Log - a unified money-movement feed (Vision "Transactions Log"), house theme.
+ * Money IN (collections) + money OUT (payouts) in one paginated read-only ledger, served by
+ * the backend /payments/movements/ union (no client-side merge or caps). KPIs from the
+ * movements summary; direction / status / provider filters are server-side; a row drawer
+ * shows the movement's detail. Payout beneficiary name/account are FLS-masked server-side.
+ */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDownLeft, ArrowUpRight, Receipt, Banknote } from "lucide-react";

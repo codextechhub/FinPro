@@ -34,10 +34,12 @@ import type {
 import { formatMoney } from "@/utils/money";
 import { batchAdjustmentLinesAreValid } from "./batch-adjustment-validation";
 
-// `available` is deliberately NOT held in state. Every line's headroom depends on the
-// batch's posting date - refundable credit is measured as at that date - so a stored
-// snapshot goes stale the moment the date changes, and the user submits against a
-// number the backend no longer agrees with. It is derived on every render instead.
+/**
+ * `available` is deliberately NOT held in state. Every line's headroom depends on the
+ * batch's posting date - refundable credit is measured as at that date - so a stored
+ * snapshot goes stale the moment the date changes, and the user submits against a
+ * number the backend no longer agrees with. It is derived on every render instead.
+ */
 type Line = { id: number; target: string; amount: number };
 let lineSequence = 1;
 const newLine = (): Line => ({ id: lineSequence++, target: "", amount: 0 });

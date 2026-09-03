@@ -1,10 +1,12 @@
-// Collections → Virtual accounts. Dedicated funding NUBANs per customer, minted
-// through a payment gateway (Paystack / Fake-for-dev). Money transferred
-// to a customer's number arrives as a Collection that reconciles to their AR.
-//
-// The funding account number/name are FLS-stripped unless the caller holds
-// payments.virtual_account.view_sensitive → render "••••" rather than crash.
-// No prototype exists for this screen; built in the house theme to match AR.
+/**
+ * Collections → Virtual accounts. Dedicated funding NUBANs per customer, minted
+ * through a payment gateway (Paystack / Fake-for-dev). Money transferred
+ * to a customer's number arrives as a Collection that reconciles to their AR.
+ *
+ * The funding account number/name are FLS-stripped unless the caller holds
+ * payments.virtual_account.view_sensitive → render "••••" rather than crash.
+ * No prototype exists for this screen; built in the house theme to match AR.
+ */
 
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";

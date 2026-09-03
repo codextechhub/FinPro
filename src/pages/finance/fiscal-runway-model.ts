@@ -1,13 +1,15 @@
-// Copy and tone for the fiscal-calendar runway banner.
-//
-// Fiscal periods are created a year at a time. When the last one's end date passes
-// with no new year created, the posting guard rejects every date, so every posting
-// in the entity fails at once: invoices, receipts, payroll, gateway settlements.
-// Nothing degrades first, which is why the dashboard has to say something before
-// the date arrives - and why it must say nothing at all while the runway is fine.
-//
-// The words live here rather than in the component so all four states (fine,
-// running out, lapsed, never had a calendar) can be read and tested in one place.
+/**
+ * Copy and tone for the fiscal-calendar runway banner.
+ *
+ * Fiscal periods are created a year at a time. When the last one's end date passes
+ * with no new year created, the posting guard rejects every date, so every posting
+ * in the entity fails at once: invoices, receipts, payroll, gateway settlements.
+ * Nothing degrades first, which is why the dashboard has to say something before
+ * the date arrives - and why it must say nothing at all while the runway is fine.
+ *
+ * The words live here rather than in the component so all four states (fine,
+ * running out, lapsed, never had a calendar) can be read and tested in one place.
+ */
 
 import type { FiscalRunway } from "@/redux/services/finance/reports-types";
 
