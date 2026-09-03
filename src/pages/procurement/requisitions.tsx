@@ -82,7 +82,8 @@ export default function RequisitionsPage() {
     sourceDocumentIdFromParams(searchParams)
   ));
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PROC_CREATE_REQUISITION), () => setCreating(true));
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");

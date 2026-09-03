@@ -81,7 +81,8 @@ export default function BankingPage() {
   const { code: entity, currency } = useActiveEntity();
   const [selected, setSelected] = useState<BankAccount | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_CREATE_BANK_ACCOUNT), () => setCreating(true));
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput.trim().toLowerCase(), 250);
 

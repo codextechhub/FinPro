@@ -7,7 +7,7 @@ import { AlertTriangle, CalendarClock, ClipboardCheck, Clock, Plus } from "lucid
 import { useActionParam } from "@/hooks/use-action-param";
 
 import {
-  Can, DetailDrawer, EmptyState, ErrorState, ForbiddenState, StatCard,
+  Can, useCan, DetailDrawer, EmptyState, ErrorState, ForbiddenState, StatCard,
   LoadingState, toArray,
 } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,8 @@ export default function PerformanceScreen({ entity, currency }: SectionProps) {
   const [end, setEnd] = useState("");
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<VendorPerformanceRow | null>(null);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PROC_CREATE_VENDOR_ASSESSMENT), () => setCreating(true));
   const params = useMemo(
     () => ({ entity, ...(start ? { start_date: start } : {}), ...(end ? { end_date: end } : {}) }),
     [entity, start, end],

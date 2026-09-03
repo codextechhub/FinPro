@@ -66,7 +66,8 @@ export default function ContractsPage() {
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PROC_CREATE_CONTRACT), () => setCreating(true));
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(search.trim()), 350);
     return () => window.clearTimeout(timer);

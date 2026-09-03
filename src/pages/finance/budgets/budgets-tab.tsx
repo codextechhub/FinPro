@@ -76,7 +76,8 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 export function BudgetsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_CREATE_BUDGET), () => setCreating(true));
   const [heatmapId, setHeatmapId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const { data, isLoading, isFetching, isError, refetch } = useGetBudgetsQuery({ entity, page });

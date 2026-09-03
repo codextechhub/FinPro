@@ -96,7 +96,8 @@ export default function VendorInvoicesPage() {
     sourceDocumentIdFromParams(searchParams)
   ));
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PROC_CREATE_VENDOR_INVOICE), () => setCreating(true));
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => window.clearTimeout(timer);

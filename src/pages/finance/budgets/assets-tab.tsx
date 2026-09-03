@@ -12,7 +12,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus, Sparkles, Banknote, PackageX } from "lucide-react";
 import { DataTable, Money, MoneyInput, DetailDrawer, FormField, BankAccountPicker, AccountPicker, PostingRecap, KpiCard, toArray, type Column, type RecapRow, PostingDateField,} from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -75,7 +75,8 @@ function yearlySchedule(asset: FixedAsset) {
 export function AssetsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_CREATE_FIXED_ASSET), () => setCreating(true));
   const [running, setRunning] = useState(false);
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");

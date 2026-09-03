@@ -155,7 +155,8 @@ export default function PayrollPage() {
 function RunsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_CREATE_PAYROLL), () => setCreating(true));
   const [page, setPage] = useState(1);
   const { data, isLoading, isFetching, isError, refetch } = useGetPayrollRunsQuery({ entity, page });
   const rows = useMemo(() => toArray(data?.data), [data]);

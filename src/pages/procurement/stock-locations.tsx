@@ -48,7 +48,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<StockLocation | null>(null);
   const [balancesFor, setBalancesFor] = useState<StockLocation | null>(null);
-  useActionParam("new", () => setCreating(true));
+  useActionParam("new", can(P.PROC_MANAGE_STOCK), () => setCreating(true));
 
   // Every location, active and archived: this is the screen that manages them, so
   // unlike useStockLocations it must not hide the ones it exists to reactivate.

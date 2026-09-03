@@ -8,7 +8,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Search, ArrowUp, ArrowDown, Layers, Plus } from "lucide-react";
 import { DataTable, Money, ConfirmActionModal, InfoHint, toArray, kpiValueClass, type Column } from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,7 +85,8 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
   const [reason, setReason] = useState("");
   const [batchOpen, setBatchOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
-  useActionParam("new", () => setNewOpen(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_CREATE_INVOICE), () => setNewOpen(true));
 
   const params = useMemo(() => ({ entity, page, ...(bucket ? { bucket } : {}), ...(search ? { search } : {}) }), [entity, page, bucket, search]);
   const { data, isLoading, isFetching, isError, refetch } = useGetInvoicesQuery(params);

@@ -7,7 +7,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { DataTable, StatusPill, FormModal, FormField, type Column } from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { P } from "../../../permissions";
@@ -22,7 +22,8 @@ const selectCls = "h-9 w-full rounded-md border border-white-02 bg-white px-2 fo
 export function EntitiesTab() {
   const { data, isLoading, isFetching, isError, refetch } = useGetEntitiesQuery();
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_CREATE_ENTITY), () => setCreating(true));
   const rows = data?.data ?? [];
 
   const columns: Column<LedgerEntity>[] = [

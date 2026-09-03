@@ -26,7 +26,7 @@ export function TaxCodesTab({ entity }: { entity: string }) {
   const [type, setType] = useState("");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<TaxCode | null>(null);
-  useActionParam("new", () => { if (canEdit) setCreating(true); });
+  useActionParam("new", canEdit, () => { if (canEdit) setCreating(true); });
 
   const types = useMemo(() => [...new Set(codes.map((c) => taxType(c.code)))].sort(), [codes]);
   const rows = useMemo(() => codes.filter((c) => !type || taxType(c.code) === type), [codes, type]);

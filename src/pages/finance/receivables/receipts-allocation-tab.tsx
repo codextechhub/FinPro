@@ -8,7 +8,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { Search, Plus, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, toArray, type Column } from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,7 +59,8 @@ export function ReceiptsAllocationTab({ entity, currency }: { entity: string; cu
   const [status, setStatus] = useState("");
   const [method, setMethod] = useState("");
   const [newOpen, setNewOpen] = useState(false);
-  useActionParam("new", () => setNewOpen(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_RECORD_PAYMENT), () => setNewOpen(true));
   const [selected, setSelected] = useState<number | null>(null);
 
   const [page, setPage] = useState(1);

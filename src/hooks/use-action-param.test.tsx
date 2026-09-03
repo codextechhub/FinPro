@@ -12,9 +12,9 @@ let root: Root;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
-function Probe({ onOpen }: { onOpen: () => void }) {
+function Probe({ onOpen, allowed = true }: { onOpen: () => void; allowed?: boolean }) {
   const location = useLocation();
-  useActionParam("new", onOpen);
+  useActionParam("new", allowed, onOpen);
   return <output data-search={location.search}>{location.search}</output>;
 }
 
@@ -24,13 +24,13 @@ function Probe({ onOpen }: { onOpen: () => void }) {
 function TabThenAction({ onOpen, onTab }: { onOpen: () => void; onTab: (v: string) => void }) {
   const location = useLocation();
   useFilterParam("tab", ["team", "mine"] as const, onTab);
-  useActionParam("new", onOpen);
+  useActionParam("new", true, onOpen);
   return <output data-search={location.search}>{location.search}</output>;
 }
 
 function ActionThenTab({ onOpen, onTab }: { onOpen: () => void; onTab: (v: string) => void }) {
   const location = useLocation();
-  useActionParam("new", onOpen);
+  useActionParam("new", true, onOpen);
   useFilterParam("tab", ["team", "mine"] as const, onTab);
   return <output data-search={location.search}>{location.search}</output>;
 }
@@ -75,6 +75,41 @@ describe("useActionParam create-drawer contract", () => {
     expect(onOpen).not.toHaveBeenCalled();
     expect(container.querySelector("output")?.getAttribute("data-search"))
       .toBe("?action=receive");
+  });
+
+  it("opens nothing for a caller who may not create", async () => {
+    // The reason `allowed` is an argument at all. A bursar at Holy Cross with
+    // no procurement.vendor.create sees no Add Vendor button, and used to get
+    // the Add Vendor form anyway from
+    // /procurement/vendors/vendors?action=new - the button was gated, the
+    // drawer rendered off local state, and this hook set that state on sight
+    // of the param.
+    const onOpen = vi.fn();
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/procurement/vendors/vendors?action=new"]}>
+          <Probe onOpen={onOpen} allowed={false} />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("still consumes a refused instruction", async () => {
+    // It was answered; the answer was no. Left on the URL it would re-fire on
+    // the next render, and the address would go on promising something it will
+    // never do.
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/procurement/vendors/vendors?action=new&from=palette"]}>
+          <Probe onOpen={vi.fn()} allowed={false} />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector("output")?.getAttribute("data-search"))
+      .toBe("?from=palette");
   });
 });
 

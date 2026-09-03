@@ -92,7 +92,8 @@ export function PaymentPlansTab({ entity, currency }: { entity: string; currency
   const search = useDebounce(searchInput.trim(), 350);
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { canAll } = useCan();
+  useActionParam("new", canAll(P.FIN_CREATE_PAYMENT_PLAN, P.FIN_ACTIVATE_PAYMENT_PLAN), () => setCreating(true));
   const [selected, setSelected] = useState<PaymentPlan | null>(null);
 
   const params = useMemo(() => ({ entity, page, ...(search ? { search } : {}) }), [entity, page, search]);

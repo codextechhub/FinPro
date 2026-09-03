@@ -16,7 +16,7 @@ import {
   LoadingState, StatusPill, ActionButton, TaxCodePicker, toArray,
   useActiveEntity, type Column,
 } from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,7 +55,8 @@ export default function QuotationsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const [comparing, setComparing] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PROC_CREATE_QUOTATION), () => setCreating(true));
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(search.trim()), 350);
     return () => window.clearTimeout(timer);

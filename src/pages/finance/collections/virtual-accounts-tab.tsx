@@ -60,7 +60,8 @@ export function VirtualAccountsTab({ entity, currency }: { entity: string; curre
   const [provider, setProvider] = useState("");
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PAY_CREATE_VIRTUAL_ACCOUNT), () => setCreating(true));
   const [selected, setSelected] = useState<VirtualAccount | null>(null);
 
   const params = useMemo(() => ({

@@ -18,7 +18,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus, RefreshCw, Link2, Receipt } from "lucide-react";
 import { DataTable, Money, MoneyInput, DetailDrawer, FormField, CustomerPicker, PostingRecap, KpiCard, toArray, type Column, type RecapRow } from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,7 +73,8 @@ const isDeposit = (c: Collection) => c.channel === "VIRTUAL_ACCOUNT";
 export function CollectionsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PAY_CREATE_COLLECTION), () => setCreating(true));
   const [group, setGroup] = useState("");
   const [provider, setProvider] = useState("");
   const [page, setPage] = useState(1);

@@ -49,7 +49,8 @@ export default function GoodsReceiptsPage() {
   const canPROC_VIEW_GOODS_RECEIPTS = useCan().can(P.PROC_VIEW_GOODS_RECEIPTS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PROC_CREATE_GOODS_RECEIPT), () => setCreating(true));
   const [page, setPage] = useState(1);
   const { data, isLoading, isFetching, isError, refetch } = useGetGoodsReceiptsQuery(
     { entity: entity!, page }, { skip: !entity || !canPROC_VIEW_GOODS_RECEIPTS },

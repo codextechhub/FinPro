@@ -15,7 +15,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Plus, Layers, Banknote } from "lucide-react";
 import { DataTable, Money, MoneyInput, DetailDrawer, FormField, VendorPicker, AccountPicker, PostingRecap, KpiCard, toArray, type Column, type RecapRow } from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,7 +72,8 @@ export function PayoutsTab({ entity, currency }: { entity: string; currency?: st
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PAY_CREATE_PAYOUT), () => setCreating(true));
   const [group, setGroup] = useState("");
   const [provider, setProvider] = useState("");
   const [page, setPage] = useState(1);

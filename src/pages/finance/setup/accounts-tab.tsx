@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { ArrowLeft, ChevronDown, ChevronRight, Check, Plus, Printer, Activity, Columns2, Network, Settings2 } from "lucide-react";
 import { Money, FormField, DetailDrawer, InfoHint, StatusPill, DataTable, toArray, useActiveEntity, type Column } from "@/components/finance-ui";
 import { SearchSelect } from "@/components/custom/search-select";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/states";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -96,7 +96,8 @@ export function AccountsTab({ entity }: { entity: string }) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [touched, setTouched] = useState(false);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_CREATE_ACCOUNT), () => setCreating(true));
   const [detailId, setDetailId] = useState<number | null>(null);
 
   // Default: expand every parent until the user starts toggling.

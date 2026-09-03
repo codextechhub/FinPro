@@ -8,7 +8,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus, TrendingUp, TrendingDown } from "lucide-react";
 import { DataTable, StatusPill, Sparkline, FormDrawer, FormField, CHART_COLORS, toArray, type Column } from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,8 @@ export function CurrenciesTab() {
   const [base, setBase] = useState("");
   const [source, setSource] = useState("");
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_CREATE_FX_RATE), () => setCreating(true));
 
   const bases = useMemo(() => [...new Set(rates.map((r) => r.base))].sort(), [rates]);
   const sources = useMemo(() => [...new Set(rates.map((r) => r.source).filter(Boolean))].sort(), [rates]);

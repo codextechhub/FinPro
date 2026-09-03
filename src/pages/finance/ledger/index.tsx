@@ -9,7 +9,7 @@ import { Plus, Search } from "lucide-react";
 import { FinanceShell } from "../finance-shell";
 import { DataTable, InfoHint, Money, StatusPill, useActiveEntity, type Column } from "@/components/finance-ui";
 import { EmptyState } from "@/components/finance-ui/states";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +58,8 @@ export default function GeneralLedgerPage() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<number | null>(null);
   const [directOpen, setDirectOpen] = useState(false);
-  useActionParam("new", () => setDirectOpen(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_POST_DIRECT_ENTRY), () => setDirectOpen(true));
 
   const range = preset === "custom" ? custom : presetRange(preset);
   const filters = useMemo(() => ({

@@ -16,7 +16,7 @@ import {
   InfoHint, LoadingState, MoneyInput, PostingRecap, StatusPill, TaxCodePicker,
   toArray, useActiveEntity, type Column,
   PostingDateField,} from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,7 +74,8 @@ export default function VendorPaymentsPage() {
     sourceDocumentIdFromParams(searchParams)
   ));
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PROC_CREATE_VENDOR_PAYMENT), () => setCreating(true));
   const { data, isLoading, isFetching, isError, error, refetch } = useGetVendorPaymentsQuery(
     { entity: entity!, page }, { skip: !entity },
   );

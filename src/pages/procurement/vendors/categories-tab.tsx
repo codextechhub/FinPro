@@ -90,7 +90,7 @@ export function CategoriesTab({ entity, currency }: { entity: string; currency?:
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  useActionParam("new", can(P.PROC_CREATE_CATEGORY), () => setCreating(true));
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);

@@ -84,7 +84,8 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_CREATE_EXPENSE_CLAIM), () => setCreating(true));
   const [selected, setSelected] = useState<ExpenseClaim | null>(null);
   const [linkedDocumentDismissed, setLinkedDocumentDismissed] = useState(false);
   const linkedDocumentId = sourceDocumentIdFromParams(searchParams);

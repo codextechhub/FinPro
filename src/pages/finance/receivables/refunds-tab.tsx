@@ -94,14 +94,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export function RefundsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [searchParams] = useSearchParams();
-  const { can } = useCan();
+  const { can, canAny } = useCan();
   const [filter, setFilter] = useState<"" | Mode>("");
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
   const search = useDebounce(searchInput.trim(), 350);
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
   const [batching, setBatching] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  useActionParam("new", canAny(P.FIN_CREATE_REFUND, P.FIN_CREATE_WRITE_OFF, P.FIN_WRITE_OFF_INVOICE), () => setCreating(true));
   const [selected, setSelected] = useState<ArAdjustment | null>(null);
 
   // Unified, server-paginated refunds + write-offs; KPI totals ride in the envelope.

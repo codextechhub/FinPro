@@ -78,7 +78,8 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
   const search = useDebounce(searchInput.trim(), 350);
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.FIN_CREATE_CONCESSION), () => setCreating(true));
   const [selected, setSelected] = useState<Concession | null>(null);
 
   const params = useMemo(() => ({

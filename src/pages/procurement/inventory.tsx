@@ -111,7 +111,8 @@ function ItemsSection({ entity, currency }: { entity: string; currency?: string 
   const [creating, setCreating] = useState(false);
   const [store, setStore] = useState("");
   const { locations, multi } = useStockLocations(entity);
-  useActionParam("new", () => setCreating(true));
+  const { can } = useCan();
+  useActionParam("new", can(P.PROC_MANAGE_STOCK), () => setCreating(true));
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(search.trim()), 350);
     return () => window.clearTimeout(timer);
