@@ -3,3 +3,7 @@
 # no install of its own. A stray node_modules/ here (npx leaves one behind)
 # also blocks release.sh, which refuses to tag a dirty tree.
 node_modules/
+
+# Machine-specific: launch.json holds absolute paths to one developer's
+# checkout, so it works nowhere but the machine that wrote it.
+.claude/launch.json
