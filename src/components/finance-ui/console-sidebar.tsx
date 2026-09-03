@@ -1,10 +1,14 @@
 // The left sidebar for a dedicated console (Finance / Procurement). Mirrors the
 // global AppSidebar's chrome but renders the console's own menu via the shared
-// collapsible NavMain - expand-only parents + leaf links - with a "Back to main
-// app" entry on top. Replaces the global nav while you're inside the console.
+// collapsible NavMain - expand-only parents + leaf links. Replaces the global
+// nav while you're inside the console.
+//
+// There is no way-out row. The mark at the top is already a link home, and the
+// header's search box reaches any screen by name, so a permanent "Back to Home"
+// was a third route to the same place, taking the first slot on every console
+// screen to do it.
 
 import { useLayoutEffect, useRef } from "react";
-import { ArrowLeft } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import {
   Sidebar,
@@ -100,14 +104,6 @@ export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavG
     .map((g) => ({ label: g.label, items: mapItems(g.items) }))
     .filter((g) => g.items.length > 0);
 
-  const backItem = {
-    title: "Back to Home",
-    url: routesPath.PROTECTED.OVERVIEW.INDEX,
-    icon: ArrowLeft,
-    isActive: false,
-    childActive: false,
-  };
-
   const groupLabelCls = "px-4 pb-1 pt-3 font-mont text-[10px] font-semibold uppercase tracking-wide text-gray-05 group-data-[collapsible=icon]:hidden";
 
   return (
@@ -137,7 +133,10 @@ export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavG
         // is long, so force vertical scroll when collapsed (x stays clipped).
         className="bg-white pt-3 pb-6 group-data-[collapsible=icon]:overflow-y-auto!"
       >
-        <NavMain items={[backItem]} navigationKey={location} />
+        {/* No "Back to Home" row. The mark above is already a link home
+            (aria-label "Go to dashboard"), and the header's search box jumps
+            anywhere by name - so a permanent row costing a slot at the top of
+            every console screen was buying a third way to do the same thing. */}
         <p className={groupLabelCls}>{title}</p>
         {groups.map((g, i) => (
           <div key={g.label ?? `g${i}`}>
