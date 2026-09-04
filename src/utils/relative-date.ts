@@ -32,3 +32,20 @@ export const formatRelativeDate = (dateStr: string): string => {
 
   return `${day}${suffix} ${date.toLocaleString("en-GB", { month: "long" })} ${date.getFullYear()}`;
 };
+
+/**
+ * An ISO calendar date: ``2026-09-04``.
+ *
+ * Deliberately not localised. This is the form a date takes in an input, in a
+ * filter and in a payload, where a reader is matching it against something
+ * rather than reading it as prose - and where "04/09/2026" means two different
+ * days depending on who is looking.
+ */
+export const formatDate = (timestamp: string | number | Date): string => {
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return "-";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
