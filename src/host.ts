@@ -43,6 +43,26 @@ export interface HostPerson {
   status: string;
 }
 
+/** The minimum a role must expose to be pointed at by an approval step.
+ *
+ *  ``key`` is what the engine resolves against, and it is the reason this is in
+ *  the contract at all rather than the package reading roles itself. Both apps
+ *  already query the same endpoint - ``/rbac/tenants/{slug}/roles/`` - through
+ *  their own RTK Query slices with their own tag types. A package that shipped a
+ *  third slice over those routes would give an app two caches of one truth:
+ *  approving a role change would invalidate one and not the other, and the roles
+ *  table and an approver picker would disagree about what a role holds,
+ *  intermittently, depending on which screen was opened first.
+ *
+ *  So the package asks the app it is running inside, which already knows.
+ */
+export interface HostRole {
+  id: string | number;
+  /** The slug an approval stage names. Not the display name. */
+  key: string;
+  name: string;
+}
+
 export interface HostQueryResult<T> {
   /** The rows themselves, already unwrapped from whatever envelope the app uses. */
   data: T[] | undefined;
@@ -107,6 +127,9 @@ export interface HostContract {
   useBranches(): HostQueryResult<HostBranch>;
   /** Everyone the signed-in caller may name. Scoped by the app, not here. */
   useDirectory(): HostQueryResult<HostPerson>;
+  /** Every role an approval step may be pointed at. Supplied by the app because
+   *  both apps already read these rows; see :type:`HostRole`. */
+  useRoles(): HostQueryResult<HostRole>;
   /** The application's own logo. */
   AppLogo: ComponentType<{ animate?: boolean; className?: string }>;
   /** An extra section on Setup -> Entities, below the caller's own books.
