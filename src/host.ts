@@ -61,6 +61,20 @@ export interface HostRole {
   /** The slug an approval stage names. Not the display name. */
   key: string;
   name: string;
+  /** ACTIVE / INACTIVE / ARCHIVED. A step must not be pointed at a role that
+   *  is out of use, so the pickers filter on this rather than offering it. */
+  status: string;
+  /** How many people hold it. Shown beside the name so nobody points a step at
+   *  a role nobody holds and waits for an approval that cannot come. */
+  assigned_users_count: number;
+}
+
+/** One thing a reader opened, for a host that keeps a trail of them. */
+export interface HostRecentEntry {
+  kind: string;
+  id: string;
+  label: string;
+  to: string;
 }
 
 export interface HostQueryResult<T> {
@@ -130,6 +144,21 @@ export interface HostContract {
   /** Every role an approval step may be pointed at. Supplied by the app because
    *  both apps already read these rows; see :type:`HostRole`. */
   useRoles(): HostQueryResult<HostRole>;
+  /** Note that the reader opened something, for the app's own "recently
+   *  opened" trail. The console keeps one; an app that does not supplies a hook
+   *  that ignores the call, which is a real answer rather than a gap. */
+  useLogRecentOpen(entry: HostRecentEntry | null): void;
+  /** Where this app lists who holds which role. The workflow screens link to it
+   *  from the approval-roles tab, and the two apps put it in different places -
+   *  the console under its roles console, the school app under Administration. */
+  rolesHref: string;
+  /** The approval-roles tab, where one exists.
+   *
+   *  The console shows which approval roles are unstaffed across the platform,
+   *  reading its own RBAC surface to do it. A product built for one school has
+   *  no platform-wide view and supplies a component that renders nothing -
+   *  the same answer PlatformLedgerInventory gives, for the same reason. */
+  ApprovalRolesTab: ComponentType;
   /** The application's own logo. */
   AppLogo: ComponentType<{ animate?: boolean; className?: string }>;
   /** An extra section on Setup -> Entities, below the caller's own books.
@@ -156,5 +185,6 @@ void _satisfies;
 
 export const {
   useBranches, useDirectory, useRoles, AppLogo, QuickExportButton, UserAvatar,
-  useDashboardTitle, PlatformLedgerInventory,
+  useDashboardTitle, PlatformLedgerInventory, useLogRecentOpen, rolesHref,
+  ApprovalRolesTab,
 } = host;
