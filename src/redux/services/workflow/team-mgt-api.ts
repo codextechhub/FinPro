@@ -1,6 +1,6 @@
  
 import { generateQueryString } from "@/utils/helpers";
-import { baseApi } from "../base-api";
+import { baseApi } from "@/redux/services/base-api";
 import type { TeamMemberRes, TeamMembersRes } from "./dashboard-types";
 
 export const teamMgtApi = baseApi.injectEndpoints({

@@ -1,5 +1,4 @@
-import type { PaginatedResponse } from "@/types"
-import type { ResponseMessage } from "../auth/auth-types"
+import type { PaginatedResponse, ResponseMessage } from "./envelope-types";
 
 export interface TeamMembersRes extends PaginatedResponse {
   data: TeamMember[]

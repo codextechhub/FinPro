@@ -10,7 +10,7 @@
  * are derived by walking up from their seat's node.
  */
 
-import type { PaginatedResponse } from "./rbac-types";
+import type { PaginatedResponse } from "./envelope-types";
 
 // ── Enums (mirror model TextChoices) ─────────────────────────────────────────
 

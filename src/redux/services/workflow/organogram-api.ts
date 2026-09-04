@@ -2,7 +2,7 @@
 // Mounted backend-side at .../v1/user/organogram/* and .../v1/user/platform-staff-profiles/*.
 
 import { generateQueryString } from "@/utils/helpers";
-import { baseApi } from "../base-api";
+import { baseApi } from "@/redux/services/base-api";
 import type {
   OrgNode,
   OrgNodeWritePayload,
