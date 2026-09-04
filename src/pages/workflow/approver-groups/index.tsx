@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import Tabs from "@/pages/protected/workflow/components/tabs";
 import { useFilterParam } from "@/hooks/use-filter-param";
 import GroupsTab from "./groups-tab";
 import DynamicRoleTab from "./dynamic-role-tab";
@@ -38,27 +38,11 @@ export default function WorkflowApprover() {
         </p>
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Workflow approver sections"
-        className="inline-flex max-w-full overflow-x-auto rounded-lg border border-white-02 bg-white p-1"
-      >
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.key}
-            onClick={() => setTab(t.key)}
-            className={cn(
-              "whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-              tab === t.key ? "bg-pry-01 text-primary" : "text-gray-01 hover:bg-gray-50",
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={TABS.map((t) => ({ value: t.key, label: t.label }))}
+        activeTab={tab}
+        setActiveTab={(value) => setTab(value as Tab)}
+      />
 
       {tab === "groups" ? <GroupsTab /> : tab === "rules" ? <DynamicRoleTab /> : <ApprovalRolesTab />}
     </PageShell>
