@@ -155,6 +155,6 @@ const _satisfies: HostContract = host;
 void _satisfies;
 
 export const {
-  useBranches, useDirectory, AppLogo, QuickExportButton, UserAvatar, useDashboardTitle,
-  PlatformLedgerInventory,
+  useBranches, useDirectory, useRoles, AppLogo, QuickExportButton, UserAvatar,
+  useDashboardTitle, PlatformLedgerInventory,
 } = host;
