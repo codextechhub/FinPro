@@ -15,8 +15,8 @@ import {
 import { FinanceShell } from "./finance-shell";
 import { fiscalRunwayNotice } from "./fiscal-runway-model";
 import {
-  Money, StatusPill, BudgetBar, AgingStack, TrendArea, kpiValueClass,
-  CHART_COLORS, InfoHint, useActiveEntity, type AgingDatum,
+  Money, StatusPill, BudgetBar, AgingStack, TrendArea, TabStrip, kpiValueClass,
+  CHART_COLORS, InfoHint, useActiveEntity, type AgingDatum, type TabStripItem,
 } from "@/components/finance-ui";
 import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/states";
 import { useCan } from "@/components/finance-ui/can";
@@ -157,6 +157,12 @@ function FiscalRunwayBanner({ runway, canManage, onManage }: {
     </div>
   );
 }
+
+// Lower case: the strip capitalises its labels.
+const GRANULARITY_TABS: TabStripItem<"monthly" | "quarterly">[] = [
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+];
 
 const AGING_META: Record<string, { label: string; color: string }> = {
   current: { label: "Current", color: CHART_COLORS.green },
@@ -299,14 +305,13 @@ export default function FinanceDashboard() {
             {/* Receivables vs Collections trend */}
             <Card title="Receivables vs Collections" subtitle="Trailing 12 months"
               action={
-                <div className="flex rounded-md border border-white-02 p-0.5 font-mont text-xs">
-                  {(["monthly", "quarterly"] as const).map((g) => (
-                    <button key={g} onClick={() => setGranularity(g)}
-                      className={cn("rounded px-2.5 py-1 capitalize", granularity === g ? "bg-primary text-white" : "text-gray-05 hover:text-gray-01")}>
-                      {g}
-                    </button>
-                  ))}
-                </div>
+                <TabStrip
+                  items={GRANULARITY_TABS}
+                  value={granularity}
+                  onChange={setGranularity}
+                  variant="pill-compact"
+                  ariaLabel="Trend granularity"
+                />
               }>
               <TrendArea labels={trend.labels} format={(v) => formatMoney(v, currency)}
                 series={[

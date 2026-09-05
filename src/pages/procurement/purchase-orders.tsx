@@ -12,7 +12,8 @@ import { RequisitionPicker, VendorPicker, ContractPicker } from "./pickers";
 import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import {
   Can, ConfirmActionModal, DataTable, DetailDrawer, EmptyState, ErrorState,
-  FormField, InfoHint, LoadingState, StatCard, StatusPill, toArray, useActiveEntity, useCan, type Column,
+  FormField, InfoHint, LoadingState, StatCard, StatusPill, TabStrip, toArray, useActiveEntity,
+  useCan, type Column, type TabStripItem,
 } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
 import { QuickExportButton } from "../../host";
@@ -56,6 +57,13 @@ const DETAIL_TABS = [
 ] as const;
 
 type DetailTab = typeof DETAIL_TABS[number]["value"];
+
+/** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
+const STATUS_TAB_ITEMS: TabStripItem<string>[] = STATUS_TABS.map((tab) => ({ value: tab.value, label: tab.label }));
+const DETAIL_TAB_ITEMS: TabStripItem<DetailTab>[] = DETAIL_TABS.map(({ value, label, icon: Icon }) => ({
+  value,
+  label: <><Icon className="size-3.5" />{label}</>,
+}));
 
 function shortDate(value?: string | null) {
   if (!value) return "-";
@@ -169,9 +177,15 @@ export default function PurchaseOrdersPage() {
 
         <section data-guide="procurement-purchase-orders.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">
-            <div className="max-w-full overflow-x-auto"><div className="flex min-w-max gap-5">
-              {STATUS_TABS.map((tab) => <button key={tab.value || "all"} type="button" onClick={() => { setStatus(tab.value); setPage(1); }} className={cn("border-b-2 px-0.5 py-3 font-mont text-xs font-medium whitespace-nowrap", status === tab.value ? "border-primary text-primary" : "border-transparent text-gray-05 hover:text-black-01")}>{tab.label}</button>)}
-            </div></div>
+            <TabStrip
+              items={STATUS_TAB_ITEMS}
+              value={status}
+              onChange={(next) => { setStatus(next); setPage(1); }}
+              variant="underline"
+              ariaLabel="Purchase order status"
+              className="gap-5 self-center border-b-0"
+              buttonClassName="py-3"
+            />
             <div className="flex w-full items-center py-2 sm:ml-auto sm:w-auto"><label className="relative min-w-0 flex-1 sm:w-64 sm:flex-none"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search purchase orders" className="h-9 bg-white pl-9" /></label></div>
           </div>
           <DataTable columns={columns} rows={rows} rowKey={(po) => po.id} loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(po) => setSelectedId(po.id)} page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage} emptyTitle={status ? `No ${STATUS_TABS.find((tab) => tab.value === status)?.label.toLowerCase()} purchase orders` : "No purchase orders yet"} emptyMessage={debouncedSearch ? "Try a different search term or status." : "Create an order from an approved requisition to begin."} />
@@ -263,7 +277,15 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
   </>}>
     {isLoading ? <LoadingState rows={7} /> : isError || !po ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3"><StatusPill status={po.display_status} /><p className="font-mont text-lg font-semibold tabular-nums text-black-01">{money(po.total)}</p></div>
-      <div className="max-w-full overflow-x-auto border-b border-white-02"><div className="flex min-w-max gap-5">{DETAIL_TABS.map(({ value, label, icon: Icon }) => <button key={value} type="button" onClick={() => setTab(value)} className={cn("flex items-center gap-1.5 border-b-2 py-2.5 font-mont text-xs font-medium whitespace-nowrap", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}><Icon className="size-3.5" />{label}</button>)}</div></div>
+      <TabStrip
+        items={DETAIL_TAB_ITEMS}
+        value={tab}
+        onChange={setTab}
+        variant="underline"
+        ariaLabel="Purchase order sections"
+        className="w-full gap-5"
+        buttonClassName="flex items-center gap-1.5 px-0"
+      />
 
       {tab === "overview" && <div className="space-y-5">
         <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Vendor" value={po.vendor_name || po.vendor_code} /><Field label="Order date" value={shortDate(po.order_date)} /><Field label="Expected delivery" value={shortDate(po.expected_date)} /><Field label="Payment terms" value={po.payment_terms || "Not specified"} /><Field label="Delivery address" value={po.delivery_address || "Not specified"} /><Field label="Invoice progress" value={percent(po.invoiced_pct)} /></dl>

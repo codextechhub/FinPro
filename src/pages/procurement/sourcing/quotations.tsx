@@ -13,8 +13,8 @@ import { RfqPicker, VendorPicker } from "../pickers";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormDrawer, FormField, MoneyInput,
-  LoadingState, StatusPill, ActionButton, TaxCodePicker, toArray,
-  useActiveEntity, type Column,
+  LoadingState, StatusPill, ActionButton, TabStrip, TaxCodePicker, toArray,
+  useActiveEntity, type Column, type TabStripItem,
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,13 @@ const DETAIL_TABS = [
   ["evidence", "Evidence", Paperclip],
   ["activity", "Activity", History],
 ] as const;
+
+/** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
+const STATUS_TAB_ITEMS: TabStripItem<string>[] = QUOTATION_TABS.map(([label, value]) => ({ value, label }));
+const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label, Icon]) => ({
+  value,
+  label: <><Icon className="size-3.5" />{label}</>,
+}));
 
 export default function QuotationsPage() {
   const { code: entity, currency } = useActiveEntity();
@@ -102,9 +109,15 @@ export default function QuotationsPage() {
 
       <section data-guide="procurement-quotations.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">
-          <div className="max-w-full overflow-x-auto"><div className="flex min-w-max gap-5">{QUOTATION_TABS.map(([label, value]) => (
-            <button key={label} onClick={() => { setStatus(value); setPage(1); }} className={cn("border-b-2 py-3 font-mont text-xs font-medium whitespace-nowrap", status === value ? "border-primary text-primary" : "border-transparent text-gray-05")}>{label}</button>
-          ))}</div></div>
+          <TabStrip
+            items={STATUS_TAB_ITEMS}
+            value={status}
+            onChange={(next) => { setStatus(next); setPage(1); }}
+            variant="underline"
+            ariaLabel="Quotation status"
+            className="gap-5 self-center border-b-0"
+            buttonClassName="px-0 py-3"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2 border-b border-white-02 px-4 py-2.5">
           <div className="min-w-44 flex-1 sm:max-w-56"><SearchSelect options={rfqOptions} value={rfqFilter} onChange={(e) => { setRfqFilter(e.target.value); setPage(1); }} placeholder="All RFQs" revealOnSearch /></div>
@@ -152,9 +165,15 @@ function QuotationDrawer({ id, entity, currency, onClose }: { id: number | null;
           <div className="flex flex-wrap items-center gap-1.5"><StatusPill status={q.quotation_status} />{q.is_expired && <ExpiredPill />}</div>
           <p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(q.total, currency)}</p>
         </div>
-        <div className="max-w-full overflow-x-auto border-b border-white-02"><div className="flex min-w-max gap-5">{DETAIL_TABS.map(([value, label, Icon]) => (
-          <button key={value} onClick={() => setTab(value)} className={cn("flex items-center gap-1.5 border-b-2 py-2.5 font-mont text-xs font-medium whitespace-nowrap", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}><Icon className="size-3.5" />{label}</button>
-        ))}</div></div>
+        <TabStrip
+          items={DETAIL_TAB_ITEMS}
+          value={tab}
+          onChange={setTab}
+          variant="underline"
+          ariaLabel="Quotation sections"
+          className="w-full gap-5"
+          buttonClassName="flex items-center gap-1.5 px-0"
+        />
 
         {tab === "overview" && (
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">

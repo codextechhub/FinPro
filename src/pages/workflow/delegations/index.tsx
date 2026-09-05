@@ -23,6 +23,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { TabStrip, type TabStripItem } from "@/components/finance-ui/tab-strip";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/utils/relative-date";
 import { useAppSelector } from "@/redux/store";
@@ -74,6 +75,11 @@ export default function Delegations() {
   const toMe = useMemo(() => all.filter((d) => sameId(d.delegate, uid)), [all, uid]);
   const list = tab === "mine" ? mine : toMe;
 
+  const scopeTabs: TabStripItem<"mine" | "tome">[] = [
+    { value: "mine", label: `My Delegations (${mine.length})` },
+    { value: "tome", label: `Delegated to me (${toMe.length})` },
+  ];
+
   const doRevoke = () => {
     if (!revokeTarget) return;
     revoke(revokeTarget.id)
@@ -100,19 +106,19 @@ export default function Delegations() {
           </Button>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <div data-guide="workflow-delegations.scope" className="inline-flex rounded-lg border border-white-02 bg-white p-1">
-            <TabButton active={tab === "mine"} onClick={() => setTab("mine")}>
-              My Delegations ({mine.length})
-            </TabButton>
-            <TabButton active={tab === "tome"} onClick={() => setTab("tome")}>
-              Delegated to me ({toMe.length})
-            </TabButton>
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <TabStrip
+            items={scopeTabs}
+            value={tab}
+            onChange={setTab}
+            variant="pill-soft"
+            ariaLabel="Delegation scope"
+            dataGuide="workflow-delegations.scope"
+          />
           <Button
             variant="white"
             size="lg"
-            className="[&_svg]:size-5 font-medium font-mont"
+            className="ml-auto [&_svg]:size-5 font-medium font-mont"
             onClick={() => refetch()}
             disabled={isFetching}
           >
@@ -209,29 +215,6 @@ export default function Delegations() {
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-        active ? "bg-pry-01 text-primary" : "text-gray-01 hover:bg-gray-50",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

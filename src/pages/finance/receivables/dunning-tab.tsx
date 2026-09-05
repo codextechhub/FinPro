@@ -13,7 +13,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Play, SlidersHorizontal, Trash2, Pencil, Ban, Send } from "lucide-react";
-import { ConfirmActionModal, DataTable, toArray, type Column } from "@/components/finance-ui";
+import { ConfirmActionModal, DataTable, TabStrip, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { DetailDrawer, FormField } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,12 @@ export function DunningTab({ entity, currency }: { entity: string; currency?: st
     } catch { /* central */ }
   };
 
+  // Counts ride in the label so an empty queue reads as a plain word, not "(0)".
+  const viewTabs: TabStripItem<typeof tab>[] = [
+    { value: "queue", label: `Reminder queue${noticeCount ? ` (${noticeCount})` : ""}` },
+    { value: "policies", label: `Policies${policies.length ? ` (${policies.length})` : ""}` },
+  ];
+
   return (
     <>
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -89,15 +95,7 @@ export function DunningTab({ entity, currency }: { entity: string; currency?: st
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex gap-1 rounded-lg bg-[#ECECEC] p-1">
-          {([["queue", `Reminder queue${noticeCount ? ` (${noticeCount})` : ""}`], ["policies", `Policies${policies.length ? ` (${policies.length})` : ""}`]] as [typeof tab, string][]).map(([v, lbl]) => (
-            <button key={v} type="button" onClick={() => setTab(v)}
-              className={cn("rounded-md px-3 py-1.5 font-mont text-sm transition-colors",
-                tab === v ? "bg-white font-semibold text-black-01 shadow-sm ring-1 ring-black/5" : "font-medium text-gray-05 hover:text-gray-01")}>
-              {lbl}
-            </button>
-          ))}
-        </div>
+        <TabStrip items={viewTabs} value={tab} onChange={setTab} variant="segmented" ariaLabel="Dunning view" />
         <div className="flex items-center gap-2">
           <Can permission={P.FIN_MANAGE_DUNNING}>
             <Button variant="outline" onClick={() => setTab("policies")} className="gap-1.5"><SlidersHorizontal className="size-4" /> Configure cadence</Button>

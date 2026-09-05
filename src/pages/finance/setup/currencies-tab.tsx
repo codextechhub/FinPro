@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus, TrendingUp, TrendingDown } from "lucide-react";
-import { DataTable, StatusPill, Sparkline, FormDrawer, FormField, CHART_COLORS, toArray, type Column } from "@/components/finance-ui";
+import { DataTable, StatusPill, Sparkline, FormDrawer, FormField, TabStrip, CHART_COLORS, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,10 @@ import type { Currency, FxRate } from "@/redux/services/finance/setup-types";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
 const fmtRate = (r: string | number) => Number(r).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const VIEW_TABS: TabStripItem<"fx" | "currencies">[] = [
+  { value: "fx", label: "FX Rates" },
+  { value: "currencies", label: "Currencies" },
+];
 
 function Delta({ pct }: { pct: number | null }) {
   if (pct == null) return <span className="font-mont text-xs text-gray-05">-</span>;
@@ -83,14 +87,8 @@ export function CurrenciesTab() {
   return (
     <div className="space-y-4">
       {/* tabs + action */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 rounded-md border border-white-02 bg-white p-1">
-          {(["fx", "currencies"] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={cn("rounded px-3 py-1.5 font-mont text-xs font-semibold", tab === t ? "bg-primary text-white" : "text-gray-05 hover:text-gray-01")}>
-              {t === "fx" ? "FX Rates" : "Currencies"}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <TabStrip items={VIEW_TABS} value={tab} onChange={setTab} ariaLabel="Currency views" />
         {tab === "fx" && (
           <Can permission={P.FIN_CREATE_FX_RATE}>
             <Button onClick={() => setCreating(true)} className="h-9 gap-1.5 font-mont text-xs font-semibold"><Plus className="size-3.5" /> New FX rate</Button>

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
   AccountPicker, DataTable, DetailDrawer, FormDrawer, FormField, Money,
-  MoneyInput, StatusPill, TaxCodePicker, toArray, type Column,
+  MoneyInput, StatusPill, TabStrip, TaxCodePicker, toArray, type Column, type TabStripItem,
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,13 @@ const DETAIL_TABS = [
   ["Vendor Pricing", "pricing", Store],
   ["Purchase History", "history", FileClock],
 ] as const;
+
+/** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
+const STATUS_TAB_ITEMS: TabStripItem<(typeof STATUS_TABS)[number][1]>[] = STATUS_TABS.map(([label, value]) => ({ value, label }));
+const DETAIL_TAB_ITEMS: TabStripItem<(typeof DETAIL_TABS)[number][1]>[] = DETAIL_TABS.map(([label, value, Icon]) => ({
+  value,
+  label: <><Icon className="size-3.5" />{label}</>,
+}));
 
 function isForbidden(error: unknown) {
   return !!error && typeof error === "object" && "status" in error && error.status === 403;
@@ -129,7 +136,15 @@ export function CatalogTab({ entity, currency }: { entity: string; currency?: st
 
     <section data-guide="procurement-catalog.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">
-        <div className="max-w-full overflow-x-auto"><div className="flex min-w-max gap-5">{STATUS_TABS.map(([label, value]) => <button key={value} type="button" onClick={() => { setStatus(value); setPage(1); }} className={cn("border-b-2 py-3 font-mont text-xs font-medium whitespace-nowrap", status === value ? "border-primary text-primary" : "border-transparent text-gray-05")}>{label}</button>)}</div></div>
+        <TabStrip
+          items={STATUS_TAB_ITEMS}
+          value={status}
+          onChange={(next) => { setStatus(next); setPage(1); }}
+          variant="underline"
+          ariaLabel="Catalog item status"
+          className="gap-5 self-center border-b-0"
+          buttonClassName="px-0 py-3"
+        />
         <label className="relative my-2 min-w-0 basis-full sm:min-w-52 sm:flex-1 sm:basis-auto sm:max-w-72"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search catalog" className="h-9 bg-white pl-9" /></label>
       </div>
       <div className="grid grid-cols-1 gap-2 border-b border-white-02 p-3 sm:grid-cols-2">
@@ -174,7 +189,15 @@ function CatalogDrawer({ id, entity, currency, onClose }: { id: number | null; e
   return <>
     <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={item?.name || "Catalog Item"} description={item ? `${item.code} · ${item.category_path || "Uncategorised"}` : "Loading catalog item"} widthClass="sm:max-w-[700px]" footer={item && <Can permission={P.PROC_UPDATE_CATALOG_ITEM}><Button variant="outline" onClick={() => setEditing(true)}><PencilLine className="size-4" /> Edit Item</Button></Can>}>
       {isLoading ? <EmptyPanel>Loading catalog item…</EmptyPanel> : isForbidden(error) ? <EmptyPanel>You do not have permission to view this catalog item.</EmptyPanel> : isError || !item ? <EmptyPanel><button type="button" className="text-primary" onClick={() => refetch()}>Catalog item could not be loaded. Try again.</button></EmptyPanel> : <div className="space-y-5">
-        <div className="max-w-full overflow-x-auto border-b border-white-02"><div className="flex min-w-max gap-5">{DETAIL_TABS.map(([label, value, Icon]) => <button key={value} type="button" onClick={() => setTab(value)} className={cn("flex items-center gap-1.5 border-b-2 py-3 font-mont text-xs font-medium whitespace-nowrap", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}><Icon className="size-3.5" />{label}</button>)}</div></div>
+        <TabStrip
+          items={DETAIL_TAB_ITEMS}
+          value={tab}
+          onChange={setTab}
+          variant="underline"
+          ariaLabel="Catalog item sections"
+          className="w-full gap-5"
+          buttonClassName="flex items-center gap-1.5 px-0 py-3"
+        />
         {tab === "overview" && <CatalogOverview item={item} currency={currency} showStock={canStock} />}
         {tab === "pricing" && <VendorPricing item={item} insights={insights} currency={currency} allowed={canReports} loading={insightsLoading} error={insightsError} />}
         {tab === "history" && <PurchaseHistory insights={insights} currency={currency} allowed={canReports} loading={insightsLoading} error={insightsError} />}

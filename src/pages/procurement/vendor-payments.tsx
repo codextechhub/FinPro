@@ -13,15 +13,14 @@ import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
 import {
   BankAccountPicker, DataTable, DetailDrawer, EmptyState, ErrorState, FormField,
-  InfoHint, LoadingState, MoneyInput, PostingRecap, StatusPill, TaxCodePicker,
-  toArray, useActiveEntity, type Column,
+  InfoHint, LoadingState, MoneyInput, PostingRecap, StatusPill, TabStrip, TaxCodePicker,
+  toArray, useActiveEntity, type Column, type TabStripItem,
   PostingDateField,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
-import { cn } from "@/lib/utils";
 import { P } from "../../permissions";
 import {
   useCancelVendorPaymentMutation, useCreateVendorPaymentMutation,
@@ -51,6 +50,12 @@ const DETAIL_TABS = [
   ["posting", "Posting", ReceiptText], ["attachments", "Attachments", Paperclip],
   ["activity", "Activity", History],
 ] as const;
+
+/** Drawer sections for the tab strip, built once so the sliding bar re-measures only when the active tab changes. */
+const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label, Icon]) => ({
+  value,
+  label: <><Icon className="size-3.5" />{label}</>,
+}));
 
 function shortDate(value?: string | null) {
   if (!value) return "-";
@@ -168,7 +173,15 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
     </>}>
       {isLoading ? <LoadingState rows={8} /> : isError || !payment ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={payment.status} /><StatusPill status={payment.approval_state} />{payment.status === "POSTED" && <StatusPill status={payment.allocation_status} />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(payment.net_amount, currency)}</p></div>
-        <div className="max-w-full overflow-x-auto border-b border-white-02"><div className="flex min-w-max gap-5">{DETAIL_TABS.map(([value, label, Icon]) => <button key={value} onClick={() => setTab(value)} className={cn("flex items-center gap-1.5 border-b-2 py-2.5 font-mont text-xs font-medium whitespace-nowrap", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}><Icon className="size-3.5" />{label}</button>)}</div></div>
+        <TabStrip
+          items={DETAIL_TAB_ITEMS}
+          value={tab}
+          onChange={setTab}
+          variant="underline"
+          ariaLabel="Vendor payment sections"
+          className="w-full gap-5"
+          buttonClassName="flex items-center gap-1.5 px-0"
+        />
         {tab === "overview" && <div className="space-y-5">
           {payment.approval_state === "PENDING" && <section className="rounded-md border border-amber-200 bg-amber-50 p-4"><p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>{canVote && <><Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" loading={voting} onClick={() => vote("APPROVED")}><Check className="size-4" /> Approve</Button><Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button><Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button></div></>}</section>}
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Payment reference" value={payment.reference} /><Field label="Vendor" value={payment.vendor_name || payment.vendor_code} /><Field label="Payment date" value={shortDate(payment.payment_date)} /><Field label="Method" value={payment.method.replaceAll("_", " ")} /><Field label="Bank account" value={payment.bank_account_name || payment.payment_account_name || payment.payment_code} /><Field label="WHT code" value={payment.wht_tax_code_value} /><Field label="Gross settled" value={formatMoney(payment.gross_amount, currency)} /><Field label="WHT withheld" value={formatMoney(payment.wht_amount, currency)} /><Field label="Net cash paid" value={formatMoney(payment.net_amount, currency)} /><Field label="Allocated to bills" value={formatMoney(payment.allocated_amount, currency)} />{payment.status === "POSTED" && payment.advance_remaining > 0 && <Field label="Paid in advance" value={formatMoney(payment.advance_remaining, currency)} />}</dl>

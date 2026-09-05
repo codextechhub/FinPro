@@ -9,7 +9,8 @@ import { toast } from "sonner";
 
 import {
   AccountPicker, DataTable, DetailDrawer, ErrorState, FormDrawer,
-  FormField, LoadingState, StatCard, StatusPill, TaxCodePicker, toArray, type Column,
+  FormField, LoadingState, StatCard, StatusPill, TabStrip, TaxCodePicker, toArray,
+  type Column, type TabStripItem,
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
@@ -43,6 +44,13 @@ const DETAIL_TABS = [
   ["performance", "Performance", TrendingUp],
 ] as const;
 const PAYMENT_TERMS = ["NET_0", "NET_7", "NET_14", "NET_30", "NET_60", "NET_90"];
+
+/** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
+const STATUS_TAB_ITEMS: TabStripItem<(typeof STATUS_TABS)[number][1]>[] = STATUS_TABS.map(([label, value]) => ({ value, label }));
+const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label, Icon]) => ({
+  value,
+  label: <><Icon className="size-3.5" />{label}</>,
+}));
 
 function isForbidden(error: unknown) {
   return !!error && typeof error === "object" && "status" in error && error.status === 403;
@@ -144,7 +152,15 @@ export function VendorsTab({ entity, currency }: { entity: string; currency?: st
 
     <section data-guide="procurement-vendors.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">
-        <div className="max-w-full overflow-x-auto"><div className="flex min-w-max gap-5">{STATUS_TABS.map(([label, value]) => <button key={value} onClick={() => { setStatus(value); setPage(1); }} className={cn("border-b-2 py-3 font-mont text-xs font-medium whitespace-nowrap", status === value ? "border-primary text-primary" : "border-transparent text-gray-05")}>{label}</button>)}</div></div>
+        <TabStrip
+          items={STATUS_TAB_ITEMS}
+          value={status}
+          onChange={(next) => { setStatus(next); setPage(1); }}
+          variant="underline"
+          ariaLabel="Vendor status"
+          className="gap-5 self-center border-b-0"
+          buttonClassName="px-0 py-3"
+        />
         <div className="my-2 flex min-w-0 basis-full flex-wrap justify-end gap-2 xl:basis-auto">
           <select value={kyc} onChange={(event) => { setKyc(event.target.value); setPage(1); }} className="h-9 rounded-md border bg-white px-3 font-mont text-xs text-black-01">
             <option value="">All KYC states</option><option value="PENDING">KYC Pending</option><option value="VERIFIED">KYC Verified</option><option value="REJECTED">KYC Rejected</option>
@@ -194,7 +210,15 @@ function VendorDrawer({ id, entity, currency, onClose }: { id: number | null; en
     <DetailDrawer open={id != null} onOpenChange={(open) => !open && closeDrawer()} title={vendor?.name || "Vendor"} description={vendor ? `${vendor.code} · ${vendor.category_code || "Uncategorised"}` : "Loading vendor profile"} widthClass="sm:max-w-[720px]" footer={vendor && <Can permission={P.PROC_UPDATE_VENDOR}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit Vendor</Button></Can>}>
       {isLoading ? <LoadingState /> : isError || !vendor ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
         <div className="flex flex-wrap gap-1.5"><StatusPill status={vendorState(vendor)} /><StatusPill status={vendor.kyc_status} /><StatusPill status={vendor.risk} /></div>
-        <div className="max-w-full overflow-x-auto border-b border-white-02"><div className="flex min-w-max gap-1">{DETAIL_TABS.map(([value, label, Icon]) => <button key={value} onClick={() => setTab(value)} className={cn("flex items-center gap-1.5 border-b-2 px-3 py-2.5 font-mont text-xs font-medium whitespace-nowrap", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}><Icon className="size-3.5" />{label}</button>)}</div></div>
+        <TabStrip
+          items={DETAIL_TAB_ITEMS}
+          value={tab}
+          onChange={setTab}
+          variant="underline"
+          ariaLabel="Vendor sections"
+          className="w-full gap-1"
+          buttonClassName="flex items-center gap-1.5 px-3"
+        />
         {tab === "profile" && <ProfileTab vendor={vendor} insights={reportAllowed ? insights : undefined} currency={currency} reportRestricted={!reportAllowed} />}
         {tab === "contacts" && <ContactsTab vendor={vendor} />}
         {tab === "bank" && <BankTab vendor={vendor} />}

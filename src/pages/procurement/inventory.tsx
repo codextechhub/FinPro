@@ -12,8 +12,8 @@ import {
 import { ProcurementShell } from "./procurement-shell";
 import {
   AccountPicker, DataTable, DetailDrawer, EmptyState, ErrorState, FormDrawer, FormField,
-  LoadingState, Money, MoneyInput, PostingRecap, Segmented, StatCard, StatusPill, toArray,
-  useActiveEntity, type Column, type RecapRow,
+  LoadingState, Money, MoneyInput, PostingRecap, Segmented, StatCard, StatusPill, TabStrip, toArray,
+  useActiveEntity, type Column, type RecapRow, type TabStripItem,
   PostingDateField,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,13 @@ const DETAIL_TABS = [
 const MOVEMENT_TABS = [
   ["All", ""], ["Receipt", "RECEIPT"], ["Issue", "ISSUE"], ["Adjustment", "ADJUSTMENT"],
 ] as const;
+
+/** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
+const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label, Icon]) => ({
+  value,
+  label: <><Icon className="size-3.5" />{label}</>,
+}));
+const MOVEMENT_TAB_ITEMS: TabStripItem<string>[] = MOVEMENT_TABS.map(([label, value]) => ({ value, label }));
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 /**
@@ -233,9 +240,15 @@ function StockItemDrawer({ id, entity, currency, onClose }: { id: number | null;
           <StatusPill status={itemStatus(item)} />
           <p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(item.stock_value, currency)}</p>
         </div>
-        <div className="max-w-full overflow-x-auto border-b border-white-02"><div className="flex min-w-max gap-5">{DETAIL_TABS.map(([value, label, Icon]) => (
-          <button key={value} onClick={() => setTab(value)} className={cn("flex items-center gap-1.5 border-b-2 py-2.5 font-mont text-xs font-medium whitespace-nowrap", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}><Icon className="size-3.5" />{label}</button>
-        ))}</div></div>
+        <TabStrip
+          items={DETAIL_TAB_ITEMS}
+          value={tab}
+          onChange={setTab}
+          variant="underline"
+          ariaLabel="Stock item sections"
+          className="w-full gap-5"
+          buttonClassName="flex items-center gap-1.5 px-0"
+        />
 
         {tab === "overview" && (<>
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">
@@ -627,11 +640,15 @@ function MovementsSection({ entity, currency }: { entity: string; currency?: str
         </div>
         <section data-guide="procurement-stock-movements.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">
-            <div className="max-w-full overflow-x-auto">
-              <div className="flex min-w-max gap-5">{MOVEMENT_TABS.map(([label, value]) => (
-                <button key={label} onClick={() => { setTab(value); setPage(1); }} className={cn("border-b-2 py-3 font-mont text-xs font-medium whitespace-nowrap", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}>{label}</button>
-              ))}</div>
-            </div>
+            <TabStrip
+              items={MOVEMENT_TAB_ITEMS}
+              value={tab}
+              onChange={(next) => { setTab(next); setPage(1); }}
+              variant="underline"
+              ariaLabel="Movement type"
+              className="gap-5 self-center border-b-0"
+              buttonClassName="px-0 py-3"
+            />
             {multi && (
               <label className="w-full py-2 sm:w-56">
                 <span className="sr-only">Filter by store</span>

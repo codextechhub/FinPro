@@ -1,10 +1,18 @@
 /**
  * <Segmented> - a segmented toggle that reads as a control at first glance: a grey
- * track with a raised white "thumb" on the active option. Used across the finance
- * drawers (note type, refund action, payment-plan frequency…) for one consistent
- * look. Renders its own label with comfortable spacing (don't wrap in FormField).
+ * track with a raised white "thumb" that slides onto the option being set. Used
+ * across the finance drawers (note type, refund action, payment-plan frequency…)
+ * for one consistent look. Renders its own label with comfortable spacing (don't
+ * wrap in FormField).
+ *
+ * The buttons carry `aria-pressed` rather than tab semantics, because this sets a
+ * value on the form around it instead of moving between panels.
+ *
+ * Options arrive as `[value, label]` pairs so a caller can keep them in one
+ * `as const` list beside the state they drive; the track itself is the shared
+ * <TabStrip> in its `segmented` skin, which is what gives the thumb its slide.
  */
-import { cn } from "@/lib/utils";
+import { TabStrip, type TabStripItem } from "./tab-strip";
 
 export function Segmented<T extends string>({ value, onChange, options, label, isDisabled, className }: {
   value: T;
@@ -14,29 +22,23 @@ export function Segmented<T extends string>({ value, onChange, options, label, i
   isDisabled?: (v: T) => boolean;
   className?: string;
 }) {
+  const items: TabStripItem<T>[] = options.map(([v, lbl]) => ({
+    value: v,
+    label: lbl,
+    disabled: isDisabled?.(v) ?? false,
+  }));
+
   return (
     <div>
       {label ? <p className="mb-2 font-mont text-xs text-gray-05">{label}</p> : null}
-      <div className={cn("inline-flex max-w-full gap-1 overflow-x-auto rounded-lg bg-[#ECECEC] p-1", className)}>
-        {options.map(([v, lbl]) => {
-          const dis = isDisabled?.(v) ?? false;
-          return (
-            <button
-              key={v} type="button" aria-pressed={value === v} disabled={dis}
-              onClick={() => !dis && onChange(v)}
-              className={cn(
-                "whitespace-nowrap rounded-md px-3 py-1.5 font-mont text-sm transition-colors",
-                dis && "cursor-not-allowed opacity-40",
-                value === v
-                  ? "bg-white font-semibold text-black-01 shadow-sm ring-1 ring-black/5"
-                  : "font-medium text-gray-05 hover:text-gray-01",
-              )}
-            >
-              {lbl}
-            </button>
-          );
-        })}
-      </div>
+      <TabStrip
+        items={items}
+        value={value}
+        onChange={onChange}
+        variant="segmented"
+        semantics="toggle"
+        className={className}
+      />
     </div>
   );
 }

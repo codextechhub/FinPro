@@ -18,7 +18,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { Plus, Search, Trash2, Upload, RefreshCw, ListChecks, FileText, History, Settings as SettingsIcon, ArrowLeftRight, ChevronDown, Rows3, FileSpreadsheet, Download, Pencil } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
-import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, useActiveEntity, toArray, type Column } from "@/components/finance-ui";
+import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -177,6 +177,12 @@ const TABS = [
   { key: "settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
+/** Drawer sections for the tab strip, built once so the sliding bar re-measures only when the active tab changes. */
+const TAB_ITEMS: TabStripItem<(typeof TABS)[number]["key"]>[] = TABS.map((t) => ({
+  value: t.key,
+  label: <><t.icon className="size-3.5" /> {t.label}</>,
+}));
+
 function MetricCard({ label, kobo, currency, danger }: { label: string; kobo: number; currency?: string | null; danger?: boolean }) {
   return (
     <div className="rounded-md border border-white-02 bg-white p-3">
@@ -249,15 +255,15 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
             <MetricCard label="Unreconciled diff" kobo={m?.unreconciled_diff ?? 0} currency={currency} danger />
           </div>
 
-          <div className="flex flex-wrap gap-1 border-b border-white-02">
-            {TABS.map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className={cn("-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 font-mont text-xs font-semibold",
-                  tab === t.key ? "border-primary text-primary" : "border-transparent text-gray-05 hover:text-gray-01")}>
-                <t.icon className="size-3.5" /> {t.label}
-              </button>
-            ))}
-          </div>
+          <TabStrip
+            items={TAB_ITEMS}
+            value={tab}
+            onChange={setTab}
+            variant="underline"
+            ariaLabel="Bank account sections"
+            className="w-full gap-1"
+            buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
+          />
 
           {tab === "transactions" && <TransactionsTab detail={detail} currency={currency} />}
           {tab === "lines" && <StatementLinesTab id={account.id} entity={entity} currency={currency} />}

@@ -13,8 +13,8 @@ import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LineEditor,
-  LoadingState, PostingRecap, StatCard, StatusPill, emptyLine, toApiLines, toArray,
-  useActiveEntity, type Column, type DocLine,
+  LoadingState, PostingRecap, StatCard, StatusPill, TabStrip, emptyLine, toApiLines, toArray,
+  useActiveEntity, type Column, type DocLine, type TabStripItem,
   PostingDateField,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../host";
@@ -67,6 +67,13 @@ const DETAIL_TABS = [
   ["match", "3-Way Match", Check], ["payments", "Payment History", CircleDollarSign],
   ["attachments", "Attachments", Paperclip], ["activity", "Activity", History],
 ] as const;
+
+/** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
+const STATUS_TAB_ITEMS: TabStripItem<string>[] = TABS.map(([label, value]) => ({ value, label }));
+const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label, Icon]) => ({
+  value,
+  label: <><Icon className="size-3.5" />{label}</>,
+}));
 
 function shortDate(value?: string | null) {
   if (!value) return "-";
@@ -132,7 +139,15 @@ export default function VendorInvoicesPage() {
       </div>
       <section data-guide="procurement-vendor-invoices.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">
-          <div className="max-w-full overflow-x-auto"><div className="flex min-w-max gap-5">{TABS.map(([label, value]) => <button key={label} onClick={() => { setStatus(value); setPage(1); }} className={cn("border-b-2 py-3 font-mont text-xs font-medium whitespace-nowrap", status === value ? "border-primary text-primary" : "border-transparent text-gray-05")}>{label}</button>)}</div></div>
+          <TabStrip
+            items={STATUS_TAB_ITEMS}
+            value={status}
+            onChange={(next) => { setStatus(next); setPage(1); }}
+            variant="underline"
+            ariaLabel="Vendor invoice status"
+            className="gap-5 self-center border-b-0"
+            buttonClassName="px-0 py-3"
+          />
           <label className="relative my-2 min-w-0 flex-1 sm:max-w-64"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search invoices or vendors" className="h-9 bg-white pl-9" /></label>
         </div>
         <DataTable columns={columns} rows={rows} rowKey={(invoice) => invoice.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(invoice) => setSelectedId(invoice.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle={status ? `No ${TABS.find((tab) => tab[1] === status)?.[0].toLowerCase()} invoices` : "No vendor invoices yet"} emptyMessage={debouncedSearch ? "Try a different search term or status." : "Record a supplier bill to begin matching."} />
@@ -194,7 +209,15 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
     </>}>
       {isLoading ? <LoadingState rows={8} /> : isError || !invoice ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={invoice.status} /><StatusPill status={invoice.approval_state} /><StatusPill status={invoice.match_status} /><StatusPill status={invoice.payment_status} />{invoice.is_overdue && <StatusPill status="OVERDUE" />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(invoice.total, currency)}</p></div>
-        <div className="max-w-full overflow-x-auto border-b border-white-02"><div className="flex min-w-max gap-5">{DETAIL_TABS.map(([value, label, Icon]) => <button key={value} onClick={() => setTab(value)} className={cn("flex items-center gap-1.5 border-b-2 py-2.5 font-mont text-xs font-medium whitespace-nowrap", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}><Icon className="size-3.5" />{label}</button>)}</div></div>
+        <TabStrip
+          items={DETAIL_TAB_ITEMS}
+          value={tab}
+          onChange={setTab}
+          variant="underline"
+          ariaLabel="Vendor invoice sections"
+          className="w-full gap-5"
+          buttonClassName="flex items-center gap-1.5 px-0"
+        />
         {tab === "overview" && <div className="space-y-5">
           {invoice.approval_state === "PENDING" && <section className="rounded-md border border-amber-200 bg-amber-50 p-4"><p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>{canVote && <><Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" loading={voting} onClick={() => vote("APPROVED")}><Check className="size-4" /> Approve</Button><Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button><Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button></div></>}</section>}
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Vendor invoice #" value={invoice.vendor_reference} /><Field label="Internal invoice #" value={invoice.document_number} /><Field label="Vendor" value={invoice.vendor_name || invoice.vendor_code} /><Field label="PO reference" value={invoice.purchase_order_number || "Direct invoice"} /><Field label="Invoice date" value={shortDate(invoice.invoice_date)} /><Field label="Due date" value={shortDate(invoice.due_date)} /><Field label="Subtotal" value={formatMoney(invoice.subtotal, currency)} /><Field label="Tax" value={formatMoney(invoice.tax_total, currency)} /><Field label="Paid" value={formatMoney(invoice.amount_paid, currency)} /><Field label="Balance due" value={formatMoney(invoice.balance_due, currency)} /></dl>

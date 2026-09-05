@@ -10,8 +10,10 @@ import {
   FormDrawer,
   FormField,
   StatusPill,
+  TabStrip,
   toArray,
   type Column,
+  type TabStripItem,
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,13 @@ const DETAIL_TABS = [
   ["Usage", "usage", Users],
   ["Spend", "spend", ChartNoAxesCombined],
 ] as const;
+
+/** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
+const STATUS_TAB_ITEMS: TabStripItem<(typeof STATUS_TABS)[number][1]>[] = STATUS_TABS.map(([label, value]) => ({ value, label }));
+const DETAIL_TAB_ITEMS: TabStripItem<(typeof DETAIL_TABS)[number][1]>[] = DETAIL_TABS.map(([label, value, Icon]) => ({
+  value,
+  label: <><Icon className="size-3.5" />{label}</>,
+}));
 
 function isForbidden(error: unknown) {
   return !!error && typeof error === "object" && "status" in error && error.status === 403;
@@ -142,7 +151,15 @@ export function CategoriesTab({ entity, currency }: { entity: string; currency?:
 
     <section data-guide="procurement-categories.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">
-        <div className="max-w-full overflow-x-auto"><div className="flex min-w-max gap-5">{STATUS_TABS.map(([label, value]) => <button key={value} type="button" onClick={() => { setStatus(value); setPage(1); }} className={cn("border-b-2 py-3 font-mont text-xs font-medium whitespace-nowrap", status === value ? "border-primary text-primary" : "border-transparent text-gray-05")}>{label}</button>)}</div></div>
+        <TabStrip
+          items={STATUS_TAB_ITEMS}
+          value={status}
+          onChange={(next) => { setStatus(next); setPage(1); }}
+          variant="underline"
+          ariaLabel="Category status"
+          className="gap-5 self-center border-b-0"
+          buttonClassName="px-0 py-3"
+        />
         <label className="relative my-2 min-w-0 basis-full sm:min-w-52 sm:flex-1 sm:basis-auto sm:max-w-72"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search categories" className="h-9 bg-white pl-9" /></label>
       </div>
       <DataTable
@@ -180,7 +197,15 @@ function CategoryDrawer({ id, entity, currency, canReports, insight, onClose }: 
   return <>
     <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={category?.name || "Category"} description={category ? `${category.code} · ${category.default_expense_code || "No default expense account"}` : "Loading category"} widthClass="sm:max-w-[640px]" footer={category && <Can permission={P.PROC_UPDATE_CATEGORY}><Button variant="outline" onClick={() => setEditing(true)}>Edit Category</Button></Can>}>
       {isLoading ? <RestrictedPanel>Loading category…</RestrictedPanel> : isForbidden(error) ? <RestrictedPanel>You do not have permission to view this category.</RestrictedPanel> : isError || !category ? <RestrictedPanel><button type="button" className="text-primary" onClick={() => refetch()}>Category could not be loaded. Try again.</button></RestrictedPanel> : <div className="space-y-5">
-        <div className="max-w-full overflow-x-auto border-b border-white-02"><div className="flex min-w-max gap-5">{DETAIL_TABS.map(([label, value, Icon]) => <button key={value} type="button" onClick={() => setTab(value)} className={cn("flex items-center gap-1.5 border-b-2 py-3 font-mont text-xs font-medium whitespace-nowrap", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}><Icon className="size-3.5" />{label}</button>)}</div></div>
+        <TabStrip
+          items={DETAIL_TAB_ITEMS}
+          value={tab}
+          onChange={setTab}
+          variant="underline"
+          ariaLabel="Category sections"
+          className="w-full gap-5"
+          buttonClassName="flex items-center gap-1.5 px-0 py-3"
+        />
         {tab === "overview" && <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Category name" value={category.name} /><Field label="Code" value={category.code} /><Field label="Level" value={`Level ${category.level}`} /><Field label="Parent category" value={category.parent_name || "Root category"} /><Field label="Default expense account" value={category.default_expense_code || "Not configured"} /><Field label="Status" value={<StatusPill status={category.is_active ? "ACTIVE" : "INACTIVE"} />} /></dl>}
         {tab === "usage" && <div className="space-y-4"><dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Linked vendors" value={category.vendor_count ?? 0} /><Field label="Direct sub-categories" value={category.child_count ?? 0} /><Field label="Catalog items" value={category.catalog_item_count ?? 0} /><Field label="Hierarchy position" value={category.parent_name ? `${category.parent_name} · Level ${category.level}` : "Root · Level 1"} /><Field label="Assignment state" value={category.is_active ? "Available for new vendors" : "Historical links only"} /></dl><p className="rounded-md border border-dashed border-white-02 p-4 font-mont text-xs leading-5 text-gray-05">The hierarchy supports three levels. Catalog items counts reflect items assigned directly to this category, not its sub-categories.</p></div>}
         {tab === "spend" && (!canReports ? <RestrictedPanel>Category spend requires Procurement report access.</RestrictedPanel> : <div className="space-y-3"><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><SpendCard label="This month" value={formatMoney(insight?.spend_mtd ?? 0, currency)} /><SpendCard label="Last month" value={formatMoney(insight?.spend_prior_month ?? 0, currency)} /><SpendCard label="Year to date" value={formatMoney(insight?.spend_ytd ?? 0, currency)} /></div><p className="font-mont text-xs text-gray-05">Realised spend is sourced only from posted vendor invoices for vendors currently linked to this category.</p></div>)}

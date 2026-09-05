@@ -10,11 +10,11 @@ import { toast } from "sonner";
 import { ProcurementShell } from "./procurement-shell";
 import {
   ConfirmActionModal, DataTable, DetailDrawer, EmptyState, ErrorState,
-  InfoHint, LoadingState, StatusPill, useActiveEntity, type Column,
+  InfoHint, LoadingState, StatusPill, TabStrip, useActiveEntity, type Column,
+  type TabStripItem,
 } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import {
   useGetProcurementApprovalQuery,
   useGetProcurementApprovalsQuery,
@@ -36,6 +36,12 @@ const DOCUMENT_TYPES = [
   ["procurement.vendor_invoice", "Vendor Invoices"],
   ["procurement.vendor_payment", "Vendor Payments"],
 ] as const;
+
+/** Drawer sections for the tab strip, built once so the sliding bar re-measures only when the active tab changes. */
+const DETAIL_TABS: TabStripItem<"overview" | "activity">[] = [
+  { value: "overview", label: <><FileText className="size-3.5" />Overview</> },
+  { value: "activity", label: <><History className="size-3.5" />Activity</> },
+];
 
 function dateTime(value?: string | null) {
   if (!value) return "-";
@@ -205,17 +211,15 @@ function ApprovalDrawer({ id, entity, currency, onClose }: {
       title={approval ? <span className="flex flex-wrap items-center gap-2"><span className="text-primary">{approval.reference}</span><StatusPill status="PENDING_APPROVAL" /></span> : "Approval"}
       description={approval?.title ?? "Loading approval details"} widthClass="sm:max-w-[720px]">
       {isLoading ? <LoadingState rows={8} /> : isError || !approval ? <ErrorState message="This approval is no longer available in your queue." onRetry={refetch} /> : <div className="space-y-5">
-        <div className="max-w-full overflow-x-auto border-b border-white-02">
-          <div className="flex min-w-max gap-5">
-            {(["overview", "activity"] as const).map((value) => {
-              const Icon = value === "overview" ? FileText : History;
-              return <button key={value} onClick={() => setTab(value)} className={cn(
-                "flex items-center gap-1.5 border-b-2 py-2.5 font-mont text-xs font-medium capitalize whitespace-nowrap",
-                tab === value ? "border-primary text-primary" : "border-transparent text-gray-05",
-              )}><Icon className="size-3.5" />{value}</button>;
-            })}
-          </div>
-        </div>
+        <TabStrip
+          items={DETAIL_TABS}
+          value={tab}
+          onChange={setTab}
+          variant="underline"
+          ariaLabel="Approval sections"
+          className="w-full gap-5"
+          buttonClassName="flex items-center gap-1.5 px-0"
+        />
 
         {tab === "overview" && <ApprovalOverview approval={approval} activeStage={activeStage} currency={currency}
           comment={comment} setComment={setComment} deciding={deciding}

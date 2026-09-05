@@ -12,7 +12,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Download, RefreshCw, ArrowDownLeft, ArrowUpRight } from "lucide-react";
-import { DataTable, Money, KpiCard, DetailDrawer, type Column } from "@/components/finance-ui";
+import { DataTable, Money, KpiCard, DetailDrawer, TabStrip, type Column } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
@@ -115,15 +115,19 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-lg bg-[#ECECEC] p-1">
-          {tabs.map((t) => (
-            <button key={t.id} type="button" onClick={() => setTab(t.id)}
-              className={cn("whitespace-nowrap rounded-md px-3 py-1.5 font-mont text-xs transition-colors",
-                tab === t.id ? "bg-white font-semibold text-black-01 shadow-sm ring-1 ring-black/5" : "font-medium text-gray-05 hover:text-gray-01")}>
-              {t.label} <span className="ml-1 tabular-nums text-gray-05">{t.n}</span>
-            </button>
-          ))}
-        </div>
+        {/* The count stays grey on the active view so the label keeps one weight. */}
+        <TabStrip
+          items={tabs.map((t) => ({
+            value: t.id,
+            label: <>{t.label} <span className="ml-1 tabular-nums text-gray-05">{t.n}</span></>,
+          }))}
+          value={tab}
+          onChange={setTab}
+          variant="segmented"
+          className="gap-0"
+          buttonClassName="text-xs"
+          ariaLabel="Settlement view"
+        />
         <div className="flex flex-wrap items-center gap-2">
           <Select value={provider} onChange={setProvider} className="w-40">
             <option value="">All providers</option>

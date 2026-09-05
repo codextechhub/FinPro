@@ -15,7 +15,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { RefreshCw, RotateCcw } from "lucide-react";
-import { DataTable, KpiCard, toArray, type Column } from "@/components/finance-ui";
+import { DataTable, KpiCard, TabStrip, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,12 +46,12 @@ function StatusPill({ status }: { status: string }) {
   return <span className={cn(PILL, s.cls)}>{s.label}</span>;
 }
 
-const FILTERS = [
-  { key: "", label: "Needs attention" },
-  { key: "FAILED", label: "Failed" },
-  { key: "IGNORED", label: "Unmatched" },
-  { key: "ALL", label: "All events" },
-] as const;
+const FILTERS: TabStripItem<string>[] = [
+  { value: "", label: "Needs attention" },
+  { value: "FAILED", label: "Failed" },
+  { value: "IGNORED", label: "Unmatched" },
+  { value: "ALL", label: "All events" },
+];
 
 export function WebhooksTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const { can } = useCan();
@@ -162,27 +162,14 @@ export function WebhooksTab({ entity, currency }: { entity: string; currency?: s
         <KpiCard label="Unmatched" value={sum?.ignored ?? 0} foot="Nothing local to attach it to" />
       </div>
 
-      <div className="flex flex-wrap items-center gap-1 rounded-md border border-white-02 bg-white p-1">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key || "default"}
-            onClick={() => setStatus(f.key)}
-            className={cn(
-              "whitespace-nowrap rounded-md px-3 py-1.5 font-mont text-xs font-semibold",
-              status === f.key ? "bg-primary text-white" : "text-gray-05 hover:bg-gray-50 hover:text-gray-01",
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
+      {/* The status strip sizes to its tabs, so search and Refresh share its line. */}
       <div className="flex flex-wrap items-center gap-2">
+        <TabStrip items={FILTERS} value={status} onChange={setStatus} ariaLabel="Event status" />
         <Input
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Search reference"
-          className="h-9 w-64 font-mont text-sm"
+          className="h-9 w-full min-w-0 font-mont text-sm sm:w-64"
         />
         <div className="ml-auto">
           <Button variant="outline" onClick={() => refetch()} className="gap-1.5">

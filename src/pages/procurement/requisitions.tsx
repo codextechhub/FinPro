@@ -14,7 +14,8 @@ import { sameId } from "../../components/workflow/workflow-format";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LoadingState,
-  MoneyInput, StatCard, StatusPill, toArray, useActiveEntity, type Column,
+  MoneyInput, StatCard, StatusPill, TabStrip, toArray, useActiveEntity, type Column,
+  type TabStripItem,
 } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../host";
@@ -51,6 +52,15 @@ const STATUS_TABS = [
   { label: "Approved", value: "APPROVED" },
   { label: "Draft", value: "DRAFT" },
   { label: "Rejected", value: "REJECTED" },
+];
+
+/** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
+const STATUS_TAB_ITEMS: TabStripItem<string>[] = STATUS_TABS.map((tab) => ({ value: tab.value, label: tab.label }));
+const DETAIL_TAB_ITEMS: TabStripItem<"overview" | "lines" | "approval" | "activity">[] = [
+  { value: "overview", label: "Overview" },
+  { value: "lines", label: "Line Items" },
+  { value: "approval", label: "Approval Trail" },
+  { value: "activity", label: "Activity" },
 ];
 
 function displayStatus(row: Requisition) {
@@ -198,15 +208,15 @@ export default function RequisitionsPage() {
 
         <section data-guide="procurement-requisitions.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">
-            <div className="max-w-full overflow-x-auto">
-              <div className="flex min-w-max gap-5">
-                {STATUS_TABS.map((tab) => (
-                  <button key={tab.value || "all"} type="button" onClick={() => { setStatus(tab.value); setPage(1); }}
-                    className={cn("border-b-2 px-0.5 py-3 font-mont text-xs font-medium whitespace-nowrap", status === tab.value ? "border-primary text-primary" : "border-transparent text-gray-05 hover:text-black-01")}
-                  >{tab.label}</button>
-                ))}
-              </div>
-            </div>
+            <TabStrip
+              items={STATUS_TAB_ITEMS}
+              value={status}
+              onChange={(next) => { setStatus(next); setPage(1); }}
+              variant="underline"
+              ariaLabel="Requisition status"
+              className="gap-5 self-center border-b-0"
+              buttonClassName="py-3"
+            />
             <div className="flex w-full items-center py-2 sm:ml-auto sm:w-auto">
               <label className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
                 <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" />
@@ -296,13 +306,15 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
               <StatusPill status={displayStatus(req)} />
               <p className="font-mont text-lg font-semibold tabular-nums text-black-01">{formatMoney(req.estimated_total, currency)}</p>
             </div>
-            <div className="max-w-full overflow-x-auto border-b border-white-02">
-              <div className="flex min-w-max gap-5">
-                {(["overview", "lines", "approval", "activity"] as const).map((value) => (
-                  <button key={value} onClick={() => setTab(value)} className={cn("border-b-2 py-2.5 font-mont text-xs font-medium capitalize", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}>{value === "lines" ? "Line Items" : value === "approval" ? "Approval Trail" : value}</button>
-                ))}
-              </div>
-            </div>
+            <TabStrip
+              items={DETAIL_TAB_ITEMS}
+              value={tab}
+              onChange={setTab}
+              variant="underline"
+              ariaLabel="Requisition sections"
+              className="w-full gap-5"
+              buttonClassName="px-0"
+            />
 
             {tab === "overview" && <div className="space-y-5">
               {req.status === "PENDING_APPROVAL" && (

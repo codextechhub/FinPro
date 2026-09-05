@@ -6,7 +6,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { ArrowLeft, ChevronDown, ChevronRight, Check, Plus, Printer, Activity, Columns2, Network, Settings2 } from "lucide-react";
-import { Money, FormField, DetailDrawer, InfoHint, StatusPill, DataTable, toArray, useActiveEntity, type Column } from "@/components/finance-ui";
+import { Money, FormField, DetailDrawer, InfoHint, StatusPill, DataTable, TabStrip, toArray, useActiveEntity, type Column, type TabStripItem } from "@/components/finance-ui";
 import { SearchSelect } from "@/components/custom/search-select";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/states";
@@ -38,6 +38,16 @@ const TYPE_PILL: Record<string, string> = {
 };
 const headCls = "text-gray-01 bg-[#F1F1F1] font-semibold font-mont text-xs whitespace-nowrap px-3 py-2.5 text-left";
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm focus:border-primary focus:outline-none";
+// Lower case: the strip capitalises its labels.
+const VIEW_TABS: TabStripItem<"tree" | "flat">[] = [
+  { value: "tree", label: "Tree" },
+  { value: "flat", label: "Flat" },
+];
+
+const GROUP_VIEW_TABS: TabStripItem<"balances" | "activity">[] = [
+  { value: "balances", label: "Balance breakdown" },
+  { value: "activity", label: "Consolidated activity" },
+];
 
 function Tag({ label }: { label: string }) {
   return <span className="ml-1.5 rounded bg-gray-03/60 px-1.5 py-0.5 font-mont text-[10px] font-semibold uppercase tracking-wide text-gray-05">{label}</span>;
@@ -131,14 +141,7 @@ export function AccountsTab({ entity }: { entity: string }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code or name" className="h-9 max-w-xs font-mont text-sm" />
-        <div className="flex rounded-md border border-white-02 p-0.5 font-mont text-xs">
-          {(["tree", "flat"] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)}
-              className={cn("rounded px-2.5 py-1 capitalize", view === v ? "bg-primary text-white" : "text-gray-05 hover:text-gray-01")}>
-              {v}
-            </button>
-          ))}
-        </div>
+        <TabStrip items={VIEW_TABS} value={view} onChange={setView} variant="pill-compact" ariaLabel="Account list shape" />
         <select value={type} onChange={(e) => setType(e.target.value)} className={selectCls} aria-label="Account type">
           <option value="">All types</option>
           {ACCOUNT_TYPES.map((t) => <option key={t} value={t}>{t[0] + t.slice(1).toLowerCase()}</option>)}
@@ -334,8 +337,18 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
   const acc = d?.account;
   const kids = id ? accounts.filter((a) => a.parent_id === id) : [];
   const availableTabKeys = getAccountDetailTabKeys(acc?.is_postable ?? true);
-  const tabs = DRAWER_TABS.filter((candidate) => availableTabKeys.includes(candidate.key));
   const activeTab = availableTabKeys.includes(tab) ? tab : availableTabKeys[0];
+  const tabItems: TabStripItem<AccountDetailTabKey>[] = DRAWER_TABS
+    .filter((candidate) => availableTabKeys.includes(candidate.key))
+    .map((candidate) => ({
+      value: candidate.key,
+      label: (
+        <>
+          <candidate.icon className="size-3.5" />
+          {candidate.label}{candidate.key === "subs" && kids.length ? ` (${kids.length})` : ""}
+        </>
+      ),
+    }));
 
   const cell = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
   const th = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -401,16 +414,15 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
           ) : (
             <>
           {/* tabs */}
-          <div className="flex max-w-full gap-1 overflow-x-auto border-b border-white-02">
-            {tabs.map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className={cn("-mb-px inline-flex whitespace-nowrap items-center gap-1.5 border-b-2 px-3 py-2 font-mont text-xs font-semibold",
-                  activeTab === t.key ? "border-primary text-primary" : "border-transparent text-gray-05 hover:text-gray-01")}>
-                <t.icon className="size-3.5" />
-                {t.label}{t.key === "subs" && kids.length ? ` (${kids.length})` : ""}
-              </button>
-            ))}
-          </div>
+          <TabStrip
+            items={tabItems}
+            value={activeTab}
+            onChange={setTab}
+            variant="underline"
+            ariaLabel="Account detail sections"
+            className="gap-1"
+            buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
+          />
 
           {activeTab === "activity" && (
             d.activity.length === 0 ? <EmptyState title="No postings" message="Posted journal lines hitting this account will appear here." /> : (
@@ -611,16 +623,14 @@ function GroupLedger({ initialView, entity, account, accounts, summary, currency
             <p className="font-mont text-xs text-gray-05">Balances and posted movement across every posting account under {account.code}.</p>
           </div>
         </div>
-        <div className="flex max-w-full overflow-x-auto rounded-md border border-white-02 p-0.5 font-mont text-xs">
-          <button type="button" onClick={() => setView("balances")} aria-pressed={view === "balances"}
-            className={cn("whitespace-nowrap rounded px-2.5 py-1.5 font-semibold", view === "balances" ? "bg-primary text-white" : "text-gray-05 hover:text-gray-01")}>
-            Balance breakdown
-          </button>
-          <button type="button" onClick={() => setView("activity")} aria-pressed={view === "activity"}
-            className={cn("whitespace-nowrap rounded px-2.5 py-1.5 font-semibold", view === "activity" ? "bg-primary text-white" : "text-gray-05 hover:text-gray-01")}>
-            Consolidated activity
-          </button>
-        </div>
+        <TabStrip
+          items={GROUP_VIEW_TABS}
+          value={view}
+          onChange={setView}
+          variant="pill-compact"
+          semantics="toggle"
+          buttonClassName="py-1.5 font-semibold"
+        />
       </div>
 
       {view === "balances" ? (

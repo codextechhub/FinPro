@@ -7,8 +7,8 @@ import { ProcurementShell } from "./procurement-shell";
 import { PurchaseOrderPicker, VendorPicker } from "./pickers";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LoadingState,
-  PostingRecap, StatusPill, toArray, useActiveEntity, type Column,
-  PostingDateField,} from "@/components/finance-ui";
+  PostingRecap, StatusPill, TabStrip, toArray, useActiveEntity, type Column,
+  type TabStripItem, PostingDateField,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,12 @@ const DETAIL_TABS = [
   { value: "quality", label: "Quality Notes", icon: ClipboardCheck },
 ] as const;
 type DetailTab = typeof DETAIL_TABS[number]["value"];
+
+/** Drawer sections for the tab strip, built once so the sliding bar re-measures only when the active tab changes. */
+const DETAIL_TAB_ITEMS: TabStripItem<DetailTab>[] = DETAIL_TABS.map(({ value, label, icon: Icon }) => ({
+  value,
+  label: <><Icon className="size-3.5" /> {label}</>,
+}));
 
 function shortDate(value?: string | null) {
   if (!value) return "-";
@@ -161,15 +167,15 @@ function ReceiptDrawer({ id, entity, currency, onClose, onSelectReceipt }: {
           <StatusPill status={receipt.purchase_order_fulfilment_status} />
         </section>}
 
-        <div className="max-w-full overflow-x-auto border-b border-white-02">
-          <div className="flex min-w-max gap-5">
-            {DETAIL_TABS.map(({ value, label, icon: Icon }) => (
-              <button key={value} type="button" onClick={() => setTab(value)}
-                className={cn("flex items-center gap-1.5 border-b-2 py-2.5 font-mont text-xs font-medium whitespace-nowrap", tab === value ? "border-primary text-primary" : "border-transparent text-gray-05")}
-              ><Icon className="size-3.5" /> {label}</button>
-            ))}
-          </div>
-        </div>
+        <TabStrip
+          items={DETAIL_TAB_ITEMS}
+          value={tab}
+          onChange={setTab}
+          variant="underline"
+          ariaLabel="Goods receipt sections"
+          className="w-full gap-5"
+          buttonClassName="flex items-center gap-1.5 px-0"
+        />
 
         {tab === "overview" && <div className="space-y-5">
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">

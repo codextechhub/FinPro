@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { ArrowLeftRight, ScrollText, User, BellRing, CreditCard, Printer, Receipt } from "lucide-react";
-import { DetailDrawer, DocumentEmailAction, Money, ConfirmActionModal, FormField, useActiveEntity } from "@/components/finance-ui";
+import { DetailDrawer, DocumentEmailAction, Money, ConfirmActionModal, FormField, TabStrip, useActiveEntity, type TabStripItem } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState, EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -89,9 +89,16 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
     } catch { /* central */ }
   };
 
-  const count = (k: string) =>
-    k === "open" ? (d ? d.open_invoices.length + d.open_debit_notes.length : undefined)
-      : k === "transactions" ? d?.transactions.length : k === "statement" ? d?.statement.length : undefined;
+  // Tabs that stand for a list carry its size; Contact has nothing to count.
+  const tabItems = useMemo<TabStripItem<(typeof TABS)[number]["key"]>[]>(() => {
+    const count = (k: string) =>
+      k === "open" ? (d ? d.open_invoices.length + d.open_debit_notes.length : undefined)
+        : k === "transactions" ? d?.transactions.length : k === "statement" ? d?.statement.length : undefined;
+    return TABS.map((t) => ({
+      value: t.key,
+      label: <><t.icon className="size-3.5" />{t.label}{count(t.key) ? ` (${count(t.key)})` : ""}</>,
+    }));
+  }, [d]);
 
   return (
     <DetailDrawer
@@ -121,15 +128,15 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
             <Stat label="Open invoices">{s.open_invoice_count}</Stat>
           </div>
 
-          <div className="flex flex-wrap gap-1 border-b border-white-02">
-            {TABS.map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className={cn("-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 font-mont text-xs font-semibold",
-                  tab === t.key ? "border-primary text-primary" : "border-transparent text-gray-05 hover:text-gray-01")}>
-                <t.icon className="size-3.5" />{t.label}{count(t.key) ? ` (${count(t.key)})` : ""}
-              </button>
-            ))}
-          </div>
+          <TabStrip
+            items={tabItems}
+            value={tab}
+            onChange={setTab}
+            variant="underline"
+            ariaLabel="Customer sections"
+            className="w-full gap-1"
+            buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
+          />
 
           {tab === "open" && <OpenItemsTab d={d} currency={currency} />}
 

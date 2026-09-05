@@ -23,7 +23,7 @@ import { routesPath } from "@/routes/routes-path";
 import { useGetTrialBalanceQuery } from "@/redux/services/finance/reports-api";
 import { useGetBranchOptionsQuery, type BranchOption } from "@/redux/services/tenants-api";
 import { FinanceShell } from "./finance-shell";
-import { DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, useActiveEntity, toArray, type Column, PostingDateField,} from "@/components/finance-ui";
+import { DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, type Column, type TabStripItem, PostingDateField,} from "@/components/finance-ui";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -111,6 +111,12 @@ const TABS = [
   { key: "statutory", label: "Statutory returns", icon: Landmark },
 ] as const;
 
+/** Payroll sections for the tab strip, built once so the sliding bar re-measures only when the active tab changes. */
+const TAB_ITEMS: TabStripItem<(typeof TABS)[number]["key"]>[] = TABS.map((t) => ({
+  value: t.key,
+  label: <><t.icon className="size-3.5" /> {t.label}</>,
+}));
+
 export default function PayrollPage() {
   const { code: entity, currency } = useActiveEntity();
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("runs");
@@ -134,15 +140,16 @@ export default function PayrollPage() {
           <p className="mt-0.5 font-mont text-xs text-gray-05">Monthly salary runs and payslips, generated from the employee roster.</p>
         </div>
 
-        <div className="flex flex-wrap gap-1 border-b border-white-02" data-guide="finance-payroll.sections">
-          {TABS.map((t) => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={cn("-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 font-mont text-xs font-semibold",
-                tab === t.key ? "border-primary text-primary" : "border-transparent text-gray-05 hover:text-gray-01")}>
-              <t.icon className="size-3.5" /> {t.label}
-            </button>
-          ))}
-        </div>
+        <TabStrip
+          items={TAB_ITEMS}
+          value={tab}
+          onChange={setTab}
+          variant="underline"
+          ariaLabel="Payroll sections"
+          dataGuide="finance-payroll.sections"
+          className="w-full gap-1"
+          buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
+        />
 
         {tab === "runs" ? <RunsTab entity={entity} currency={currency} />
           : tab === "employees" ? <EmployeesTab entity={entity} currency={currency} />

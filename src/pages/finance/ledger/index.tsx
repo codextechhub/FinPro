@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { Plus, Search } from "lucide-react";
 import { FinanceShell } from "../finance-shell";
-import { DataTable, InfoHint, Money, StatusPill, useActiveEntity, type Column } from "@/components/finance-ui";
+import { DataTable, InfoHint, Money, StatusPill, TabStrip, useActiveEntity, type Column, type TabStripItem } from "@/components/finance-ui";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
@@ -18,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { UserAvatar } from "../../../host";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useActionParam } from "@/hooks/use-action-param";
-import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
 import { useGetJournalsQuery, useGetJournalSummaryQuery } from "@/redux/services/finance/gl-api";
@@ -82,6 +81,14 @@ export default function GeneralLedgerPage() {
 
   const count = (key?: JournalStatus) => key ? (summary?.by_status?.[key] ?? 0) : (summary?.total ?? 0);
 
+  const statusTabs: TabStripItem<JournalStatus | "">[] = [
+    { value: "", label: <>All <span className="ml-1 opacity-70">{count()}</span></> },
+    ...STATUS_TABS.map((t) => ({
+      value: t.key,
+      label: <>{t.label} <span className="ml-1 opacity-70">{count(t.key)}</span></>,
+    })),
+  ];
+
   const columns: Column<JournalListItem>[] = [
     { header: "Journal No.", cell: (j) => <span className="font-semibold">{j.document_number}</span> },
     { header: "Date", cell: (j) => j.date },
@@ -105,11 +112,6 @@ export default function GeneralLedgerPage() {
       </FinanceShell>
     );
   }
-
-  const tabBtn = (active: boolean) => cn(
-    "rounded-md px-3 py-1.5 font-mont text-xs font-semibold",
-    active ? "bg-primary text-white" : "text-gray-05 hover:bg-gray-50 hover:text-gray-01",
-  );
 
   return (
     <FinanceShell>
@@ -141,18 +143,15 @@ export default function GeneralLedgerPage() {
           </div>
         </div>
 
-        {/* Status tabs with counts */}
-        <div className="flex flex-wrap items-center gap-1 rounded-md border border-white-02 bg-white p-1">
-          <button onClick={() => { setStatus(""); setPage(1); }} className={tabBtn(status === "")}>All <span className="ml-1 opacity-70">{count()}</span></button>
-          {STATUS_TABS.map((t) => (
-            <button key={t.key} onClick={() => { setStatus(t.key); setPage(1); }} className={tabBtn(status === t.key)}>
-              {t.label} <span className="ml-1 opacity-70">{count(t.key)}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Filters */}
+        {/* The status strip sizes to its tabs, so the filters share its line on a
+            wide screen and wrap under it when the row runs out of width. */}
         <div className="flex flex-wrap items-center gap-2">
+          <TabStrip
+            items={statusTabs}
+            value={status}
+            onChange={(next) => { setStatus(next); setPage(1); }}
+            ariaLabel="Journal status"
+          />
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
             <Input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); setPage(1); }} placeholder="Search journal no / reference" className="h-9 w-64 pl-8 font-mont text-sm" />

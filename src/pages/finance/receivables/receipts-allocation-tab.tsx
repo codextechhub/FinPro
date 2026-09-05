@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { Search, Plus, Printer } from "lucide-react";
 import { toast } from "sonner";
-import { DataTable, toArray, type Column } from "@/components/finance-ui";
+import { DataTable, TabStrip, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
@@ -91,6 +91,11 @@ export function ReceiptsAllocationTab({ entity, currency }: { entity: string; cu
     }
   };
 
+  const statusTabs: TabStripItem<string>[] = STATUS_TABS.map((t) => ({
+    value: t.key,
+    label: <>{t.label} <span className="ml-1 opacity-70">{t.key ? (counts[t.key] ?? 0) : (sum?.count ?? 0)}</span></>,
+  }));
+
   const columns: Column<Payment>[] = [
     { header: "Receipt No.", cell: (p) => <span className="font-semibold">{p.document_number}</span> },
     { header: "Date", cell: (p) => <span className="tabular-nums text-gray-05">{p.payment_date}</span> },
@@ -137,28 +142,19 @@ export function ReceiptsAllocationTab({ entity, currency }: { entity: string; cu
         <Kpi label="Receipts" value={String(sum?.count ?? 0)} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-1 rounded-md border border-white-02 bg-white p-1">
-        {STATUS_TABS.map((t) => (
-          <button key={t.key} onClick={() => setStatus(t.key)}
-            className={cn("rounded-md px-3 py-1.5 font-mont text-xs font-semibold", status === t.key ? "bg-primary text-white" : "text-gray-05 hover:bg-gray-50 hover:text-gray-01")}>
-            {t.label} <span className="ml-1 opacity-70">{t.key ? (counts[t.key] ?? 0) : (sum?.count ?? 0)}</span>
-          </button>
-        ))}
-      </div>
-
+      {/* The status strip sizes to its tabs, so the filters and actions share its line. */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
+        <TabStrip items={statusTabs} value={status} onChange={setStatus} ariaLabel="Allocation status" />
+        <div className="relative w-full min-w-0 sm:w-64">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
-          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search receipt / customer / ref" className="h-9 w-64 pl-8 font-mont text-sm" />
+          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search receipt / customer / ref" className="h-9 w-full pl-8 font-mont text-sm" />
         </div>
         <select value={method} onChange={(e) => setMethod(e.target.value)} className={selectCls} aria-label="Method">
           <option value="">All methods</option>
           {METHODS.map((m) => <option key={m} value={m}>{methodLabel(m)}</option>)}
         </select>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {/* Was a client-side CSV of `rows`, which is the CURRENT PAGE - 25 of
-              however many the filters match, in a file called "receipts". The
-              server-side export applies the same filters to the whole set. */}
+          {/* Server-side export: the same filters over the whole set, not the 25 rows on this page. */}
           <QuickExportButton
             screen="finance.receipts"
             params={{ search, status, method }}

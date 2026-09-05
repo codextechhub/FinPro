@@ -18,6 +18,7 @@ export { FormModal, FormDrawer, FormField } from "./form-modal";
 export { PostingDateField } from "./posting-date-field";
 export { usePostingWindow, type PostingWindowState } from "./use-posting-window";
 export { Segmented } from "./segmented";
+export { TabStrip, type TabStripItem, type TabStripProps, type TabStripVariant } from "./tab-strip";
 export { AccountPicker, ReceivableAccountPicker, CustomerPicker, VendorPicker, CurrencyPicker, TaxCodePicker, CostCenterPicker, TaxObligationPicker, PettyCashFundPicker, BankAccountPicker } from "./pickers";
 export { LineEditor, emptyLine, toApiLines, type DocLine } from "./line-editor";
 export { useActiveEntity, useEntityCode } from "./use-entity";

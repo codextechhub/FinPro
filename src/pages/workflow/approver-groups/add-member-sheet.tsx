@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { UserAvatar } from "@xvs/finance/host";
+import { TabStrip, type TabStripItem } from "@/components/finance-ui/tab-strip";
 import { cn } from "@/lib/utils";
 import { useGetTeamMembersQuery } from "@/redux/services/workflow/team-mgt-api";
 import { useRoles } from "@xvs/finance/host";
@@ -34,10 +35,10 @@ type Candidate = {
   userId?: string;
 };
 
-const TABS: { key: GroupMemberKind; label: string }[] = [
-  { key: "USER", label: "People" },
-  { key: "ROLE", label: "Roles" },
-  { key: "POSITION", label: "Positions" },
+const TABS: TabStripItem<GroupMemberKind>[] = [
+  { value: "USER", label: "People" },
+  { value: "ROLE", label: "Roles" },
+  { value: "POSITION", label: "Positions" },
 ];
 
 function payloadFor(c: Candidate): ApproverGroupMemberPayload {
@@ -189,21 +190,13 @@ export default function AddMemberSheet({
         </SheetHeader>
 
         <div className="px-6 pt-4 pb-3 space-y-3 border-b border-white-02">
-          <div className="inline-flex max-w-full overflow-x-auto rounded-lg border border-white-02 bg-white p-1">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setTab(t.key)}
-                className={cn(
-                  "whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                  tab === t.key ? "bg-pry-01 text-primary" : "text-gray-01 hover:bg-gray-50",
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <TabStrip
+            items={TABS}
+            value={tab}
+            onChange={setTab}
+            variant="pill-soft"
+            ariaLabel="Directory to add from"
+          />
 
           <div className="flex h-9 items-center gap-2 rounded-md border border-white-02 px-3">
             <Search className="size-4 shrink-0 text-gray-01" />

@@ -14,8 +14,8 @@ import { toast } from "sonner";
 import { Plus, Coins, ArrowDownToLine, RefreshCw, FileText, ListChecks, Ban, Send } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField, ConfirmActionModal,
-  AccountPicker, TaxCodePicker, BankAccountPicker, StatusPill, toArray, type Column,
-  PostingDateField,} from "@/components/finance-ui";
+  AccountPicker, TaxCodePicker, BankAccountPicker, StatusPill, TabStrip, toArray, type Column,
+  type TabStripItem, PostingDateField,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,12 @@ function FundWorkbench({ fund, entity, currency, onEstablish }: { fund: PettyCas
   const vouchersQ = useGetPettyCashVouchersQuery({ entity, fund: fund.id, page_size: 100 });
   const vouchers = useMemo(() => toArray(vouchersQ.data?.data), [vouchersQ.data]);
 
+  // Voucher tab carries its own count; the strip re-measures when the label grows.
+  const tabItems = useMemo<TabStripItem<(typeof TABS)[number]["key"]>[]>(() => TABS.map((t) => ({
+    value: t.key,
+    label: <><t.icon className="size-3.5" /> {t.label}{t.key === "vouchers" && vouchers.length ? ` · ${vouchers.length}` : ""}</>,
+  })), [vouchers.length]);
+
   const registerCols: Column<PettyCashMovement>[] = [
     { header: "Date", cell: (m) => <span className="tabular-nums text-gray-05">{fmtDate(m.date)}</span> },
     { header: "Description", cell: (m) => m.description },
@@ -138,15 +144,15 @@ function FundWorkbench({ fund, entity, currency, onEstablish }: { fund: PettyCas
         <Kpi label="To replenish" value={formatMoney(fund.shortfall, currency)} danger={fund.shortfall > 0} hint="Restores the float" />
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-white-02">
-        {TABS.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={cn("-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 font-mont text-xs font-semibold",
-              tab === t.key ? "border-primary text-primary" : "border-transparent text-gray-05 hover:text-gray-01")}>
-            <t.icon className="size-3.5" /> {t.label}{t.key === "vouchers" && vouchers.length ? ` · ${vouchers.length}` : ""}
-          </button>
-        ))}
-      </div>
+      <TabStrip
+        items={tabItems}
+        value={tab}
+        onChange={setTab}
+        variant="underline"
+        ariaLabel="Petty cash views"
+        className="w-full gap-1"
+        buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
+      />
 
       {tab === "register" ? (
         <DataTable columns={registerCols} rows={register} rowKey={(m) => m.id}
