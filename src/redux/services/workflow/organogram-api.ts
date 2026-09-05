@@ -159,7 +159,7 @@ export const organogramApi = baseApi.injectEndpoints({
       },
       // Invalidating the shared photo map refreshes every avatar on the platform
       // (header, org chart, audit, RBAC, …) the moment a photo changes.
-      invalidatesTags: ["StaffProfiles", "StaffPhotos"],
+      invalidatesTags: ["StaffProfiles", "StaffProfiles"],
     }),
   }),
 });
