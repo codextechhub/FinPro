@@ -217,10 +217,19 @@ export function TabStrip<T extends string>({
       role={semantics === "tablist" ? "tablist" : undefined}
       aria-label={ariaLabel}
       className={cn(
-        "relative inline-flex max-w-full items-center justify-self-start self-start overflow-x-auto",
+        // The app styles scrollbars thin rather than hiding them, which suits a
+        // box of content and not a tab strip. Where scrollbars are overlaid the
+        // difference is invisible, but where they take space out of the box the
+        // groove lands directly under the tabs, on the same line the underline
+        // skin draws its bar. The tabs are their own affordance for scrolling.
+        "relative inline-flex max-w-full items-center justify-self-start self-start overflow-x-auto [&::-webkit-scrollbar]:hidden",
         skin.container,
         className,
       )}
+      // Inline because the app sets `scrollbar-width: thin` on every element,
+      // and the standard property beats the WebKit pseudo-element wherever both
+      // are understood, so the class alone leaves the groove showing.
+      style={{ scrollbarWidth: "none" }}
     >
       <span
         aria-hidden
