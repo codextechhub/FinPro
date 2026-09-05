@@ -498,7 +498,7 @@ export default function GroupsTab() {
                             >
                               {m.kind === "USER" ? (
                                 <UserAvatar
-                                  userId={m.user}
+                                  userId={m.user ?? undefined}
                                   name={memberLabel(m)}
                                   className="size-9"
                                   fallbackClassName="text-xs"

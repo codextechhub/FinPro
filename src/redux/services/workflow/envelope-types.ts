@@ -23,7 +23,7 @@ export interface PaginatedResponse<T = never> {
   success: boolean;
   message: string;
   pagination: Pagination;
-  data: T[];
+  data?: T[];
 }
 
 export interface ResponseMessage {
