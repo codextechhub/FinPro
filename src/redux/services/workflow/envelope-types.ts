@@ -19,7 +19,7 @@ The two apps' own copies disagree on this: one is a bare envelope whose caller
 adds ``data``, the other carries ``data: T[]``. Both spellings appear in the
 services that moved here, so this accepts either - ``PaginatedResponse`` for the
 bare shell, ``PaginatedResponse<OrgNode>`` where the rows are known. */
-export interface PaginatedResponse<T = never> {
+export interface PaginatedResponse<T = unknown> {
   success: boolean;
   message: string;
   pagination: Pagination;
