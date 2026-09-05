@@ -88,14 +88,14 @@ export default function DynamicRoleTab() {
   // nobody holds is the quiet way a ladder stops working, so it is on screen.
   const holdersByKey = useMemo(() => {
     const map = new Map<string, { name: string; count: number }>();
-    for (const r of roles?.data ?? [])
+    for (const r of roles ?? [])
       map.set(r.key, { name: r.name, count: r.assigned_users_count ?? 0 });
     return map;
   }, [roles]);
 
   const roleOptions = useMemo(
     () =>
-      (roles?.data ?? [])
+      (roles ?? [])
         .filter((r) => r.status === "ACTIVE")
         .map((r) => ({
           value: r.key,
@@ -637,7 +637,7 @@ function OverrideSheet({
     { skip: !open },
   );
 
-  const roleOptions = (roles?.data ?? [])
+  const roleOptions = (roles ?? [])
     .filter((r) => r.status === "ACTIVE")
     .map((r) => ({ value: r.key, label: `${r.name} · ${r.assigned_users_count ?? 0} holder(s)` }));
   const groupOptions = (groups?.data ?? [])

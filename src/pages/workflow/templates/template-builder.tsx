@@ -237,7 +237,7 @@ export default function TemplateBuilder() {
   const { data: groupsRes } = useGetApproverGroupsQuery({ page: 1, page_size: 100 });
   const roleOptions = useMemo(
     () =>
-      (rolesRes?.data ?? [])
+      (rolesRes ?? [])
         .filter((r) => r.status === "ACTIVE")
         .map((r) => ({ value: r.key, label: `${r.name} · ${r.assigned_users_count ?? 0} holder(s)` })),
     [rolesRes],

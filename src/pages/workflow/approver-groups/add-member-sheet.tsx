@@ -74,10 +74,7 @@ export default function AddMemberSheet({
     { page: 1, page_size: 500 },
     { skip: !open },
   );
-  const { data: roles, isLoading: rolesLoading } = useGetAllRolesQuery(
-    { page: 1, page_size: 200 },
-    { skip: !open },
-  );
+  const { data: roles, isLoading: rolesLoading } = useRoles();
   const { data: positions, isLoading: positionsLoading } = useGetPositionsQuery(
     { page: 1, page_size: 200 },
     { skip: !open },
@@ -115,7 +112,7 @@ export default function AddMemberSheet({
         }));
     }
     if (tab === "ROLE") {
-      return (roles?.data ?? [])
+      return (roles ?? [])
         .filter((r) => r.status === "ACTIVE")
         .map((r) => ({
           kind: "ROLE" as const,
