@@ -361,7 +361,7 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
   const { data: branchData } = useGetBranchOptionsQuery(undefined, { skip: !open || !perBranch });
   const branches = useMemo(() => toArray(branchData?.data), [branchData]);
 
-  // Only where there is a choice to make. A caller pinned to one site has
+  // Only where there is a choice to make. A caller pinned to one branch has
   // already answered by being pinned - the backend stamps her branch and
   // refuses any other - so asking her would be a question with one answer. A
   // central school is never asked at all: its runs cover everybody by design.
@@ -401,7 +401,7 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
     return roster.filter((e) => String(e.branch_id) === scopeChoice);
   }, [roster, asksForScope, scopeChoice]);
   const coverageLabel = scopeChoice === WHOLE_SCHOOL
-    ? "every site"
+    ? "every branch"
     : branches.find((b) => String(b.id) === scopeChoice)?.name ?? "";
 
   // No default when she is asked. A whole-school run under per-branch payroll is
@@ -438,7 +438,7 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
               </Select>
             </FormField>
             <p className="mt-1 font-mont text-[11px] text-gray-05">
-              This school runs payroll per branch. A whole-school run pays every site at once, and no branch run can be raised for the same period afterwards.
+              This school runs payroll per branch. A whole-school run pays every branch at once, and no branch run can be raised for the same period afterwards.
             </p>
           </div>
         ) : null}
@@ -483,7 +483,7 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
  *  endpoint accepts on `?branch=`, so the two spellings cannot drift. */
 const UNASSIGNED = "unassigned";
 
-/** A person's site, or a visible gap where one should be. */
+/** A person's branch, or a visible gap where one should be. */
 function BranchCell({ salary }: { salary: EmployeeSalary }) {
   if (salary.branch_name) return <span className="text-gray-01">{salary.branch_name}</span>;
   return <span className={cn(PILL, "bg-amber-50 text-amber-700")}>Unassigned</span>;
@@ -498,8 +498,8 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
   const all = useMemo(() => toArray(data?.data), [data]);
 
   // The branches this caller may work in, from the tenant rather than from the
-  // rows. Reading them off the roster only ever offered sites that already had
-  // somebody on them, which is never the new site she is trying to fill.
+  // rows. Reading them off the roster only ever offered branches that already had
+  // somebody on them, which is never the new branch she is trying to fill.
   const { data: branchData } = useGetBranchOptionsQuery();
   const branches = useMemo(() => toArray(branchData?.data), [branchData]);
   const unassignedCount = useMemo(() => all.filter((e) => e.branch_id == null).length, [all]);
@@ -570,7 +570,7 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
       {unassignedCount && branchFilter !== UNASSIGNED ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
           <p className="font-mont text-[13px] text-amber-900">
-            <span className="font-semibold">{unassignedCount}</span> {unassignedCount === 1 ? "person is" : "people are"} not assigned to a branch. Per-branch payroll cannot be switched on until {unassignedCount === 1 ? "they have" : "each of them has"} a site.
+            <span className="font-semibold">{unassignedCount}</span> {unassignedCount === 1 ? "person is" : "people are"} not assigned to a branch. Per-branch payroll cannot be switched on until {unassignedCount === 1 ? "they have" : "each of them has"} a branch.
           </p>
           <button type="button" onClick={() => setBranchFilter(UNASSIGNED)} className="font-mont text-[13px] font-semibold text-amber-900 underline underline-offset-2">Show them</button>
         </div>
@@ -618,7 +618,7 @@ function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: {
 
   // Only sent when it actually changed: the backend reads the key's presence as
   // "retarget this row", and a blank one means "my own branch" to a caller
-  // pinned to a single site, so sending it unchanged would move people.
+  // pinned to a single branch, so sending it unchanged would move people.
   const branchChanged = String(salary?.branch_id ?? "") !== branchId;
   const branchPatch = branchChanged ? { branch: branchId ? Number(branchId) : null } : {};
 
@@ -652,7 +652,7 @@ function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: {
                 {branches.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
               </Select>
             </FormField>
-            <p className="mt-1 font-mont text-[11px] text-gray-05">The site this person is paid from. Everyone needs one before the school can switch to per-branch payroll.</p>
+            <p className="mt-1 font-mont text-[11px] text-gray-05">The branch this person is paid from. Everyone needs one before the school can switch to per-branch payroll.</p>
           </div>
         ) : null}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

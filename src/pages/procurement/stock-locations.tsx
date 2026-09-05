@@ -2,13 +2,13 @@
  * Procurement → Inventory → Locations. The places stock physically sits.
  *
  * Low-traffic admin: a school sets its stores up once and rarely returns. The screen
- * exists because stock is now held per location, and because a two-campus school
- * migrated onto a single `MAIN` store needs somewhere to create the other one.
+ * exists because stock is held per location, and because a two-branch school sitting
+ * on a single `MAIN` store needs somewhere to create the other one.
  *
- * There is deliberately no Transfer button. Moving stock between locations today is
- * an issue at the source and a receipt at the destination, and the receipt re-prices
+ * There is deliberately no Transfer button. Moving stock between locations is an
+ * issue at the source and a receipt at the destination, and the receipt re-prices
  * the stock rather than carrying its cost across. A single transfer document is a
- * recorded gap in the backend and will arrive with its own endpoint.
+ * recorded gap in the backend, with no endpoint behind it.
  */
 import { useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
@@ -210,7 +210,7 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
     <FormDrawer
       open onOpenChange={(o) => !saving && !o && onClose()}
       title={initial ? "Edit stock location" : "New stock location"}
-      description={initial ? "Update this store. Its code cannot be changed." : "A store stock is held in. Leave the campus blank for an entity-wide store."}
+      description={initial ? "Update this store. Its code cannot be changed." : "A store stock is held in. Leave the branch blank for an entity-wide store."}
       widthClass="sm:max-w-lg" onSubmit={save} submitText={initial ? "Save changes" : "Create"}
       loading={saving} canSubmit={canSubmit}
     >

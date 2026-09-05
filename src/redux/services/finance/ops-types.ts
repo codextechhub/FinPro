@@ -220,7 +220,7 @@ export interface EmployeeSalary {
   name: string;
   structure_id: number | null;
   structure_name: string | null;
-  // Which site the person works at. Deliberately outside the FLS block below:
+  // Which branch the person works at. Deliberately outside the FLS block below:
   // it is not a pay figure, and whoever assigns branches before a school can
   // switch to per-branch payroll has to be able to read it. Null means
   // unassigned, which is the state that blocks that switch.
@@ -266,7 +266,7 @@ export interface PayrollRun {
   document_number: string;
   pay_date: string;
   period_label: string;
-  // Which site the run covers. Null is a central run over the whole entity -
+  // Which branch the run covers. Null is a central run over the whole entity -
   // the shape every run had before per-branch payroll existed - so null and
   // "a branch I cannot read" are deliberately different answers.
   branch_id: number | null;

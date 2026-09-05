@@ -298,7 +298,7 @@ export const opsApi = baseApi.injectEndpoints({
       invalidatesTags: ["FinancePayroll", "FinanceJournals", "FinanceReports"],
     }),
     // `branch` is omitted for a whole-school run, and omitted entirely for a
-    // caller pinned to one site - the backend stamps hers, and naming a
+    // caller pinned to one branch - the backend stamps hers, and naming a
     // different one is refused rather than silently retargeted.
     generatePayrollRun: b.mutation<ApiEnvelope<PayrollRun>, { entity: string; pay_date: string; period_label?: string; narration?: string; branch?: number }>({
       query: ({ entity, ...body }) => ({ url: `/finance/payroll-runs/generate/${qs({ entity })}`, method: "POST", body }),
