@@ -3,6 +3,7 @@
 // available close action explicit.
 
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import {
@@ -53,6 +54,13 @@ import {
   type YearCloseState,
 } from "./periods-model";
 
+/**
+ * Subtitle for the screen this file renders. Both routes that reach the
+ * workbench (finance setup and finance reports) put it under their page title,
+ * so it lives with the screen rather than being written out twice.
+ */
+export const PERIODS_DESCRIPTION = "Review one fiscal year at a time. Restrict each posting window, finish the year-end close, then apply permanent locks.";
+
 const selectCls = "h-9 w-full rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -71,7 +79,21 @@ const isForbidden = (error: unknown) => (
   typeof error === "object" && error !== null && "status" in error && error.status === 403
 );
 
-export function PeriodsTab({ entity }: { entity: string }) {
+/**
+ * Fiscal close workbench for one ledger entity.
+ *
+ * The calendar controls (fiscal year picker and the new-year action) read as part
+ * of the page heading rather than as the first row of the body, so a host that
+ * exposes a `headerSlot` node receives them through a portal and gets them on the
+ * title line; a host that does not passes nothing and they render inline above the
+ * workbench. The picker owns the selected year that drives every query below it,
+ * which is why the controls stay part of this component instead of being lifted
+ * into the host.
+ */
+export function PeriodsTab({ entity, headerSlot }: {
+  entity: string;
+  headerSlot?: HTMLElement | null;
+}) {
   const {
     data: fiscalYearData,
     isLoading: fiscalYearsLoading,
@@ -148,38 +170,34 @@ export function PeriodsTab({ entity }: { entity: string }) {
       : <ErrorState onRetry={refetchFiscalYears} />;
   }
 
+  const calendarControls = (
+    <div data-guide="finance-periods.calendar-controls" className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+      {fiscalYears.length > 0 ? (
+        <label className="min-w-0 flex-1 sm:w-40 sm:flex-none">
+          <span className="sr-only">Fiscal year</span>
+          <select
+            value={activeYear ?? ""}
+            onChange={(event) => chooseYear(Number(event.target.value))}
+            disabled={periodsFetching}
+            className={selectCls}
+          >
+            {fiscalYears.map((year) => (
+              <option key={year.id} value={year.year}>FY {year.year} · {humanize(year.status)}</option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      <Can permission={P.FIN_CREATE_PERIOD}>
+        <Button onClick={() => setCreating(true)} className="h-9 flex-1 gap-1.5 font-mont text-xs font-semibold sm:flex-none">
+          <Plus className="size-3.5" /> New fiscal year
+        </Button>
+      </Can>
+    </div>
+  );
+
   return (
     <div data-guide="finance-periods.workbench" className="min-w-0 space-y-5">
-      <div data-guide="finance-periods.calendar-controls" className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="font-mont text-base font-semibold text-gray-01">Fiscal close workbench</h2>
-          <p className="mt-1 max-w-2xl font-mont text-xs leading-5 text-gray-05">
-            Review one fiscal year at a time. Restrict each posting window, finish the year-end close, then apply permanent locks.
-          </p>
-        </div>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-          {fiscalYears.length > 0 ? (
-            <label className="min-w-0 flex-1 sm:w-40 sm:flex-none">
-              <span className="sr-only">Fiscal year</span>
-              <select
-                value={activeYear ?? ""}
-                onChange={(event) => chooseYear(Number(event.target.value))}
-                disabled={periodsFetching}
-                className={selectCls}
-              >
-                {fiscalYears.map((year) => (
-                  <option key={year.id} value={year.year}>FY {year.year} · {humanize(year.status)}</option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <Can permission={P.FIN_CREATE_PERIOD}>
-            <Button onClick={() => setCreating(true)} className="h-9 flex-1 gap-1.5 font-mont text-xs font-semibold sm:flex-none">
-              <Plus className="size-3.5" /> New fiscal year
-            </Button>
-          </Can>
-        </div>
-      </div>
+      {headerSlot ? createPortal(calendarControls, headerSlot) : calendarControls}
 
       {fiscalYears.length === 0 ? (
         <div className="rounded-md border border-white-02 bg-white">
@@ -214,7 +232,7 @@ export function PeriodsTab({ entity }: { entity: string }) {
           <section data-guide="finance-periods.periods">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
               <div>
-                <h3 className="font-mont text-sm font-semibold text-gray-01">Posting periods</h3>
+                <h2 className="font-mont text-sm font-semibold text-gray-01">Posting periods</h2>
                 <p className="mt-0.5 font-mont text-xs text-gray-05">Select a period to inspect its close checklist and available actions.</p>
               </div>
               <p className="font-mont text-[11px] text-gray-05">{summary.total === 4 ? "Quarterly" : summary.total === 12 ? "Monthly" : "Custom"} calendar · {summary.total} periods</p>
@@ -278,7 +296,7 @@ function FiscalYearOverview({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-mont text-lg font-semibold text-black-01">Fiscal year {fiscalYear.year}</h3>
+            <h2 className="font-mont text-lg font-semibold text-black-01">Fiscal year {fiscalYear.year}</h2>
             <StatusPill status={fiscalYear.status} />
           </div>
           <p className="mt-1 font-mont text-xs text-gray-05">
