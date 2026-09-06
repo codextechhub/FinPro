@@ -200,6 +200,39 @@ export function TabStrip<T extends string>({
   }, [highlight.width]);
   const animate = settled.current && highlight.width > 0;
 
+  /**
+   * Bring the active tab into view when it is off the end of a scrolled strip.
+   *
+   * A strip that scrolls rather than wraps can hold its active tab off-screen,
+   * and a tab restored from the address or from saved state arrives that way
+   * with nothing on screen saying so: the strip looks like an ordinary row whose
+   * highlight has vanished. Only the strip scrolls, never the page, so this
+   * cannot pull the screen out from under a reader, and a tab already fully in
+   * view is left exactly where it is rather than being centred for no reason.
+   *
+   * Keyed on the selection alone. Doing it from the measuring effect would also
+   * fire on resize, which would yank the strip back while somebody is reading
+   * the other end of it.
+   */
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const active = list.querySelector<HTMLElement>('[data-active="true"]');
+    if (!active) return;
+    const left = active.offsetLeft;
+    const right = left + active.offsetWidth;
+    if (left >= list.scrollLeft && right <= list.scrollLeft + list.clientWidth) return;
+    const reduced = typeof window !== "undefined" && typeof window.matchMedia === "function"
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    list.scrollTo({
+      left: Math.max(0, left < list.scrollLeft ? left : right - list.clientWidth),
+      // The same rule the highlight follows: the first placement is instant, so
+      // a strip that opens already scrolled does not scroll itself in front of
+      // the reader.
+      behavior: settled.current && !reduced ? "smooth" : "auto",
+    });
+  }, [value, items]);
+
   useEffect(() => {
     const list = listRef.current;
     if (!list || typeof ResizeObserver === "undefined") return;
