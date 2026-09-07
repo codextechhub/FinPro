@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createsWorkflowTemplates } from "@xvs/finance/host";
 import { useNavigate } from "react-router";
 import { Info, Plus, RefreshCw } from "lucide-react";
 import CustomTable from "@/components/custom/custom-table";
@@ -75,11 +76,18 @@ export default function WorkflowTemplates() {
                 : "Your approval paths. Each starts as the Codex version; adjust one and this school runs your version from then on."}
             </p>
           </div>
-          <PermissionGate permission={P.MANAGE_WORKFLOW_TEMPLATES}>
-            <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.WORKFLOW.TEMPLATE_NEW)}>
-              <Plus /> New Template
-            </Button>
-          </PermissionGate>
+          {/* Two different questions. The host says whether this product
+              authors approval paths at all; the permission says whether this
+              reader may. A tenant answers no to the first however senior the
+              reader is: its templates arrive published and are adjusted, not
+              written from nothing. */}
+          {createsWorkflowTemplates && (
+            <PermissionGate permission={P.MANAGE_WORKFLOW_TEMPLATES}>
+              <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.WORKFLOW.TEMPLATE_NEW)}>
+                <Plus /> New Template
+              </Button>
+            </PermissionGate>
+          )}
         </div>
 
         <div className="flex justify-end">

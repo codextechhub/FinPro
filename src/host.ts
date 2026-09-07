@@ -186,6 +186,19 @@ export interface HostContract {
    *  school fees. An app that omits "fees" from `financeSettingsSections`
    *  supplies a component that renders nothing and it is never reached. */
   FeeDuePolicyPanel: ComponentType;
+  /** Whether this app creates approval templates from nothing.
+   *
+   *  CodeX does: the shared paths every tenant starts on are authored in the
+   *  console. A tenant does not. Its templates arrive already published, and
+   *  what it does is adjust one - "each starts as the Codex version; adjust one
+   *  and this school runs your version from then on". Offering "New Template"
+   *  there invites somebody to author a path from scratch alongside the seeded
+   *  ones, which is a second answer to a question that already has one.
+   *
+   *  Not a permission. A tenant admin holds ``workflow.template.manage`` and
+   *  needs it, because adjusting a template is what that key is for; this says
+   *  the *product* has no create story here, which no permission can express. */
+  createsWorkflowTemplates: boolean;
   /** The application's own logo. */
   AppLogo: ComponentType<{ animate?: boolean; className?: string }>;
   /** An extra section on Setup -> Entities, below the caller's own books.
@@ -214,4 +227,5 @@ export const {
   useBranches, useDirectory, useRoles, AppLogo, QuickExportButton, UserAvatar,
   useDashboardTitle, PlatformLedgerInventory, useLogRecentOpen, rolesHref,
   ApprovalRolesTab, financeSettingsSections, setupSections, FeeDuePolicyPanel,
+  createsWorkflowTemplates,
 } = host;
