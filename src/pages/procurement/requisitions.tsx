@@ -21,6 +21,7 @@ import { Can } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Textarea } from "@/components/ui/textarea";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { cn } from "@/lib/utils";
@@ -470,8 +471,8 @@ function RequisitionForm({ open, onClose, entity, currency, initial, onSaved }: 
           <FormField label="Title" required><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What is being requested?" /></FormField>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <FormField label="Cost Centre"><SearchSelect options={costCenters} value={costCenter} onChange={(e) => setCostCenter(e.target.value)} placeholder="Select cost centre" /></FormField>
-            <FormField label="Request date" required><Input type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} /></FormField>
-            <FormField label="Needed by"><Input type="date" min={requestDate} value={neededBy} onChange={(e) => setNeededBy(e.target.value)} /></FormField>
+            <FormField label="Request date" required><DatePickerInput value={requestDate} onChange={(e) => setRequestDate(e.target.value)} /></FormField>
+            <FormField label="Needed by"><DatePickerInput min={requestDate} value={neededBy} onChange={(e) => setNeededBy(e.target.value)} /></FormField>
           </div>
         </section>
 

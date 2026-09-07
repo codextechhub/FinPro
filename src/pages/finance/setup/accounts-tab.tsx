@@ -11,6 +11,7 @@ import { SearchSelect } from "@/components/custom/search-select";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/states";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
@@ -665,10 +666,10 @@ function GroupLedger({ initialView, entity, account, accounts, summary, currency
               </select>
             </FormField>
             <FormField label="From">
-              <Input type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setActivityPage(1); }} className="bg-white" />
+              <DatePickerInput value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setActivityPage(1); }} className="bg-white" />
             </FormField>
             <FormField label="To">
-              <Input type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setActivityPage(1); }} className="bg-white" />
+              <DatePickerInput value={dateTo} onChange={(event) => { setDateTo(event.target.value); setActivityPage(1); }} className="bg-white" />
             </FormField>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">

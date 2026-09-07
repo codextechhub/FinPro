@@ -8,7 +8,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 import { FormModal, FormField, toArray, PostingDateField,} from "@/components/finance-ui";
-import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { apiErrorMessage } from "@/utils/api-errors";
 import { useGetFeeStructuresQuery, useGenerateFromFeeStructureMutation } from "@/redux/services/finance/ar-api";
 import type { FeeStructure } from "@/redux/services/finance/ar-types";
@@ -66,7 +66,7 @@ export function BatchGenerateModal({ open, onOpenChange, entity }: {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} required={false} />
         <FormField label="Due date">
-          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" />
+          <DatePickerInput value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" />
         </FormField>
       </div>
       {failure ? (

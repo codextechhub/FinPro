@@ -11,6 +11,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { DetailDrawer, Money, CustomerPicker, AccountPicker, TaxCodePicker, toArray, PostingDateField,} from "@/components/finance-ui";
 import { SearchSelect } from "@/components/custom/search-select";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Button } from "@/components/ui/button";
 import { useGetTaxCodesQuery } from "@/redux/services/finance/setup-api";
 import { useCreateInvoiceMutation, useGetFeeStructuresQuery } from "@/redux/services/finance/ar-api";
@@ -126,7 +127,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
             <PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} />
             <label className="block space-y-1">
               <span className={fieldLabel}>Due date</span>
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" />
+              <DatePickerInput value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" />
             </label>
           </div>
           <label className="block space-y-1">

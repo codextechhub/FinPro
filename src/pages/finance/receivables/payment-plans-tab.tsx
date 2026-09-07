@@ -19,6 +19,7 @@ import {
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { SearchSelect } from "@/components/custom/search-select";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
@@ -379,7 +380,7 @@ function NewPlanDrawer({ open, onClose, entity, currency }: {
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <FormField label="Total" required><MoneyInput valueKobo={total} onChangeKobo={setTotal} currency={currency} /></FormField>
-          <FormField label="Start date" required><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white" /></FormField>
+          <FormField label="Start date" required><DatePickerInput value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white" /></FormField>
           <FormField label="Installments" required><Input type="number" min={1} max={60} value={count} onChange={(e) => setCount(Math.max(1, Number(e.target.value) || 1))} className="bg-white tabular-nums" /></FormField>
         </div>
         <Segmented label="Frequency" value={frequency} onChange={setFrequency} options={FREQS} />

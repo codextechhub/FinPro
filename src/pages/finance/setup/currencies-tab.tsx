@@ -13,6 +13,7 @@ import { DataTable, StatusPill, Sparkline, FormDrawer, FormField, TabStrip, CHAR
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
 import { useGetCurrenciesQuery, useGetFxRatesQuery, useCreateFxRateMutation } from "@/redux/services/finance/setup-api";
@@ -176,7 +177,7 @@ function NewFxRateModal({ open, onClose, currencies }: { open: boolean; onClose:
       </div>
       <FormField label="Rate" required><Input value={rate} onChange={(e) => setRate(e.target.value)} type="number" step="0.0001" placeholder="e.g. 1612.40" className="bg-white font-mont" /></FormField>
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="As of" required><Input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} className="bg-white" /></FormField>
+        <FormField label="As of" required><DatePickerInput value={asOf} onChange={(e) => setAsOf(e.target.value)} className="bg-white" /></FormField>
         <FormField label="Source"><Input value={src} onChange={(e) => setSrc(e.target.value)} placeholder="e.g. CBN" className="bg-white" /></FormField>
       </div>
     </FormDrawer>

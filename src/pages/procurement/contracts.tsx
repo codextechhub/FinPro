@@ -18,6 +18,7 @@ import {
 import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
@@ -385,8 +386,8 @@ function ContractForm({ entity, currency, initial, onClose }: { entity: string; 
         <FormField label="Type / title" required><Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} className="bg-white" placeholder="e.g. Cloud hosting (SLA)" /></FormField>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField label="Start date"><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white" /></FormField>
-        <FormField label="End date"><Input type="date" min={startDate || undefined} value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-white" /></FormField>
+        <FormField label="Start date"><DatePickerInput value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white" /></FormField>
+        <FormField label="End date"><DatePickerInput min={startDate || undefined} value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-white" /></FormField>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FormField label="Contract value"><MoneyInput valueKobo={value} onChangeKobo={setValue} currency={currency} /></FormField>
@@ -414,7 +415,7 @@ function ContractForm({ entity, currency, initial, onClose }: { entity: string; 
         {milestones.map((row) => (
           <div key={row.key} className="flex flex-wrap items-center gap-2 rounded-md border border-white-02 p-2">
             <Input value={row.name} onChange={(e) => setMs(row.key, { name: e.target.value })} placeholder="Milestone name" className="min-w-40 flex-1 bg-white" />
-            <Input type="date" value={row.due_date} onChange={(e) => setMs(row.key, { due_date: e.target.value })} className="w-40 bg-white" aria-label="Due date" />
+            <DatePickerInput value={row.due_date} onChange={(e) => setMs(row.key, { due_date: e.target.value })} className="w-40 bg-white" aria-label="Due date" />
             <div className="w-36"><MoneyInput valueKobo={row.amountKobo} onChangeKobo={(k) => setMs(row.key, { amountKobo: k })} currency={currency} placeholder="Amount" /></div>
             <button type="button" onClick={() => removeMs(row.key)} className="text-gray-05 hover:text-destructive" aria-label="Remove milestone">✕</button>
           </div>
@@ -448,8 +449,8 @@ function RenewForm({ entity, currency, contract, onClose }: { entity: string; cu
       widthClass="sm:max-w-lg" onSubmit={save} submitText="Renew" loading={isLoading} canSubmit={valid}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField label="New start date" required><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white" /></FormField>
-        <FormField label="New end date" required><Input type="date" min={startDate || undefined} value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-white" /></FormField>
+        <FormField label="New start date" required><DatePickerInput value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white" /></FormField>
+        <FormField label="New end date" required><DatePickerInput min={startDate || undefined} value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-white" /></FormField>
       </div>
       <FormField label="Contract value"><MoneyInput valueKobo={value} onChangeKobo={setValue} currency={currency} /></FormField>
       <label className="flex items-center gap-2 font-mont text-sm text-gray-01">

@@ -119,7 +119,7 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
         sections={sections}
         scopeLabel={active.entity ? `${active.entity.code} · ${active.entity.name}` : "Select an entity"}
       >
-        {activeSection === "overview" ? <Overview entity={active.entity} /> : null}
+        {activeSection === "overview" ? <Overview entity={active.entity} sections={sections} /> : null}
         {activeSection === "entities" ? <Entities /> : null}
         {activeSection === "fiscal-calendar" ? <FiscalCalendar entity={active.entity} /> : null}
         {/* Keyed on the entity: unsaved mapping edits are per-entity, so switching
@@ -136,14 +136,33 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
   );
 }
 
-function Overview({ entity }: { entity: ReturnType<typeof useActiveEntity>["entity"] }) {
-  // Administering entities is a platform act, not a tenant one: a product whose
-  // customer keeps a single set of books never mounts the section and grants
-  // nobody finance.entity.create. The card was offered there anyway and led to
-  // a 404. Gated on the key that decides whether entities are administered
-  // here at all, rather than on the key to read the one you already have.
-  const { hasPermission } = usePermissions();
-  const administersEntities = hasPermission(P.FIN_CREATE_ENTITY);
+/** What each section's overview card says. Keyed by section so the cards cannot
+ *  drift from the nav: both are rendered from the one filtered list. */
+const OVERVIEW_CARDS: Record<Exclude<FinanceSettingsSection, "overview">, {
+  description: string;
+  status: string;
+  tone?: "ready" | "attention";
+}> = {
+  entities: { description: "Create and review the independent sets of books owned by this tenant.", status: "Available", tone: "ready" },
+  "fiscal-calendar": { description: "Open fiscal years, manage posting periods and control the close.", status: "Configured", tone: "ready" },
+  accounting: { description: "Review the control accounts currently resolved by finance posting services.", status: "Review", tone: "attention" },
+  documents: { description: "Manage collection defaults, reminders, fee structures and document policies.", status: "Mixed" },
+  "banking-cash": { description: "Set automatic reconciliation and receipt-allocation defaults.", status: "Configurable", tone: "ready" },
+  // Deliberately not a list of the pages behind it. Which reference pages exist
+  // is the host's answer, and naming currencies and dimensions here was wrong in
+  // an app that mounts neither.
+  "reference-data": { description: "Maintain the chart of accounts, tax codes and the other shared reference data.", status: "Available", tone: "ready" },
+  approvals: { description: "Review approval templates for journals, refunds and write-offs.", status: "Shared workflow" },
+  fees: { description: "Choose when fee bills fall due once they are raised.", status: "Configurable", tone: "ready" },
+};
+
+function Overview({ entity, sections }: {
+  entity: ReturnType<typeof useActiveEntity>["entity"];
+  // The same list the nav was built from. Passed in rather than recomputed: the
+  // cards were their own hardcoded set, so Entities kept its card in an app that
+  // does not mount the section long after the nav entry had gone.
+  sections: (ConsoleSettingsSection & { key: FinanceSettingsSection })[];
+}) {
   return (
     <div className="space-y-5">
       <SettingsSectionHeader title="Configuration overview" description="Start with the legal entity and fiscal calendar, then review the controls that drive posting." />
@@ -157,15 +176,26 @@ function Overview({ entity }: { entity: ReturnType<typeof useActiveEntity>["enti
         </SettingsPanel>
       )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {administersEntities && (
-          <SettingsOverviewCard icon={Building2} title="Entities" description="Create and review the independent sets of books owned by this tenant." to={`${F.SETTINGS}/entities`} status="Available" tone="ready" />
-        )}
-        <SettingsOverviewCard icon={CalendarRange} title="Fiscal calendar" description="Open fiscal years, manage posting periods and control the close." to={`${F.SETTINGS}/fiscal-calendar`} status={entity ? "Configured" : "Select entity"} tone={entity ? "ready" : "attention"} />
-        <SettingsOverviewCard icon={BookOpenCheck} title="Accounting defaults" description="Review the control accounts currently resolved by finance posting services." to={`${F.SETTINGS}/accounting`} status="Review" tone="attention" />
-        <SettingsOverviewCard icon={FileCog} title="Documents" description="Manage collection defaults, reminders, fee structures and document policies." to={`${F.SETTINGS}/documents`} status="Mixed" />
-        <SettingsOverviewCard icon={Banknote} title="Banking and cash" description="Set automatic reconciliation and receipt-allocation defaults." to={`${F.SETTINGS}/banking-cash`} status="Configurable" tone="ready" />
-        <SettingsOverviewCard icon={ListTree} title="Reference data" description="Maintain the chart, tax codes, currencies, cost centres and dimensions." to={`${F.SETTINGS}/reference-data`} status="Available" tone="ready" />
-        <SettingsOverviewCard icon={Workflow} title="Approvals" description="Review approval templates for journals, refunds and write-offs." to={`${F.SETTINGS}/approvals`} status="Shared workflow" />
+        {sections
+          .filter((item) => item.key !== "overview")
+          .map((item) => {
+            const card = OVERVIEW_CARDS[item.key as Exclude<FinanceSettingsSection, "overview">];
+            if (!card) return null;
+            // The fiscal calendar is the one card whose state depends on there
+            // being an active entity to read periods from.
+            const needsEntity = item.key === "fiscal-calendar" && !entity;
+            return (
+              <SettingsOverviewCard
+                key={item.key}
+                icon={item.icon}
+                title={item.title}
+                description={card.description}
+                to={`${F.SETTINGS}/${item.key}`}
+                status={needsEntity ? "Select entity" : card.status}
+                tone={needsEntity ? "attention" : card.tone}
+              />
+            );
+          })}
       </div>
     </div>
   );

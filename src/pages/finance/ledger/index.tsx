@@ -15,6 +15,7 @@ import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { UserAvatar } from "../../../host";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useActionParam } from "@/hooks/use-action-param";
@@ -169,8 +170,8 @@ export default function GeneralLedgerPage() {
           </select>
           {preset === "custom" && (
             <>
-              <Input type="date" value={custom.from} onChange={(e) => { setCustom((c) => ({ ...c, from: e.target.value })); setPage(1); }} aria-label="From" className="h-9 w-36 bg-white" />
-              <Input type="date" value={custom.to} onChange={(e) => { setCustom((c) => ({ ...c, to: e.target.value })); setPage(1); }} aria-label="To" className="h-9 w-36 bg-white" />
+              <DatePickerInput value={custom.from} onChange={(e) => { setCustom((c) => ({ ...c, from: e.target.value })); setPage(1); }} aria-label="From" className="h-9 w-36 bg-white" />
+              <DatePickerInput value={custom.to} onChange={(e) => { setCustom((c) => ({ ...c, to: e.target.value })); setPage(1); }} aria-label="To" className="h-9 w-36 bg-white" />
             </>
           )}
         </div>

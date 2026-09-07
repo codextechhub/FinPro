@@ -23,6 +23,7 @@ import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -662,7 +663,7 @@ function EditStatementForm({
       ) : null}
       <div className="grid grid-cols-2 gap-3">
         <FormField label="Statement date" required>
-          <Input type="date" value={statementDate} onChange={(event) => setStatementDate(event.target.value)} disabled={!statement.can_edit} className="bg-white font-mont" />
+          <DatePickerInput value={statementDate} onChange={(event) => setStatementDate(event.target.value)} disabled={!statement.can_edit} className="bg-white font-mont" />
         </FormField>
         <FormField label="Period label">
           <Input value={periodLabel} onChange={(event) => setPeriodLabel(event.target.value)} disabled={!statement.can_edit} placeholder="e.g. Apr 2026" className="bg-white" />
@@ -707,7 +708,7 @@ function EditStatementForm({
           {rows.map((row, index) => (
             <div key={row.id ?? `new-${index}`} className="flex items-end gap-2 rounded-md border border-white-02 bg-white p-2.5">
               <div className="grid flex-1 grid-cols-12 gap-2">
-                <div className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Date</p><Input type="date" value={row.txn_date} onChange={(event) => setRow(index, { txn_date: event.target.value })} disabled={!statement.can_edit} className="bg-white font-mont text-sm" /></div>
+                <div className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Date</p><DatePickerInput value={row.txn_date} onChange={(event) => setRow(index, { txn_date: event.target.value })} disabled={!statement.can_edit} className="bg-white font-mont text-sm" /></div>
                 <div className="col-span-4"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Description</p><Input value={row.description} onChange={(event) => setRow(index, { description: event.target.value })} disabled={!statement.can_edit} className="bg-white text-sm" /></div>
                 <div className="col-span-2"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Reference</p><Input value={row.reference} onChange={(event) => setRow(index, { reference: event.target.value })} disabled={!statement.can_edit} className="bg-white font-mont text-sm" /></div>
                 <div className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Amount</p><Input type="number" value={row.amount} onChange={(event) => setRow(index, { amount: event.target.value })} disabled={!statement.can_edit} className="bg-white font-mont text-sm" /></div>
@@ -801,7 +802,7 @@ function ImportStatementDrawer({ id, entity, onClose }: { id: number; entity: st
             {rows.map((r, i) => (
               <div key={i} className="flex items-end gap-2 rounded-md border border-white-02 bg-white p-2.5">
                 <div className="grid flex-1 grid-cols-12 gap-2">
-                  <div className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Date</p><Input type="date" value={r.txn_date} onChange={(e) => setRow(i, { txn_date: e.target.value })} className="bg-white font-mont text-sm" /></div>
+                  <div className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Date</p><DatePickerInput value={r.txn_date} onChange={(e) => setRow(i, { txn_date: e.target.value })} className="bg-white font-mont text-sm" /></div>
                   <div className="col-span-4"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Description</p><Input value={r.description} onChange={(e) => setRow(i, { description: e.target.value })} className="bg-white text-sm" /></div>
                   <div className="col-span-2"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Reference</p><Input value={r.reference} onChange={(e) => setRow(i, { reference: e.target.value })} className="bg-white font-mont text-sm" /></div>
                   <div className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Amount (₦)</p><Input type="number" value={r.amount} onChange={(e) => setRow(i, { amount: e.target.value })} placeholder="0.00" className="bg-white font-mont text-sm" /></div>
@@ -957,7 +958,7 @@ function BulkImportStatementDrawer({ id, entity, onClose }: { id: number; entity
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormField label="Statement date" required>
-              <Input type="date" value={statementDate} onChange={(e) => setStatementDate(e.target.value)} className="bg-white font-mont" />
+              <DatePickerInput value={statementDate} onChange={(e) => setStatementDate(e.target.value)} className="bg-white font-mont" />
             </FormField>
             <FormField label="Period label">
               <Input value={periodLabel} onChange={(e) => setPeriodLabel(e.target.value)} placeholder="e.g. Apr 2026" className="bg-white" />

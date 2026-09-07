@@ -14,6 +14,7 @@ import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState, EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
@@ -252,9 +253,9 @@ function StatementTab({ d, entity, entityName, currency }: { d: CustomerDetail; 
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="flex items-end gap-2">
           <label className="space-y-1"><span className="font-mont text-[11px] text-gray-05">From</span>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 bg-white" /></label>
+            <DatePickerInput value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 bg-white" /></label>
           <label className="space-y-1"><span className="font-mont text-[11px] text-gray-05">To</span>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 bg-white" /></label>
+            <DatePickerInput value={to} onChange={(e) => setTo(e.target.value)} className="h-9 bg-white" /></label>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => window.print()} className="gap-1.5"><Printer className="size-4" /> Print</Button>

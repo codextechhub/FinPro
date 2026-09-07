@@ -23,6 +23,7 @@ import {
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { apiErrorMessage } from "@/utils/api-errors";
@@ -278,7 +279,7 @@ function GenerateDrawer({ structure, entity, onClose }: { structure: FeeStructur
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} />
-          <FormField label="Due date"><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" /></FormField>
+          <FormField label="Due date"><DatePickerInput value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" /></FormField>
         </div>
         {failure ? (
           <div role="alert" className="flex gap-2 rounded-md border border-error/30 bg-error/5 px-3 py-2.5">

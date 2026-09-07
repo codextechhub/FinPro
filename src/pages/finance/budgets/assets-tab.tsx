@@ -17,6 +17,7 @@ import { DataTable, Money, MoneyInput, DetailDrawer, FormField, BankAccountPicke
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
@@ -376,7 +377,7 @@ function RunDepreciationDrawer({ open, onClose, entity, currency }: { open: bool
         <Button disabled={isLoading || isFetching || nothing || !preview} onClick={submit} className="gap-1.5"><Sparkles className="size-4" />{isLoading ? "Posting…" : "Post depreciation"}</Button>
       </>}>
       <div className="space-y-4">
-        <FormField label="Post all charges due up to"><Input type="date" value={upTo} onChange={(e) => setUpTo(e.target.value)} className="h-9 w-52 bg-white" /></FormField>
+        <FormField label="Post all charges due up to"><DatePickerInput value={upTo} onChange={(e) => setUpTo(e.target.value)} className="h-9 w-52 bg-white" /></FormField>
         {isFetching && !preview ? <p className="py-6 text-center font-mont text-xs text-gray-05">Loading…</p> : null}
         {preview ? (
           nothing ? (

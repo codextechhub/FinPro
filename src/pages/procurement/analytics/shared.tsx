@@ -2,6 +2,7 @@
 // Kept separate from helpers.ts (pure) so this file only exports components.
 
 import { Info } from "lucide-react";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
@@ -102,11 +103,10 @@ export function DateFilter({ label, value, onChange }: {
   return (
     <label className="flex flex-col gap-1">
       <span className="font-mont text-[11px] font-medium text-gray-05">{label}</span>
-      <input
-        type="date"
+      <DatePickerInput
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 rounded-md border border-white-02 bg-white px-2.5 font-mont text-sm text-black-01 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        className="h-9 bg-white font-mont text-sm"
       />
     </label>
   );

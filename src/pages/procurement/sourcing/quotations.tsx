@@ -19,6 +19,7 @@ import {
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
@@ -365,8 +366,8 @@ function QuotationForm({ entity, currency, initial, onClose }: { entity: string;
         </FormField>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <FormField label="Quote date" required><Input type="date" value={quoteDate} onChange={(e) => setQuoteDate(e.target.value)} className="bg-white" /></FormField>
-        <FormField label="Valid until"><Input type="date" min={quoteDate} value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="bg-white" /></FormField>
+        <FormField label="Quote date" required><DatePickerInput value={quoteDate} onChange={(e) => setQuoteDate(e.target.value)} className="bg-white" /></FormField>
+        <FormField label="Valid until"><DatePickerInput min={quoteDate} value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="bg-white" /></FormField>
         <FormField label="Lead time (days)"><Input type="number" min="0" max="3650" value={leadTime} onChange={(e) => setLeadTime(e.target.value)} className="bg-white tabular-nums" /></FormField>
       </div>
       <FormField label="Reference"><Input value={reference} maxLength={64} onChange={(e) => setReference(e.target.value)} className="bg-white" /></FormField>

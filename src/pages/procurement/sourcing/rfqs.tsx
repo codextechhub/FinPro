@@ -19,6 +19,7 @@ import {
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
@@ -465,8 +466,8 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
         <FormField label="Title" required><Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-white" /></FormField>
         {!initial && <FormField label="From requisition"><RequisitionPicker entity={entity} value={requisition} onChange={setRequisition} status="APPROVED" placeholder="Optional - prefill from an approved requisition" /></FormField>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Issue date" required><Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="bg-white" /></FormField>
-          <FormField label="Response due"><Input type="date" min={issueDate} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" /></FormField>
+          <FormField label="Issue date" required><DatePickerInput value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="bg-white" /></FormField>
+          <FormField label="Response due"><DatePickerInput min={issueDate} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" /></FormField>
         </div>
         <FormField label="Budget estimate (optional)"><MoneyInput valueKobo={budgetKobo} onChangeKobo={setBudgetKobo} currency={currency} placeholder="No budget ceiling" /></FormField>
         <div>

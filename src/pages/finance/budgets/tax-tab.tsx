@@ -15,6 +15,7 @@ import { DataTable, Money, MoneyInput, DetailDrawer, FormField, AccountPicker, B
 import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
@@ -310,10 +311,10 @@ function NewFilingDrawer({ open, onClose, entity }: { open: boolean; onClose: ()
       <div className="space-y-4">
         <FormField label="Tax obligation" required><TaxObligationPicker entity={entity} value={obligation} onChange={setObligation} /></FormField>
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="Period start" required><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="h-9 bg-white" /></FormField>
-          <FormField label="Period end" required><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="h-9 bg-white" /></FormField>
+          <FormField label="Period start" required><DatePickerInput value={start} onChange={(e) => setStart(e.target.value)} className="h-9 bg-white" /></FormField>
+          <FormField label="Period end" required><DatePickerInput value={end} onChange={(e) => setEnd(e.target.value)} className="h-9 bg-white" /></FormField>
         </div>
-        <FormField label="Due date"><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} className="h-9 bg-white" /></FormField>
+        <FormField label="Due date"><DatePickerInput value={due} onChange={(e) => setDue(e.target.value)} className="h-9 bg-white" /></FormField>
         <p className="font-mont text-[11px] text-gray-05">The accrued amount is read from the obligation's liability control account over the period.</p>
       </div>
     </DetailDrawer>
