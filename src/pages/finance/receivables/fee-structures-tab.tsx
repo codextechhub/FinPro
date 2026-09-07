@@ -312,7 +312,7 @@ function DuplicateDrawer({ structure, entity, onClose }: { structure: FeeStructu
 
   const submit = async () => {
     try {
-      const res = await duplicate({ id: structure.code, entity, code: code.trim().toUpperCase(), name: name.trim() || undefined }).unwrap();
+      const res = await duplicate({ id: structure.code, entity, code: code.trim().toUpperCase() || undefined, name: name.trim() || undefined }).unwrap();
       toast.success(res.message || "Fee structure duplicated.");
       onClose();
     } catch { /* central */ }
@@ -325,14 +325,14 @@ function DuplicateDrawer({ structure, entity, onClose }: { structure: FeeStructu
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !code.trim()} onClick={submit} className="gap-1.5"><Copy className="size-4" />{isLoading ? "Duplicating…" : "Create copy"}</Button>
+        <Button disabled={isLoading} onClick={submit} className="gap-1.5"><Copy className="size-4" />{isLoading ? "Duplicating…" : "Create copy"}</Button>
       </>}
     >
       <div className="space-y-4">
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
           Copies every line (fee code, GL account, amount, tax and optional flag) into a new <span className="font-medium">inactive</span> structure you can review before activating.
         </p>
-        <FormField label="New code" required><Input value={code} onChange={(e) => setCode(e.target.value)} className="bg-white font-mont" /></FormField>
+        <FormField label="New code"><Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Set from the name" className="bg-white font-mont" /></FormField>
         <FormField label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} className="bg-white" /></FormField>
       </div>
     </DetailDrawer>
@@ -383,7 +383,7 @@ function StructureFormDrawer({ open, structure, onClose, entity, currency }: {
   const total = items.reduce((s, it) => s + it.amount, 0);
 
   const validItems = items.filter((it) => it.description.trim() && it.revenue_account && it.amount > 0);
-  const canSubmit = code.trim() !== "" && name.trim() !== "" && validItems.length > 0;
+  const canSubmit = name.trim() !== "" && validItems.length > 0;
 
   const submit = async () => {
     const payloadItems = validItems.map((it) => ({ code: it.code.trim() || undefined, description: it.description.trim(), revenue_account: it.revenue_account, amount: it.amount, tax_code: it.tax_code || undefined, is_optional: it.is_optional }));
@@ -392,7 +392,7 @@ function StructureFormDrawer({ open, structure, onClose, entity, currency }: {
         const res = await update({ id: structure.code, entity, name: name.trim(), applies_to: appliesTo, description: description.trim(), is_active: active, items: payloadItems }).unwrap();
         toast.success(res.message || "Fee structure updated.");
       } else {
-        const res = await create({ entity, code: code.trim().toUpperCase(), name: name.trim(), applies_to: appliesTo, description: description.trim() || undefined, is_active: active, items: payloadItems }).unwrap();
+        const res = await create({ entity, code: code.trim().toUpperCase() || undefined, name: name.trim(), applies_to: appliesTo, description: description.trim() || undefined, is_active: active, items: payloadItems }).unwrap();
         toast.success(res.message || "Fee structure created.");
       }
       onClose();
@@ -415,8 +415,11 @@ function StructureFormDrawer({ open, structure, onClose, entity, currency }: {
     >
       <div className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
-          <FormField label="Code" required>
-            <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. FS-STD-2026" disabled={isEdit} className="bg-white font-mont disabled:opacity-60" />
+          {/* Not required. Most schools do not run fee codes, and the backend
+              derives one from the name when this is left empty. Supplying one
+              means matching a code the school already uses on paper. */}
+          <FormField label="Code">
+            <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Set from the name" disabled={isEdit} className="bg-white font-mont disabled:opacity-60" />
           </FormField>
           <FormField label="Applies to" required>
             <select value={appliesTo} onChange={(e) => setAppliesTo(e.target.value as FeeAppliesTo)} className="h-9 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01">

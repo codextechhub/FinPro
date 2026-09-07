@@ -398,7 +398,10 @@ export const arApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/finance/fee-structures/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["FinanceFeeStructures"],
     }),
-    createFeeStructure: builder.mutation<ApiEnvelope<FeeStructure>, { entity: string; code: string; name: string; applies_to?: string; description?: string; is_active?: boolean; items: FeeLineInput[] }>({
+    // ``code`` is optional: omit it and the backend derives one from the name,
+    // uniquified within the entity. Supplying one still means matching a code
+    // the caller already uses, and a clash on it is still refused.
+    createFeeStructure: builder.mutation<ApiEnvelope<FeeStructure>, { entity: string; code?: string; name: string; applies_to?: string; description?: string; is_active?: boolean; items: FeeLineInput[] }>({
       query: ({ entity, ...body }) => ({ url: `/finance/fee-structures/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceFeeStructures"],
     }),
@@ -406,7 +409,7 @@ export const arApi = baseApi.injectEndpoints({
       query: ({ id, entity, ...body }) => ({ url: `/finance/fee-structures/${id}/${qs({ entity })}`, method: "PATCH", body }),
       invalidatesTags: ["FinanceFeeStructures"],
     }),
-    duplicateFeeStructure: builder.mutation<ApiEnvelope<FeeStructure>, { id: string | number; entity: string; code: string; name?: string }>({
+    duplicateFeeStructure: builder.mutation<ApiEnvelope<FeeStructure>, { id: string | number; entity: string; code?: string; name?: string }>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/fee-structures/${id}/duplicate/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceFeeStructures"],
     }),
