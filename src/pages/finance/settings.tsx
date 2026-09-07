@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Save,
   Settings2,
+  CalendarClock,
   ShieldCheck,
   Workflow,
 } from "lucide-react";
@@ -51,12 +52,16 @@ import {
 } from "@/components/settings/settings-layout";
 import { useActiveEntity } from "@/components/finance-ui";
 import { DEFAULT_FINANCE_SETTINGS_SECTION, type FinanceSettingsSection } from "./console-sections";
+import { FeeDuePolicyPanel, financeSettingsSections, setupSections } from "@xvs/finance/host";
 import { FinanceShell } from "./finance-shell";
 import { EntitiesTab } from "./setup/entities-tab";
 
 const F = routesPath.PROTECTED.FINANCE;
 
-const SECTIONS: ConsoleSettingsSection[] = [
+// Keys typed to the section union rather than to `string`, so the host's
+// mounted-sections list can be checked against them at compile time and a
+// section renamed in one place cannot silently stop matching in the other.
+const SECTIONS: (ConsoleSettingsSection & { key: FinanceSettingsSection })[] = [
   { key: "overview", title: "Overview", description: "Configuration health", icon: Settings2 },
   { key: "entities", title: "Entities", description: "Sets of books", icon: Building2 },
   { key: "fiscal-calendar", title: "Fiscal calendar", description: "Years and periods", icon: CalendarRange },
@@ -65,6 +70,7 @@ const SECTIONS: ConsoleSettingsSection[] = [
   { key: "banking-cash", title: "Banking and cash", description: "Matching and allocation", icon: Banknote },
   { key: "reference-data", title: "Reference data", description: "Codes and dimensions", icon: ListTree },
   { key: "approvals", title: "Approvals", description: "Finance workflows", icon: Workflow },
+  { key: "fees", title: "Fee due dates", description: "When fee bills fall due", icon: CalendarClock },
 ];
 
 const ACCOUNT_DESCRIPTIONS: Record<string, string> = {
@@ -92,10 +98,14 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
   // section, and must not be offered it here either: the list and the overview
   // card both led to a 404, which reads as a broken screen rather than as a
   // section this product does not have.
+  // Two gates, and they answer different questions. The host says which
+  // sections it routes at all - offering one it does not mount produced a link
+  // that 404ed - and the permission then decides whether a mounted section is
+  // shown to this caller.
   const { hasPermission } = usePermissions();
-  const sections = hasPermission(P.FIN_CREATE_ENTITY)
-    ? SECTIONS
-    : SECTIONS.filter((item) => item.key !== "entities");
+  const sections = SECTIONS
+    .filter((item) => financeSettingsSections.includes(item.key))
+    .filter((item) => item.key !== "entities" || hasPermission(P.FIN_CREATE_ENTITY));
   const activeSection = sections.some((item) => item.key === section) ? section : "overview";
   const active = useActiveEntity();
 
@@ -120,6 +130,7 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
         {activeSection === "banking-cash" ? <BankingCashPolicy entityCode={active.code} /> : null}
         {activeSection === "reference-data" ? <ReferenceData /> : null}
         {activeSection === "approvals" ? <Approvals /> : null}
+        {activeSection === "fees" ? <FeeDuePolicyPanel /> : null}
       </ConsoleSettingsLayout>
     </FinanceShell>
   );
@@ -375,13 +386,21 @@ function BankingCashForm({ entityCode, values, consumers, history, canUpdate }: 
 }
 
 function ReferenceData() {
-  const cards = [
-    [ListTree, "Chart of accounts", "Account hierarchy and posting availability.", `${F.SETUP}/accounts`],
-    [Percent, "Tax codes", "Rates and input or output tax accounts.", `${F.SETUP}/tax-codes`],
-    [Network, "Cost centres", "Ownership tags for income and spend.", `${F.SETUP}/cost-centers`],
-    [GitBranch, "Dimensions", "Additional reporting axes and allowed values.", `${F.SETUP}/dimensions`],
-    [Banknote, "Currencies and FX", "Supported currencies and dated exchange rates.", `${F.SETUP}/currencies`],
+  // Keyed by the setup section each card opens, so a card can only be offered
+  // where the host routes its page. Dimensions and currencies are the reason:
+  // both were shown unconditionally and both 404ed in an app that mounts
+  // neither.
+  const all = [
+    ["accounts", ListTree, "Chart of accounts", "Account hierarchy and posting availability."],
+    ["tax-codes", Percent, "Tax codes", "Rates and input or output tax accounts."],
+    ["cost-centers", Network, "Cost centres", "Ownership tags for income and spend."],
+    ["dimensions", GitBranch, "Dimensions", "Additional reporting axes and allowed values."],
+    ["currencies", Banknote, "Currencies and FX", "Supported currencies and dated exchange rates."],
   ] as const;
+  const cards = all
+    .filter(([section]) => setupSections.includes(section))
+    .map(([section, icon, title, description]) =>
+      [icon, title, description, `${F.SETUP}/${section}`] as const);
   return (
     <div className="space-y-5">
       <SettingsSectionHeader title="Reference data" description="Stable codes and analytical structures used by transactions across Finance and Procurement." />

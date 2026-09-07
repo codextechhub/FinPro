@@ -22,6 +22,10 @@
 
 import type { ComponentType } from "react";
 
+import type {
+  FinanceSettingsSection, SetupSection,
+} from "./pages/finance/console-sections";
+
 /** The minimum a branch must expose. Apps may return richer rows. */
 export interface HostBranch {
   id: string | number;
@@ -159,6 +163,29 @@ export interface HostContract {
    *  no platform-wide view and supplies a component that renders nothing -
    *  the same answer PlatformLedgerInventory gives, for the same reason. */
   ApprovalRolesTab: ComponentType;
+  /** Which Finance Settings sections and Setup pages this app actually mounts.
+   *
+   *  The package used to guess. Settings offered "Entities" whenever the caller
+   *  held ``finance.entity.create``, and Reference data always offered all five
+   *  of its cards - while the app's own route table mounted a different set. A
+   *  school admin holding that permission therefore got an Entities link that
+   *  404ed, and Dimensions and Currencies did the same, because two lists were
+   *  answering one question and nothing reconciled them.
+   *
+   *  The router is the only thing that knows what it serves, so it says. A
+   *  permission still decides whether a mounted section is *offered*; this
+   *  decides whether it exists here at all, and the two are different questions.
+   *
+   *  Both apps build their route tables from these same arrays, so a section
+   *  cannot be advertised without being routable. */
+  financeSettingsSections: readonly FinanceSettingsSection[];
+  setupSections: readonly SetupSection[];
+  /** When this school's fee bills fall due, for the "fees" settings section.
+   *
+   *  School-only: the endpoint is the FAL's, and the console does not bill
+   *  school fees. An app that omits "fees" from `financeSettingsSections`
+   *  supplies a component that renders nothing and it is never reached. */
+  FeeDuePolicyPanel: ComponentType;
   /** The application's own logo. */
   AppLogo: ComponentType<{ animate?: boolean; className?: string }>;
   /** An extra section on Setup -> Entities, below the caller's own books.
@@ -186,5 +213,5 @@ void _satisfies;
 export const {
   useBranches, useDirectory, useRoles, AppLogo, QuickExportButton, UserAvatar,
   useDashboardTitle, PlatformLedgerInventory, useLogRecentOpen, rolesHref,
-  ApprovalRolesTab,
+  ApprovalRolesTab, financeSettingsSections, setupSections, FeeDuePolicyPanel,
 } = host;
