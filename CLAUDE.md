@@ -2,10 +2,23 @@
 
 ## What this package is
 
-`@xvs/finance` is the finance and procurement product: the screens for the
-domain-neutral `vs_finance`, `vs_procurement` and `vs_payments` engines. It is
-shared by two applications, `console-fe` and `school-fe`, and it belongs to
-neither of them.
+`@xvs/finance` is the screens for the platform's domain-neutral engines: the
+finance, procurement and payments product (`vs_finance`, `vs_procurement`,
+`vs_payments`), the approval workflow (`vs_workflow`), the Data Imports console
+(`vs_import_data`) and the Export Centre (`vs_exports`). It is shared by two
+applications, `console-fe` and `school-fe`, and it belongs to neither of them.
+
+The name is now narrower than the contents. It stays as it is because renaming a
+package two applications pin by git tag costs more than it explains, but read
+`@xvs/finance` as "the shared engine screens" rather than as a claim about
+finance.
+
+**The test for whether a screen belongs here is the engine underneath it, not
+the menu it hangs from.** A screen over an engine that is domain-neutral and
+tenant-scoped serves both products and belongs here. A screen over a table with
+no tenant column does not, however shareable it looks: the CX organogram
+(`vs_user`, `IsVisionStaff`, no tenant column) stays in the console, because
+there is no version of it a school could be shown.
 
 It is consumed **as TypeScript source**, not as a build artifact. `@/*` imports
 resolve against the *consuming* application, which is why the extraction was
