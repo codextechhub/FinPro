@@ -56,6 +56,33 @@ applications, and restores the console's npm link that the install overwrites.
 It moves versions; it does not verify them. Committing the two lockfiles and
 running both suites afterwards is still yours.
 
+### Cut the version in the same change, and cut it with `release.sh`
+
+A change to `src/` is not finished when it typechecks. It is finished when both
+applications are pinned to a tag that contains it. Do that in the same change
+that makes it, before committing the applications, and do it with `release.sh`
+rather than by hand.
+
+Both halves of that matter, and the reason is the console's npm link:
+
+> `console-fe/node_modules/@xvs/finance` is a symlink to this working tree.
+> `school-fe` holds a real installed copy from a tag. So an edit here is live in
+> the console the moment it is saved, and invisible to the school app until the
+> tag moves.
+>
+> Finance Settings was offering sections the school app does not route. The fix
+> was tagged `v0.1.22` and school-fe was moved onto it by hand; console-fe's
+> pin was left at `v0.1.21`. Both applications typechecked clean, because the
+> console was compiling against the symlink rather than against what it pins.
+> A fresh install anywhere else, including CI, would have fetched `v0.1.21` and
+> quietly not had the fix.
+
+A hand-bump reads as done and is not, because the one application that would
+have caught the stale pin is the one that cannot see it. `release.sh` moves both
+applications together, which is why it exists.
+
+Then commit both lockfiles. A tag nothing points at has released nothing.
+
 ## Pre-ship review (`ship-check`)
 
 When I say **`ship-check`** (or "run the ship-check") on a change, answer these
