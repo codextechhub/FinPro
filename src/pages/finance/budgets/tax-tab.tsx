@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
+import { printTaxFilingPack } from "../../../utils/finance-print";
 import { P } from "../../../permissions";
 import {
   useGetTaxFilingsQuery, useGetTaxFilingSummaryQuery, useGetTaxObligationsQuery, useCreateTaxObligationMutation,
@@ -99,7 +100,7 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
           {Object.entries(STATUS).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
         </Select>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => printFilingPack(rows, currency)} disabled={!rows.length} className="gap-1.5"><Printer className="size-4" /> Filing pack</Button>
+          <Button variant="outline" onClick={() => printTaxFilingPack(rows, currency)} disabled={!rows.length} className="gap-1.5"><Printer className="size-4" /> Filing pack</Button>
           <Can permission={P.FIN_MANAGE_TAX}>
             <Button variant="outline" onClick={() => setNewObligation(true)} className="gap-1.5"><Plus className="size-4" /> New obligation</Button>
           </Can>
@@ -359,29 +360,4 @@ function NewObligationDrawer({ open, onClose, entity }: { open: boolean; onClose
       </div>
     </DetailDrawer>
   );
-}
-
-function printFilingPack(filings: TaxFiling[], currency?: string | null) {
-  const money = (k: number) => formatMoney(k, currency);
-  const rows = filings.map((f) => `<tr>
-    <td>${f.obligation_code}</td><td>${periodLabel(f.period_start, f.period_end)}</td><td>${f.authority_name || "-"}</td>
-    <td class="r">${money(f.gross_liability)}</td><td class="r">${money(f.balance_due)}</td>
-    <td>${f.due_date ? new Date(f.due_date).toLocaleDateString() : "-"}</td><td>${f.filing_reference || "-"}</td>
-    <td>${(STATUS[f.filing_status] ?? STATUS.DRAFT).label}</td></tr>`).join("");
-  const totalAccrued = filings.reduce((s, f) => s + f.gross_liability, 0);
-  const totalOutstanding = filings.reduce((s, f) => s + f.balance_due, 0);
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Tax filing pack</title>
-  <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a;padding:32px;max-width:900px;margin:auto}
-  h1{font-size:18px;margin:0 0 2px}.sub{color:#666;font-size:12px;margin-bottom:20px}
-  table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:7px 8px;border-bottom:1px solid #eee;text-align:left}
-  th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#888}td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
-  .tot td{font-weight:700;border-top:2px solid #ddd;border-bottom:none}</style></head><body>
-  <h1>Tax filing pack</h1>
-  <div class="sub">Statutory obligations · generated ${new Date().toLocaleString()}</div>
-  <table><thead><tr><th>Tax</th><th>Period</th><th>Authority</th><th class="r">Accrued</th><th class="r">Outstanding</th><th>Due date</th><th>Filing ref</th><th>Status</th></tr></thead>
-  <tbody>${rows}<tr class="tot"><td colspan="3">Total</td><td class="r">${money(totalAccrued)}</td><td class="r">${money(totalOutstanding)}</td><td colspan="3"></td></tr></tbody></table>
-  </body></html>`;
-  const w = window.open("", "_blank", "width=960,height=720");
-  if (!w) { toast.error("Pop-up blocked - allow pop-ups to print."); return; }
-  w.document.write(html); w.document.close(); w.focus(); w.print();
 }

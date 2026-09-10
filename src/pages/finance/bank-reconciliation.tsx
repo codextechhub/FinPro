@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { bookingDateFor } from "@/utils/posting-window";
+import { printBankReconciliation } from "../../utils/finance-print";
 import { P } from "../../permissions";
 import {
   useGetBankAccountsQuery, useGetBankAccountQuery, useGetStatementLinesQuery,
@@ -189,7 +190,7 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-mont text-xs text-gray-05">{account.bank_name || "-"} · {account.gl_account}{detail?.statements?.[0]?.period_label ? ` · ${detail.statements[0].period_label}` : ""}</p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => printReport({ account, currency, book, statement, difference, matched, unmatched })} className="gap-1.5"><Printer className="size-4" /> Reconciliation report</Button>
+          <Button variant="outline" onClick={() => printBankReconciliation({ account, currency, book, statement, difference, matched, unmatched })} className="gap-1.5"><Printer className="size-4" /> Reconciliation report</Button>
           <Can permission={P.FIN_RECONCILE_BANK}>
             <Button onClick={doComplete} disabled={completing} className="gap-1.5"><CheckCircle2 className="size-4" />{completing ? "Saving…" : "Complete reconciliation"}</Button>
           </Can>
@@ -515,34 +516,4 @@ function AdjustDrawer({ line, entity, currency, onClose, onDone }: {
       </div>
     </DetailDrawer>
   );
-}
-
-function printReport({ account, currency, book, statement, difference, matched, unmatched }: {
-  account: BankAccount; currency?: string | null; book: number; statement: number; difference: number;
-  matched: BankStatementLine[]; unmatched: BankStatementLine[];
-}) {
-  const money = (k: number) => formatMoney(k, currency);
-  const row = (l: BankStatementLine) => `<tr><td>${l.txn_date}</td><td>${(l.description || "-")}</td><td style="text-align:right">${money(l.amount)}</td></tr>`;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Bank reconciliation - ${account.name}</title>
-  <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a;padding:32px;max-width:760px;margin:auto}
-  h1{font-size:18px;margin:0 0 4px} .sub{color:#666;font-size:12px;margin-bottom:20px}
-  table{width:100%;border-collapse:collapse;margin:8px 0 20px;font-size:12px} th,td{border-bottom:1px solid #eee;padding:6px 8px;text-align:left}
-  .cards{display:flex;gap:12px;margin-bottom:20px} .card{flex:1;border:1px solid #eee;border-radius:8px;padding:10px}
-  .card .l{color:#666;font-size:11px} .card .v{font-size:16px;font-weight:600} .diff{color:${difference !== 0 ? "#c0392b" : "#1a1a1a"}}
-  h3{font-size:13px;margin:16px 0 4px}</style></head><body>
-  <h1>Bank reconciliation</h1>
-  <div class="sub">${account.name} · ${account.bank_name || ""} · GL ${account.gl_account} · ${new Date().toLocaleDateString()}</div>
-  <div class="cards">
-    <div class="card"><div class="l">Statement balance</div><div class="v">${money(statement)}</div></div>
-    <div class="card"><div class="l">Book balance</div><div class="v">${money(book)}</div></div>
-    <div class="card"><div class="l">Difference</div><div class="v diff">${money(difference)}</div></div>
-  </div>
-  <h3>Matched lines (${matched.length})</h3>
-  <table><thead><tr><th>Date</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead><tbody>${matched.map(row).join("") || '<tr><td colspan="3">None</td></tr>'}</tbody></table>
-  <h3>Unmatched lines (${unmatched.length})</h3>
-  <table><thead><tr><th>Date</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead><tbody>${unmatched.map(row).join("") || '<tr><td colspan="3">None</td></tr>'}</tbody></table>
-  </body></html>`;
-  const w = window.open("", "_blank", "width=820,height=900");
-  if (!w) { toast.error("Pop-up blocked - allow pop-ups to print the report."); return; }
-  w.document.write(html); w.document.close(); w.focus(); w.print();
 }

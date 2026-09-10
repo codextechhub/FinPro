@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
 import { isStripped } from "@/utils/fls";
+import { printPayrollSchedule, printPayslip } from "../../utils/finance-print";
 import {
   useGetPayrollRunsQuery, useGetPayrollSummaryQuery, useGetPayrollRunQuery, usePostPayrollRunMutation,
   useCancelPayrollRunMutation, usePayPayrollRunMutation, useCreatePayrollRunMutation, useGeneratePayrollRunMutation,
@@ -983,7 +984,7 @@ function schedStripped(run: PayrollRun, kind: "PAYE" | "PENSION") {
 function SchedButton({ run, kind, currency, label }: { run: PayrollRun; kind: "PAYE" | "PENSION"; currency?: string | null; label?: string }) {
   const stripped = schedStripped(run, kind);
   return (
-    <button type="button" disabled={stripped} onClick={(e) => { e.stopPropagation(); printSchedule(run, kind, currency); }}
+    <button type="button" disabled={stripped} onClick={(e) => { e.stopPropagation(); printPayrollSchedule(run, kind, currency); }}
       title={stripped ? "Needs the sensitive payroll grant to list per-employee figures" : `Print the ${kind} schedule`}
       className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:text-gray-05 disabled:no-underline">
       <Printer className="size-3" /> {label ?? (kind === "PAYE" ? "PAYE" : "Pension")}
@@ -1113,65 +1114,4 @@ function RemitRow({ label, code, outstanding, currency }: { label: string; code:
           : <span className="inline-flex items-center gap-2"><span className="tabular-nums text-destructive">{formatMoney(outstanding, currency)}</span><span className={cn(PILL, "bg-amber-50 text-amber-700")}>Outstanding</span></span>}
     </div>
   );
-}
-
-function printSchedule(run: PayrollRun, kind: "PAYE" | "PENSION", currency?: string | null) {
-  const money = (k?: number) => formatMoney(k ?? 0, currency);
-  const field = kind === "PAYE" ? "paye_amount" : "pension_amount";
-  const title = kind === "PAYE" ? "PAYE remittance schedule" : "Pension remittance schedule";
-  const total = kind === "PAYE" ? run.paye_total : run.pension_total;
-  const rows = run.lines.map((l) => `<tr><td>${l.employee_name || "-"}</td><td class="r">${money(money2(l, field))}</td></tr>`).join("");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title} - ${run.document_number}</title>
-  <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a;padding:32px;max-width:560px;margin:auto}
-  h1{font-size:18px;margin:0 0 2px}.sub{color:#666;font-size:12px;margin-bottom:20px}
-  table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px 0;border-bottom:1px solid #eee;text-align:left}
-  td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}.tot td{font-weight:700;border-top:2px solid #ddd;border-bottom:none}</style></head><body>
-  <h1>${title}</h1>
-  <div class="sub">${run.period_label || ""} · ${run.document_number} · pay date ${fmtDate(run.pay_date)}</div>
-  <table><thead><tr><th>Employee</th><th class="r">${kind} withheld</th></tr></thead><tbody>
-    ${rows}
-    <tr class="tot"><td>Total ${kind} payable</td><td class="r">${money(total)}</td></tr>
-  </tbody></table></body></html>`;
-  const w = window.open("", "_blank", "width=600,height=760");
-  if (!w) { toast.error("Pop-up blocked - allow pop-ups to print."); return; }
-  w.document.write(html); w.document.close(); w.focus(); w.print();
-}
-// reads the (possibly FLS-stripped) numeric field off a line; schedules are only offered
-// when the lines aren't stripped, so this is always a number here.
-function money2(line: PayrollLine, field: string): number {
-  return (line as unknown as Record<string, number>)[field] ?? 0;
-}
-
-function printPayslip(run: PayrollRun, line: PayrollLine, currency?: string | null) {
-  const money = (k?: number) => formatMoney(k ?? 0, currency);
-  const comps = line.components ?? [];
-  const earnings = comps.filter((c) => c.kind === "EARNING");
-  const deductions = comps.filter((c) => c.kind === "DEDUCTION");
-  // With a structure: itemise the earning tranches and each deduction. Flat lines fall
-  // back to the gross / PAYE / pension / net summary.
-  const body = comps.length
-    ? `<tr class="sec"><td colspan="2">Earnings</td></tr>
-       ${earnings.map((c) => `<tr><td>${c.name}</td><td class="r">${money(c.amount)}</td></tr>`).join("")}
-       <tr class="sub2"><td>Gross pay</td><td class="r">${money(line.gross_amount)}</td></tr>
-       <tr class="sec"><td colspan="2">Deductions</td></tr>
-       ${deductions.map((c) => `<tr><td>${c.name} (${c.statutory_type})</td><td class="r">− ${money(c.amount)}</td></tr>`).join("")}
-       <tr class="net"><td>Net pay</td><td class="r">${money(line.net_amount)}</td></tr>`
-    : `<tr><td>Gross pay</td><td class="r">${money(line.gross_amount)}</td></tr>
-       <tr><td>PAYE (income tax)</td><td class="r">− ${money(line.paye_amount)}</td></tr>
-       <tr><td>Pension</td><td class="r">− ${money(line.pension_amount)}</td></tr>
-       <tr class="net"><td>Net pay</td><td class="r">${money(line.net_amount)}</td></tr>`;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Payslip - ${line.employee_name}</title>
-  <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a;padding:32px;max-width:520px;margin:auto}
-  h1{font-size:18px;margin:0 0 2px}.sub{color:#666;font-size:12px;margin-bottom:20px}
-  table{width:100%;border-collapse:collapse;font-size:13px}td{padding:7px 0;border-bottom:1px solid #eee}
-  td.r{text-align:right;font-variant-numeric:tabular-nums}
-  .sec td{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#888;padding-top:14px;border-bottom:none}
-  .sub2 td{font-weight:600;border-top:1px solid #ddd}
-  .net td{font-weight:700;border-top:2px solid #ddd;border-bottom:none}</style></head><body>
-  <h1>Payslip</h1>
-  <div class="sub">${line.employee_name} · ${run.period_label || ""} · ${run.document_number} · paid ${fmtDate(run.pay_date)}</div>
-  <table>${body}</table></body></html>`;
-  const w = window.open("", "_blank", "width=560,height=720");
-  if (!w) { toast.error("Pop-up blocked - allow pop-ups to print."); return; }
-  w.document.write(html); w.document.close(); w.focus(); w.print();
 }

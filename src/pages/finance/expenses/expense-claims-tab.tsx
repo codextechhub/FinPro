@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
 import { openAttachment } from "@/utils/attachment-download";
+import { printExpenseClaim } from "../../../utils/finance-print";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import {
   useGetExpenseClaimsQuery, useGetExpenseClaimSummaryQuery, useGetExpenseClaimQuery, useCreateExpenseClaimMutation,
@@ -232,7 +233,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
           <>
             <StatusPill claim={full} />
             <div className="flex-1" />
-            <Button variant="outline" onClick={() => printClaim(full, currency)} className="gap-1.5"><Printer className="size-4" /> Print</Button>
+            <Button variant="outline" onClick={() => printExpenseClaim(full, disp(full).label, currency)} className="gap-1.5"><Printer className="size-4" /> Print</Button>
             {isDraft && full.approval_required ? (
               <Can permission={P.FIN_CREATE_EXPENSE_CLAIM}>
                 <Button disabled={submitting} onClick={doSubmit} className="gap-1.5"><Send className="size-4" />{submitting ? "Submitting…" : "Submit for approval"}</Button>
@@ -544,23 +545,4 @@ function NewClaimDrawer({ open, onClose, entity, currency }: { open: boolean; on
       {noApproverDialog}
     </DetailDrawer>
   );
-}
-
-function printClaim(c: ExpenseClaim, currency?: string | null) {
-  const money = (k: number) => formatMoney(k, currency);
-  const row = (l: ExpenseClaimLine) => `<tr><td>${l.expense_account}</td><td>${l.description || "-"}</td><td>${l.cost_center || "-"}</td><td style="text-align:right">${money(l.line_total)}</td></tr>`;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Expense claim ${c.document_number}</title>
-  <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a;padding:32px;max-width:720px;margin:auto}
-  h1{font-size:18px;margin:0 0 4px}.sub{color:#666;font-size:12px;margin-bottom:20px}
-  table{width:100%;border-collapse:collapse;font-size:12px}th,td{border-bottom:1px solid #eee;padding:6px 8px;text-align:left}
-  tfoot td{font-weight:600;border-top:2px solid #ddd}</style></head><body>
-  <h1>Expense claim ${c.document_number}</h1>
-  <div class="sub">${c.claimant_name || "-"} · ${fmtDate(c.claim_date)} · ${c.title || ""} · ${disp(c).label}</div>
-  <table><thead><tr><th>Category</th><th>Description</th><th>Cost center</th><th style="text-align:right">Amount</th></tr></thead>
-  <tbody>${c.lines.map(row).join("")}</tbody>
-  <tfoot><tr><td colspan="3">Total</td><td style="text-align:right">${money(c.total)}</td></tr></tfoot></table>
-  </body></html>`;
-  const w = window.open("", "_blank", "width=780,height=900");
-  if (!w) { toast.error("Pop-up blocked - allow pop-ups to print."); return; }
-  w.document.write(html); w.document.close(); w.focus(); w.print();
 }
