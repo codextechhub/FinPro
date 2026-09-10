@@ -47,6 +47,20 @@ export interface HostPerson {
   status: string;
 }
 
+/** The minimum an organogram seat must expose to be pointed at by an approval
+ *  step.
+ *
+ *  ``code`` is what the engine resolves against, the way ``key`` is for a role.
+ *  ``holders`` is the live headcount behind the seat, so picking one that
+ *  currently reaches nobody is a visible choice rather than a surprise on the
+ *  members list afterwards. */
+export interface HostPosition {
+  code: string;
+  title: string;
+  is_active: boolean;
+  holders: number;
+}
+
 /** The minimum a role must expose to be pointed at by an approval step.
  *
  *  ``key`` is what the engine resolves against, and it is the reason this is in
@@ -148,6 +162,19 @@ export interface HostContract {
   /** Every role an approval step may be pointed at. Supplied by the app because
    *  both apps already read these rows; see :type:`HostRole`. */
   useRoles(): HostQueryResult<HostRole>;
+  /** Every organogram seat an approval step may be pointed at.
+   *
+   *  In the contract because the organogram is not a thing every application
+   *  has. It is CodeX's own reporting structure, read from a platform endpoint
+   *  a school administrator may not call at all - so a package that queried it
+   *  directly gave a school a picker that answered 403 and a tab that could
+   *  never list anything.
+   *
+   *  An app with no organogram supplies a hook returning an empty list, and the
+   *  Positions tab disappears rather than standing there empty. That is the
+   *  same answer :type:`ApprovalRolesTab` gives for a view a school has no
+   *  platform-wide version of. */
+  usePositions(): HostQueryResult<HostPosition>;
   /** Note that the reader opened something, for the app's own "recently
    *  opened" trail. The console keeps one; an app that does not supplies a hook
    *  that ignores the call, which is a real answer rather than a gap. */
@@ -224,7 +251,7 @@ const _satisfies: HostContract = host;
 void _satisfies;
 
 export const {
-  useBranches, useDirectory, useRoles, AppLogo, QuickExportButton, UserAvatar,
+  useBranches, useDirectory, useRoles, usePositions, AppLogo, QuickExportButton, UserAvatar,
   useDashboardTitle, PlatformLedgerInventory, useLogRecentOpen, rolesHref,
   ApprovalRolesTab, financeSettingsSections, setupSections, FeeDuePolicyPanel,
   createsWorkflowTemplates,

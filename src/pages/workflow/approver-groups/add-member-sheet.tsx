@@ -13,9 +13,7 @@ import {
 import { UserAvatar } from "@xvs/finance/host";
 import { TabStrip, type TabStripItem } from "@/components/finance-ui/tab-strip";
 import { cn } from "@/lib/utils";
-import { useGetTeamMembersQuery } from "@/redux/services/workflow/team-mgt-api";
-import { useRoles } from "@xvs/finance/host";
-import { useGetPositionsQuery } from "@/redux/services/workflow/organogram-api";
+import { useDirectory, usePositions, useRoles } from "@xvs/finance/host";
 import { useAddApproverGroupMemberMutation } from "@/redux/services/dashboard/workflow-api";
 import type {
   ApproverGroup,
@@ -38,8 +36,12 @@ type Candidate = {
 const TABS: TabStripItem<GroupMemberKind>[] = [
   { value: "USER", label: "People" },
   { value: "ROLE", label: "Roles" },
-  { value: "POSITION", label: "Positions" },
 ];
+
+const POSITIONS_TAB: TabStripItem<GroupMemberKind> = {
+  value: "POSITION",
+  label: "Positions",
+};
 
 function payloadFor(c: Candidate): ApproverGroupMemberPayload {
   if (c.kind === "USER") return { kind: "USER", user: c.target };
@@ -71,21 +73,34 @@ export default function AddMemberSheet({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Candidate[]>([]);
 
-  const { data: people, isLoading: peopleLoading } = useGetTeamMembersQuery(
-    { page: 1, page_size: 500 },
-    { skip: !open },
-  );
+  // All three directories come from the host, and none of them is the
+  // package's to query. Who a caller may name, which roles exist and whether
+  // there is an organogram at all are answers only the surrounding application
+  // has: the console reads platform users and the CX reporting structure, and a
+  // school reads its own staff and has no organogram. The package asking
+  // directly is what put a platform endpoint behind a school's picker and
+  // answered 403 to every school administrator who opened this sheet.
+  const { data: people, isLoading: peopleLoading } = useDirectory();
   const { data: roles, isLoading: rolesLoading } = useRoles();
-  const { data: positions, isLoading: positionsLoading } = useGetPositionsQuery(
-    { page: 1, page_size: 200 },
-    { skip: !open },
-  );
+  const { data: positions, isLoading: positionsLoading } = usePositions();
   const [addMember, { isLoading: isAdding }] = useAddApproverGroupMemberMutation();
 
+  // Offered only where the host has an organogram. A tab that can never list
+  // anything is not an empty state, it is a promise the application cannot
+  // keep - and the reader has no way to tell "no seats yet" from "this product
+  // does not have seats". Hidden while the answer is still loading, so it
+  // appears once rather than flickering in and out.
+  const tabs = useMemo(
+    () => (positions && positions.length > 0 ? [...TABS, POSITIONS_TAB] : TABS),
+    [positions],
+  );
+  // A tab that has just disappeared must not stay selected.
+  const activeTab = tabs.some((t) => t.value === tab) ? tab : "USER";
+
   const isLoading =
-    (tab === "USER" && peopleLoading) ||
-    (tab === "ROLE" && rolesLoading) ||
-    (tab === "POSITION" && positionsLoading);
+    (activeTab === "USER" && peopleLoading) ||
+    (activeTab === "ROLE" && rolesLoading) ||
+    (activeTab === "POSITION" && positionsLoading);
 
   // Membership is keyed the same way the API identifies a target, so an
   // already-added row can be shown as added instead of silently no-opping.
@@ -100,8 +115,8 @@ export default function AddMemberSheet({
   }, [group.members]);
 
   const candidates = useMemo<Candidate[]>(() => {
-    if (tab === "USER") {
-      return (people?.data ?? [])
+    if (activeTab === "USER") {
+      return (people ?? [])
         .filter((u) => u.status === "ACTIVE")
         .map((u) => ({
           kind: "USER" as const,
@@ -112,7 +127,7 @@ export default function AddMemberSheet({
           reach: null,
         }));
     }
-    if (tab === "ROLE") {
+    if (activeTab === "ROLE") {
       return (roles ?? [])
         .filter((r) => r.status === "ACTIVE")
         .map((r) => ({
@@ -123,16 +138,16 @@ export default function AddMemberSheet({
           reach: r.assigned_users_count ?? 0,
         }));
     }
-    return (positions?.data ?? [])
+    return (positions ?? [])
       .filter((p) => p.is_active)
       .map((p) => ({
         kind: "POSITION" as const,
         target: p.code,
         name: p.title,
         sub: p.code,
-        reach: p.current_holders?.length ?? 0,
+        reach: p.holders,
       }));
-  }, [tab, people, roles, positions]);
+  }, [activeTab, people, roles, positions]);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -191,8 +206,8 @@ export default function AddMemberSheet({
 
         <div className="px-6 pt-4 pb-3 space-y-3 border-b border-white-02">
           <TabStrip
-            items={TABS}
-            value={tab}
+            items={tabs}
+            value={activeTab}
             onChange={setTab}
             variant="pill-soft"
             ariaLabel="Directory to add from"
