@@ -119,6 +119,26 @@ describe("stageToPayload", () => {
       { order: 1, condition: null, role_key: "head", label: "" },
     ]);
   });
+
+  it("sends a named Dynamic Role by its code, and no rules of its own", () => {
+    const payload = stageToPayload(
+      stage({
+        approver_source: "DYNAMIC_ROLE",
+        dynamic_role: {
+          id: "dr1",
+          code: "spend-approver",
+          name: "Spend approver",
+          is_active: true,
+          document_types: [],
+          rules: [],
+        },
+        dynamic_role_rules: [],
+      }),
+      1,
+    );
+    expect(payload.dynamic_role_code).toBe("spend-approver");
+    expect(payload).not.toHaveProperty("dynamic_role_rules");
+  });
 });
 
 describe("templateToPublishPayload", () => {
@@ -160,44 +180,6 @@ describe("templateToPublishPayload", () => {
     ]);
   });
 
-  it("replaces rules on the named stage only, and leaves its siblings alone", () => {
-    const t = template([
-      stage({ id: "s1", code: "one", label: "One", order: 1, approver_role_key: "bursar" }),
-      stage({
-        id: "s2",
-        code: "spend",
-        label: "Spend",
-        order: 2,
-        approver_source: "DYNAMIC_ROLE",
-        dynamic_role_rules: [
-          { id: "a", order: 0, condition: null, role_key: "old", role_name: "Old", label: "", is_fallback: true },
-        ],
-      }),
-    ]);
-    const payload = templateToPublishPayload(t, {
-      stageCode: "spend",
-      rules: [
-        { order: 9, condition: { op: "lt", field: "amount", value: 1 }, role_key: "new", label: "" },
-        { order: 4, condition: null, role_key: "head", label: "" },
-      ],
-    });
-
-    expect(payload.stages[0].approver_role_key).toBe("bursar");
-    expect(payload.stages[0]).not.toHaveProperty("dynamic_role_rules");
-    // Renumbered densely, in the order given - the array order is the contract,
-    // not whatever `order` the caller happened to carry in.
-    expect(payload.stages[1].dynamic_role_rules).toEqual([
-      { order: 0, condition: { op: "lt", field: "amount", value: 1 }, role_key: "new", label: "" },
-      { order: 1, condition: null, role_key: "head", label: "" },
-    ]);
-  });
-
-  it("changes nothing when the named stage is not in the template", () => {
-    const t = template([stage({ code: "one", order: 1 })]);
-    expect(templateToPublishPayload(t, { stageCode: "ghost", rules: [] })).toEqual(
-      templateToPublishPayload(t),
-    );
-  });
 });
 
 describe("isCentralTemplate", () => {

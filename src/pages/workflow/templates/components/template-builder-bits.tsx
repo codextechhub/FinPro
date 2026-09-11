@@ -1,31 +1,21 @@
 import { useState } from "react";
 import {
-  ChevronDown,
   ChevronRight,
-  ChevronUp,
-  Info,
   CornerDownRight,
   Eye,
+  Info,
   Network,
-  Plus,
   Shield,
   TriangleAlert,
-  Trash2,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { CustomInput } from "@/components/custom/custom-input";
 import { SearchSelect } from "@/components/custom/search-select";
+import { MoneyInput } from "@/components/finance-ui";
 import { cn } from "@/lib/utils";
+import { apiErrorMessage } from "@/utils/api-errors";
 import { usePreviewApproversMutation } from "@/redux/services/dashboard/workflow-api";
-import {
-  type RuleForm,
-  type StageForm,
-  OP_OPTIONS,
-  emptyRule,
-  rulesPayload,
-} from "./stage-form";
+import type { StageForm } from "./stage-form";
 
 /**
  * The fill behind a band of one stage's settings, and behind the panels that
@@ -145,208 +135,12 @@ export function Section({
   );
 }
 
-/**
- * Ordered "when this, then that role" rules for a DYNAMIC_ROLE stage.
- *
- * Order is the contract - the engine takes the first match - so the rows are
- * numbered and movable rather than sorted by anything implicit. The fallback
- * (no condition) is a checkbox rather than a separate concept, and the editor
- * says plainly when it is missing or out of place, because both are refused by
- * the publish endpoint and both mean "a request could reach nobody".
- */
-export function DynamicRulesEditor({
-  rules,
-  roleOptions,
-  onChange,
-  stageIndex,
-}: {
-  rules: RuleForm[];
-  roleOptions: { value: string; label: string }[];
-  onChange: (next: RuleForm[]) => void;
-  stageIndex: number;
-}) {
-  const update = (i: number, patch: Partial<RuleForm>) =>
-    onChange(rules.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  const add = () => onChange([...rules, emptyRule()]);
-  const remove = (i: number) => onChange(rules.filter((_, j) => j !== i));
-  const move = (i: number, dir: -1 | 1) => {
-    const j = i + dir;
-    if (j < 0 || j >= rules.length) return;
-    const next = [...rules];
-    [next[i], next[j]] = [next[j], next[i]];
-    onChange(next);
-  };
-
-  const fallbackAt = rules.findIndex((r) => r.is_fallback);
-  const noFallback = fallbackAt === -1;
-  const fallbackNotLast = fallbackAt > -1 && fallbackAt !== rules.length - 1;
-
-  return (
-    <div className="mt-3 space-y-3 rounded-md border border-white-02 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-black-01">
-          Rules <span className="font-normal text-gray-01">first match wins</span>
-        </p>
-        <Button variant="outline" size="sm" type="button" onClick={add}>
-          <Plus className="size-3.5" /> Add rule
-        </Button>
-      </div>
-
-      {noFallback && (
-        <p className="flex items-start gap-2 rounded-md border border-yellow-01/30 bg-yellow-01/10 px-3 py-2 text-xs text-yellow-01-text">
-          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-          No fallback rule. A request matching none of these resolves to nobody - add a
-          final rule with "Otherwise" ticked to catch everything else.
-        </p>
-      )}
-      {fallbackNotLast && (
-        <p className="flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-error-text">
-          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-          The "Otherwise" rule is rule {fallbackAt + 1} of {rules.length}. It matches
-          everything, so the {rules.length - fallbackAt - 1} rule(s) after it can never
-          fire. Move it last - publishing will refuse it otherwise.
-        </p>
-      )}
-
-      {rules.map((r, i) => (
-        <div
-          key={r.key}
-          className={cn(
-            "rounded-md border p-3",
-            r.is_fallback ? cn("border-white-02", BAND_SURFACE) : "border-white-02",
-          )}
-        >
-          <div className="mb-2 flex items-center gap-2">
-            <span className="grid size-5 shrink-0 place-content-center rounded bg-pry-01 text-[11px] font-semibold text-primary tabular-nums">
-              {i + 1}
-            </span>
-            <label className="flex items-center gap-1.5 text-xs text-gray-01">
-              <input
-                type="checkbox"
-                checked={r.is_fallback}
-                onChange={(e) => update(i, { is_fallback: e.target.checked })}
-              />
-              Otherwise (catches everything else)
-            </label>
-            <div className="ml-auto flex items-center gap-1">
-              <button
-                type="button"
-                className="text-gray-01 hover:text-black-01 disabled:opacity-30"
-                disabled={i === 0}
-                onClick={() => move(i, -1)}
-                aria-label={`Move rule ${i + 1} up`}
-              >
-                <ChevronUp className="size-4" />
-              </button>
-              <button
-                type="button"
-                className="text-gray-01 hover:text-black-01 disabled:opacity-30"
-                disabled={i === rules.length - 1}
-                onClick={() => move(i, 1)}
-                aria-label={`Move rule ${i + 1} down`}
-              >
-                <ChevronDown className="size-4" />
-              </button>
-              <button
-                type="button"
-                className="text-gray-01 hover:text-destructive disabled:opacity-30"
-                disabled={rules.length === 1}
-                onClick={() => remove(i)}
-                aria-label={`Remove rule ${i + 1}`}
-              >
-                <Trash2 className="size-4" />
-              </button>
-            </div>
-          </div>
-
-          {!r.is_fallback &&
-            (r.raw !== null ? (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium">
-                  Condition{" "}
-                  <span className="text-gray-01">
-                    (JSON - this rule uses a shape the simple editor cannot show)
-                  </span>
-                </label>
-                <Textarea
-                  rows={3}
-                  className="font-mono text-xs"
-                  value={r.raw_text}
-                  onChange={(e) => {
-                    let parsed: RuleForm["raw"] = r.raw;
-                    try {
-                      parsed = JSON.parse(e.target.value);
-                    } catch {
-                      // Keep the last valid tree while the text is mid-edit;
-                      // publish re-parses and reports if it never became valid.
-                    }
-                    update(i, { raw_text: e.target.value, raw: parsed });
-                  }}
-                />
-                <button
-                  type="button"
-                  className="text-xs text-primary hover:underline"
-                  onClick={() => update(i, { raw: null, raw_text: "" })}
-                >
-                  Replace with a simple comparison
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <CustomInput
-                  id={`rule-field-${stageIndex}-${i}`}
-                  label="When field"
-                  placeholder="e.g. amount"
-                  value={r.field}
-                  onChange={(e) => update(i, { field: e.target.value })}
-                />
-                <SearchSelect
-                  id={`rule-op-${stageIndex}-${i}`}
-                  label="Operator"
-                  clearable={false}
-                  options={OP_OPTIONS}
-                  value={r.op}
-                  onChange={(e) => update(i, { op: e.target.value })}
-                />
-                <CustomInput
-                  id={`rule-value-${stageIndex}-${i}`}
-                  label="Value"
-                  placeholder="e.g. 100000"
-                  value={r.value}
-                  onChange={(e) => update(i, { value: e.target.value })}
-                />
-              </div>
-            ))}
-
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <SearchSelect
-              id={`rule-role-${stageIndex}-${i}`}
-              label="Then approved by role"
-              options={roleOptions}
-              value={r.role_key}
-              onChange={(e) => update(i, { role_key: e.target.value })}
-              placeholder="Pick a role"
-            />
-            <CustomInput
-              id={`rule-label-${stageIndex}-${i}`}
-              label="Note (optional)"
-              placeholder="e.g. Desk limit"
-              value={r.label}
-              onChange={(e) => update(i, { label: e.target.value })}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // Whether a stage carries enough approver config for the preview to mean anything.
 function previewReady(stage: StageForm): boolean {
   if (stage.approver_source === "ROLE") return !!stage.approver_role_key;
   if (stage.approver_source === "WORKFLOW_GROUP") return !!stage.approver_group_code;
   if (stage.approver_source === "DYNAMIC_ROLE")
-    return stage.dynamic_rules.length > 0 && stage.dynamic_rules.every((r) => !!r.role_key);
+    return !!stage.dynamic_role_code || stage.legacy_rules.length > 0;
   return (
     !!stage.organogram_target &&
     (stage.organogram_target !== "SPECIFIC_POSITION" || !!stage.organogram_position_code)
@@ -365,15 +159,21 @@ const SOURCE_ICON = {
  *
  * The answer comes from the engine's own resolver server-side rather than
  * anything re-implemented here, so a preview that says "nobody" is the same
- * "nobody" an activation would produce. For a dynamic stage it also returns
- * which rule won against the sample document, which is the only way to check a
- * rule ladder before a real request depends on it.
+ * "nobody" an activation would produce. For a Dynamic Role stage it also says
+ * which rule decides for the person and amount being tried, which is the way to
+ * check the stage before a real request depends on it.
+ *
+ * The person matters to two sources: an organogram climb starts from them, and
+ * a Dynamic Role's rules can test their role and branch. Every other source
+ * resolves the same for anybody, so it runs as you.
  */
 export function ApproverPreview({
   stage,
   requester,
-  sampleText,
-  onSampleChange,
+  documentType = "",
+  hasAmount = false,
+  sampleAmount = null,
+  onSampleAmountChange,
   sampleId = "sample-document",
   requesterOptions,
   onRequesterChange,
@@ -381,10 +181,15 @@ export function ApproverPreview({
   stage: StageForm;
   /** Who the preview resolves as. Defaults to the signed-in user upstream. */
   requester: string;
-  sampleText?: string;
-  onSampleChange?: (v: string) => void;
+  /** The template's document type, which a Dynamic Role's rules are read against. */
+  documentType?: string;
+  /** Whether that document type has an amount a rule can test. */
+  hasAmount?: boolean;
+  /** Whole kobo. */
+  sampleAmount?: number | null;
+  onSampleAmountChange?: (kobo: number | null) => void;
   sampleId?: string;
-  /** Only supplied where the answer depends on the person, i.e. an organogram climb. */
+  /** Supplied only where the answer depends on the person. */
   requesterOptions?: { value: string; label: string }[];
   onRequesterChange?: (v: string) => void;
 }) {
@@ -394,19 +199,26 @@ export function ApproverPreview({
   const isOrganogram = stage.approver_source === "ORGANOGRAM";
   const ready = !!requester && previewReady(stage);
   const Icon = SOURCE_ICON[stage.approver_source] ?? Shield;
+  const amount = hasAmount && sampleAmount != null ? sampleAmount : undefined;
 
-  let sampleInvalid = false;
-  let sampleDocument: Record<string, unknown> = {};
-  if (isDynamic && sampleText?.trim()) {
-    try {
-      sampleDocument = JSON.parse(sampleText);
-    } catch {
-      sampleInvalid = true;
-    }
-  }
+  // A named Dynamic Role is tried by code; rules a stage carries itself go as they are.
+  const dynamicPart = !isDynamic
+    ? {}
+    : stage.dynamic_role_code
+      ? {
+          dynamic_role_code: stage.dynamic_role_code,
+          sample: {
+            ...(amount != null ? { amount } : {}),
+            ...(documentType ? { document_type: documentType } : {}),
+          },
+        }
+      : {
+          dynamic_role_rules: stage.legacy_rules,
+          sample_document: amount != null ? { amount } : {},
+        };
 
   const run = () => {
-    if (!ready || sampleInvalid) return;
+    if (!ready) return;
     preview({
       requester,
       approver_source: stage.approver_source,
@@ -414,8 +226,7 @@ export function ApproverPreview({
       approver_role_key: stage.approver_source === "ROLE" ? stage.approver_role_key : "",
       approver_group_code:
         stage.approver_source === "WORKFLOW_GROUP" ? stage.approver_group_code : "",
-      dynamic_role_rules: isDynamic ? rulesPayload(stage.dynamic_rules) : undefined,
-      sample_document: isDynamic ? sampleDocument : undefined,
+      ...dynamicPart,
       organogram_target: stage.approver_source === "ORGANOGRAM" ? stage.organogram_target : "",
       organogram_levels: Number(stage.organogram_levels) || 1,
       organogram_position_code: stage.organogram_position_code,
@@ -424,6 +235,9 @@ export function ApproverPreview({
 
   const empty = data && data.count === 0;
   const dyn = data?.dynamic_role;
+  const picked = dyn?.evaluations.find((e) => e.picked);
+  const pickedName =
+    dyn?.matched_target?.name ?? dyn?.matched_role_name ?? picked?.target?.name ?? picked?.role_name;
 
   return (
     <div
@@ -441,7 +255,7 @@ export function ApproverPreview({
           variant="outline"
           size="sm"
           type="button"
-          disabled={!ready || isLoading || sampleInvalid}
+          disabled={!ready || isLoading}
           onClick={run}
           title={!ready ? "Finish choosing who approves this step" : "Resolve approvers"}
         >
@@ -449,70 +263,58 @@ export function ApproverPreview({
         </Button>
       </div>
 
-      {isDynamic && onSampleChange && (
-        <div className="mt-2 space-y-1">
+      {isDynamic && hasAmount && onSampleAmountChange && (
+        <div className="mt-2 max-w-xs space-y-1">
           <label htmlFor={sampleId} className="text-[11px] font-medium text-black-01">
-            Sample document <span className="text-gray-01">(JSON the rules are tried against)</span>
+            Amount to try
           </label>
-          <Textarea
-            id={sampleId}
-            rows={2}
-            className="font-mono text-xs"
-            placeholder={`{ "amount": 250000 }`}
-            value={sampleText ?? ""}
-            onChange={(e) => onSampleChange(e.target.value)}
-          />
-          {sampleInvalid && (
-            <p className="text-[11px] text-destructive">Sample document is not valid JSON.</p>
-          )}
+          <MoneyInput id={sampleId} valueKobo={sampleAmount} onChangeKobo={onSampleAmountChange} />
         </div>
       )}
 
-      {/* Role, group and rule stages resolve the same for anybody, so the
-          preview simply runs as you. An organogram climb is the exception:
-          "the requester's manager" has no answer without a requester, so the
-          person is asked for here, where it means something. */}
-      {isOrganogram ? (
-        requesterOptions && onRequesterChange ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-gray-01">Climbing from</span>
-            <div className="min-w-52 flex-1 sm:max-w-xs">
-              <SearchSelect
-                id={`${sampleId}-requester`}
-                options={requesterOptions}
-                value={requester}
-                onChange={(e) => onRequesterChange(e.target.value)}
-                placeholder="Whose chain to climb"
-              />
-            </div>
+      {(isOrganogram || isDynamic) && requesterOptions && onRequesterChange ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] text-gray-01">
+            {isOrganogram ? "Climbing from" : "Raised by"}
+          </span>
+          <div className="min-w-52 flex-1 sm:max-w-xs">
+            <SearchSelect
+              id={`${sampleId}-requester`}
+              options={requesterOptions}
+              value={requester}
+              onChange={(e) => onRequesterChange(e.target.value)}
+              placeholder={isOrganogram ? "Whose chain to climb" : "Who is raising it?"}
+            />
           </div>
-        ) : (
-          <p className="mt-1.5 text-[11px] text-gray-01">
-            Climbing from you. Previewing for someone else needs staff directory access.
-          </p>
-        )
+        </div>
       ) : (
-        <p className="mt-1.5 text-[11px] text-gray-01">Resolved as if you raised this request.</p>
+        <p className="mt-1.5 text-[11px] text-gray-01">
+          {isOrganogram
+            ? "Climbing from you. Previewing for someone else needs staff directory access."
+            : "Resolved as if you raised this request."}
+        </p>
       )}
 
       {error != null && (
         <p className="mt-1.5 text-[11px] text-destructive">
-          {/* The endpoint's own message names the mistyped role, missing group or
-              bad operator - far more useful than a generic failure line. */}
-          {(error as { data?: { detail?: string } })?.data?.detail ??
-            "Could not resolve approvers."}
+          {/* The endpoint names the mistyped role, missing group or switched-off
+              Dynamic Role, which says far more than a generic line. */}
+          {apiErrorMessage(error, "Could not resolve approvers.")}
         </p>
       )}
 
       {dyn && (
         <div className="mt-2 space-y-1">
-          {dyn.matched_role_key ? (
+          {picked && pickedName ? (
             <p className="text-[12px] text-black-01">
-              Rule{" "}
-              <strong>
-                {(dyn.evaluations.findIndex((e) => e.picked) + 1) || "?"}
-              </strong>{" "}
-              wins, so this goes to <strong>{dyn.matched_role_name}</strong>.
+              {picked.is_fallback ? (
+                <>No rule fits, so Otherwise sends it to <strong>{pickedName}</strong>.</>
+              ) : (
+                <>
+                  Rule <strong>{picked.order + 1}</strong> decides: it goes to{" "}
+                  <strong>{pickedName}</strong>.
+                </>
+              )}
             </p>
           ) : (
             <p className="text-[12px] font-medium text-yellow-01-text">
@@ -522,18 +324,21 @@ export function ApproverPreview({
           <ul className="space-y-0.5">
             {dyn.evaluations.map((e) => (
               <li
-                key={e.order}
+                key={e.rule_id ?? e.order}
                 className={cn(
-                  "flex items-center gap-2 text-[11px]",
+                  "flex flex-wrap items-center gap-x-2 text-[11px]",
                   e.picked ? "font-medium text-primary" : "text-gray-01",
                 )}
               >
-                <span className="tabular-nums">{e.order + 1}.</span>
-                <span>{e.is_fallback ? "Otherwise" : "When condition"}</span>
+                <span>{e.is_fallback ? "Otherwise" : `Rule ${e.order + 1}`}</span>
                 <span aria-hidden>→</span>
-                <span>{e.role_name}</span>
-                <span className={cn(e.trace.result ? "text-green-01-text" : "text-gray-01")}>
-                  {e.picked ? "matched" : e.trace.result ? "matched (not reached)" : "no match"}
+                <span>{e.target?.name ?? e.role_name}</span>
+                <span className={cn(e.trace.result && !e.picked && "text-green-01-text")}>
+                  {e.picked
+                    ? "decides"
+                    : e.trace.result
+                      ? "fits, but an earlier rule decided"
+                      : "does not fit"}
                 </span>
               </li>
             ))}

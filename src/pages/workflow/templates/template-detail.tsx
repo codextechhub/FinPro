@@ -33,6 +33,7 @@ import {
   humanizeDocumentType,
 } from "@/pages/protected/workflow/components/workflow-format";
 import { ConditionView } from "@/pages/protected/workflow/components/condition-view";
+import { DynamicRoleRuleList } from "@/pages/protected/workflow/components/dynamic-role-rule-list";
 import { PageShell } from "@/components/layout/page-shell";
 import { useRoles } from "@xvs/finance/host";
 
@@ -222,8 +223,21 @@ export default function TemplateDetail() {
                             <Detail label="Skip if no approvers" value={s.skip_if_no_approvers ? "Yes" : "No"} />
                           </div>
                           {/* A dynamic stage's answer IS its rule order, so the
-                              ladder is spelled out rather than summarised. */}
-                          {s.approver_source === "DYNAMIC_ROLE" && (
+                              rules are spelled out rather than summarised. */}
+                          {s.approver_source === "DYNAMIC_ROLE" && s.dynamic_role && (
+                            <div className="mt-2 space-y-1 border-l-2 border-white-02 pl-3">
+                              {!s.dynamic_role.is_active && (
+                                <p className="text-xs text-yellow-01-text">
+                                  Switched off, so this step finds nobody until it is reactivated.
+                                </p>
+                              )}
+                              <DynamicRoleRuleList
+                                rules={s.dynamic_role.rules}
+                                documentTypes={s.dynamic_role.document_types}
+                              />
+                            </div>
+                          )}
+                          {s.approver_source === "DYNAMIC_ROLE" && !s.dynamic_role && (
                             <ol className="mt-2 space-y-1 border-l-2 border-white-02 pl-3">
                               {[...(s.dynamic_role_rules ?? [])]
                                 .sort((a, b) => a.order - b.order)

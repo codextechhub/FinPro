@@ -2,7 +2,7 @@ import { useState } from "react";
 import Tabs from "@/pages/protected/workflow/components/tabs";
 import { useFilterParam } from "@/hooks/use-filter-param";
 import GroupsTab from "./groups-tab";
-import DynamicRoleTab from "./dynamic-role-tab";
+import DynamicRolesTab from "./dynamic-roles-tab";
 import { PageShell } from "@/components/layout/page-shell";
 
 type Tab = "groups" | "rules";
@@ -45,7 +45,7 @@ export default function WorkflowApprover() {
         setActiveTab={(value) => setTab(value as Tab)}
       />
 
-      {tab === "groups" ? <GroupsTab /> : <DynamicRoleTab />}
+      {tab === "groups" ? <GroupsTab /> : <DynamicRolesTab />}
     </PageShell>
   );
 }

@@ -74,6 +74,7 @@ export function approverSummary(
     case "WORKFLOW_GROUP":
       return `${stage.approver_group_name || stage.approver_group_code || "?"} (group)`;
     case "DYNAMIC_ROLE": {
+      if (stage.dynamic_role) return `${stage.dynamic_role.name} (Dynamic Role)`;
       const n = stage.dynamic_role_rules?.length ?? 0;
       return `Dynamic Role - ${n} ${n === 1 ? "rule" : "rules"}`;
     }

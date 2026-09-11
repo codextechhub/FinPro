@@ -74,7 +74,9 @@ export function stageToPayload(stage: WorkflowStage, order: number): WorkflowSta
       base.approver_group_code = stage.approver_group_code ?? "";
       break;
     case "DYNAMIC_ROLE":
-      base.dynamic_role_rules = stageRulesPayload(stage);
+      // A named Dynamic Role goes by code; a stage's own older rules go back unchanged.
+      if (stage.dynamic_role) base.dynamic_role_code = stage.dynamic_role.code;
+      else base.dynamic_role_rules = stageRulesPayload(stage);
       break;
     case "ORGANOGRAM":
       base.organogram_target = stage.organogram_target;
@@ -98,27 +100,11 @@ function routeToPayload(route: WorkflowTemplate["routes"][number]): WorkflowRout
   };
 }
 
-/**
- * The whole template as a republishable payload, optionally with one stage's
- * dynamic rules swapped out.
- *
- * `replaceRules` is how a screen edits a ladder without owning the rest of the
- * template: everything else round-trips untouched, and a stage code that is not
- * in the template changes nothing rather than inventing a stage.
- */
-export function templateToPublishPayload(
-  template: WorkflowTemplate,
-  replaceRules?: { stageCode: string; rules: DynamicRulePayload[] },
-): PublishTemplatePayload {
+/** The whole template as a republishable payload, every stage and route as it was. */
+export function templateToPublishPayload(template: WorkflowTemplate): PublishTemplatePayload {
   const stages = [...(template.stages ?? [])]
     .sort((a, b) => a.order - b.order)
-    .map((s, i) => {
-      const payload = stageToPayload(s, i + 1);
-      if (replaceRules && s.code === replaceRules.stageCode) {
-        payload.dynamic_role_rules = replaceRules.rules.map((r, j) => ({ ...r, order: j }));
-      }
-      return payload;
-    });
+    .map((s, i) => stageToPayload(s, i + 1));
 
   return {
     document_type: template.document_type,

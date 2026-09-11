@@ -15,16 +15,21 @@ import { P } from "@/permissions";
 import { routesPath } from "../paths";
 import {
   useGetApproverGroupsQuery,
+  useGetDynamicRoleFieldsQuery,
+  useGetDynamicRolesQuery,
   useGetWorkflowTemplateQuery,
   usePublishWorkflowTemplateMutation,
 } from "@/redux/services/dashboard/workflow-api";
 import { useGetPositionsQuery } from "@/redux/services/workflow/organogram-api";
 import { useGetTeamMembersQuery } from "@/redux/services/workflow/team-mgt-api";
-import { useRoles } from "@xvs/finance/host";
+import { useDirectory, useRoles } from "@xvs/finance/host";
 import { approverScopeLabel } from "@/pages/protected/workflow/components/workflow-format";
+import { ConditionView } from "@/pages/protected/workflow/components/condition-view";
+import { DynamicRoleRuleList } from "@/pages/protected/workflow/components/dynamic-role-rule-list";
 import type {
   ApproverScope,
   ApproverSource,
+  DynamicRole,
   OrganogramTarget,
   PublishTemplatePayload,
   StageAdvanceRule,
@@ -32,21 +37,15 @@ import type {
   StageOnRejection,
   WorkflowStagePayload,
 } from "@/redux/services/dashboard/workflow-types";
-import {
-  type StageForm,
-  emptyStage,
-  rulesPayload,
-  rulesToForm,
-  validateRules,
-} from "./components/stage-form";
+import { type StageForm, emptyStage } from "./components/stage-form";
 import {
   Advanced,
   Band,
   FieldHint,
   Section,
   ApproverPreview,
-  DynamicRulesEditor,
 } from "./components/template-builder-bits";
+import { stageRulesPayload } from "./components/template-payload";
 import { TemplateReachChip, TemplateReachNotice } from "./components/template-reach";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -64,7 +63,7 @@ const SOURCE_HINT: Record<string, string> = {
   WORKFLOW_GROUP:
     "A named pool built on the Approvers screen - people, roles and org seats mixed.",
   DYNAMIC_ROLE:
-    "The document picks the role: ordered rules, first match wins (e.g. amount thresholds).",
+    "A Dynamic Role from the Approvers screen: its rules look at the document and who raised it, and the first one that fits decides.",
   ORGANOGRAM: "Climbs the org chart relative to whoever raised the request.",
 };
 const TARGET_OPTIONS = [
@@ -111,8 +110,8 @@ const NOTIF_EVENTS = [
  * something and it wakes up, put it back and it goes quiet again, with no
  * separate "dirty" flag to drift out of step with what is on screen.
  *
- * Sample-document text is deliberately absent: it drives the preview and is
- * never published, so typing in it must not arm the button.
+ * The sample amount is deliberately absent: it drives the preview and is never
+ * published, so typing in it must not arm the button.
  */
 function formSignature(form: {
   name: string;
@@ -150,16 +149,8 @@ function formSignature(form: {
       on_rejection: s.on_rejection,
       skip_if_no_approvers: s.skip_if_no_approvers,
       inclusion_condition_text: s.inclusion_condition_text.trim(),
-      // The rule rows without their React keys, which are not data.
-      dynamic_rules: s.dynamic_rules.map((r) => ({
-        field: r.field.trim(),
-        op: r.op,
-        value: r.value.trim(),
-        role_key: r.role_key.trim(),
-        label: r.label.trim(),
-        is_fallback: r.is_fallback,
-        raw: r.raw,
-      })),
+      dynamic_role_code: s.dynamic_role_code,
+      legacy_rules: s.legacy_rules,
     })),
   });
 }
@@ -173,6 +164,102 @@ function advancedSummary(s: StageForm, isPlatformTenant: boolean): string | null
   if (s.kind === "APPROVAL" && !s.skip_if_no_approvers) carried.push("never skipped");
   if (s.inclusion_condition_text.trim()) carried.push("runs conditionally");
   return carried.length ? carried.join(" · ") : null;
+}
+
+/**
+ * What a Dynamic Role stage will do, shown under its picker.
+ *
+ * The picked Dynamic Role's rules are spelled out, so the stage can be checked
+ * without leaving the template. A stage still carrying rules of its own shows
+ * them read-only: they keep working, and are published back unchanged until a
+ * Dynamic Role is picked in their place. A shared template is refused outright,
+ * because each school builds its own Dynamic Roles and a shared one would name
+ * a code no school has.
+ */
+function DynamicRoleStagePanel({
+  stage,
+  editingShared,
+  roles,
+  loaded,
+}: {
+  stage: StageForm;
+  editingShared: boolean;
+  roles: DynamicRole[];
+  /** Whether the list has answered, so "none yet" is not said while it loads. */
+  loaded: boolean;
+}) {
+  const { data: hostRoles } = useRoles();
+  const roleName = (key: string) => hostRoles?.find((r) => r.key === key)?.name ?? key;
+  // Opens beside the builder, so an unsaved template is not lost on the way.
+  const manageHref = `${routesPath.PROTECTED.WORKFLOW.APPROVER_GROUPS}?tab=rules`;
+  const manage = (text: string) => (
+    <a href={manageHref} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+      {text}
+    </a>
+  );
+
+  if (editingShared) {
+    return (
+      <p className="mt-3 rounded-md border border-yellow-01/30 bg-yellow-01/10 px-3 py-2 text-xs text-yellow-01-text">
+        A shared template cannot use a Dynamic Role, because each school builds its own.
+        Choose another way to decide who approves this step.
+      </p>
+    );
+  }
+
+  const picked = roles.find((r) => r.code === stage.dynamic_role_code);
+  if (picked) {
+    return (
+      <div
+        className={cn(
+          "mt-3 space-y-2 rounded-md border px-3 py-2.5",
+          picked.is_active ? "border-white-02 bg-white" : "border-yellow-01/30 bg-yellow-01/10",
+        )}
+      >
+        {!picked.is_active && (
+          <p className="text-xs text-yellow-01-text">
+            Switched off, so this step finds nobody until it is reactivated.
+          </p>
+        )}
+        <DynamicRoleRuleList rules={picked.rules} documentTypes={picked.document_types} />
+        <p className="text-xs">{manage("Edit it on the Approvers screen")}</p>
+      </div>
+    );
+  }
+
+  if (stage.legacy_rules.length) {
+    return (
+      <div className="mt-3 space-y-2 rounded-md border border-white-02 bg-white px-3 py-2.5 text-xs">
+        <p className="text-gray-01">
+          This step carries rules of its own, from before Dynamic Roles had names. They keep
+          working as they are. Pick a Dynamic Role above to replace them.
+        </p>
+        <ol className="space-y-1">
+          {stage.legacy_rules.map((r) => (
+            <li key={r.order} className="flex flex-wrap items-center gap-2">
+              <span className="text-gray-01 tabular-nums">{r.order + 1}.</span>
+              {r.condition == null ? (
+                <span className="text-gray-01">Otherwise</span>
+              ) : (
+                <ConditionView condition={r.condition} />
+              )}
+              <span aria-hidden className="text-gray-01">→</span>
+              <span className="font-medium text-black-01">{roleName(r.role_key)}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  }
+
+  if (loaded && !roles.some((r) => r.is_active)) {
+    return (
+      <p className="mt-3 text-xs text-gray-01">
+        No Dynamic Role serves this document yet. {manage("Build one on the Approvers screen")}.
+      </p>
+    );
+  }
+  return <p className="mt-3 text-xs">{manage("Manage Dynamic Roles")}</p>;
 }
 
 export default function TemplateBuilder() {
@@ -274,6 +361,28 @@ export default function TemplateBuilder() {
   // The form as it was last saved (or as it started, when creating).
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
 
+  // This school's Dynamic Roles for the document type, switched-off ones included
+  // so a stage still pointing at one shows its name.
+  const docType = documentType.trim();
+  const { data: dynamicRolesRes, isFetching: dynamicRolesLoading } = useGetDynamicRolesQuery(
+    { document_type: docType, page_size: 100 },
+    { skip: editingShared || !docType },
+  );
+  const dynamicRoles = useMemo(() => dynamicRolesRes?.data ?? [], [dynamicRolesRes]);
+  const { data: docFields } = useGetDynamicRoleFieldsQuery(docType ? [docType] : [], {
+    skip: editingShared || !docType,
+  });
+  const hasAmount = !!docFields?.fields.some((f) => f.key === "amount");
+  // Who a Dynamic Role is tried for: its rules can test the person's role and branch.
+  const { data: people } = useDirectory();
+  const directoryOptions = useMemo(
+    () =>
+      (people ?? [])
+        .filter((p) => p.status === "ACTIVE")
+        .map((p) => ({ value: String(p.id), label: p.full_name || p.email })),
+    [people],
+  );
+
   // Prefill once when editing an existing template.
   useEffect(() => {
     if (!isEdit || !existing || prefilled) return;
@@ -293,8 +402,10 @@ export default function TemplateBuilder() {
           approver_scope: s.approver_scope,
           approver_role_key: s.approver_role_key ?? "",
           approver_group_code: s.approver_group_code ?? "",
-          dynamic_rules: rulesToForm(s),
-          sample_document_text: "",
+          dynamic_role_code: s.dynamic_role?.code ?? "",
+          legacy_rules:
+            s.approver_source === "DYNAMIC_ROLE" && !s.dynamic_role ? stageRulesPayload(s) : [],
+          sample_amount: null,
           organogram_target: s.organogram_target ?? "",
           organogram_levels: String(s.organogram_levels ?? 1),
           organogram_position_code: s.organogram_position_code ?? "",
@@ -396,12 +507,15 @@ export default function TemplateBuilder() {
         toast.error(`Stage ${i + 1}: pick the approver group this stage routes to.`);
         return;
       }
-      // Mirror the publish endpoint's rule checks so a bad ladder is caught in
-      // the form, where it can be fixed, rather than as a 400 after a save.
       if (isApproval && s.approver_source === "DYNAMIC_ROLE") {
-        const problem = validateRules(s.dynamic_rules);
-        if (problem) {
-          toast.error(`Stage ${i + 1}: ${problem}`);
+        if (editingShared) {
+          toast.error(
+            `Stage ${i + 1}: a shared template cannot use a Dynamic Role, because each school builds its own. Choose another way to decide who approves.`,
+          );
+          return;
+        }
+        if (!s.dynamic_role_code && !s.legacy_rules.length) {
+          toast.error(`Stage ${i + 1}: pick the Dynamic Role that decides who approves this stage.`);
           return;
         }
       }
@@ -415,8 +529,12 @@ export default function TemplateBuilder() {
         // a group stage would leave the wrong answer sitting in the row.
         approver_role_key: s.approver_source === "ROLE" ? s.approver_role_key : "",
         approver_group_code: s.approver_source === "WORKFLOW_GROUP" ? s.approver_group_code : "",
-        dynamic_role_rules:
-          s.approver_source === "DYNAMIC_ROLE" ? rulesPayload(s.dynamic_rules) : undefined,
+        // A named Dynamic Role goes by code; a stage's own older rules go back unchanged.
+        ...(s.approver_source === "DYNAMIC_ROLE"
+          ? s.dynamic_role_code
+            ? { dynamic_role_code: s.dynamic_role_code }
+            : { dynamic_role_rules: s.legacy_rules }
+          : {}),
         approver_scope: s.approver_scope,
         // Organogram fields are OMITTED, not blanked, on any other source: the
         // publish validator checks every key it is given against the enum, so an
@@ -745,11 +863,14 @@ export default function TemplateBuilder() {
                           label="Decided by"
                           containerClass="sm:col-span-2 lg:col-span-1"
                           clearable={false}
-                          options={
-                          canUseOrganogram
-                            ? SOURCE_OPTIONS
-                            : SOURCE_OPTIONS.filter((o) => o.value !== "ORGANOGRAM")
-                        }
+                          options={SOURCE_OPTIONS.filter(
+                            (o) =>
+                              (o.value !== "ORGANOGRAM" || canUseOrganogram) &&
+                              // Kept while a stage still names one, so the refusal below can explain it.
+                              (o.value !== "DYNAMIC_ROLE" ||
+                                !editingShared ||
+                                s.approver_source === "DYNAMIC_ROLE"),
+                          )}
                           value={s.approver_source}
                           onChange={(e) => updateStage(i, { approver_source: e.target.value as ApproverSource })}
                         />
@@ -773,6 +894,24 @@ export default function TemplateBuilder() {
                             value={s.approver_group_code}
                             onChange={(e) => updateStage(i, { approver_group_code: e.target.value })}
                             placeholder="Pick a group"
+                          />
+                        )}
+
+                        {s.approver_source === "DYNAMIC_ROLE" && !editingShared && (
+                          <SearchSelect
+                            id={`stage-dynamic-role-${i}`}
+                            label="Dynamic Role"
+                            loading={dynamicRolesLoading}
+                            disabled={!docType}
+                            options={dynamicRoles
+                              .filter((r) => r.is_active || r.code === s.dynamic_role_code)
+                              .map((r) => ({
+                                value: r.code,
+                                label: r.is_active ? r.name : `${r.name} (switched off)`,
+                              }))}
+                            value={s.dynamic_role_code}
+                            onChange={(e) => updateStage(i, { dynamic_role_code: e.target.value })}
+                            placeholder={docType ? "Pick a Dynamic Role" : "Set the document type first"}
                           />
                         )}
 
@@ -813,6 +952,14 @@ export default function TemplateBuilder() {
                         <p className="mt-2 text-xs text-gray-01">
                           {SOURCE_HINT[s.approver_source]}
                         </p>
+                        {s.approver_source === "DYNAMIC_ROLE" && (
+                          <DynamicRoleStagePanel
+                            stage={s}
+                            editingShared={editingShared}
+                            roles={dynamicRoles}
+                            loaded={!!dynamicRolesRes}
+                          />
+                        )}
                       </Band>
 
                       <Band title="How it advances">
@@ -891,37 +1038,27 @@ export default function TemplateBuilder() {
                     </div>
                   </Advanced>
 
-                  <div
-                    className={cn(
-                      "grid grid-cols-1 items-start gap-3",
-                      s.approver_source === "DYNAMIC_ROLE" && "2xl:grid-cols-2",
-                    )}
-                  >
-                  {s.kind === "APPROVAL" && s.approver_source === "DYNAMIC_ROLE" && (
-                    <DynamicRulesEditor
-                      rules={s.dynamic_rules}
-                      roleOptions={roleOptions}
-                      stageIndex={i}
-                      onChange={(next) => updateStage(i, { dynamic_rules: next })}
-                    />
-                  )}
-
                   {s.kind === "APPROVAL" && (
                     <ApproverPreview
                       stage={s}
                       requester={sampleRequester}
+                      documentType={docType}
+                      hasAmount={hasAmount}
                       requesterOptions={
-                        canSeeDirectory && s.approver_source === "ORGANOGRAM"
-                          ? requesterOptions
-                          : undefined
+                        s.approver_source === "ORGANOGRAM"
+                          ? canSeeDirectory
+                            ? requesterOptions
+                            : undefined
+                          : s.approver_source === "DYNAMIC_ROLE" && directoryOptions.length
+                            ? directoryOptions
+                            : undefined
                       }
-                      onRequesterChange={canSeeDirectory ? setSampleRequester : undefined}
-                      sampleText={s.sample_document_text}
-                      onSampleChange={(v) => updateStage(i, { sample_document_text: v })}
+                      onRequesterChange={setSampleRequester}
+                      sampleAmount={s.sample_amount}
+                      onSampleAmountChange={(kobo) => updateStage(i, { sample_amount: kobo })}
                       sampleId={`stage-sample-${i}`}
                     />
                   )}
-                  </div>
                 </div>
               ))}
             </div>
