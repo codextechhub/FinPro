@@ -3,14 +3,12 @@ import Tabs from "@/pages/protected/workflow/components/tabs";
 import { useFilterParam } from "@/hooks/use-filter-param";
 import GroupsTab from "./groups-tab";
 import DynamicRoleTab from "./dynamic-role-tab";
-import { ApprovalRolesTab } from "@xvs/finance/host";
 import { PageShell } from "@/components/layout/page-shell";
 
-type Tab = "groups" | "rules" | "roles";
+type Tab = "groups" | "rules";
 const TABS: { key: Tab; label: string }[] = [
-  { key: "groups", label: "Approver Groups" },
+  { key: "groups", label: "Groups" },
   { key: "rules", label: "Dynamic Role" },
-  { key: "roles", label: "Approval Roles" },
 ];
 
 /**
@@ -21,17 +19,20 @@ const TABS: { key: Tab; label: string }[] = [
  * moves between them constantly - a step that outgrows a single group usually
  * becomes a threshold ladder, and a ladder's rules point back at roles and
  * groups defined here.
+ *
+ * The heading is the name both apps' sidebars give this screen, so somebody who
+ * clicked "Approvers" lands on a page that says so. Rename one and the
+ * other goes with it.
  */
 export default function WorkflowApprover() {
   const [tab, setTab] = useState<Tab>("groups");
-  // Deep links (from a template, a stalled approval, the action palette) can
-  // land straight on the rules tab.
-  useFilterParam<Tab>("tab", ["groups", "rules", "roles"], setTab);
+  // A deep link can open the rules tab directly.
+  useFilterParam<Tab>("tab", ["groups", "rules"], setTab);
 
   return (
     <PageShell className="space-y-5 text-black-01">
       <div>
-        <p className="font-semibold font-mont text-gray-01">Workflow Approver</p>
+        <p className="font-semibold font-mont text-gray-01">Approvers</p>
         <p className="mt-0.5 text-xs text-gray-01">
           Define who can approve. Roles, seats and rules resolve at the moment a step
           activates, so an approval path stays correct as people move.
@@ -44,7 +45,7 @@ export default function WorkflowApprover() {
         setActiveTab={(value) => setTab(value as Tab)}
       />
 
-      {tab === "groups" ? <GroupsTab /> : tab === "rules" ? <DynamicRoleTab /> : <ApprovalRolesTab />}
+      {tab === "groups" ? <GroupsTab /> : <DynamicRoleTab />}
     </PageShell>
   );
 }

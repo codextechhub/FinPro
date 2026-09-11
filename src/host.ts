@@ -171,25 +171,12 @@ export interface HostContract {
    *  never list anything.
    *
    *  An app with no organogram supplies a hook returning an empty list, and the
-   *  Positions tab disappears rather than standing there empty. That is the
-   *  same answer :type:`ApprovalRolesTab` gives for a view a school has no
-   *  platform-wide version of. */
+   *  Positions tab disappears rather than standing there empty. */
   usePositions(): HostQueryResult<HostPosition>;
   /** Note that the reader opened something, for the app's own "recently
    *  opened" trail. The console keeps one; an app that does not supplies a hook
    *  that ignores the call, which is a real answer rather than a gap. */
   useLogRecentOpen(entry: HostRecentEntry | null): void;
-  /** Where this app lists who holds which role. The workflow screens link to it
-   *  from the approval-roles tab, and the two apps put it in different places -
-   *  the console under its roles console, the school app under Administration. */
-  rolesHref: string;
-  /** The approval-roles tab, where one exists.
-   *
-   *  The console shows which approval roles are unstaffed across the platform,
-   *  reading its own RBAC surface to do it. A product built for one school has
-   *  no platform-wide view and supplies a component that renders nothing -
-   *  the same answer PlatformLedgerInventory gives, for the same reason. */
-  ApprovalRolesTab: ComponentType;
   /** Which Finance Settings sections and Setup pages this app actually mounts.
    *
    *  The package used to guess. Settings offered "Entities" whenever the caller
@@ -252,7 +239,6 @@ void _satisfies;
 
 export const {
   useBranches, useDirectory, useRoles, usePositions, AppLogo, QuickExportButton, UserAvatar,
-  useDashboardTitle, PlatformLedgerInventory, useLogRecentOpen, rolesHref,
-  ApprovalRolesTab, financeSettingsSections, setupSections, FeeDuePolicyPanel,
-  createsWorkflowTemplates,
+  useDashboardTitle, PlatformLedgerInventory, useLogRecentOpen,
+  financeSettingsSections, setupSections, FeeDuePolicyPanel, createsWorkflowTemplates,
 } = host;

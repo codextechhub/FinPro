@@ -62,7 +62,7 @@ const SOURCE_OPTIONS = [
 const SOURCE_HINT: Record<string, string> = {
   ROLE: "Whoever currently holds this role in the tenant that raised the request.",
   WORKFLOW_GROUP:
-    "A named pool built on the Approver Groups screen - people, roles and org seats mixed.",
+    "A named pool built on the Approvers screen - people, roles and org seats mixed.",
   DYNAMIC_ROLE:
     "The document picks the role: ordered rules, first match wins (e.g. amount thresholds).",
   ORGANOGRAM: "Climbs the org chart relative to whoever raised the request.",
