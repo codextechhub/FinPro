@@ -42,7 +42,7 @@ export function AuditTimeline({
               )}
             </p>
             {log.message && <p className="text-xs text-gray-01 mt-0.5">{log.message}</p>}
-            <p className="text-[11px] text-gray-05 mt-0.5">
+            <p className="text-[11px] text-gray-06 mt-0.5">
               {formatRelativeDate(log.occurred_at)}
             </p>
           </div>

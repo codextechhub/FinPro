@@ -274,7 +274,7 @@ export default function ApprovalDetail() {
                           }
                           onChange={(e) => setReason(e.target.value)}
                         />
-                        <div className="text-right text-[11px] text-gray-05">{reason.length} / 500</div>
+                        <div className="text-right text-[11px] text-gray-06">{reason.length} / 500</div>
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="outline"

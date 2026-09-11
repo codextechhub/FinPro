@@ -28,6 +28,17 @@ import {
 } from "./stage-form";
 
 /**
+ * The fill behind a band of one stage's settings, and behind the panels that
+ * sit inside a stage card.
+ *
+ * Light on purpose. A band holds white inputs beside dropdowns whose own
+ * background is transparent, so on a darker fill the dropdowns take on its
+ * colour and read as disabled, and the small grey hints fade into it.
+ * `gray-03` is a fill, never a line - see card-surface.ts.
+ */
+export const BAND_SURFACE = "bg-gray-03";
+
+/**
  * A labelled slice of one stage's settings.
  *
  * A stage carries a dozen fields that answer four unrelated questions, and as
@@ -37,7 +48,7 @@ import {
  */
 export function Band({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-md bg-gray-06/30 p-3">
+    <div className={cn("rounded-md p-3", BAND_SURFACE)}>
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-01">
         {title}
       </p>
@@ -64,7 +75,7 @@ export function Advanced({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-md bg-gray-06/30 p-3">
+    <div className={cn("rounded-md p-3", BAND_SURFACE)}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -106,7 +117,7 @@ export function FieldHint({ title, children }: { title: string; children: React.
         <span className="underline decoration-dotted underline-offset-2">{title}</span>
       </button>
       {open && (
-        <p className="mt-1.5 rounded-md border border-white-02 bg-gray-06/30 px-3 py-2 leading-relaxed text-gray-01">
+        <p className={cn("mt-1.5 rounded-md border border-white-02 px-3 py-2 leading-relaxed text-gray-01", BAND_SURFACE)}>
           {children}
         </p>
       )}
@@ -202,7 +213,7 @@ export function DynamicRulesEditor({
           key={r.key}
           className={cn(
             "rounded-md border p-3",
-            r.is_fallback ? "border-white-02 bg-gray-06/30" : "border-white-02",
+            r.is_fallback ? cn("border-white-02", BAND_SURFACE) : "border-white-02",
           )}
         >
           <div className="mb-2 flex items-center gap-2">
@@ -418,7 +429,7 @@ export function ApproverPreview({
     <div
       className={cn(
         "mt-3 rounded-md border px-3 py-2.5",
-        empty ? "border-yellow-01/40 bg-yellow-01/5" : "border-white-02 bg-gray-06/30",
+        empty ? "border-yellow-01/40 bg-yellow-01/5" : cn("border-white-02", BAND_SURFACE),
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">

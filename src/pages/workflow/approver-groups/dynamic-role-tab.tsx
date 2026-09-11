@@ -38,7 +38,7 @@ import type {
 } from "@/redux/services/dashboard/workflow-types";
 import { ConditionView } from "@/pages/protected/workflow/components/condition-view";
 import { humanizeDocumentType } from "@/pages/protected/workflow/components/workflow-format";
-import { DynamicRulesEditor } from "../templates/components/template-builder-bits";
+import { BAND_SURFACE, DynamicRulesEditor } from "../templates/components/template-builder-bits";
 import {
   type RuleForm,
   rulesPayload,
@@ -439,7 +439,7 @@ export default function DynamicRoleTab() {
 
                   {dyn &&
                     (dyn.matched_role_key ? (
-                      <div className="rounded-md border border-white-02 bg-gray-06/30 px-3 py-2.5 text-xs">
+                      <div className={cn("rounded-md border border-white-02 px-3 py-2.5 text-xs", BAND_SURFACE)}>
                         <p className="text-black-01">
                           <strong>Rule {(hitOrder ?? 0) + 1}</strong> wins, so this goes to{" "}
                           <strong>{dyn.matched_role_name}</strong>.

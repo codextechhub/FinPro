@@ -249,7 +249,7 @@ function ApprovalRow({
 
       <div className="flex items-center gap-3 shrink-0">
         <div className="hidden md:block text-right text-xs text-gray-01">
-          <span className="block text-gray-05">In your queue</span>
+          <span className="block text-gray-06">In your queue</span>
           {item.awaiting_since
             ? formatRelativeDate(item.awaiting_since)
             : item.submitted_at

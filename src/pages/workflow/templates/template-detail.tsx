@@ -318,7 +318,7 @@ export default function TemplateDetail() {
 function Detail({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-wide text-gray-05">{label}</p>
+      <p className="text-[11px] uppercase tracking-wide text-gray-06">{label}</p>
       <p className={mono ? "font-mono text-black-01" : "text-black-01"}>{value}</p>
     </div>
   );

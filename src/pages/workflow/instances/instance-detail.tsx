@@ -162,7 +162,7 @@ export default function InstanceDetail() {
                             </span>
                           </p>
                           {a.comment && <p className="text-xs text-gray-01">“{a.comment}”</p>}
-                          <p className="text-[11px] text-gray-05">{formatRelativeDate(a.acted_at)}</p>
+                          <p className="text-[11px] text-gray-06">{formatRelativeDate(a.acted_at)}</p>
                         </div>
                         {reversed && <Badge variant="inactive">Reversed</Badge>}
                         {isReversalRow && <Badge variant="outline">Reversal entry</Badge>}

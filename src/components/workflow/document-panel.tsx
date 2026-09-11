@@ -129,7 +129,7 @@ export function DocumentPanel({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0 space-y-1">
-      <p className="text-[11px] uppercase tracking-wide text-gray-05">{label}</p>
+      <p className="text-[11px] uppercase tracking-wide text-gray-06">{label}</p>
       <div className="text-sm">{children}</div>
     </div>
   );
