@@ -34,12 +34,19 @@ import {
 } from "@/pages/protected/workflow/components/workflow-format";
 import { ConditionView } from "@/pages/protected/workflow/components/condition-view";
 import { PageShell } from "@/components/layout/page-shell";
+import { useRoles } from "@xvs/finance/host";
 
 export default function TemplateDetail() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const isPlatformTenant = useAppSelector(selectIsPlatformTenant);
   const [resetOpen, setResetOpen] = useState(false);
+  // A shared template names its roles by key; the host knows what they are called.
+  const { data: roles } = useRoles();
+  const roleName = useMemo(() => {
+    const names = new Map((roles ?? []).map((r) => [r.key, r.name] as const));
+    return (key: string) => names.get(key);
+  }, [roles]);
 
   const { data: template, isLoading, isError, refetch } = useGetWorkflowTemplateQuery(id, {
     refetchOnMountOrArgChange: true,
@@ -205,7 +212,7 @@ export default function TemplateDetail() {
                       {s.kind === "APPROVAL" && (
                         <>
                           <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-gray-01 sm:grid-cols-3">
-                            <Detail label="Approved by" value={approverSummary(s)} />
+                            <Detail label="Approved by" value={approverSummary(s, roleName)} />
                             <Detail
                             label="Approvers looked for in"
                             value={approverScopeLabel(s.approver_scope, isPlatformTenant)}
@@ -230,7 +237,7 @@ export default function TemplateDetail() {
                                     )}
                                     <span aria-hidden className="text-gray-01">→</span>
                                     <span className="font-medium text-black-01">
-                                      {r.role_name || r.role_key}
+                                      {r.role_name || roleName(r.role_key) || r.role_key}
                                     </span>
                                     {r.label && <span className="text-gray-01">{r.label}</span>}
                                   </li>

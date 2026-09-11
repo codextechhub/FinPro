@@ -60,8 +60,16 @@ const ORGANOGRAM_LABEL: Record<string, string> = {
  * its answer in a different field - so it is computed once here rather than
  * re-derived per screen, where one of them would inevitably keep showing the
  * old strategy's field after the next change.
+ *
+ * `roleName` names a role the server could not. A stage on a shared template
+ * points at its role by key alone, because every tenant holds its own copy of
+ * that role, so there is no single row to read a name from; the caller passes
+ * a lookup over the host's roles.
  */
-export function approverSummary(stage: WorkflowStage): string {
+export function approverSummary(
+  stage: WorkflowStage,
+  roleName?: (key: string) => string | undefined,
+): string {
   switch (stage.approver_source) {
     case "WORKFLOW_GROUP":
       return `${stage.approver_group_name || stage.approver_group_code || "?"} (group)`;
@@ -80,7 +88,12 @@ export function approverSummary(stage: WorkflowStage): string {
       return `Organogram - ${ORGANOGRAM_LABEL[stage.organogram_target] ?? "relative to the requester"}`;
     }
     default:
-      return stage.approver_role_name || stage.approver_role_key || "-";
+      return (
+        stage.approver_role_name ||
+        (stage.approver_role_key ? roleName?.(stage.approver_role_key) : undefined) ||
+        stage.approver_role_key ||
+        "-"
+      );
   }
 }
 
