@@ -20,8 +20,7 @@ import { P } from "@/permissions";
 import { selectIsPlatformTenant } from "@/redux/features/auth/auth-slice";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAppSelector } from "@/redux/store";
-import { useRoles } from "@xvs/finance/host";
-import { useGetTeamMembersQuery } from "@/redux/services/workflow/team-mgt-api";
+import { useDirectory, useRoles } from "@xvs/finance/host";
 import {
   useCreateStageApproverOverrideMutation,
   useDeleteStageApproverOverrideMutation,
@@ -80,7 +79,8 @@ export default function DynamicRoleTab() {
   const { data: overrides } = useGetStageApproverOverridesQuery(undefined, {
     skip: !canSeeTemplates,
   });
-  const { data: members } = useGetTeamMembersQuery({ page: 1, page_size: 200 });
+  // The host's directory: this tenant's people, never the whole platform's.
+  const { data: people } = useDirectory();
   const [preview, { data: previewData, isLoading: isPreviewing, error: previewError }] =
     usePreviewApproversMutation();
 
@@ -141,10 +141,10 @@ export default function DynamicRoleTab() {
 
   const memberOptions = useMemo(
     () =>
-      (members?.data ?? [])
+      (people ?? [])
         .filter((u) => u.status === "ACTIVE")
-        .map((u) => ({ value: String(u.id), label: u.full_name || u.email })),
-    [members],
+        .map((u) => ({ value: u.id, label: u.full_name || u.email })),
+    [people],
   );
 
   let sampleInvalid = false;
