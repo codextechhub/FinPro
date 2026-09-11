@@ -75,7 +75,7 @@ export function approverSummary(
       return `${stage.approver_group_name || stage.approver_group_code || "?"} (group)`;
     case "DYNAMIC_ROLE": {
       const n = stage.dynamic_role_rules?.length ?? 0;
-      return `Chosen by the document - ${n} ${n === 1 ? "rule" : "rules"}`;
+      return `Dynamic Role - ${n} ${n === 1 ? "rule" : "rules"}`;
     }
     case "ORGANOGRAM": {
       if (stage.organogram_target === "N_LEVELS_UP") {

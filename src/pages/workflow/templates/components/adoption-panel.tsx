@@ -31,7 +31,7 @@ const VALUE_LABELS: Record<string, string> = {
   RETURN_TO_REQUESTER: "Returns to the requester",
   ROLE: "Role holders",
   WORKFLOW_GROUP: "Approver group",
-  DYNAMIC_ROLE: "Role chosen by the document",
+  DYNAMIC_ROLE: "Dynamic Role",
   ORGANOGRAM: "Organogram",
   APPROVAL: "Approval",
   BRANCH: "Branch (routing only)",

@@ -221,8 +221,8 @@ export default function DynamicRoleTab() {
             </div>
           ) : ruleSets.length === 0 ? (
             <p className="px-1 py-8 text-center text-xs text-gray-01">
-              No step uses document-driven rules yet. Set a stage's approver source to
-              "Role chosen by the document" in the template builder.
+              No step uses Dynamic Role yet. Set a stage's "Decided by" to "Dynamic
+              Role" in the template builder.
             </p>
           ) : (
             <ul className="space-y-1">
@@ -284,8 +284,8 @@ export default function DynamicRoleTab() {
                 <FlaskConical className="size-6" />
               </span>
               <p className="mx-auto mt-3 max-w-md text-sm text-gray-01">
-                Nothing to show yet. A stage published with the "Role chosen by the
-                document" source appears here with its rules and a tester.
+                Nothing to show yet. A published stage decided by Dynamic Role appears
+                here with its rules and a tester.
               </p>
             </div>
           ) : (

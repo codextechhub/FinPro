@@ -53,7 +53,7 @@ import { PageShell } from "@/components/layout/page-shell";
 const SOURCE_OPTIONS = [
   { value: "ROLE", label: "Role holders" },
   { value: "WORKFLOW_GROUP", label: "Approver group" },
-  { value: "DYNAMIC_ROLE", label: "Role chosen by the document" },
+  { value: "DYNAMIC_ROLE", label: "Dynamic Role" },
   { value: "ORGANOGRAM", label: "Organogram (relative to requester)" },
 ];
 // What each source resolves to, in the words an administrator uses. Shown under
