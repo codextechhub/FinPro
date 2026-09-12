@@ -7,8 +7,9 @@
  * the form cannot delete it, move it or give it a condition, and joins the two
  * back together only when it builds a payload.
  *
- * Values are held the way the API wants them: money in whole kobo, ids and
- * keys as strings, and a list for "is one of".
+ * The conditions themselves belong to the shared condition model, because the
+ * same rows are written on a template stage ("only run this step when..."); it
+ * is re-exported here so a screen that holds a rule reaches for one module.
  */
 import type {
   ConditionFieldSpec,
@@ -17,25 +18,25 @@ import type {
   DynamicRoleRulePayload,
   DynamicRoleTargetKind,
   DynamicRoleWritePayload,
-  WorkflowCondition,
 } from "@/redux/services/dashboard/workflow-types";
+import {
+  type ConditionDraft,
+  type ConditionValue,
+  conditionFromDrafts,
+  conditionProblem,
+  draftsFromCondition,
+  emptyCondition,
+  nextKey,
+} from "@/pages/protected/workflow/components/condition-draft";
 
-export type ConditionValue = string | number | string[] | null;
-
-/** One comparison in a rule: a field, how it is compared, and what with. */
-export interface ConditionDraft {
-  key: string;
-  /**
-   * The area the picker is showing: `document`, `requester`, or one an app
-   * owns, such as `student`. Never sent - a field's own key says which area it
-   * belongs to - but held so the field list can be narrowed before one is
-   * picked.
-   */
-  area: string;
-  field: string;
-  op: string;
-  value: ConditionValue;
-}
+export type { ConditionDraft, ConditionValue };
+export {
+  LIST_OPS,
+  areaOf,
+  emptyCondition,
+  resetForField,
+  valueForOp,
+} from "@/pages/protected/workflow/components/condition-draft";
 
 /** Who a rule sends to. Only the field matching `kind` is read. */
 export interface TargetDraft {
@@ -62,25 +63,11 @@ export interface DynamicRoleDraft {
   otherwise: TargetDraft;
 }
 
-/** Operators whose value is a list rather than one value. */
-export const LIST_OPS = new Set(["in", "not_in"]);
-
-let seq = 0;
-const nextKey = (prefix: string) => `${prefix}-${++seq}`;
-
 export const emptyTarget = (kind: DynamicRoleTargetKind = "ROLE"): TargetDraft => ({
   kind,
   roleKey: "",
   userId: "",
   groupCode: "",
-});
-
-export const emptyCondition = (area = "document"): ConditionDraft => ({
-  key: nextKey("cond"),
-  area,
-  field: "",
-  op: "",
-  value: null,
 });
 
 export const emptyRule = (): RuleDraft => ({
@@ -107,37 +94,6 @@ export function slugify(value: string): string {
     .slice(0, 100);
 }
 
-/** A condition pointed at a newly chosen field: its first operator, and no value yet. */
-export function resetForField(
-  condition: ConditionDraft,
-  field: ConditionFieldSpec | undefined,
-): ConditionDraft {
-  return { ...condition, field: field?.key ?? "", op: field?.operators[0] ?? "", value: null };
-}
-
-/** The value reshaped for an operator: a list for "is one of", a single value otherwise. */
-export function valueForOp(op: string, previous: ConditionValue): ConditionValue {
-  if (LIST_OPS.has(op)) {
-    if (Array.isArray(previous)) return previous;
-    return previous == null || previous === "" ? [] : [String(previous)];
-  }
-  return Array.isArray(previous) ? (previous[0] ?? null) : previous;
-}
-
-function leavesOf(condition: WorkflowCondition): { op: string; field: string; value: unknown }[] {
-  if (condition == null) return [];
-  if ("all" in condition) return condition.all.flatMap(leavesOf);
-  if ("op" in condition) return [condition];
-  return [];
-}
-
-function normaliseValue(value: unknown): ConditionValue {
-  if (Array.isArray(value)) return value.map(String);
-  if (typeof value === "number") return value;
-  if (value == null) return null;
-  return String(value);
-}
-
 function targetFrom(rule: DynamicRoleRule): TargetDraft {
   return {
     kind: rule.target_kind,
@@ -145,19 +101,6 @@ function targetFrom(rule: DynamicRoleRule): TargetDraft {
     userId: rule.user != null ? String(rule.user) : "",
     groupCode: rule.group_code ?? "",
   };
-}
-
-/**
- * The area a field belongs to: what the catalogue says, or what its key shows.
- *
- * The key falls back for a rule saved before its area was declared, or read
- * while the catalogue is still loading - `student.class_name` is the student's
- * either way, and a key with no area in it is the document's own.
- */
-export function areaOf(key: string, fields?: Map<string, ConditionFieldSpec>): string {
-  const field = fields?.get(key);
-  if (field) return field.area;
-  return key.includes(".") ? key.split(".")[0] : "document";
 }
 
 /** A saved Dynamic Role as an editable draft. */
@@ -175,13 +118,7 @@ export function draftFromDynamicRole(
       .filter((rule) => !rule.is_fallback)
       .map((rule) => ({
         key: nextKey("rule"),
-        conditions: leavesOf(rule.condition).map((leaf) => ({
-          key: nextKey("cond"),
-          area: areaOf(leaf.field, fields),
-          field: leaf.field,
-          op: leaf.op,
-          value: normaliseValue(leaf.value),
-        })),
+        conditions: draftsFromCondition(rule.condition, fields),
         target: targetFrom(rule),
         label: rule.label ?? "",
       })),
@@ -199,14 +136,11 @@ function targetPayload(
 
 /** The rules as the API stores them: the ordered rules, then the Otherwise row, last. */
 export function rulesPayload(draft: DynamicRoleDraft): DynamicRoleRulePayload[] {
-  const rules: DynamicRoleRulePayload[] = draft.rules.map((rule) => {
-    const leaves = rule.conditions.map((c) => ({ op: c.op, field: c.field, value: c.value }));
-    return {
-      condition: leaves.length === 1 ? leaves[0] : { all: leaves },
-      ...targetPayload(rule.target),
-      label: rule.label.trim(),
-    };
-  });
+  const rules: DynamicRoleRulePayload[] = draft.rules.map((rule) => ({
+    condition: conditionFromDrafts(rule.conditions),
+    ...targetPayload(rule.target),
+    label: rule.label.trim(),
+  }));
   return [...rules, { condition: null, ...targetPayload(draft.otherwise) }];
 }
 
@@ -223,10 +157,6 @@ export function draftPayload(
   };
 }
 
-function isBlank(value: ConditionValue): boolean {
-  return value == null || value === "" || (Array.isArray(value) && value.length === 0);
-}
-
 function targetProblem(target: TargetDraft): string | null {
   if (target.kind === "ROLE" && !target.roleKey) return "choose the role that approves.";
   if (target.kind === "USER" && !target.userId) return "choose the person who approves.";
@@ -239,9 +169,9 @@ function targetProblem(target: TargetDraft): string | null {
  *
  * The server checks the same things and has the last word. This catches the
  * gaps a half-finished form always has - a rule with no role picked, an amount
- * left blank, a condition on a field the chosen document types no longer
- * offer - so the reason appears at once, numbered the way the server numbers
- * rules. Returns null when the draft is complete.
+ * left blank, a condition on a field nothing can answer - so the reason appears
+ * at once, numbered the way the server numbers rules. Returns null when the
+ * draft is complete.
  */
 export function draftProblem(
   draft: DynamicRoleDraft,
@@ -252,14 +182,8 @@ export function draftProblem(
     const where = `Rule ${i + 1}`;
     const rule = draft.rules[i];
     if (!rule.conditions.length) return `${where}: add a condition, or remove the rule.`;
-    for (const condition of rule.conditions) {
-      const field = fields.get(condition.field);
-      if (!field) return `${where}: choose what the condition tests.`;
-      if (!field.operators.includes(condition.op)) {
-        return `${where}: choose how ${field.label} is compared.`;
-      }
-      if (isBlank(condition.value)) return `${where}: give a value for ${field.label}.`;
-    }
+    const conditionIssue = conditionProblem(rule.conditions, fields, where);
+    if (conditionIssue) return conditionIssue;
     const problem = targetProblem(rule.target);
     if (problem) return `${where}: ${problem}`;
   }

@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Lock, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Lock, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CustomInput } from "@/components/custom/custom-input";
 import { SearchSelect, type SearchSelectOption } from "@/components/custom/search-select";
-import { MoneyInput } from "@/components/finance-ui";
 import {
   Sheet,
   SheetContent,
@@ -25,29 +24,26 @@ import {
   useUpdateDynamicRoleMutation,
 } from "@/redux/services/dashboard/workflow-api";
 import type {
-  ConditionArea,
-  ConditionFieldSpec,
   DynamicRole,
   DynamicRoleTargetKind,
 } from "@/redux/services/dashboard/workflow-types";
-import { operatorLabel } from "@/pages/protected/workflow/components/dynamic-role-format";
+import {
+  type ConditionCatalogue,
+  type ConditionChoices,
+  ConditionList,
+} from "@/pages/protected/workflow/components/condition-builder";
 import { BAND_SURFACE } from "../templates/components/template-builder-bits";
 import {
-  type ConditionDraft,
   type DynamicRoleDraft,
   type RuleDraft,
   type TargetDraft,
-  LIST_OPS,
   draftFromDynamicRole,
   draftPayload,
   draftProblem,
-  emptyCondition,
   emptyDraft,
   emptyRule,
   emptyTarget,
-  resetForField,
   slugify,
-  valueForOp,
 } from "./dynamic-role-form";
 
 /** Ask for the whole catalogue. A stable reference, so the query is cached once. */
@@ -59,28 +55,16 @@ const TARGET_OPTIONS: SearchSelectOption[] = [
   { value: "GROUP", label: "An approver group" },
 ];
 
-/** The pick-lists a rule draws on, loaded once for the whole editor. */
-interface Choices {
+/**
+ * The pick-lists a rule draws on, loaded once for the whole editor.
+ *
+ * A condition's own lists come from :type:`ConditionChoices`, shared with the
+ * template builder; the two here are what a rule sends to, which only a
+ * Dynamic Role has.
+ */
+interface Choices extends ConditionChoices {
   approverRoles: SearchSelectOption[];
-  anyRoles: SearchSelectOption[];
-  people: SearchSelectOption[];
-  branches: SearchSelectOption[];
   groups: SearchSelectOption[];
-}
-
-function valueOptions(field: ConditionFieldSpec, choices: Choices): SearchSelectOption[] {
-  switch (field.type) {
-    case "CHOICE":
-      return field.choices;
-    case "BRANCH":
-      return choices.branches;
-    case "PERSON":
-      return choices.people;
-    case "ROLE":
-      return choices.anyRoles;
-    default:
-      return [];
-  }
 }
 
 /**
@@ -124,11 +108,13 @@ export function DynamicRoleEditor({
     useGetDynamicRoleFieldsQuery(EVERY_DOCUMENT);
   const fields = useMemo(() => fieldsData?.fields ?? [], [fieldsData]);
   const fieldMap = useMemo(() => new Map(fields.map((f) => [f.key, f])), [fields]);
-  const areas = useMemo(() => fieldsData?.areas ?? [], [fieldsData]);
-  const typeLabels = useMemo(
-    () => new Map((fieldsData?.document_types ?? []).map((t) => [t.value, t.label])),
-    [fieldsData],
-  );
+  const catalogue = useMemo<ConditionCatalogue>(() => ({
+    areas: fieldsData?.areas ?? [],
+    fields,
+    fieldMap,
+    typeLabels: new Map((fieldsData?.document_types ?? []).map((t) => [t.value, t.label])),
+    loading: fieldsLoading,
+  }), [fieldsData, fields, fieldMap, fieldsLoading]);
 
   const { data: people } = useDirectory();
   const { data: branches } = useBranches();
@@ -267,11 +253,7 @@ export function DynamicRoleEditor({
                   index={i}
                   count={draft.rules.length}
                   rule={rule}
-                  areas={areas}
-                  fields={fields}
-                  fieldMap={fieldMap}
-                  fieldsLoading={fieldsLoading}
-                  typeLabels={typeLabels}
+                  catalogue={catalogue}
                   choices={choices}
                   onChange={(next) => patchRule(i, next)}
                   onMove={(by) => moveRule(i, by)}
@@ -321,11 +303,7 @@ function RuleCard({
   index,
   count,
   rule,
-  areas,
-  fields,
-  fieldMap,
-  fieldsLoading,
-  typeLabels,
+  catalogue,
   choices,
   onChange,
   onMove,
@@ -334,19 +312,12 @@ function RuleCard({
   index: number;
   count: number;
   rule: RuleDraft;
-  areas: ConditionArea[];
-  fields: ConditionFieldSpec[];
-  fieldMap: Map<string, ConditionFieldSpec>;
-  fieldsLoading: boolean;
-  typeLabels: Map<string, string>;
+  catalogue: ConditionCatalogue;
   choices: Choices;
   onChange: (next: Partial<RuleDraft>) => void;
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
 }) {
-  const setCondition = (i: number, next: ConditionDraft) =>
-    onChange({ conditions: rule.conditions.map((c, j) => (j === i ? next : c)) });
-
   return (
     <div className="space-y-3 rounded-md border border-white-02 bg-white p-3">
       <div className="flex items-center gap-2">
@@ -384,33 +355,13 @@ function RuleCard({
         </div>
       </div>
 
-      {rule.conditions.map((condition, i) => (
-        <div key={condition.key} className="space-y-2">
-          {i > 0 && <p className="text-[11px] font-semibold uppercase text-gray-01">and</p>}
-          <ConditionRow
-            idPrefix={`dr-r${index}-c${i}`}
-            condition={condition}
-            areas={areas}
-            fields={fields}
-            fieldMap={fieldMap}
-            fieldsLoading={fieldsLoading}
-            typeLabels={typeLabels}
-            choices={choices}
-            removable={rule.conditions.length > 1}
-            onChange={(next) => setCondition(i, next)}
-            onRemove={() =>
-              onChange({ conditions: rule.conditions.filter((_, j) => j !== i) })
-            }
-          />
-        </div>
-      ))}
-      <button
-        type="button"
-        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-        onClick={() => onChange({ conditions: [...rule.conditions, emptyCondition()] })}
-      >
-        <Plus className="size-3.5" /> And another condition
-      </button>
+      <ConditionList
+        idPrefix={`dr-r${index}`}
+        conditions={rule.conditions}
+        catalogue={catalogue}
+        choices={choices}
+        onChange={(conditions) => onChange({ conditions })}
+      />
 
       <div className="space-y-2 border-t border-white-02 pt-3">
         <p className="text-xs font-semibold text-black-01">Then send it to</p>
@@ -429,224 +380,6 @@ function RuleCard({
         />
       </div>
     </div>
-  );
-}
-
-/**
- * One comparison: the area it asks about, which of that area's fields, how it
- * is compared, and with what.
- *
- * The area comes first because it is what somebody knows before they know a
- * field name: "the student", then "their class". Every area the system holds is
- * offered, so a field only some documents carry says so underneath rather than
- * being hidden - the stage that runs the rule is where that is settled.
- */
-function ConditionRow({
-  idPrefix,
-  condition,
-  areas,
-  fields,
-  fieldMap,
-  fieldsLoading,
-  typeLabels,
-  choices,
-  removable,
-  onChange,
-  onRemove,
-}: {
-  idPrefix: string;
-  condition: ConditionDraft;
-  areas: ConditionArea[];
-  fields: ConditionFieldSpec[];
-  fieldMap: Map<string, ConditionFieldSpec>;
-  fieldsLoading: boolean;
-  typeLabels: Map<string, string>;
-  choices: Choices;
-  removable: boolean;
-  onChange: (next: ConditionDraft) => void;
-  onRemove: () => void;
-}) {
-  const field = fieldMap.get(condition.field);
-  const fieldOptions = fields
-    .filter((f) => f.area === condition.area)
-    .map((f) => ({ value: f.key, label: f.label }));
-  // Named while the list is short enough to read; counted once it is not, since
-  // nine document names in a hint is a wall rather than an answer.
-  const carriers = (field?.document_types ?? []).map((t) => typeLabels.get(t) ?? t);
-  const onlyOn = carriers.length === 0
-    ? ""
-    : carriers.length <= 3
-      ? `Only ${carriers.join(", ")} carry this`
-      : `Only ${carriers.length} document types carry this`;
-
-  return (
-    <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-2">
-      <SearchSelect
-        id={`${idPrefix}-area`}
-        label="About"
-        size="sm"
-        clearable={false}
-        loading={fieldsLoading}
-        options={areas.map((a) => ({ value: a.key, label: a.label }))}
-        value={condition.area}
-        onChange={(e) =>
-          onChange({ ...resetForField(condition, undefined), area: e.target.value })
-        }
-      />
-      <SearchSelect
-        id={`${idPrefix}-field`}
-        label="What"
-        size="sm"
-        clearable={false}
-        loading={fieldsLoading}
-        options={fieldOptions}
-        value={condition.field}
-        placeholder="Choose what to test"
-        onChange={(e) => onChange(resetForField(condition, fieldMap.get(e.target.value)))}
-      />
-      {field && (
-        <>
-          <SearchSelect
-            id={`${idPrefix}-op`}
-            label="Is"
-            size="sm"
-            clearable={false}
-            options={field.operators.map((op) => ({ value: op, label: operatorLabel(field, op) }))}
-            value={condition.op}
-            onChange={(e) =>
-              onChange({ ...condition, op: e.target.value, value: valueForOp(e.target.value, condition.value) })
-            }
-          />
-          <div className="flex items-end gap-2">
-            <div className="min-w-0 flex-1">
-              <ValueInput
-                id={`${idPrefix}-value`}
-                field={field}
-                op={condition.op}
-                value={condition.value}
-                choices={choices}
-                onChange={(value) => onChange({ ...condition, value })}
-              />
-            </div>
-            {removable && (
-              <button
-                type="button"
-                className="mb-2 text-gray-01 hover:text-destructive"
-                onClick={onRemove}
-                aria-label="Remove this condition"
-              >
-                <X className="size-4" />
-              </button>
-            )}
-          </div>
-        </>
-      )}
-      {onlyOn && (
-        <p className="text-[11px] text-gray-01 sm:col-span-2" title={carriers.join(", ")}>
-          {onlyOn}, so a stage for any other document will not take this rule.
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** The value box for a field's own kind, and a list for "is one of". */
-function ValueInput({
-  id,
-  field,
-  op,
-  value,
-  choices,
-  onChange,
-}: {
-  id: string;
-  field: ConditionFieldSpec;
-  op: string;
-  value: ConditionDraft["value"];
-  choices: Choices;
-  onChange: (value: ConditionDraft["value"]) => void;
-}) {
-  if (field.type === "MONEY") {
-    return (
-      <div className="space-y-1.5">
-        <label htmlFor={id} className="text-xs font-medium text-black-01">Amount</label>
-        <MoneyInput
-          id={id}
-          valueKobo={typeof value === "number" ? value : null}
-          onChangeKobo={(kobo) => onChange(kobo)}
-        />
-      </div>
-    );
-  }
-  if (field.type === "NUMBER") {
-    return (
-      <CustomInput
-        id={id}
-        label="Number"
-        type="number"
-        min={0}
-        value={value == null ? "" : String(value)}
-        onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-      />
-    );
-  }
-  if (field.type === "TEXT") {
-    return (
-      <CustomInput
-        id={id}
-        label="Text"
-        value={typeof value === "string" ? value : ""}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  }
-  const options = valueOptions(field, choices);
-  if (LIST_OPS.has(op)) {
-    const picked = Array.isArray(value) ? value : [];
-    return (
-      <div className="space-y-1.5">
-        <SearchSelect
-          id={id}
-          label="Any of"
-          size="sm"
-          options={options.filter((o) => !picked.includes(o.value))}
-          value=""
-          placeholder="Add one"
-          onChange={(e) => e.target.value && onChange([...picked, e.target.value])}
-        />
-        {picked.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {picked.map((v) => (
-              <span
-                key={v}
-                className="inline-flex items-center gap-1 rounded-full border border-white-02 bg-white px-2 py-0.5 text-xs text-black-01"
-              >
-                {options.find((o) => o.value === v)?.label ?? v}
-                <button
-                  type="button"
-                  aria-label="Remove"
-                  className="text-gray-01 hover:text-destructive"
-                  onClick={() => onChange(picked.filter((p) => p !== v))}
-                >
-                  <X className="size-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-  return (
-    <SearchSelect
-      id={id}
-      label="Value"
-      size="sm"
-      options={options}
-      value={typeof value === "string" ? value : ""}
-      placeholder="Choose"
-      onChange={(e) => onChange(e.target.value || null)}
-    />
   );
 }
 

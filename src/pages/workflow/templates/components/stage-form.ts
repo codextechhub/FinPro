@@ -2,6 +2,7 @@
  * The draft shape for one workflow stage in the template builder, shared by the
  * builder form and the live approver preview.
  */
+import type { ConditionDraft } from "@/pages/protected/workflow/components/condition-draft";
 import type {
   ApproverScope,
   ApproverSource,
@@ -38,7 +39,13 @@ export interface StageForm {
   quorum_count: string;
   on_rejection: StageOnRejection;
   skip_if_no_approvers: boolean;
-  inclusion_condition_text: string;
+  /**
+   * When this step runs at all, as rows joined by "and". Empty means every
+   * time, which is what most steps are. The same rows a Dynamic Role's rule
+   * holds, so a school writes "the amount is over ₦2m" once and recognises it
+   * wherever it appears.
+   */
+  inclusion: ConditionDraft[];
 }
 
 export const emptyStage = (): StageForm => ({
@@ -59,5 +66,5 @@ export const emptyStage = (): StageForm => ({
   quorum_count: "0",
   on_rejection: "TERMINAL",
   skip_if_no_approvers: true,
-  inclusion_condition_text: "",
+  inclusion: [],
 });

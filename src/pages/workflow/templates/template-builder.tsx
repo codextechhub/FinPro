@@ -22,7 +22,15 @@ import {
 } from "@/redux/services/dashboard/workflow-api";
 import { useGetPositionsQuery } from "@/redux/services/workflow/organogram-api";
 import { useGetTeamMembersQuery } from "@/redux/services/workflow/team-mgt-api";
-import { createsWorkflowTemplates, useDirectory, useRoles } from "@xvs/finance/host";
+import { createsWorkflowTemplates, useBranches, useDirectory, useRoles } from "@xvs/finance/host";
+import {
+  type ConditionCatalogue,
+  type ConditionChoices,
+  ConditionList,
+} from "@/pages/protected/workflow/components/condition-builder";
+import {
+  conditionFromDrafts, conditionProblem, draftsFromCondition,
+} from "@/pages/protected/workflow/components/condition-draft";
 import {
   approverScopeLabel, humanizeDocumentType,
 } from "@/pages/protected/workflow/components/workflow-format";
@@ -134,7 +142,8 @@ function formSignature(form: {
       quorum_count: s.quorum_count,
       on_rejection: s.on_rejection,
       skip_if_no_approvers: s.skip_if_no_approvers,
-      inclusion_condition_text: s.inclusion_condition_text.trim(),
+      // The rows without their React keys, which are not data.
+      inclusion: s.inclusion.map((c) => ({ field: c.field, op: c.op, value: c.value })),
       dynamic_role_code: s.dynamic_role_code,
       legacy_rules: s.legacy_rules,
     })),
@@ -148,7 +157,7 @@ function advancedSummary(s: StageForm, isPlatformTenant: boolean): string | null
     carried.push(approverScopeLabel(s.approver_scope, isPlatformTenant));
   }
   if (s.kind === "APPROVAL" && !s.skip_if_no_approvers) carried.push("never skipped");
-  if (s.inclusion_condition_text.trim()) carried.push("runs conditionally");
+  if (s.inclusion.length) carried.push("runs conditionally");
   return carried.length ? carried.join(" · ") : null;
 }
 
@@ -382,10 +391,27 @@ export default function TemplateBuilder() {
     { skip: editingShared || !docType },
   );
   const dynamicRoles = useMemo(() => dynamicRolesRes?.data ?? [], [dynamicRolesRes]);
-  const { data: docFields } = useGetDynamicRoleFieldsQuery(docType ? [docType] : [], {
-    skip: editingShared || !docType,
-  });
+  // Codex needs the catalogue too: a shared template's steps carry conditions
+  // even though its stages cannot name a Dynamic Role.
+  const { data: docFields, isFetching: docFieldsLoading } = useGetDynamicRoleFieldsQuery(
+    docType ? [docType] : [],
+    { skip: !docType },
+  );
   const hasAmount = !!docFields?.fields.some((f) => f.key === "amount");
+  // The pick-lists and the field catalogue a condition draws on - the same ones
+  // a Dynamic Role's rules use, so a condition written on a step reads exactly
+  // as one written there.
+  const { data: branchList } = useBranches();
+  const conditionCatalogue = useMemo<ConditionCatalogue>(() => {
+    const fields = docFields?.fields ?? [];
+    return {
+      areas: docFields?.areas ?? [],
+      fields,
+      fieldMap: new Map(fields.map((f) => [f.key, f])),
+      typeLabels: new Map((docFields?.document_types ?? []).map((t) => [t.value, t.label])),
+      loading: docFieldsLoading,
+    };
+  }, [docFields, docFieldsLoading]);
   // The server names each document type. Humanising the code is only the
   // fallback, and it reads "Rbac Role Change" where the server says "Role change".
   const documentLabel =
@@ -400,6 +426,13 @@ export default function TemplateBuilder() {
         .map((p) => ({ value: String(p.id), label: p.full_name || p.email })),
     [people],
   );
+  const conditionChoices = useMemo<ConditionChoices>(() => ({
+    anyRoles: (rolesRes ?? [])
+      .filter((r) => r.status === "ACTIVE")
+      .map((r) => ({ value: r.key, label: r.name })),
+    people: directoryOptions,
+    branches: (branchList ?? []).map((b) => ({ value: String(b.id), label: b.name })),
+  }), [rolesRes, directoryOptions, branchList]);
 
   // Prefill once when editing an existing template.
   useEffect(() => {
@@ -431,9 +464,7 @@ export default function TemplateBuilder() {
           quorum_count: String(s.quorum_count ?? 0),
           on_rejection: s.on_rejection,
           skip_if_no_approvers: s.skip_if_no_approvers,
-          inclusion_condition_text: s.inclusion_condition
-            ? JSON.stringify(s.inclusion_condition, null, 2)
-            : "",
+          inclusion: draftsFromCondition(s.inclusion_condition),
         })),
     );
     setRoutes(
@@ -490,15 +521,14 @@ export default function TemplateBuilder() {
         toast.error(`Stage ${i + 1}: code and label are required.`);
         return;
       }
-      let inclusion = undefined;
-      if (s.inclusion_condition_text.trim()) {
-        try {
-          inclusion = JSON.parse(s.inclusion_condition_text);
-        } catch {
-          toast.error(`Stage ${i + 1}: inclusion condition is not valid JSON.`);
-          return;
-        }
+      const whenProblem = conditionProblem(
+        s.inclusion, conditionCatalogue.fieldMap, `Stage ${i + 1}`,
+      );
+      if (whenProblem) {
+        toast.error(whenProblem);
+        return;
       }
+      const inclusion = conditionFromDrafts(s.inclusion) ?? undefined;
       const isOrg = s.kind === "APPROVAL" && s.approver_source === "ORGANOGRAM";
       if (isOrg && !s.organogram_target) {
         toast.error(`Stage ${i + 1}: pick an organogram target.`);
@@ -774,7 +804,7 @@ export default function TemplateBuilder() {
                 <span className="min-w-0">
                   <span className="text-black-01">{s.label.trim() || `Step ${i + 1}`}</span>
                   {s.kind === "BRANCH" && <span className="text-gray-01"> · routing only</span>}
-                  {s.inclusion_condition_text.trim() && (
+                  {s.inclusion.length > 0 && (
                     <span className="text-gray-01"> · runs only in some cases</span>
                   )}
                 </span>
@@ -1040,22 +1070,25 @@ export default function TemplateBuilder() {
                       )}
                     </div>
 
-                    <div className="mt-3 space-y-1.5">
-                      <label className="text-xs font-medium">
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-medium">
                         Only run this step when{" "}
                         <span className="text-gray-01">
-                          (optional - leave blank to run it every time)
+                          (leave this empty to run it every time)
                         </span>
-                      </label>
-                      <Textarea
-                        rows={2}
-                        className="font-mono text-xs"
-                        placeholder='{ "op": "gte", "field": "amount", "value": 500000 }'
-                        value={s.inclusion_condition_text}
-                        onChange={(e) =>
-                          updateStage(i, { inclusion_condition_text: e.target.value })
-                        }
+                      </p>
+                      <ConditionList
+                        idPrefix={`stage-when-${i}`}
+                        conditions={s.inclusion}
+                        catalogue={conditionCatalogue}
+                        choices={conditionChoices}
+                        onChange={(inclusion) => updateStage(i, { inclusion })}
                       />
+                      {!docType && (
+                        <p className="text-[11px] text-gray-01">
+                          Set the document type first, so this knows what a step can test.
+                        </p>
+                      )}
                     </div>
                   </Advanced>
 
