@@ -22,8 +22,10 @@ import {
 } from "@/redux/services/dashboard/workflow-api";
 import { useGetPositionsQuery } from "@/redux/services/workflow/organogram-api";
 import { useGetTeamMembersQuery } from "@/redux/services/workflow/team-mgt-api";
-import { useDirectory, useRoles } from "@xvs/finance/host";
-import { approverScopeLabel } from "@/pages/protected/workflow/components/workflow-format";
+import { createsWorkflowTemplates, useDirectory, useRoles } from "@xvs/finance/host";
+import {
+  approverScopeLabel, humanizeDocumentType,
+} from "@/pages/protected/workflow/components/workflow-format";
 import { ConditionView } from "@/pages/protected/workflow/components/condition-view";
 import { DynamicRoleRuleList } from "@/pages/protected/workflow/components/dynamic-role-rule-list";
 import type {
@@ -166,6 +168,24 @@ function advancedSummary(s: StageForm, isPlatformTenant: boolean): string | null
   return carried.length ? carried.join(" · ") : null;
 }
 
+/** One fixed fact about a template, where the path's identity is not this app's to change. */
+function TemplateFact({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-black-01">{label}</p>
+      <p className={cn("text-sm text-gray-01", mono && "font-mono text-xs")}>{value}</p>
+    </div>
+  );
+}
+
 /**
  * What a Dynamic Role stage will do, shown under its picker.
  *
@@ -305,6 +325,11 @@ export default function TemplateBuilder() {
   // silently updating another.
   const editingShared = isPlatformTenant && (!isEdit || existing?.is_platform === true);
   const willFork = !isPlatformTenant && isEdit && existing?.is_platform === true;
+  // A school adjusts the approval path it was given rather than naming one. The
+  // name, document type and code identify the path - changing the last two
+  // publishes a different template altogether - so they are shown and fixed
+  // wherever this app authors no templates, and the steps are what is edited.
+  const canEditDetails = createsWorkflowTemplates;
   const [publish, { isLoading: isPublishing }] = usePublishWorkflowTemplateMutation();
 
   // Organogram approver-source support: positions for SPECIFIC_POSITION, and a
@@ -373,6 +398,11 @@ export default function TemplateBuilder() {
     skip: editingShared || !docType,
   });
   const hasAmount = !!docFields?.fields.some((f) => f.key === "amount");
+  // The server names each document type. Humanising the code is only the
+  // fallback, and it reads "Rbac Role Change" where the server says "Role change".
+  const documentLabel =
+    docFields?.document_types.find((t) => t.value === docType)?.label
+    ?? humanizeDocumentType(documentType);
   // Who a Dynamic Role is tried for: its rules can test the person's role and branch.
   const { data: people } = useDirectory();
   const directoryOptions = useMemo(
@@ -683,41 +713,59 @@ export default function TemplateBuilder() {
         {/* Meta */}
         <Section title="Template details">
           <div className="space-y-4">
-            <CustomInput
-              id="tpl-name"
-              label="Name"
-              isRequired
-              placeholder="e.g. Standard Leave Approval"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <CustomInput
-                id="tpl-doc-type"
-                label="Document type"
-                isRequired
-                placeholder="e.g. leave.request"
-                value={documentType}
-                onChange={(e) => setDocumentType(e.target.value)}
-              />
-              <CustomInput
-                id="tpl-code"
-                label="Code"
-                isRequired
-                placeholder="e.g. standard"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium">Description</label>
-              <Textarea
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What is this approval path for?"
-              />
-            </div>
+            {canEditDetails ? (
+              <>
+                <CustomInput
+                  id="tpl-name"
+                  label="Name"
+                  isRequired
+                  placeholder="e.g. Standard Leave Approval"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <CustomInput
+                    id="tpl-doc-type"
+                    label="Document type"
+                    isRequired
+                    placeholder="e.g. leave.request"
+                    value={documentType}
+                    onChange={(e) => setDocumentType(e.target.value)}
+                  />
+                  <CustomInput
+                    id="tpl-code"
+                    label="Code"
+                    isRequired
+                    placeholder="e.g. standard"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Description</label>
+                  <Textarea
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="What is this approval path for?"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <TemplateFact label="Name" value={name || "Untitled"} />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <TemplateFact label="Document" value={documentLabel} />
+                  <TemplateFact label="Code" value={code} mono />
+                </div>
+                {description && <TemplateFact label="Description" value={description} />}
+                <p className="text-xs text-gray-01">
+                  These name the path and stay as they are. What this school decides is the
+                  steps beside them: who approves each one, in what order, and when a step
+                  runs at all.
+                </p>
+              </>
+            )}
             {willFork && (
               <p className="rounded-md border border-white-02 bg-pry-01/40 px-3 py-2 text-xs text-gray-01">
                 This is the Codex version. Saving keeps theirs as it is and gives this school
@@ -734,7 +782,7 @@ export default function TemplateBuilder() {
                   </p>
                 )
             )}
-            {isEdit && (
+            {isEdit && canEditDetails && (
               <FieldHint title="Can I change the document type or code?">
                 These two name the template. Publishing with the same pair updates this
                 template in place; changing either publishes a <strong>new</strong> template
