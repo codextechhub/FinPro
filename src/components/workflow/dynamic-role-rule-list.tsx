@@ -5,24 +5,25 @@ import type { DynamicRoleRule } from "@/redux/services/dashboard/workflow-types"
 import { conditionSentence, targetSentence } from "./dynamic-role-format";
 import { useRuleNames } from "./use-rule-names";
 
+/** Ask for the whole catalogue. A stable reference, so the query is cached once. */
+const EVERY_DOCUMENT: string[] = [];
+
 /**
  * A Dynamic Role's rules, numbered and in words, with the Otherwise row last.
  *
  * Read-only, for the places a stage names a Dynamic Role: the template page and
- * the builder. Each field's label comes from the server's field list for the
- * role's own document types, so a rule reads here exactly as it does in the
- * editor on the Approvers screen.
+ * the builder. A Dynamic Role names no document type, so each field's label
+ * comes from the whole catalogue and a rule reads here exactly as it does in
+ * the editor on the Approvers screen.
  */
 export function DynamicRoleRuleList({
   rules,
-  documentTypes,
   className,
 }: {
   rules: DynamicRoleRule[];
-  documentTypes: string[];
   className?: string;
 }) {
-  const { data } = useGetDynamicRoleFieldsQuery(documentTypes);
+  const { data } = useGetDynamicRoleFieldsQuery(EVERY_DOCUMENT);
   const fields = useMemo(() => new Map((data?.fields ?? []).map((f) => [f.key, f])), [data]);
   const names = useRuleNames();
   const ordered = useMemo(() => [...rules].sort((a, b) => a.order - b.order), [rules]);

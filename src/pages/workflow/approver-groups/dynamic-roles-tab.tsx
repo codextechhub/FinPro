@@ -45,6 +45,9 @@ import { draftFromDynamicRole, rulesPayload } from "./dynamic-role-form";
 
 type EditorState = { role: DynamicRole | null } | null;
 
+/** Ask for the whole catalogue. A stable reference, so the query is cached once. */
+const EVERY_DOCUMENT: string[] = [];
+
 /**
  * The Dynamic Role tab: named, reusable rules that decide who approves.
  *
@@ -289,7 +292,9 @@ function DynamicRoleDetail({
   onToggleActive: () => void;
   onDelete: () => void;
 }) {
-  const { data: fieldsData } = useGetDynamicRoleFieldsQuery(role.document_types);
+  // The whole catalogue: a Dynamic Role names no document type, so its rules
+  // are read back against every field the system offers.
+  const { data: fieldsData } = useGetDynamicRoleFieldsQuery(EVERY_DOCUMENT);
   const fields = useMemo(
     () => new Map((fieldsData?.fields ?? []).map((f) => [f.key, f])),
     [fieldsData],
@@ -314,14 +319,6 @@ function DynamicRoleDetail({
               </Badge>
             </div>
             {role.description && <p className="mt-1 text-xs text-gray-01">{role.description}</p>}
-            <p className="mt-2 text-xs text-gray-01">
-              For{" "}
-              <span className="text-black-01">
-                {role.document_types.length
-                  ? role.document_types.map(humanizeDocumentType).join(", ")
-                  : "any document"}
-              </span>
-            </p>
           </div>
           {canManage && (
             <div className="flex flex-wrap items-center gap-2">
@@ -454,7 +451,7 @@ function DynamicRoleTester({
     if (!requester) return;
     preview({
       requester,
-      document_types: role.document_types,
+      document_types: [],
       rules: rulesPayload(draftFromDynamicRole(role)),
       sample: {
         ...(hasAmount && amount != null ? { amount } : {}),

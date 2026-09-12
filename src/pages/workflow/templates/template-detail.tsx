@@ -231,10 +231,7 @@ export default function TemplateDetail() {
                                   Switched off, so this step finds nobody until it is reactivated.
                                 </p>
                               )}
-                              <DynamicRoleRuleList
-                                rules={s.dynamic_role.rules}
-                                documentTypes={s.dynamic_role.document_types}
-                              />
+                              <DynamicRoleRuleList rules={s.dynamic_role.rules} />
                             </div>
                           )}
                           {s.approver_source === "DYNAMIC_ROLE" && !s.dynamic_role && (

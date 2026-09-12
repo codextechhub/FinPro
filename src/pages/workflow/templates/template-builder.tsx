@@ -221,7 +221,7 @@ function DynamicRoleStagePanel({
             Switched off, so this step finds nobody until it is reactivated.
           </p>
         )}
-        <DynamicRoleRuleList rules={picked.rules} documentTypes={picked.document_types} />
+        <DynamicRoleRuleList rules={picked.rules} />
         <p className="text-xs">{manage("Edit it on the Approvers screen")}</p>
       </div>
     );

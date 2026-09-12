@@ -97,7 +97,8 @@ export function conditionLeaves(
  * in for, because a sum of kobo read as a plain number is off by a hundred.
  */
 const AMOUNT: ConditionFieldSpec = {
-  key: "amount", label: "Amount", subject: "document", type: "MONEY", operators: [], choices: [],
+  key: "amount", label: "Amount", area: "document", subject: "document", type: "MONEY",
+  operators: [], choices: [], document_types: [],
 };
 
 /** A field path in words: `requester.job_title` reads "Requester job title". */

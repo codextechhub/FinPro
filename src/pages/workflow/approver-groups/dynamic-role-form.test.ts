@@ -16,12 +16,12 @@ import {
 } from "./dynamic-role-form";
 
 const AMOUNT: ConditionFieldSpec = {
-  key: "amount", label: "Amount", subject: "document", type: "MONEY",
-  operators: ["gt", "gte", "lt", "lte", "eq", "ne"], choices: [],
+  key: "amount", label: "Amount", area: "document", subject: "document", type: "MONEY",
+  operators: ["gt", "gte", "lt", "lte", "eq", "ne"], choices: [], document_types: [],
 };
 const BRANCH: ConditionFieldSpec = {
-  key: "requester.branch", label: "Their branch", subject: "requester", type: "BRANCH",
-  operators: ["eq", "ne", "in", "not_in"], choices: [],
+  key: "requester.branch", label: "Their branch", area: "requester", subject: "requester",
+  type: "BRANCH", operators: ["eq", "ne", "in", "not_in"], choices: [], document_types: [],
 };
 const FIELDS = new Map([AMOUNT, BRANCH].map((field) => [field.key, field]));
 
@@ -29,14 +29,13 @@ const FIELDS = new Map([AMOUNT, BRANCH].map((field) => [field.key, field]));
 function spendApprover(): DynamicRoleDraft {
   const draft = emptyDraft();
   draft.name = "Spend approver";
-  draft.documentTypes = ["procurement.purchase_requisition"];
   draft.rules = [
     { ...emptyRule(), conditions: [
-      { key: "c1", subject: "document", field: "amount", op: "gt", value: 200_000_000 },
+      { key: "c1", area: "document", field: "amount", op: "gt", value: 200_000_000 },
     ], target: { kind: "ROLE", roleKey: "proprietor", userId: "", groupCode: "" } },
     { ...emptyRule(), conditions: [
-      { key: "c2", subject: "requester", field: "requester.branch", op: "eq", value: "7" },
-      { key: "c3", subject: "document", field: "amount", op: "gt", value: 100_000_000 },
+      { key: "c2", area: "requester", field: "requester.branch", op: "eq", value: "7" },
+      { key: "c3", area: "document", field: "amount", op: "gt", value: 100_000_000 },
     ], target: { kind: "USER", roleKey: "", userId: "41", groupCode: "" }, label: "Ikeja desk" },
   ];
   draft.otherwise = { kind: "GROUP", roleKey: "", userId: "", groupCode: "bursary" };
@@ -69,6 +68,12 @@ describe("rulesPayload", () => {
 });
 
 describe("draftPayload", () => {
+  it("names no document type - the stage that picks it decides", () => {
+    expect(draftPayload(spendApprover(), { creating: true })).not.toHaveProperty(
+      "document_types",
+    );
+  });
+
   it("slugs a code from the name when creating", () => {
     expect(draftPayload(spendApprover(), { creating: true }).code).toBe("spend-approver");
   });
@@ -100,6 +105,14 @@ describe("draftFromDynamicRole", () => {
     const draft = draftFromDynamicRole(stored);
     expect(draft.rules).toHaveLength(1);
     expect(draft.otherwise).toMatchObject({ kind: "ROLE", roleKey: "bursar" });
+  });
+
+  it("reads each condition's area from the catalogue, and from the key without it", () => {
+    const fields = new Map([[BRANCH.key, BRANCH]]);
+    const [known] = draftFromDynamicRole(stored, fields).rules;
+    expect(known.conditions.map((c) => c.area)).toEqual(["requester", "document"]);
+    const [guessed] = draftFromDynamicRole(stored).rules;
+    expect(guessed.conditions.map((c) => c.area)).toEqual(["requester", "document"]);
   });
 
   it("reads ids as strings and lists as lists", () => {

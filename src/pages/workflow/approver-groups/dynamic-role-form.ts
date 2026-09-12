@@ -22,14 +22,16 @@ import type {
 
 export type ConditionValue = string | number | string[] | null;
 
-/** Which question a condition answers, which decides the fields the form offers. */
-export type ConditionSubject = "document" | "requester";
-
 /** One comparison in a rule: a field, how it is compared, and what with. */
 export interface ConditionDraft {
   key: string;
-  /** The form's choice before a field is picked. Never sent: the field says it. */
-  subject: ConditionSubject;
+  /**
+   * The area the picker is showing: `document`, `requester`, or one an app
+   * owns, such as `student`. Never sent - a field's own key says which area it
+   * belongs to - but held so the field list can be narrowed before one is
+   * picked.
+   */
+  area: string;
   field: string;
   op: string;
   value: ConditionValue;
@@ -55,7 +57,6 @@ export interface DynamicRoleDraft {
   code: string;
   name: string;
   description: string;
-  documentTypes: string[];
   rules: RuleDraft[];
   /** Where a document goes when no rule matches. Always last, never conditional. */
   otherwise: TargetDraft;
@@ -74,9 +75,9 @@ export const emptyTarget = (kind: DynamicRoleTargetKind = "ROLE"): TargetDraft =
   groupCode: "",
 });
 
-export const emptyCondition = (subject: ConditionSubject = "document"): ConditionDraft => ({
+export const emptyCondition = (area = "document"): ConditionDraft => ({
   key: nextKey("cond"),
-  subject,
+  area,
   field: "",
   op: "",
   value: null,
@@ -93,7 +94,6 @@ export const emptyDraft = (): DynamicRoleDraft => ({
   code: "",
   name: "",
   description: "",
-  documentTypes: [],
   rules: [emptyRule()],
   otherwise: emptyTarget(),
 });
@@ -147,22 +147,37 @@ function targetFrom(rule: DynamicRoleRule): TargetDraft {
   };
 }
 
+/**
+ * The area a field belongs to: what the catalogue says, or what its key shows.
+ *
+ * The key falls back for a rule saved before its area was declared, or read
+ * while the catalogue is still loading - `student.class_name` is the student's
+ * either way, and a key with no area in it is the document's own.
+ */
+export function areaOf(key: string, fields?: Map<string, ConditionFieldSpec>): string {
+  const field = fields?.get(key);
+  if (field) return field.area;
+  return key.includes(".") ? key.split(".")[0] : "document";
+}
+
 /** A saved Dynamic Role as an editable draft. */
-export function draftFromDynamicRole(role: DynamicRole): DynamicRoleDraft {
+export function draftFromDynamicRole(
+  role: DynamicRole,
+  fields?: Map<string, ConditionFieldSpec>,
+): DynamicRoleDraft {
   const ordered = [...role.rules].sort((a, b) => a.order - b.order);
   const otherwise = ordered.find((rule) => rule.is_fallback);
   return {
     code: role.code,
     name: role.name,
     description: role.description ?? "",
-    documentTypes: [...role.document_types],
     rules: ordered
       .filter((rule) => !rule.is_fallback)
       .map((rule) => ({
         key: nextKey("rule"),
         conditions: leavesOf(rule.condition).map((leaf) => ({
           key: nextKey("cond"),
-          subject: leaf.field.startsWith("requester.") ? "requester" : "document",
+          area: areaOf(leaf.field, fields),
           field: leaf.field,
           op: leaf.op,
           value: normaliseValue(leaf.value),
@@ -204,7 +219,6 @@ export function draftPayload(
     ...(creating ? { code: draft.code || slugify(draft.name) } : {}),
     name: draft.name.trim(),
     description: draft.description.trim(),
-    document_types: draft.documentTypes,
     rules: rulesPayload(draft),
   };
 }

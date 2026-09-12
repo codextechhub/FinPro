@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Lock, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { CustomInput } from "@/components/custom/custom-input";
 import { SearchSelect, type SearchSelectOption } from "@/components/custom/search-select";
@@ -26,6 +25,7 @@ import {
   useUpdateDynamicRoleMutation,
 } from "@/redux/services/dashboard/workflow-api";
 import type {
+  ConditionArea,
   ConditionFieldSpec,
   DynamicRole,
   DynamicRoleTargetKind,
@@ -34,7 +34,6 @@ import { operatorLabel } from "@/pages/protected/workflow/components/dynamic-rol
 import { BAND_SURFACE } from "../templates/components/template-builder-bits";
 import {
   type ConditionDraft,
-  type ConditionSubject,
   type DynamicRoleDraft,
   type RuleDraft,
   type TargetDraft,
@@ -51,10 +50,8 @@ import {
   valueForOp,
 } from "./dynamic-role-form";
 
-const SUBJECT_OPTIONS: SearchSelectOption[] = [
-  { value: "document", label: "The document" },
-  { value: "requester", label: "Who raised it" },
-];
+/** Ask for the whole catalogue. A stable reference, so the query is cached once. */
+const EVERY_DOCUMENT: string[] = [];
 
 const TARGET_OPTIONS: SearchSelectOption[] = [
   { value: "ROLE", label: "A role" },
@@ -89,12 +86,16 @@ function valueOptions(field: ConditionFieldSpec, choices: Choices): SearchSelect
 /**
  * Builds or edits one named Dynamic Role, all of its rules at once.
  *
- * Each condition starts from what it is about - the document, or the person who
- * raised it - then offers only that subject's fields, only the comparisons the
- * field can make, and an input of the field's own kind: naira for an amount,
- * the list itself for a choice, a picker for a branch, a person or a role. The
- * fields and the approving roles come from the server, so nothing offered here
- * is something saving would refuse.
+ * Each condition starts with the area it asks about - this document, the person
+ * who raised it, the child it is for - then offers that area's fields, only the
+ * comparisons the field can make, and an input of the field's own kind: naira
+ * for an amount, the list itself for a choice, a picker for a branch, a person
+ * or a role. The areas, the fields and the approving roles all come from the
+ * server, so nothing offered here is something saving would refuse.
+ *
+ * A Dynamic Role names no document type: it is picked on a stage, and that
+ * stage's document is what decides which rules it can run. So the whole
+ * catalogue is offered, and a field only some documents carry says so.
  *
  * The Otherwise row is its own card at the bottom. It cannot be removed, moved
  * or given a condition, so a document always reaches somebody.
@@ -116,10 +117,18 @@ export function DynamicRoleEditor({
   );
   const [problem, setProblem] = useState("");
 
+  // The whole catalogue: a Dynamic Role names no document type, so every area
+  // and every field is offered here, and the stage that picks the role is where
+  // a document that cannot answer a rule is refused.
   const { data: fieldsData, isFetching: fieldsLoading } =
-    useGetDynamicRoleFieldsQuery(draft.documentTypes);
+    useGetDynamicRoleFieldsQuery(EVERY_DOCUMENT);
   const fields = useMemo(() => fieldsData?.fields ?? [], [fieldsData]);
   const fieldMap = useMemo(() => new Map(fields.map((f) => [f.key, f])), [fields]);
+  const areas = useMemo(() => fieldsData?.areas ?? [], [fieldsData]);
+  const typeLabels = useMemo(
+    () => new Map((fieldsData?.document_types ?? []).map((t) => [t.value, t.label])),
+    [fieldsData],
+  );
 
   const { data: people } = useDirectory();
   const { data: branches } = useBranches();
@@ -157,13 +166,6 @@ export function DynamicRoleEditor({
     [rules[index], rules[to]] = [rules[to], rules[index]];
     patch({ rules });
   };
-  const toggleType = (type: string, on: boolean) =>
-    patch({
-      documentTypes: on
-        ? [...draft.documentTypes, type]
-        : draft.documentTypes.filter((t) => t !== type),
-    });
-
   const save = () => {
     const found = draftProblem(draft, fieldMap);
     if (found) {
@@ -183,7 +185,6 @@ export function DynamicRoleEditor({
           apiFieldError(err, "rules") ??
             apiFieldError(err, "name") ??
             apiFieldError(err, "code") ??
-            apiFieldError(err, "document_types") ??
             apiErrorMessage(err, "This Dynamic Role could not be saved."),
         );
       });
@@ -198,7 +199,9 @@ export function DynamicRoleEditor({
           </SheetTitle>
           <SheetDescription className="text-xs text-gray-01">
             Rules are read top to bottom and the first one whose conditions all hold
-            decides who approves. Anything no rule catches goes to Otherwise.
+            decides who approves. Anything no rule catches goes to Otherwise. You pick
+            this on a template stage, and that stage's own document decides which of
+            these rules it can run.
             {!creating && role.used_by.length > 0 && (
               <> Saving changes the {role.used_by.length === 1 ? "stage" : `${role.used_by.length} stages`} using
               it from their next request.</>
@@ -243,36 +246,6 @@ export function DynamicRoleEditor({
               </div>
             </section>
 
-            <section className="space-y-2">
-              <p className="text-xs font-medium text-black-01">Used for</p>
-              <p className="text-xs text-gray-01">
-                {draft.documentTypes.length === 0
-                  ? "Any document. Its rules can test the branch and who raised it; tick documents to test their own details, such as the amount."
-                  : draft.documentTypes.length === 1
-                    ? "Its rules can test this document's own details."
-                    : "Its rules can test what these documents share, such as the amount."}
-              </p>
-              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                {(fieldsData?.document_types ?? []).map((type) => {
-                  const id = `dr-type-${type.value}`;
-                  return (
-                    <label
-                      key={type.value}
-                      htmlFor={id}
-                      className="flex items-center gap-2 rounded-md border border-white-02 px-3 py-2 text-xs"
-                    >
-                      <Checkbox
-                        id={id}
-                        checked={draft.documentTypes.includes(type.value)}
-                        onCheckedChange={(v) => toggleType(type.value, v === true)}
-                      />
-                      <span className="min-w-0 truncate">{type.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </section>
-
             <section className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-black-01">
@@ -294,9 +267,11 @@ export function DynamicRoleEditor({
                   index={i}
                   count={draft.rules.length}
                   rule={rule}
+                  areas={areas}
                   fields={fields}
                   fieldMap={fieldMap}
                   fieldsLoading={fieldsLoading}
+                  typeLabels={typeLabels}
                   choices={choices}
                   onChange={(next) => patchRule(i, next)}
                   onMove={(by) => moveRule(i, by)}
@@ -346,9 +321,11 @@ function RuleCard({
   index,
   count,
   rule,
+  areas,
   fields,
   fieldMap,
   fieldsLoading,
+  typeLabels,
   choices,
   onChange,
   onMove,
@@ -357,9 +334,11 @@ function RuleCard({
   index: number;
   count: number;
   rule: RuleDraft;
+  areas: ConditionArea[];
   fields: ConditionFieldSpec[];
   fieldMap: Map<string, ConditionFieldSpec>;
   fieldsLoading: boolean;
+  typeLabels: Map<string, string>;
   choices: Choices;
   onChange: (next: Partial<RuleDraft>) => void;
   onMove: (by: -1 | 1) => void;
@@ -411,9 +390,11 @@ function RuleCard({
           <ConditionRow
             idPrefix={`dr-r${index}-c${i}`}
             condition={condition}
+            areas={areas}
             fields={fields}
             fieldMap={fieldMap}
             fieldsLoading={fieldsLoading}
+            typeLabels={typeLabels}
             choices={choices}
             removable={rule.conditions.length > 1}
             onChange={(next) => setCondition(i, next)}
@@ -451,13 +432,23 @@ function RuleCard({
   );
 }
 
-/** One comparison: what it is about, which field, how it compares, and with what. */
+/**
+ * One comparison: the area it asks about, which of that area's fields, how it
+ * is compared, and with what.
+ *
+ * The area comes first because it is what somebody knows before they know a
+ * field name: "the student", then "their class". Every area the system holds is
+ * offered, so a field only some documents carry says so underneath rather than
+ * being hidden - the stage that runs the rule is where that is settled.
+ */
 function ConditionRow({
   idPrefix,
   condition,
+  areas,
   fields,
   fieldMap,
   fieldsLoading,
+  typeLabels,
   choices,
   removable,
   onChange,
@@ -465,9 +456,11 @@ function ConditionRow({
 }: {
   idPrefix: string;
   condition: ConditionDraft;
+  areas: ConditionArea[];
   fields: ConditionFieldSpec[];
   fieldMap: Map<string, ConditionFieldSpec>;
   fieldsLoading: boolean;
+  typeLabels: Map<string, string>;
   choices: Choices;
   removable: boolean;
   onChange: (next: ConditionDraft) => void;
@@ -475,20 +468,29 @@ function ConditionRow({
 }) {
   const field = fieldMap.get(condition.field);
   const fieldOptions = fields
-    .filter((f) => f.subject === condition.subject)
+    .filter((f) => f.area === condition.area)
     .map((f) => ({ value: f.key, label: f.label }));
+  // Named while the list is short enough to read; counted once it is not, since
+  // nine document names in a hint is a wall rather than an answer.
+  const carriers = (field?.document_types ?? []).map((t) => typeLabels.get(t) ?? t);
+  const onlyOn = carriers.length === 0
+    ? ""
+    : carriers.length <= 3
+      ? `Only ${carriers.join(", ")} carry this`
+      : `Only ${carriers.length} document types carry this`;
 
   return (
     <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-2">
       <SearchSelect
-        id={`${idPrefix}-subject`}
+        id={`${idPrefix}-area`}
         label="About"
         size="sm"
         clearable={false}
-        options={SUBJECT_OPTIONS}
-        value={condition.subject}
+        loading={fieldsLoading}
+        options={areas.map((a) => ({ value: a.key, label: a.label }))}
+        value={condition.area}
         onChange={(e) =>
-          onChange({ ...resetForField(condition, undefined), subject: e.target.value as ConditionSubject })
+          onChange({ ...resetForField(condition, undefined), area: e.target.value })
         }
       />
       <SearchSelect
@@ -499,7 +501,7 @@ function ConditionRow({
         loading={fieldsLoading}
         options={fieldOptions}
         value={condition.field}
-        placeholder={condition.subject === "requester" ? "Their role, branch…" : "Amount, branch…"}
+        placeholder="Choose what to test"
         onChange={(e) => onChange(resetForField(condition, fieldMap.get(e.target.value)))}
       />
       {field && (
@@ -538,6 +540,11 @@ function ConditionRow({
             )}
           </div>
         </>
+      )}
+      {onlyOn && (
+        <p className="text-[11px] text-gray-01 sm:col-span-2" title={carriers.join(", ")}>
+          {onlyOn}, so a stage for any other document will not take this rule.
+        </p>
       )}
     </div>
   );
