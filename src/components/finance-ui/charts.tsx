@@ -358,7 +358,7 @@ export function WorkflowStrip({ steps }: { steps: { label: string; state: "done"
     done: "bg-green-01/10 text-green-01",
     current: "bg-blue-50 text-blue-700",
     rejected: "bg-destructive/10 text-destructive",
-    todo: "bg-gray-05/10 text-gray-05",
+    todo: "bg-gray-05/10 text-gray-06-text",
   };
   return (
     <div className="flex flex-wrap items-center gap-1.5">

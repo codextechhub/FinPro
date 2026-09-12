@@ -14,7 +14,7 @@ const PILL_TONES: Record<PillTone, string> = {
   green: "bg-green-01/10 text-green-01",
   amber: "bg-amber-100 text-amber-700",
   red: "bg-destructive/10 text-destructive",
-  gray: "bg-gray-05/10 text-gray-05",
+  gray: "bg-gray-05/10 text-gray-06-text",
 };
 
 const DOT_TONES: Record<PillTone, string> = {
@@ -70,7 +70,7 @@ export function GradeBadge({ grade }: { grade: string }) {
   return (
     <span className={cn(
       "inline-flex size-6 items-center justify-center rounded-full font-mont text-xs font-semibold",
-      GRADE_BADGE_TONES[grade] ?? "bg-gray-05/10 text-gray-05",
+      GRADE_BADGE_TONES[grade] ?? "bg-gray-05/10 text-gray-06-text",
     )}>
       {grade}
     </span>
