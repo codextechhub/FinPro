@@ -37,6 +37,7 @@ import type {
   StageAdvanceRule,
   StageKind,
   StageOnRejection,
+  WorkflowRoutePayload,
   WorkflowStagePayload,
 } from "@/redux/services/dashboard/workflow-types";
 import { type StageForm, emptyStage } from "./components/stage-form";
@@ -93,15 +94,6 @@ const REJECT_OPTIONS = [
   { value: "TERMINAL", label: "The request ends there" },
   { value: "RETURN_TO_REQUESTER", label: "It goes back to the requester" },
 ];
-// The lifecycle points the engine actually emits (backend NOTIF_WIRED_EVENT_KEYS).
-// An untouched template notifies for all of these; toggling any switch makes
-// the dict exact intent (unchecked = off).
-const NOTIF_EVENTS = [
-  { key: "workflow.stage_activated", label: "Stage activated - notify that stage's approvers" },
-  { key: "workflow.returned", label: "Returned for revision - notify the requester" },
-  { key: "workflow.rejected", label: "Rejected - notify the requester" },
-  { key: "workflow.final_approved", label: "Fully approved - notify the requester" },
-];
 
 /**
  * Everything a publish would send, as one comparable string.
@@ -120,21 +112,13 @@ function formSignature(form: {
   documentType: string;
   code: string;
   description: string;
-  notifEvents: Record<string, boolean>;
   stages: StageForm[];
-  routesText: string;
 }): string {
   return JSON.stringify({
     name: form.name.trim(),
     documentType: form.documentType.trim(),
     code: form.code.trim(),
     description: form.description.trim(),
-    // Key order varies with how the switches were toggled; sort so it does not
-    // read as a change.
-    notifEvents: Object.fromEntries(
-      Object.entries(form.notifEvents).sort(([a], [b]) => a.localeCompare(b)),
-    ),
-    routesText: form.routesText.trim(),
     stages: form.stages.map((s) => ({
       code: s.code.trim(),
       label: s.label.trim(),
@@ -380,7 +364,11 @@ export default function TemplateBuilder() {
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [stages, setStages] = useState<StageForm[]>([emptyStage()]);
-  const [routesText, setRoutesText] = useState("");
+  // Both are loaded and published back untouched. Routing is the order of the
+  // steps, and who hears about a request is a school-wide setting rather than a
+  // decision to retake on every template - but a value already stored must not
+  // be wiped by a screen that no longer shows it.
+  const [routes, setRoutes] = useState<WorkflowRoutePayload[]>([]);
   const [notifEvents, setNotifEvents] = useState<Record<string, boolean>>({});
   const [prefilled, setPrefilled] = useState(false);
   // The form as it was last saved (or as it started, when creating).
@@ -448,28 +436,20 @@ export default function TemplateBuilder() {
             : "",
         })),
     );
-    setRoutesText(
-      existing.routes.length
-        ? JSON.stringify(
-            [...existing.routes]
-              .sort((a, b) => a.order - b.order)
-              .map((r) => ({
-                from_stage_code: r.from_stage_code,
-                to_stage_code: r.to_stage_code,
-                order: r.order,
-                condition: r.condition,
-              })),
-            null,
-            2,
-          )
-        : "",
+    setRoutes(
+      [...existing.routes]
+        .sort((a, b) => a.order - b.order)
+        .map((r) => ({
+          from_stage_code: r.from_stage_code,
+          to_stage_code: r.to_stage_code,
+          order: r.order,
+          condition: r.condition,
+        })),
     );
     setPrefilled(true);
   }, [isEdit, existing, prefilled]);
 
-  const signature = formSignature({
-    name, documentType, code, description, notifEvents, stages, routesText,
-  });
+  const signature = formSignature({ name, documentType, code, description, stages });
   // Creating starts from the empty form, so the first keystroke arms the button;
   // editing starts from what was loaded.
   useEffect(() => {
@@ -585,18 +565,6 @@ export default function TemplateBuilder() {
         inclusion_condition: inclusion,
       });
     }
-    // Parse advanced routes JSON.
-    let routes = [];
-    if (routesText.trim()) {
-      try {
-        routes = JSON.parse(routesText);
-        if (!Array.isArray(routes)) throw new Error("not array");
-      } catch {
-        toast.error("Routes must be a valid JSON array.");
-        return;
-      }
-    }
-
     const payload: PublishTemplatePayload = {
       scope: editingShared ? "PLATFORM" : "TENANT",
       name: name.trim(),
@@ -794,35 +762,40 @@ export default function TemplateBuilder() {
           </div>
         </Section>
 
-        {/* Notifications */}
-        <Section title="Notification events">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {NOTIF_EVENTS.map(({ key, label }) => (
-              <label key={key} className="flex items-center justify-between gap-2 rounded-md border border-white-02 px-3 py-2 text-xs">
-                <span className="text-gray-01">{label}</span>
-                <Switch
-                  checked={!!notifEvents[key]}
-                  onCheckedChange={(v) => setNotifEvents((prev) => ({ ...prev, [key]: v }))}
-                />
-              </label>
+        {/* How the path runs. The order of the steps is the routing, so this
+            reads it back rather than asking for it a second time. */}
+        <Section title="How this path runs">
+          <ol className="space-y-2">
+            {stages.map((s, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs">
+                <span className="grid size-5 shrink-0 place-content-center rounded bg-pry-01 text-[11px] font-semibold text-primary tabular-nums">
+                  {i + 1}
+                </span>
+                <span className="min-w-0">
+                  <span className="text-black-01">{s.label.trim() || `Step ${i + 1}`}</span>
+                  {s.kind === "BRANCH" && <span className="text-gray-01"> · routing only</span>}
+                  {s.inclusion_condition_text.trim() && (
+                    <span className="text-gray-01"> · runs only in some cases</span>
+                  )}
+                </span>
+              </li>
             ))}
-          </div>
-        </Section>
-
-        {/* Advanced routes */}
-        <Section title="Routing (advanced)">
-          <p className="mb-2 text-xs text-gray-01">
-            Leave blank for linear routing (stages run in order). Otherwise provide a JSON array of
-            routes: <code className="font-mono">{`{ from_stage_code, to_stage_code, order, condition }`}</code>.
-            Use <code className="font-mono">null</code> for ENTRY/EXIT or an always-true condition.
+            <li className="flex items-start gap-2 text-xs">
+              <span className="grid size-5 shrink-0 place-content-center rounded bg-gray-03 text-[11px] text-gray-01">
+                ✓
+              </span>
+              <span className="text-gray-01">Approved</span>
+            </li>
+          </ol>
+          <p className="mt-3 text-xs text-gray-01">
+            Steps run top to bottom. Move one with the arrows beside it to change the order.
           </p>
-          <Textarea
-            rows={6}
-            className="font-mono text-xs"
-            placeholder={`[\n  { "from_stage_code": null, "to_stage_code": "line-manager", "order": 1, "condition": null }\n]`}
-            value={routesText}
-            onChange={(e) => setRoutesText(e.target.value)}
-          />
+          {routes.length > 0 && (
+            <p className="mt-2 rounded-md border border-white-02 bg-pry-01/40 px-3 py-2 text-xs text-gray-01">
+              This path also carries routing rules set outside this screen, and those decide
+              the order instead. They are published back exactly as they are.
+            </p>
+          )}
         </Section>
 
           </aside>
