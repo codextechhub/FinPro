@@ -103,11 +103,20 @@ function pairCollapsed(rows: WorkflowTemplate[]): TemplateVersions[] {
   );
 }
 
-/** The one-line answer to "which version is this school running?". */
-export function versionLabel(v: TemplateVersions, isPlatformTenant: boolean): string {
-  // "Your own" would be ambiguous for Codex, whose own tenant templates are
-  // exactly the ones no school inherits.
-  if (isPlatformTenant) return v.isAdjusted ? "Codex-only" : "Shared with every school";
-  if (!v.isAdjusted) return "Codex version";
-  return v.platformMovedOn ? "Yours · Codex updated theirs" : "Yours";
+/** The one-line answer to "which version is this school running?".
+ *
+ * `platform` is what the reading product calls the body that publishes shared
+ * paths, which differs between the two: staff read the company's name, a school
+ * reads the product's. It arrives as an argument rather than through the host
+ * contract so this file stays JSX-free and testable on its own. */
+export function versionLabel(
+  v: TemplateVersions,
+  isPlatformTenant: boolean,
+  platform: string,
+): string {
+  // "Your own" would be ambiguous for the platform tenant, whose own tenant
+  // templates are exactly the ones no school inherits.
+  if (isPlatformTenant) return v.isAdjusted ? `${platform}-only` : "Shared with every school";
+  if (!v.isAdjusted) return `${platform} version`;
+  return v.platformMovedOn ? `Yours · ${platform} updated theirs` : "Yours";
 }

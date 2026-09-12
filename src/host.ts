@@ -213,6 +213,15 @@ export interface HostContract {
    *  needs it, because adjusting a template is what that key is for; this says
    *  the *product* has no create story here, which no permission can express. */
   createsWorkflowTemplates: boolean;
+  /** What this application calls the party that publishes shared templates.
+   *
+   *  The two products use different names for the same body. Staff know it as
+   *  CodeX, the company; a school knows only the product, XVS. "This school
+   *  runs the CodeX version" is correct in the console and wrong in front of a
+   *  school, which has no reason to learn the company's name to read a sentence
+   *  about its own approval path. The name therefore comes from the host rather
+   *  than being written into shared copy. */
+  platformName: string;
   /** The application's own logo. */
   AppLogo: ComponentType<{ animate?: boolean; className?: string }>;
   /** An extra section on Setup -> Entities, below the caller's own books.
@@ -241,4 +250,5 @@ export const {
   useBranches, useDirectory, useRoles, usePositions, AppLogo, QuickExportButton, UserAvatar,
   useDashboardTitle, PlatformLedgerInventory, useLogRecentOpen,
   financeSettingsSections, setupSections, FeeDuePolicyPanel, createsWorkflowTemplates,
+  platformName,
 } = host;

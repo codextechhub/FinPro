@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import PermissionGate from "@/components/custom/permission-gate";
 import { P } from "@/permissions";
+import { platformName } from "@xvs/finance/host";
 import { routesPath } from "../paths";
 import { formatRelativeDate } from "@/utils/helpers";
 import { useAppSelector } from "@/redux/store";
@@ -74,14 +75,14 @@ export default function TemplateDetail() {
     switchToPlatformVersion(template.id)
       .unwrap()
       .then((platform) => {
-        toast.success("Back on the Codex version.");
+        toast.success(`Back on the ${platformName} version.`);
         setResetOpen(false);
         navigate(routesPath.PROTECTED.WORKFLOW.TEMPLATE_DETAIL(platform.id));
       })
       .catch((err) => {
         const message =
           (err as { data?: { message?: string } })?.data?.message ??
-          "Could not switch back to the Codex version.";
+          `Could not switch back to the ${platformName} version.`;
         toast.error(message);
       });
   };
@@ -115,16 +116,16 @@ export default function TemplateDetail() {
                     {template.is_platform
                       ? isPlatformTenant
                         ? "Shared with every school"
-                        : "Codex version"
+                        : `${platformName} version`
                       : isPlatformTenant
-                        ? "Codex-only"
+                        ? `${platformName}-only`
                         : "This school's version"}
                   </Badge>
                 </p>
                 {isPlatformTenant && !template.is_platform && (
                   <div className="mt-2 max-w-2xl">
                     <FieldHint title="Why doesn't any school get this one?">
-                      This one belongs to Codex alone - no school inherits it. To give every
+                      This one belongs to {platformName} alone - no school inherits it. To give every
                       school this path, publish it with the same document type and code from a
                       new template, which writes the shared version.
                     </FieldHint>
@@ -138,7 +139,7 @@ export default function TemplateDetail() {
                 <div className="flex flex-wrap items-center gap-2">
                   {!template.is_platform && !isPlatformTenant && (
                     <Button variant="outline" onClick={() => setResetOpen(true)}>
-                      <Undo2 className="size-4" /> Use Codex's version
+                      <Undo2 className="size-4" /> Use {platformName}'s version
                     </Button>
                   )}
                   <Button
@@ -153,8 +154,9 @@ export default function TemplateDetail() {
 
             {!isPlatformTenant && template.is_platform && (
               <p className="rounded-md border border-white-02 bg-pry-01/40 px-4 py-3 text-xs text-gray-01">
-                This is the Codex version, and this school runs it as published. Adjust it and
-                this school runs your version from then on, while Codex keeps theirs.
+                This is the {platformName} version, and this school runs it as published. Adjust
+                it and this school runs your version from then on, while {platformName} keeps
+                theirs.
               </p>
             )}
             {!isPlatformTenant && !template.is_platform && (
@@ -162,16 +164,16 @@ export default function TemplateDetail() {
                 This school runs its own version of this approval path.{" "}
                 {versions?.platformMovedOn ? (
                   <>
-                    Codex changed theirs{" "}
+                    {platformName} changed theirs{" "}
                     {template.platform_updated_at
                       ? formatRelativeDate(template.platform_updated_at)
                       : "recently"}
-                    . Nothing changed here on its own - "Use Codex's version" switches to their
-                    current one.
+                    . Nothing changed here on its own - "Use {platformName}'s version" switches
+                    to their current one.
                   </>
                 ) : (
-                  <>"Use Codex's version" puts this school back on whatever Codex has at that
-                    moment.</>
+                  <>"Use {platformName}'s version" puts this school back on whatever{" "}
+                    {platformName} has at that moment.</>
                 )}
               </p>
             )}
@@ -312,9 +314,9 @@ export default function TemplateDetail() {
       <Dialog open={resetOpen} onOpenChange={(v) => !v && setResetOpen(false)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Use Codex's version?</DialogTitle>
+            <DialogTitle>Use {platformName}'s version?</DialogTitle>
             <DialogDescription>
-              This school goes back to the Codex version as it stands today, and your
+              This school goes back to the {platformName} version as it stands today, and your
               adjustments stop being used. Approvals already running keep the path they
               started on. You can adjust it again at any time.
             </DialogDescription>
@@ -324,7 +326,7 @@ export default function TemplateDetail() {
               Keep ours
             </Button>
             <Button onClick={doReset} disabled={isResetting}>
-              {isResetting ? "Switching…" : "Use Codex's version"}
+              {isResetting ? "Switching…" : `Use ${platformName}'s version`}
             </Button>
           </DialogFooter>
         </DialogContent>

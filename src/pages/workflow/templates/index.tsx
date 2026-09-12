@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createsWorkflowTemplates } from "@xvs/finance/host";
+import { createsWorkflowTemplates, platformName } from "@xvs/finance/host";
 import { useNavigate } from "react-router";
 import { Info, Plus, RefreshCw } from "lucide-react";
 import CustomTable from "@/components/custom/custom-table";
@@ -51,7 +51,7 @@ export default function WorkflowTemplates() {
         running: (
           <span className="inline-flex items-center gap-1.5">
             <Badge variant={v.isAdjusted ? "pending" : "outline"}>
-              {versionLabel(v, isPlatformTenant)}
+              {versionLabel(v, isPlatformTenant, platformName)}
             </Badge>
           </span>
         ),
@@ -73,7 +73,7 @@ export default function WorkflowTemplates() {
             <p className="text-xs text-gray-01 mt-0.5">
               {isPlatformTenant
                 ? "The approval paths every school starts on. Editing one here changes it for every school still running it."
-                : "Your approval paths. Each starts as the Codex version; adjust one and this school runs your version from then on."}
+                : `Your approval paths. Each starts as the ${platformName} version; adjust one and this school runs your version from then on.`}
             </p>
           </div>
           {/* Two different questions. The host says whether this product
@@ -106,12 +106,12 @@ export default function WorkflowTemplates() {
           <div className="flex items-start gap-2.5 rounded-md border border-white-02 bg-pry-01/40 px-4 py-3 text-xs text-gray-01">
             <Info className="mt-0.5 size-4 shrink-0 text-primary" />
             <p>
-              Codex has updated its version of{" "}
+              {platformName} has updated its version of{" "}
               <span className="font-medium text-black-01">
                 {versions.filter((v) => v.platformMovedOn).map((v) => v.running.name).join(", ")}
               </span>{" "}
               since you adjusted yours. Nothing changes on its own - open the template and
-              use Codex's version if you want their current one.
+              use {platformName}'s version if you want their current one.
             </p>
           </div>
         )}

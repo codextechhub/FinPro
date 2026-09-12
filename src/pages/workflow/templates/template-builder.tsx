@@ -22,7 +22,7 @@ import {
 } from "@/redux/services/dashboard/workflow-api";
 import { useGetPositionsQuery } from "@/redux/services/workflow/organogram-api";
 import { useGetTeamMembersQuery } from "@/redux/services/workflow/team-mgt-api";
-import { createsWorkflowTemplates, useBranches, useDirectory, useRoles } from "@xvs/finance/host";
+import { createsWorkflowTemplates, platformName, useBranches, useDirectory, useRoles } from "@xvs/finance/host";
 import {
   type ConditionCatalogue,
   type ConditionChoices,
@@ -766,9 +766,9 @@ export default function TemplateBuilder() {
             )}
             {willFork && (
               <p className="rounded-md border border-white-02 bg-pry-01/40 px-3 py-2 text-xs text-gray-01">
-                This is the Codex version. Saving keeps theirs as it is and gives this school
-                its own version of this path, which it runs from then on. You can go back to
-                Codex's version at any time from the template page.
+                This is the {platformName} version. Saving keeps theirs as it is and gives this
+                school its own version of this path, which it runs from then on. You can go back
+                to {platformName}'s version at any time from the template page.
               </p>
             )}
             {editingShared && (
