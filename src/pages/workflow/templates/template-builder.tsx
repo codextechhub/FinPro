@@ -20,9 +20,7 @@ import {
   useGetWorkflowTemplateQuery,
   usePublishWorkflowTemplateMutation,
 } from "@/redux/services/dashboard/workflow-api";
-import { useGetPositionsQuery } from "@/redux/services/workflow/organogram-api";
-import { useGetTeamMembersQuery } from "@/redux/services/workflow/team-mgt-api";
-import { createsWorkflowTemplates, platformName, useBranches, useDirectory, useRoles } from "@xvs/finance/host";
+import { createsWorkflowTemplates, platformName, useBranches, useDirectory, usePositions, useRoles } from "@xvs/finance/host";
 import {
   type ConditionCatalogue,
   type ConditionChoices,
@@ -284,19 +282,14 @@ export default function TemplateBuilder() {
   const self = useAppSelector((s) => s.auth.user);
   const { hasPermission } = usePermissions();
 
-  // Two of the builder's pickers read data this user may not be allowed to see,
-  // and asking anyway produced three red permission toasts and an empty select.
-  // Ask only when the answer can come back, and say what is missing otherwise.
+  // An organogram-sourced stage resolves its approver by climbing a reporting
+  // line, and that chart belongs to the platform: its endpoint answers to
+  // platform staff alone, so a school administrator can never resolve such a
+  // stage and is not offered the source. The seats themselves arrive through the
+  // host, which answers with an empty list in an app that keeps no organogram.
   //
-  // The staff directory carries emails, so it is not something template
-  // management should drag in; the preview works against yourself without it.
-  const canSeeDirectory = hasPermission(P.ACCESS_TEAM_PANEL);
-  // Organogram seats are Codex's own org chart, and that endpoint is CX-staff
-  // only by design - a school admin can never resolve one, so offering the
-  // source at all would be offering something that cannot work for them.
-  // An organogram-sourced stage resolves its approver from the reporting line, and
-  // building one needs the positions list. So the gate is "can this person read the
-  // organogram", which is the permission that read is enforced on.
+  // The gate is "can this person read the organogram", the permission that read
+  // is enforced on.
   //
   // Was `self.user_type === "CX_STAFF"` - a field the API does not return, so it
   // was always false and ORGANOGRAM never appeared in the picker for anyone. The
@@ -325,16 +318,8 @@ export default function TemplateBuilder() {
   const canEditDetails = createsWorkflowTemplates;
   const [publish, { isLoading: isPublishing }] = usePublishWorkflowTemplateMutation();
 
-  // Organogram approver-source support: positions for SPECIFIC_POSITION, and a
-  // sample requester so the "who would approve?" preview can resolve live.
-  const { data: positionsRes } = useGetPositionsQuery(
-    { page_size: 100 },
-    { skip: !canUseOrganogram },
-  );
-  const { data: usersRes } = useGetTeamMembersQuery(
-    { page_size: 100, scope: "platform" },
-    { skip: !canSeeDirectory },
-  );
+  // The seats a SPECIFIC_POSITION stage can name.
+  const { data: positions } = usePositions();
   // Roles and approver groups are what stages now name; both are picked from a
   // list rather than typed, so a stage cannot reference something that is not
   // there (the publish endpoint refuses that anyway - this just gets there first).
@@ -355,12 +340,8 @@ export default function TemplateBuilder() {
     [groupsRes],
   );
   const positionOptions = useMemo(
-    () => (Array.isArray(positionsRes?.data) ? positionsRes!.data : []).map((p) => ({ value: p.code, label: `${p.code} · ${p.title}` })),
-    [positionsRes],
-  );
-  const requesterOptions = useMemo(
-    () => (Array.isArray(usersRes?.data) ? usersRes!.data : []).map((u: { id: string; full_name: string; email: string }) => ({ value: u.id, label: `${u.full_name} · ${u.email}` })),
-    [usersRes],
+    () => (positions ?? []).map((p) => ({ value: p.code, label: `${p.code} · ${p.title}` })),
+    [positions],
   );
   // The preview runs as the signed-in user unless an organogram stage asks to
   // climb from somebody else, which is the only case where the answer moves.
@@ -1099,13 +1080,10 @@ export default function TemplateBuilder() {
                       documentType={docType}
                       hasAmount={hasAmount}
                       requesterOptions={
-                        s.approver_source === "ORGANOGRAM"
-                          ? canSeeDirectory
-                            ? requesterOptions
-                            : undefined
-                          : s.approver_source === "DYNAMIC_ROLE" && directoryOptions.length
-                            ? directoryOptions
-                            : undefined
+                        (s.approver_source === "ORGANOGRAM" ||
+                          s.approver_source === "DYNAMIC_ROLE") && directoryOptions.length
+                          ? directoryOptions
+                          : undefined
                       }
                       onRequesterChange={setSampleRequester}
                       sampleAmount={s.sample_amount}
