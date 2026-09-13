@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+
 import { useActionParam } from "@/hooks/use-action-param";
 import {
   AlertTriangle, Check, ChevronRight, CircleDollarSign, Clock3, FilePenLine,
@@ -54,7 +54,7 @@ import { InvoiceVarianceOverrideAction } from "./procurement-action-gates";
 import { blockingMatchReason, isBlockingInvoiceVariance } from "./invoice-action-model";
 import { ActivityFeed } from "./activity-feed";
 import { DocumentAttachments } from "./document-attachments";
-import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
+import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 
 const TABS = [
@@ -99,10 +99,9 @@ export default function VendorInvoicesPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [searchParams] = useSearchParams();
-  const [selectedId, setSelectedId] = useState<number | null>(() => (
-    sourceDocumentIdFromParams(searchParams)
-  ));
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // A link from an approval names the record to open; it opens here.
+  useSourceDocumentParam(setSelectedId);
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
   useActionParam("new", can(P.PROC_CREATE_VENDOR_INVOICE), () => setCreating(true));

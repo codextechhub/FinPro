@@ -4,7 +4,7 @@ import {
   CheckCircle2, ChevronRight, Clock3, FilePenLine, FileText, Info, Mail, PackageCheck,
   Plus, Printer, ReceiptText, Search, Send, ShoppingCart,
 } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
@@ -37,7 +37,7 @@ import type { PurchaseOrder, PurchaseOrderEmailDelivery } from "@/redux/services
 import { useGetWorkflowInstanceQuery } from "@/redux/services/dashboard/workflow-api";
 import { formatMoney } from "@/utils/money";
 import { formatQuantity } from "@/utils/quantity";
-import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
+import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 
 const STATUS_TABS = [
@@ -93,10 +93,9 @@ export default function PurchaseOrdersPage() {
   // carry procurement.purchase_order.view with it, and without this the screen
   // opened on a pair of 403s and a red toast.
   const canPROC_VIEW_PURCHASE_ORDERS = useCan().can(P.PROC_VIEW_PURCHASE_ORDERS);
-  const [searchParams] = useSearchParams();
-  const [selectedId, setSelectedId] = useState<number | null>(() => (
-    sourceDocumentIdFromParams(searchParams)
-  ));
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // A link from an approval names the record to open; it opens here.
+  useSourceDocumentParam(setSelectedId);
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
   useActionParam("new", can(P.PROC_CREATE_PURCHASE_ORDER), () => setCreating(true));

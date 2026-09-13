@@ -5,7 +5,7 @@ import {
   Check, ChevronRight, Clock3, FilePenLine, FileText, Plus,
   RotateCcw, Search, Send, Trash2, TrendingDown, TrendingUp, X,
 } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
@@ -44,7 +44,7 @@ import { useGetCostCentersQuery } from "@/redux/services/finance/setup-api";
 import { routesPath } from "@/routes/routes-path";
 import { formatMoney } from "@/utils/money";
 import { formatQuantity } from "@/utils/quantity";
-import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
+import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 
 const STATUS_TABS = [
@@ -88,10 +88,9 @@ export default function RequisitionsPage() {
   // carry procurement.requisition.view with it, and without this the screen
   // opened on a pair of 403s and a red toast.
   const canPROC_VIEW_REQUISITIONS = useCan().can(P.PROC_VIEW_REQUISITIONS);
-  const [searchParams] = useSearchParams();
-  const [selectedId, setSelectedId] = useState<number | null>(() => (
-    sourceDocumentIdFromParams(searchParams)
-  ));
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // A link from an approval names the record to open; it opens here.
+  useSourceDocumentParam(setSelectedId);
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
   useActionParam("new", can(P.PROC_CREATE_REQUISITION), () => setCreating(true));
