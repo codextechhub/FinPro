@@ -196,17 +196,22 @@ export default function ApprovalDetail() {
             </Button>
           </CenterState>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
-            {/* Left: document panel */}
-            <div data-guide="approval-detail.document" className="space-y-5 min-w-0">
-              <DocumentPanel instance={instance} name={name} initials={initials} role={role} />
-              <Section title="Activity">
-                <AuditTimeline logs={instance.audit_logs} name={name} />
-              </Section>
-            </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+            <>
+              <div data-guide="approval-detail.document" className="min-w-0 space-y-5 lg:col-start-1 lg:row-start-1">
+                <DocumentPanel instance={instance} name={name} initials={initials} role={role} />
+              </div>
+              <div className="order-3 min-w-0 lg:order-none lg:col-start-1 lg:row-start-2">
+                <Section title="Activity">
+                  <AuditTimeline logs={instance.audit_logs} name={name} />
+                </Section>
+              </div>
+            </>
 
-            {/* Right: workflow + decision */}
-            <aside data-guide="approval-detail.workflow" className="space-y-5">
+            <aside
+              data-guide="approval-detail.workflow"
+              className="order-2 space-y-5 lg:sticky lg:top-5 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start"
+            >
               <div className="rounded-lg border border-white-02 bg-white p-5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold">Workflow</h3>

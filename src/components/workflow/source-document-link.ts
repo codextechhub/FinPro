@@ -67,25 +67,33 @@ export function sourceDocumentPrompt(status: WorkflowInstanceStatus) {
   return SOURCE_DOCUMENT_PROMPTS[status];
 }
 
-function currentScopedLink(link: string | undefined, route: string): string | null {
+function safeInternalLink(link: string | undefined): string | null {
   if (!link?.startsWith("/")) return null;
   const parsed = new URL(link, "http://console.local");
-  if (parsed.origin !== "http://console.local" || parsed.pathname !== route) return null;
+  if (parsed.origin !== "http://console.local") return null;
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
+function currentScopedLink(link: string | null, route: string): string | null {
+  if (!link) return null;
+  const parsed = new URL(link, "http://console.local");
+  if (parsed.pathname !== route) return null;
   if (!parsed.searchParams.get("entity")) return null;
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 
 /**
- * Resolve the console route for a workflow's source document.
- *
- * Some handlers historically omitted links or stored API-shaped paths in the
- * workflow snapshot. Known document types are resolved from the frontend route
- * contract so existing snapshots are repaired as well as new approvals.
+ * Resolve a safe internal route for a workflow's source document.
+ * Known types use an entity-scoped handler link when it matches the route
+ * contract, then reconstruct the route from the frozen document identity.
  */
 export function sourceDocumentLink(instance: WorkflowInstanceDetail): string | null {
   const config = SOURCE_DOCUMENT_ROUTES[instance.document_type];
+  const providedLink = safeInternalLink(
+    instance.source_document_link || instance.document_summary?.link,
+  );
   if (config) {
-    const scopedLink = currentScopedLink(instance.document_summary?.link, config.route);
+    const scopedLink = currentScopedLink(providedLink, config.route);
     if (scopedLink) return scopedLink;
 
     if (config.lookup === "id") {
@@ -98,5 +106,5 @@ export function sourceDocumentLink(instance: WorkflowInstanceDetail): string | n
     return reference ? `${config.route}?search=${encodeURIComponent(reference)}` : config.route;
   }
 
-  return instance.document_summary?.link || null;
+  return providedLink || null;
 }

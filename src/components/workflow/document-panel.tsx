@@ -1,17 +1,18 @@
-import { FileText, Info, ExternalLink } from "lucide-react";
+import { FileText, Info } from "lucide-react";
 import { formatDate, formatRelativeDate } from "@/utils/relative-date";
 import type { WorkflowInstanceDetail } from "@/redux/services/dashboard/workflow-types";
-import { Button } from "@/components/ui/button";
 import { humanizeDocumentType } from "./workflow-format";
 import { InstanceStatusBadge, UserChip } from "./workflow-ui";
 import { sourceDocumentLink, sourceDocumentPrompt } from "./source-document-link";
+import { DocumentDetailsPanel } from "./document-details";
 
 type Resolver = (id?: string | number | null) => string;
 
 /**
  * Document panel shared by every instance detail view (approver / requester /
- * admin). Renders the document header + a "Summary" field grid populated from
- * the handler-provided `document_summary`, falling back to a note when none.
+ * admin). Keeps identity in the concise summary and renders the document
+ * type's frozen decision layout immediately below it. Source navigation stays
+ * available as a smaller secondary action.
  */
 export function DocumentPanel({
   instance,
@@ -98,23 +99,6 @@ export function DocumentPanel({
             )}
           </div>
 
-          {documentLink && (
-            <div
-              data-guide="approval-detail.view-document"
-              className="mt-5 flex flex-col gap-3 rounded-lg border border-primary/20 bg-pry-01 p-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-black-01">{documentPrompt.title}</p>
-                <p className="mt-0.5 text-xs text-gray-01">{documentPrompt.description}</p>
-              </div>
-              <Button asChild className="w-full sm:w-auto">
-                <a href={documentLink}>
-                  View full document <ExternalLink className="size-4" />
-                </a>
-              </Button>
-            </div>
-          )}
-
           {!summary?.fields?.length && !summary?.title && (
             <p className="mt-4 rounded-md border border-white-02 bg-gray-50 px-3 py-2 text-[11px] text-gray-01">
               Document content lives in the originating module - this view tracks the approval workflow only.
@@ -122,6 +106,12 @@ export function DocumentPanel({
           )}
         </div>
       </div>
+
+      <DocumentDetailsPanel
+        details={instance.document_details}
+        documentLink={documentLink}
+        documentPrompt={documentPrompt}
+      />
     </>
   );
 }
