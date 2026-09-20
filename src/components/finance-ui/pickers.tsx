@@ -7,6 +7,7 @@
 
 import { SearchSelect } from "@/components/custom/search-select";
 import { useGetAccountsQuery, useGetChartOfAccountsQuery, useGetCurrenciesQuery, useGetTaxCodesQuery, useGetCostCentersQuery } from "@/redux/services/finance/setup-api";
+import { selectableCostCenters } from "./cost-center-usage";
 import { useGetTaxObligationsQuery, useGetPettyCashFundsQuery, useGetBankAccountsQuery } from "@/redux/services/finance/ops-api";
 import { useGetCustomersQuery } from "@/redux/services/finance/ar-api";
 import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
@@ -79,7 +80,10 @@ export function TaxCodePicker({ entity, value, onChange, label, placeholder = "N
 
 export function CostCenterPicker({ entity, value, onChange, label, placeholder = "None", isRequired, disabled }: PickerProps) {
   const { data, isLoading } = useGetCostCentersQuery({ entity });
-  const options = toArray(data?.data).map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }));
+  const options = selectableCostCenters(toArray(data?.data), value).map((c) => ({
+    value: c.code,
+    label: `${c.code} - ${c.name}${c.is_active ? "" : " (Inactive)"}`,
+  }));
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} />;
 }
 

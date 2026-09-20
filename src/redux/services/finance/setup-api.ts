@@ -133,7 +133,7 @@ export const setupApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/cost-centers/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceSetup"],
     }),
-    createCostCenter: b.mutation<ApiEnvelope<CostCenter>, { entity: string; code: string; name: string; parent?: string }>({
+    createCostCenter: b.mutation<ApiEnvelope<CostCenter>, { entity: string; code: string; name: string; parent?: string; is_active?: boolean }>({
       query: ({ entity, ...body }) => ({ url: `/finance/cost-centers/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceSetup"],
     }),
