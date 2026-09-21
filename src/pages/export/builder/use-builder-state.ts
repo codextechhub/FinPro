@@ -52,12 +52,21 @@ export const emptyBuilderState: BuilderState = {
   fileNamePattern: "export-{date}",
 };
 
-/** Defaults the catalogue declares for a freshly picked dataset. */
+/**
+ * Defaults the catalogue declares for a freshly picked dataset.
+ *
+ * The catalogue leaves out every column this user may not take, whether Field
+ * Access hides it or the sensitive-export permission is missing, but its
+ * `default_columns` is the dataset's own list. A default the picker does not
+ * offer is dropped here, so a new export never starts with a column the user
+ * cannot see and the run never reports it as withdrawn access.
+ */
 export function defaultsForDataset(dataset: Dataset): Partial<BuilderState> {
   const format = (dataset.supported_formats.includes("xlsx") ? "xlsx" : dataset.supported_formats[0]) as ExportFormat;
   const schema = dataset.format_options?.[format] ?? {};
+  const offered = new Set(dataset.fields.map((field) => field.id));
   return {
-    columns: [...dataset.default_columns],
+    columns: dataset.default_columns.filter((id) => offered.has(id)),
     // Required filters start present but unset, so the builder shows the person
     // what they must fill in rather than letting them discover it at submit.
     filters: dataset.required_filters.map((id) => ({ id })),

@@ -1,14 +1,13 @@
 // Payments at scale (§7.6) - single payouts, payout batches (submit), and
-// settlement reconciliation (gateway vs bank). Beneficiary details are
-// FLS-masked unless payments.payout.view_sensitive.
+// settlement reconciliation (gateway vs bank). Beneficiary columns follow Field
+// Access on payments.payout: a hidden field has no column at all.
 import { useState } from "react";
 import { useParams } from "react-router";
 import { toast } from "sonner";
 import { ProcurementShell } from "./procurement-shell";
-import { DataTable, Money, StatusPill, ActionButton, toArray, useActiveEntity, type Column } from "@/components/finance-ui";
+import { DataTable, Money, StatusPill, ActionButton, toArray, useActiveEntity, useFieldAccess, type Column } from "@/components/finance-ui";
 import { EmptyState, LoadingState } from "@/components/finance-ui/states";
 import { P } from "../../permissions";
-import { isStripped } from "@/utils/fls";
 import {
   useGetPayoutsQuery, useGetPayoutBatchesQuery, useSubmitPayoutBatchMutation, useGetSettlementReconciliationQuery,
   useGetTransactionsLogQuery,
@@ -23,10 +22,11 @@ function PayoutsTab({ entity, currency }: { entity: string; currency?: string | 
   const { data, isLoading, isFetching, isError, refetch } = useGetPayoutsQuery({ entity, page });
   const rows = data?.data ?? [];
   const pg = data?.pagination;
+  const access = useFieldAccess("payments.payout");
   const columns: Column<PayoutInstruction>[] = [
     { header: "Reference", cell: (p) => <span className="font-semibold">{p.reference}</span> },
-    { header: "Beneficiary", cell: (p) => isStripped(p, "beneficiary_name") ? <span className="text-gray-05">••••</span> : p.beneficiary_name || "-" },
-    { header: "Account", cell: (p) => isStripped(p, "beneficiary_account_number") ? <span className="text-gray-05">••••</span> : p.beneficiary_account_number || "-" },
+    ...(access.isHidden("beneficiary_name") ? [] : [{ header: "Beneficiary", cell: (p: PayoutInstruction) => p.beneficiary_name || "-" }]),
+    ...(access.isHidden("beneficiary_account_number") ? [] : [{ header: "Account", cell: (p: PayoutInstruction) => p.beneficiary_account_number || "-" }]),
     { header: "Amount", align: "right", cell: (p) => <Money kobo={p.amount} currency={currency} align="right" /> },
     { header: "Status", cell: (p) => <StatusPill status={p.status} /> },
   ];

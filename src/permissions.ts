@@ -170,7 +170,6 @@ export const P = {
   PROC_VIEW_SETTINGS: "701601",
   PROC_VIEW_STOCK: "701301",
   PROC_VIEW_VENDOR_INVOICES: "701001",
-  PROC_VIEW_VENDOR_SENSITIVE: "700239",
   VIEW_AUDIT: "101801",  // view audit events and entity trails
   VIEW_WORKFLOW_TEMPLATES: "600101",  // browse approval workflow templates
 } as const;
@@ -274,7 +273,6 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "700202": "procurement.vendor.create",
   "700203": "procurement.vendor.update",
   "700208": "procurement.vendor.manage",
-  "700239": "procurement.vendor.view_sensitive",
   "700302": "procurement.catalog_item.create",
   "700303": "procurement.catalog_item.update",
   "700401": "procurement.contract.view",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Vendor } from "@/redux/services/procurement/procurement-types";
+import { resolveFieldAccess } from "../../../components/finance-ui/field-access";
 import {
   buildVendorUpdatePayload,
   type VendorFormValues,
@@ -52,12 +53,19 @@ const values: VendorFormValues = {
   active: vendor.is_active,
 };
 
+const VENDOR = "procurement.vendor";
+const SENSITIVE = ["email", "phone", "address", "tax_id", "bank_name", "bank_account_number", "bank_account_name"];
+/** A role that may read the vendor's contact and banking fields but change none of them. */
+const readOnly = resolveFieldAccess({}, VENDOR, { ...vendor, _read_only_fields: SENSITIVE });
+/** A role with full access: nothing restricted on the record. */
+const open = resolveFieldAccess({}, VENDOR, { ...vendor, _read_only_fields: [] });
+
 describe("buildVendorUpdatePayload", () => {
   it("sends only an ordinary user's dirty non-governance fields", () => {
     const payload = buildVendorUpdatePayload(
       vendor,
       { ...values, name: "Acme Office Supplies", risk: "HIGH", onHold: true },
-      { canSensitive: false, canManage: false },
+      { fields: readOnly, canManage: false },
     );
 
     expect(payload).toEqual({ name: "Acme Office Supplies" });
@@ -70,22 +78,22 @@ describe("buildVendorUpdatePayload", () => {
     const payload = buildVendorUpdatePayload(
       vendor,
       { ...values, risk: "HIGH" },
-      { canSensitive: false, canManage: true },
+      { fields: readOnly, canManage: true },
     );
 
     expect(payload).toEqual({ risk: "HIGH" });
   });
 
-  it("does not leak dirty sensitive fields without sensitive access", () => {
+  it("never sends a dirty field the user may not change", () => {
     const hidden = buildVendorUpdatePayload(
       vendor,
       { ...values, bankNumber: "9999999999" },
-      { canSensitive: false, canManage: false },
+      { fields: readOnly, canManage: false },
     );
     const allowed = buildVendorUpdatePayload(
       vendor,
       { ...values, bankNumber: "9999999999" },
-      { canSensitive: true, canManage: false },
+      { fields: open, canManage: false },
     );
 
     expect(hidden).toEqual({});
@@ -96,7 +104,21 @@ describe("buildVendorUpdatePayload", () => {
     expect(buildVendorUpdatePayload(
       vendor,
       { ...values, active: false },
-      { canSensitive: false, canManage: false },
+      { fields: readOnly, canManage: false },
     )).toEqual({ is_active: false });
+  });
+
+  it("never sends a field the user cannot see", () => {
+    const { bank_account_number: _hidden, ...withoutNumber } = vendor;
+    void _hidden;
+    const fields = resolveFieldAccess(
+      { [VENDOR]: { hidden: ["bank_account_number"] } }, VENDOR,
+      { ...withoutNumber, _read_only_fields: [] },
+    );
+    expect(buildVendorUpdatePayload(
+      withoutNumber as Vendor,
+      { ...values, bankNumber: "9999999999", phone: "08011111111" },
+      { fields, canManage: false },
+    )).toEqual({ phone: "08011111111" });
   });
 });

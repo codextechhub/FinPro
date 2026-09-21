@@ -52,7 +52,7 @@ A host must provide:
 | `@/components/ui/*` | the shadcn primitives, including `card-surface` |
 | `@/lib/utils` | `cn` |
 | `@/redux/store` | `useAppDispatch`, `useAppSelector` |
-| `@/hooks/use-permissions` | `usePermissions` |
+| `@/hooks/use-permissions` | `usePermissions`, returning `fieldAccess` beside the permission checks: the `field_access` map from the login response and `/user/auth/me/`, stored as received (an empty object when the user has no restrictions) |
 | `@/components/custom/*` | `PermissionGate`, skeletons |
 | `@/routes/routes-path` | the route table, for nav URLs |
 

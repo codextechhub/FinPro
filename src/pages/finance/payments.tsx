@@ -1,6 +1,6 @@
 // Payments (§6.Payments) - single payouts, payout batches, settlement
 // reconciliation (gateway vs bank), and the gateway transactions log.
-// Beneficiary details are FLS-masked unless payments.payout.view_sensitive.
+// Beneficiary details follow Field Access on payments.payout in each tab.
 import { DEFAULT_PAYMENTS_SECTION, type PaymentsSection } from "./console-sections";
 import { FinanceShell } from "./finance-shell";
 import { PayoutsTab } from "./payouts-tab";

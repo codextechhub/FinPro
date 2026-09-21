@@ -1,13 +1,15 @@
 // Finance operations types (banking, expenses, petty cash, payroll, budgets,
-// fixed assets, tax) - mirror the vs_finance serializers. Money is kobo. FLS
-// fields are optional + carry _stripped_fields when stripped.
+// fixed assets, tax) - mirror the vs_finance serializers. Money is kobo. A field
+// under a Field Access switch is optional, because it is absent for a caller who
+// cannot read it; a detail response lists the present ones the caller cannot
+// change in `_read_only_fields`.
 
 // ── Banking ──────────────────────────────────────────────────────────────────
 export interface BankAccount {
   id: number;
   name: string;
   bank_name: string;
-  account_number?: string; // FLS - finance.bankaccount.view_sensitive
+  account_number?: string; // Field Access: finance.bankaccount
   gl_account: string;
   gl_account_name?: string;
   gl_account_id: number;
@@ -19,7 +21,7 @@ export interface BankAccount {
   book_balance_naira: string;
   unreconciled_count: number;
   last_reconciled_at: string | null;
-  _stripped_fields?: string[];
+  _read_only_fields?: string[];
 }
 
 export interface BankTransaction {
@@ -192,7 +194,7 @@ export interface PettyCashVoucher {
   expense_account: string | null;
 }
 
-// ── Payroll (FLS on per-employee figures) ────────────────────────────────────
+// ── Payroll (Field Access on per-employee figures) ───────────────────────────
 // A computed payslip line item (snapshot copied from the salary structure).
 export interface PayslipComponent {
   name: string;
@@ -205,14 +207,14 @@ export interface PayrollLine {
   id: number;
   line_no: number;
   employee_id: number | null;
-  employee_name?: string; // FLS
-  gross_amount?: number; // FLS
-  paye_amount?: number; // FLS
-  pension_amount?: number; // FLS
-  net_amount?: number; // FLS
-  components?: PayslipComponent[]; // FLS
+  employee_name?: string; // Field Access: finance.payrollrun
+  gross_amount?: number; // Field Access: finance.payrollrun
+  paye_amount?: number; // Field Access: finance.payrollrun
+  pension_amount?: number; // Field Access: finance.payrollrun
+  net_amount?: number; // Field Access: finance.payrollrun
+  components?: PayslipComponent[]; // Field Access: finance.payrollrun
   cost_center: string | null;
-  _stripped_fields?: string[];
+  _read_only_fields?: string[];
 }
 
 export interface EmployeeSalary {
@@ -220,20 +222,20 @@ export interface EmployeeSalary {
   name: string;
   structure_id: number | null;
   structure_name: string | null;
-  // Which branch the person works at. Deliberately outside the FLS block below:
+  // Which branch the person works at. Deliberately not under Field Access:
   // it is not a pay figure, and whoever assigns branches before a school can
   // switch to per-branch payroll has to be able to read it. Null means
   // unassigned, which is the state that blocks that switch.
   branch_id: number | null;
   branch_name: string | null;
-  gross_amount?: number; // FLS
-  paye_amount?: number; // FLS (derived when a structure is set)
-  pension_amount?: number; // FLS
-  net_amount?: number; // FLS
-  components?: PayslipComponent[]; // FLS
+  gross_amount?: number; // Field Access: finance.salary
+  paye_amount?: number; // Field Access: finance.salary (derived when a structure is set)
+  pension_amount?: number; // Field Access: finance.salary
+  net_amount?: number; // Field Access: finance.salary
+  components?: PayslipComponent[]; // Field Access: finance.salary
   cost_center: string | null;
   is_active: boolean;
-  _stripped_fields?: string[];
+  _read_only_fields?: string[];
 }
 
 // ── Salary structures (reusable pay templates) ───────────────────────────────

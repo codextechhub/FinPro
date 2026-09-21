@@ -1,7 +1,7 @@
 /**
  * Banking & reconciliation (§6.5), redesigned to the Vision prototype in the
- * house theme: KPIs, a bank-accounts table (account number FLS-masked, Primary
- * badge, book balance, last reconciled), and a tabbed detail drawer
+ * house theme: KPIs, a bank-accounts table (account number, Primary badge, book
+ * balance, last reconciled), and a tabbed detail drawer
  * (Transactions · Statement lines · Statements · Reconciliations · Settings)
  * with Book/Statement/Unreconciled metric cards, Import statement and
  * Auto-reconcile.
@@ -18,7 +18,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { Plus, Search, Trash2, Upload, RefreshCw, ListChecks, FileText, History, Settings as SettingsIcon, ArrowLeftRight, ChevronDown, Rows3, FileSpreadsheet, Download, Pencil } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
-import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
+import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, AccessField, useFieldAccess, fieldWriteErrors, type Column, type TabStripItem, type FieldErrors } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,6 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
-import { isStripped } from "@/utils/fls";
 import {
   useGetBankAccountsQuery, useGetBankAccountQuery, useCreateBankAccountMutation,
   useUpdateBankAccountMutation, useGetStatementLinesQuery, useImportStatementMutation,
@@ -64,11 +63,8 @@ const partialMask = (n: string) => {
   const s = n.replace(/\s+/g, "");
   return s.length <= 4 ? s : `${s.slice(0, 4)} **** ${s.slice(-4)}`;
 };
-// Detail-drawer subtitle keeps the full (sensitive) number; the list uses partial.
-const maskedNumber = (a: { account_number?: string; _stripped_fields?: string[] }) =>
-  isStripped(a, "account_number") ? "••••" : (a.account_number || "-");
-const listAcctNo = (a: { account_number?: string; _stripped_fields?: string[] }) =>
-  isStripped(a, "account_number") ? "••••" : (a.account_number ? partialMask(a.account_number) : "-");
+/** Field Access resource for a bank account; `account_number` is its one registered field. */
+const BANK_ACCOUNT = "finance.bankaccount";
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -85,6 +81,7 @@ export default function BankingPage() {
   const [selected, setSelected] = useState<BankAccount | null>(null);
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
+  const access = useFieldAccess(BANK_ACCOUNT);
   useActionParam("new", can(P.FIN_CREATE_BANK_ACCOUNT), () => setCreating(true));
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput.trim().toLowerCase(), 250);
@@ -113,7 +110,9 @@ export default function BankingPage() {
           {a.is_primary ? <span className={cn(PILL, "bg-blue-50 text-blue-700")}>Primary</span> : null}
           {a.is_primary_collection ? <span className={cn(PILL, "bg-green-01/10 text-green-01")}>Collection</span> : null}
         </div>
-        <div className="mt-0.5 font-mont text-[11px] tabular-nums text-gray-05">A/C {listAcctNo(a)}</div>
+        {access.isHidden("account_number") ? null : (
+          <div className="mt-0.5 font-mont text-[11px] tabular-nums text-gray-05">A/C {a.account_number ? partialMask(a.account_number) : "-"}</div>
+        )}
       </div>
     ) },
     { header: "GL", cell: (a) => <span className="tabular-nums text-gray-05">{a.gl_account}</span> },
@@ -200,6 +199,7 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
   const [editingStatement, setEditingStatement] = useState<number | null>(null);
   const { data } = useGetBankAccountQuery(account ? { id: account.id, entity } : skipToken);
   const detail = data?.data;
+  const access = useFieldAccess(BANK_ACCOUNT, detail ?? account);
   const [reconcile, { isLoading: reconciling }] = useAutoReconcileMutation();
   if (!account) return null;
 
@@ -216,7 +216,7 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
       <DetailDrawer
         open={!!account} onOpenChange={(o) => (o ? undefined : onClose())}
         title={account.name}
-        description={`${account.bank_name || "-"} · ${account.gl_account} · ${maskedNumber(account)}`}
+        description={[account.bank_name || "-", account.gl_account, ...(access.isHidden("account_number") ? [] : [account.account_number || "-"])].join(" · ")}
         widthClass="sm:max-w-3xl"
         footer={
           <>
@@ -277,7 +277,7 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
             />
           )}
           {tab === "reconciliations" && <ReconciliationsTab detail={detail} currency={currency} />}
-          {tab === "settings" && <SettingsTab account={account} entity={entity} canEdit={can(P.FIN_UPDATE_BANK_ACCOUNT)} />}
+          {tab === "settings" && <SettingsTab account={account} record={detail ?? account} entity={entity} canEdit={can(P.FIN_UPDATE_BANK_ACCOUNT)} />}
         </div>
       </DetailDrawer>
 
@@ -482,7 +482,14 @@ function ReconciliationsTab({ detail, currency }: { detail?: { reconciliations: 
   );
 }
 
-function SettingsTab({ account, entity, canEdit }: { account: BankAccount; entity: string; canEdit: boolean }) {
+/**
+ * A bank account's editable settings.
+ *
+ * `record` is the detail response once it arrives, because only a detail
+ * response lists the fields this user may not change; until then the list row
+ * stands in and the Field Access map decides.
+ */
+export function SettingsTab({ account, record, entity, canEdit }: { account: BankAccount; record: BankAccount; entity: string; canEdit: boolean }) {
   const [name, setName] = useState(account.name);
   const [bankName, setBankName] = useState(account.bank_name);
   const [accountNumber, setAccountNumber] = useState(account.account_number ?? "");
@@ -490,29 +497,31 @@ function SettingsTab({ account, entity, canEdit }: { account: BankAccount; entit
   const [active, setActive] = useState(account.is_active);
   const [primary, setPrimary] = useState(account.is_primary);
   const [primaryCollection, setPrimaryCollection] = useState(account.is_primary_collection);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [update, { isLoading }] = useUpdateBankAccountMutation();
-  const numberStripped = isStripped(account, "account_number");
+  const access = useFieldAccess(BANK_ACCOUNT, record);
 
   const save = async () => {
+    setDenied(null);
     try {
       const res = await update({
         id: account.id, entity, name: name.trim(), bank_name: bankName.trim(),
-        ...(numberStripped ? {} : { account_number: accountNumber.trim() }),
+        ...access.writableOnly({ account_number: accountNumber.trim() }),
         currency: currency || undefined, is_active: active, is_primary: primary,
         is_primary_collection: primaryCollection,
       }).unwrap();
       toast.success(res.message || "Bank account updated.");
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
     <div className="space-y-4">
       <FormField label="Account name" required><Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} className="bg-white" /></FormField>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Bank name"><Input value={bankName} onChange={(e) => setBankName(e.target.value)} disabled={!canEdit} className="bg-white" /></FormField>
-        <FormField label="Account number">
-          <Input value={numberStripped ? "••••" : accountNumber} onChange={(e) => setAccountNumber(e.target.value)} disabled={!canEdit || numberStripped} className="bg-white font-mont" />
-        </FormField>
+        <AccessField access={access} name="account_number" label="Account number" errors={denied}>
+          <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} disabled={!canEdit} className="bg-white font-mont" />
+        </AccessField>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <FormField label="Currency"><CurrencyPicker value={currency} onChange={setCurrency} disabled={!canEdit} /></FormField>
@@ -1018,22 +1027,26 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
   const [active, setActive] = useState(true);
   const [primary, setPrimary] = useState(false);
   const [primaryCollection, setPrimaryCollection] = useState(false);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [create, { isLoading }] = useCreateBankAccountMutation();
+  const access = useFieldAccess(BANK_ACCOUNT);
 
-  const reset = () => { setName(""); setBankName(""); setAccountNumber(""); setGlAccount(""); setCurrency(""); setActive(true); setPrimary(false); setPrimaryCollection(false); };
+  const reset = () => { setName(""); setBankName(""); setAccountNumber(""); setGlAccount(""); setCurrency(""); setActive(true); setPrimary(false); setPrimaryCollection(false); setDenied(null); };
   const close = () => { reset(); onClose(); };
 
   const submit = async () => {
+    setDenied(null);
     try {
       const res = await create({
         entity, name: name.trim(), bank_name: bankName.trim() || undefined,
-        account_number: accountNumber.trim() || undefined, gl_account: glAccount,
+        ...access.writableOnly({ account_number: accountNumber.trim() || undefined }),
+        gl_account: glAccount,
         currency: currency || undefined, is_active: active, is_primary: primary,
         is_primary_collection: primaryCollection,
       }).unwrap();
       toast.success(res.message || "Bank account created.");
       close();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
@@ -1053,7 +1066,9 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
         <FormField label="Account name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. GTBank Operations" className="bg-white" /></FormField>
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Bank name"><Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" className="bg-white" /></FormField>
-          <FormField label="Account number"><Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" className="bg-white font-mont" /></FormField>
+          <AccessField access={access} name="account_number" label="Account number" errors={denied}>
+            <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" className="bg-white font-mont" />
+          </AccessField>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <FormField label="GL cash account" required><AccountPicker entity={entity} value={glAccount} onChange={setGlAccount} postableOnly accountType="ASSET" placeholder="Cash / bank account" /></FormField>

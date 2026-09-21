@@ -3,12 +3,18 @@
  * Money IN (collections) + money OUT (payouts) in one paginated read-only ledger, served by
  * the backend /payments/movements/ union (no client-side merge or caps). KPIs from the
  * movements summary; direction / status / provider filters are server-side; a row drawer
- * shows the movement's detail. Payout beneficiary name/account are FLS-masked server-side.
+ * shows the movement's detail.
+ *
+ * A payout row's `party` and `beneficiary_account` are its beneficiary name and
+ * account number, under Field Access on `payments.payout`. The backend leaves
+ * them out of the row for a user who cannot read them, and the screen then shows
+ * nothing in their place, not a dash. A collection's party is its customer and
+ * is always present.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDownLeft, ArrowUpRight, Receipt, Banknote } from "lucide-react";
-import { DataTable, Money, KpiCard, DetailDrawer, toArray, type Column } from "@/components/finance-ui";
+import { DataTable, Money, KpiCard, DetailDrawer, toArray, useFieldAccess, type Column } from "@/components/finance-ui";
 import { QuickExportButton } from "../../host";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
@@ -84,6 +90,8 @@ export function TransactionsTab({ entity, currency }: { entity: string; currency
   const rows = useMemo(() => toArray<Movement>(data?.data), [data]);
   const pg = data?.pagination;
   const s = summaryRes?.data;
+  const payoutAccess = useFieldAccess("payments.payout");
+  const showsParty = (m: Movement) => m.direction === "in" || !payoutAccess.isHidden("beneficiary_name");
 
   if (isLoading) return <LoadingState />;
   if (isError) return <ErrorState onRetry={refetch} />;
@@ -92,7 +100,7 @@ export function TransactionsTab({ entity, currency }: { entity: string; currency
     { header: "Reference", cell: (m) => <span className="font-semibold tabular-nums text-gray-01">{m.reference}</span> },
     { header: "Date", cell: (m) => <span className="tabular-nums text-gray-05">{fmtDateTime(m.created_at)}</span> },
     { header: "Direction", cell: (m) => <DirectionTag dir={m.direction} /> },
-    { header: "Party", cell: (m) => m.party || "-" },
+    { header: "Party", cell: (m) => (showsParty(m) ? m.party || "-" : null) },
     { header: "Provider", cell: (m) => <ProviderTag provider={m.provider} /> },
     { header: "Amount", align: "right", cell: (m) => <span className={cn(m.direction === "out" && "text-destructive")}><Money kobo={m.amount} currency={currency} align="right" /></span> },
     { header: "Status", cell: (m) => <StatusPill status={m.status} /> },
@@ -164,8 +172,12 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function MovementDrawer({ move, currency, onClose }: { move: Movement | null; currency?: string | null; onClose: () => void }) {
+  const payoutAccess = useFieldAccess("payments.payout");
   if (!move) return null;
   const inbound = move.direction === "in";
+  const showName = inbound || !payoutAccess.isHidden("beneficiary_name");
+  const showAccount = !inbound && !payoutAccess.isHidden("beneficiary_account_number") && !!move.beneficiary_account;
+  const showEmail = inbound && !!move.email;
 
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
@@ -183,12 +195,14 @@ function MovementDrawer({ move, currency, onClose }: { move: Movement | null; cu
           <Field label="Created" mono>{fmtDateTime(move.created_at)}</Field>
         </Section>
 
-        <Section title={inbound ? "Counterparty" : "Beneficiary"}>
-          <Field label={inbound ? "Customer" : "Name"}>{move.party || "-"}</Field>
-          {inbound && move.email ? <Field label="Payer email">{move.email}</Field> : null}
-          {!inbound && move.beneficiary_account ? <Field label="Account" mono>{move.beneficiary_account}</Field> : null}
-          {move.narration ? <Field label="Narration">{move.narration}</Field> : null}
-        </Section>
+        {showName || showAccount || showEmail || move.narration ? (
+          <Section title={inbound ? "Counterparty" : "Beneficiary"}>
+            {showName ? <Field label={inbound ? "Customer" : "Name"}>{move.party || "-"}</Field> : null}
+            {showEmail ? <Field label="Payer email">{move.email}</Field> : null}
+            {showAccount ? <Field label="Account" mono>{move.beneficiary_account}</Field> : null}
+            {move.narration ? <Field label="Narration">{move.narration}</Field> : null}
+          </Section>
+        ) : null}
 
         <Section title="Settlement">
           <Field label="Confirmed" mono>{fmtDateTime(move.confirmed_at)}</Field>

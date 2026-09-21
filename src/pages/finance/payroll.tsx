@@ -3,14 +3,17 @@
  * Payroll runs, Employee salaries (the roster), Salary structures, Payslips and
  * Statutory returns. Salaries can be split into tranches via a reusable structure
  * (earning/deduction components as % of gross or basic); PAYE/pension/net are then
- * derived. Per-employee figures are FLS-masked unless the caller holds
- * finance.payrollrun.view_sensitive; runs can be generated from the roster, posted,
- * paid, and each payslip / statutory schedule printed.
+ * derived. Runs can be generated from the roster, posted, paid, and each payslip /
+ * statutory schedule printed.
+ *
+ * Per-employee figures follow Field Access: `finance.payrollrun` for a run's lines
+ * and `finance.salary` for the roster. A hidden figure has no column, no form field
+ * and no line in a breakdown. A payslip or statutory schedule prints only when every
+ * figure it lists is visible, because a printed zero reads as a real one.
  *
  * Honest adaptations: deductions route only to PAYE/pension (the two payables the GL
- * has) - other deduction types (loans/union) are a noted backend expansion. Statutory
- * schedules need per-employee figures, so they're disabled (with a tooltip) without the
- * sensitive grant. PAYE/pension are remitted via Tax Remittance.
+ * has) - other deduction types (loans/union) are a noted backend expansion.
+ * PAYE/pension are remitted via Tax Remittance.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -23,7 +26,7 @@ import { routesPath } from "@/routes/routes-path";
 import { useGetTrialBalanceQuery } from "@/redux/services/finance/reports-api";
 import { useGetBranchOptionsQuery, type BranchOption } from "@/redux/services/tenants-api";
 import { FinanceShell } from "./finance-shell";
-import { DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, type Column, type TabStripItem, PostingDateField,} from "@/components/finance-ui";
+import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, useFieldAccess, fieldWriteErrors, toArray, type Column, type FieldAccess, type FieldErrors, type TabStripItem, PostingDateField,} from "@/components/finance-ui";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -31,7 +34,6 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
-import { isStripped } from "@/utils/fls";
 import { printPayrollSchedule, printPayslip } from "../../utils/finance-print";
 import {
   useGetPayrollRunsQuery, useGetPayrollSummaryQuery, useGetPayrollRunQuery, usePostPayrollRunMutation,
@@ -58,10 +60,19 @@ function RunPill({ status }: { status: string }) {
   const s = RUN_STATUS[status] ?? RUN_STATUS.DRAFT;
   return <span className={cn(PILL, s.cls)}>{s.label}</span>;
 }
-function maskedMoney(obj: { _stripped_fields?: string[] }, field: string, value: number | undefined, currency?: string | null) {
-  if (isStripped(obj, field)) return <span className="text-gray-05">••••</span>;
-  return <Money kobo={value ?? 0} currency={currency} align="right" />;
-}
+/** Field Access resources: a payroll run's lines, and the salary roster. */
+const PAYROLL_LINE = "finance.payrollrun";
+const SALARY = "finance.salary";
+type Figure = "gross_amount" | "paye_amount" | "pension_amount" | "net_amount";
+const FIGURES: readonly (readonly [Figure, string])[] = [
+  ["gross_amount", "Gross"], ["paye_amount", "PAYE"], ["pension_amount", "Pension"], ["net_amount", "Net"],
+];
+/** The figures this user may see, in display order. */
+const visibleFigures = (access: FieldAccess, only?: readonly Figure[]) =>
+  FIGURES.filter(([name]) => (!only || only.includes(name)) && !access.isHidden(name));
+/** Everything a payslip prints; it is offered only when all of it is visible. */
+const PAYSLIP_FIELDS = ["employee_name", "gross_amount", "paye_amount", "pension_amount", "net_amount"];
+const canPrintPayslip = (access: FieldAccess) => PAYSLIP_FIELDS.every((name) => !access.isHidden(name));
 function Kpi({ label, value, hint, danger }: { label: string; value: string; hint?: string; danger?: boolean }) {
   return (
     <div className="rounded-md bg-white p-4 ring-1 ring-white-02">
@@ -136,7 +147,7 @@ export default function PayrollPage() {
         <div data-guide="finance-payroll.heading">
           <div className="flex items-center gap-1.5">
             <h1 className="font-mont text-lg font-semibold text-gray-01">Payroll</h1>
-            <InfoHint ariaLabel="About payroll runs">A payroll run computes gross, PAYE, pension and net for every employee, then posts one journal - Dr salary expense; Cr PAYE payable, Cr pension payable, Cr net-wages payable. Paying it clears net-wages payable against the bank. Per-employee figures need the sensitive grant.</InfoHint>
+            <InfoHint ariaLabel="About payroll runs">A payroll run computes gross, PAYE, pension and net for every employee, then posts one journal - Dr salary expense; Cr PAYE payable, Cr pension payable, Cr net-wages payable. Paying it clears net-wages payable against the bank.</InfoHint>
           </div>
           <p className="mt-0.5 font-mont text-xs text-gray-05">Monthly salary runs and payslips, generated from the employee roster.</p>
         </div>
@@ -231,8 +242,12 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
   const { data } = useGetPayrollRunQuery(runId != null ? { id: runId, entity } : skipToken);
   const [post, { isLoading: posting }] = usePostPayrollRunMutation();
   const [cancelRun, { isLoading: cancelling }] = useCancelPayrollRunMutation();
+  const access = useFieldAccess(PAYROLL_LINE);
   const r = data?.data;
   if (runId == null || !r) return null;
+  const showName = !access.isHidden("employee_name");
+  const figures = visibleFigures(access);
+  const payslips = canPrintPayslip(access);
 
   const doPost = async () => { try { const res = await post({ id: r.id, entity }).unwrap(); toast.success(res.message || "Run posted."); } catch { /* central */ } };
   // Undo a run raised in error. Only offered before it's paid (DRAFT/POSTED); the
@@ -265,32 +280,35 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
             <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Status</p><div className="mt-1.5"><RunPill status={r.run_status} /></div></div>
           </div>
 
-          <div>
-            <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Payslips · {r.lines.length}</p>
-            <div className="overflow-hidden rounded-md border border-white-02">
-              <table className="w-full border-collapse">
-                <thead><tr>
-                  <th className={thCls}>Employee</th><th className={cn(thCls, "text-right")}>Gross</th>
-                  <th className={cn(thCls, "text-right")}>PAYE</th><th className={cn(thCls, "text-right")}>Pension</th>
-                  <th className={cn(thCls, "text-right")}>Net</th><th className={thCls} />
-                </tr></thead>
-                <tbody>
-                  {r.lines.map((l) => (
-                    <tr key={l.id}>
-                      <td className={tdCls}>{isStripped(l, "employee_name") ? <span className="text-gray-05">••••</span> : l.employee_name || "-"}</td>
-                      <td className={cn(tdCls, "text-right tabular-nums")}>{maskedMoney(l, "gross_amount", l.gross_amount, currency)}</td>
-                      <td className={cn(tdCls, "text-right tabular-nums")}>{maskedMoney(l, "paye_amount", l.paye_amount, currency)}</td>
-                      <td className={cn(tdCls, "text-right tabular-nums")}>{maskedMoney(l, "pension_amount", l.pension_amount, currency)}</td>
-                      <td className={cn(tdCls, "text-right tabular-nums font-medium")}>{maskedMoney(l, "net_amount", l.net_amount, currency)}</td>
-                      <td className={cn(tdCls, "text-right")}>
-                        {!isStripped(l, "net_amount") ? <button type="button" onClick={() => printPayslip(r, l, currency)} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Payslip</button> : null}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {showName || figures.length ? (
+            <div>
+              <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Payslips · {r.lines.length}</p>
+              <div className="overflow-hidden rounded-md border border-white-02">
+                <table className="w-full border-collapse">
+                  <thead><tr>
+                    {showName ? <th className={thCls}>Employee</th> : null}
+                    {figures.map(([name, label]) => <th key={name} className={cn(thCls, "text-right")}>{label}</th>)}
+                    {payslips ? <th className={thCls} /> : null}
+                  </tr></thead>
+                  <tbody>
+                    {r.lines.map((l) => (
+                      <tr key={l.id}>
+                        {showName ? <td className={tdCls}>{l.employee_name || "-"}</td> : null}
+                        {figures.map(([name]) => (
+                          <td key={name} className={cn(tdCls, "text-right tabular-nums", name === "net_amount" && "font-medium")}><Money kobo={l[name] ?? 0} currency={currency} align="right" /></td>
+                        ))}
+                        {payslips ? (
+                          <td className={cn(tdCls, "text-right")}>
+                            <button type="button" onClick={() => printPayslip(r, l, currency)} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Payslip</button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </DetailDrawer>
 
@@ -357,6 +375,10 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
   const [periodLabel, setPeriodLabel] = useState("");
   const [scopeChoice, setScopeChoice] = useState("");
   const [lines, setLines] = useState<EmpRow[]>([emptyEmp()]);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
+  const access = useFieldAccess(PAYROLL_LINE);
+  // A manual line is a name and a gross; without both there is nothing to raise by hand.
+  const manualAllowed = !access.isReadOnly("employee_name", { creating: true }) && !access.isReadOnly("gross_amount", { creating: true });
   const { data: rosterData } = useGetEmployeeSalariesQuery({ entity, is_active: "true" }, { skip: !open });
   const roster = useMemo(() => toArray(rosterData?.data), [rosterData]);
   const { data: branchData } = useGetBranchOptionsQuery(undefined, { skip: !open || !perBranch });
@@ -373,7 +395,7 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
 
   const setRow = (i: number, patch: Partial<EmpRow>) => setLines((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   const validLines = lines.filter((l) => l.employee_name.trim() && l.gross > 0);
-  const close = () => { setMode("roster"); setPayDate(""); setPeriodLabel(""); setScopeChoice(""); setLines([emptyEmp()]); onClose(); };
+  const close = () => { setMode("roster"); setPayDate(""); setPeriodLabel(""); setScopeChoice(""); setLines([emptyEmp()]); setDenied(null); onClose(); };
 
   // Left out for a whole-school run and for a caller who was not asked, so the
   // backend applies its own rule rather than being told an answer we guessed.
@@ -381,17 +403,18 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
     ? { branch: Number(scopeChoice) } : {};
 
   const submit = async () => {
+    setDenied(null);
     try {
       if (mode === "roster") {
         const res = await generate({ entity, pay_date: payDate, period_label: periodLabel.trim() || undefined, ...branchArg }).unwrap();
         toast.success(res.message || "Run generated.");
       } else {
         const res = await create({ entity, pay_date: payDate, period_label: periodLabel.trim() || undefined, ...branchArg,
-          lines: validLines.map((l) => ({ employee_name: l.employee_name.trim(), gross_amount: l.gross, paye_amount: l.paye, pension_amount: l.pension })) }).unwrap();
+          lines: validLines.map((l) => access.writableOnly({ employee_name: l.employee_name.trim(), gross_amount: l.gross, paye_amount: l.paye, pension_amount: l.pension }, { creating: true })) }).unwrap();
         toast.success(res.message || "Run created.");
       }
       close();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   // The people this run would pay, as chosen. Shown before she commits, because
@@ -423,7 +446,7 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
         </Button>
       </>}>
       <div className="space-y-4">
-        <Segmented value={mode} onChange={setMode} options={[["roster", "From roster"], ["manual", "Manual"]]} />
+        {manualAllowed ? <Segmented value={mode} onChange={setMode} options={[["roster", "From roster"], ["manual", "Manual"]]} /> : null}
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Period" ><Input value={periodLabel} onChange={(e) => setPeriodLabel(e.target.value)} placeholder="e.g. June 2026" className="h-9 bg-white" /></FormField>
           <PostingDateField label="Payment date" entity={entity} value={payDate} onChange={setPayDate} />
@@ -450,7 +473,7 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
               ? <>Choose what this run covers to see who it would pay.</>
               : covered.length > 0
               ? <>This will raise a draft run for the <span className="font-medium text-gray-01">{covered.length}</span> active employee(s){coverageLabel ? <> at <span className="font-medium text-gray-01">{coverageLabel}</span></> : null}, copying each one's standard gross, PAYE and pension. Review, then post.</>
-              : <>No active employees{coverageLabel ? <> at <span className="font-medium text-gray-01">{coverageLabel}</span></> : <> on the roster yet</>}. Add them under <span className="font-medium text-gray-01">Employee salaries</span>, or switch to Manual.</>}
+              : <>No active employees{coverageLabel ? <> at <span className="font-medium text-gray-01">{coverageLabel}</span></> : <> on the roster yet</>}. Add them under <span className="font-medium text-gray-01">Employee salaries</span>{manualAllowed ? ", or switch to Manual" : ""}.</>}
           </p>
         ) : (
           <div>
@@ -462,10 +485,10 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
               {lines.map((l, i) => (
                 <div key={i} className="flex items-end gap-2 rounded-md border border-white-02 bg-white p-2.5">
                   <div className="grid flex-1 grid-cols-12 gap-2">
-                    <div className="col-span-5"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Employee</p><Input value={l.employee_name} onChange={(e) => setRow(i, { employee_name: e.target.value })} placeholder="Name" className="h-9 bg-white text-sm" /></div>
-                    <div className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Gross</p><MoneyInput valueKobo={l.gross} onChangeKobo={(k) => setRow(i, { gross: k })} currency={currency} className="[&_input]:h-9" /></div>
-                    <div className="col-span-2"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">PAYE</p><MoneyInput valueKobo={l.paye} onChangeKobo={(k) => setRow(i, { paye: k })} currency={currency} className="[&_input]:h-9" /></div>
-                    <div className="col-span-2"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Pension</p><MoneyInput valueKobo={l.pension} onChangeKobo={(k) => setRow(i, { pension: k })} currency={currency} className="[&_input]:h-9" /></div>
+                    <AccessField access={access} name="employee_name" creating errors={denied} className="col-span-5"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Employee</p><Input value={l.employee_name} onChange={(e) => setRow(i, { employee_name: e.target.value })} placeholder="Name" className="h-9 bg-white text-sm" /></AccessField>
+                    <AccessField access={access} name="gross_amount" creating errors={denied} className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Gross</p><MoneyInput valueKobo={l.gross} onChangeKobo={(k) => setRow(i, { gross: k })} currency={currency} className="[&_input]:h-9" /></AccessField>
+                    <AccessField access={access} name="paye_amount" creating errors={denied} className="col-span-2"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">PAYE</p><MoneyInput valueKobo={l.paye} onChangeKobo={(k) => setRow(i, { paye: k })} currency={currency} className="[&_input]:h-9" /></AccessField>
+                    <AccessField access={access} name="pension_amount" creating errors={denied} className="col-span-2"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Pension</p><MoneyInput valueKobo={l.pension} onChangeKobo={(k) => setRow(i, { pension: k })} currency={currency} className="[&_input]:h-9" /></AccessField>
                   </div>
                   <button type="button" onClick={() => setLines((rs) => rs.filter((_, idx) => idx !== i))} disabled={lines.length <= 1} className="mb-0.5 shrink-0 rounded p-1.5 text-gray-05 hover:bg-destructive/5 hover:text-destructive disabled:opacity-30"><Trash2 className="size-4" /></button>
                 </div>
@@ -523,6 +546,7 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
     return out;
   }, [all, searchInput, branchFilter, filterStillExists]);
 
+  const access = useFieldAccess(SALARY);
   const [remove] = useDeleteEmployeeSalaryMutation();
   const doRemove = async (id: number) => { try { await remove({ id, entity }).unwrap(); toast.success("Employee removed."); } catch { /* central */ } };
 
@@ -531,10 +555,7 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
     { header: "Structure", cell: (e) => e.structure_name ? <span className={cn(PILL, "bg-blue-50 text-blue-700")}>{e.structure_name}</span> : <span className="font-mont text-[11px] text-gray-05">Flat</span> },
     { header: "Branch", cell: (e) => <BranchCell salary={e} /> },
     { header: "Cost center", cell: (e) => <span className="tabular-nums text-gray-05">{e.cost_center || "-"}</span> },
-    { header: "Gross", align: "right", cell: (e) => maskedMoney(e, "gross_amount", e.gross_amount, currency) },
-    { header: "PAYE", align: "right", cell: (e) => maskedMoney(e, "paye_amount", e.paye_amount, currency) },
-    { header: "Pension", align: "right", cell: (e) => maskedMoney(e, "pension_amount", e.pension_amount, currency) },
-    { header: "Net", align: "right", cell: (e) => maskedMoney(e, "net_amount", e.net_amount, currency) },
+    ...visibleFigures(access).map(([name, label]): Column<EmployeeSalary> => ({ header: label, align: "right", cell: (e) => <Money kobo={e[name] ?? 0} currency={currency} align="right" /> })),
     { header: "Status", cell: (e) => <span className={cn(PILL, e.is_active ? "bg-green-01/10 text-green-01" : "bg-gray-03/60 text-gray-05")}>{e.is_active ? "Active" : "Inactive"}</span> },
     { header: "", align: "right", cell: (e) => (can(P.FIN_UPDATE_SALARY) || can(P.FIN_DELETE_SALARY)) ? (
       <span className="inline-flex items-center gap-2">
@@ -587,7 +608,7 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
   );
 }
 
-function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: { open: boolean; salary: EmployeeSalary | null; entity: string; currency?: string | null; branches: BranchOption[]; onClose: () => void }) {
+export function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: { open: boolean; salary: EmployeeSalary | null; entity: string; currency?: string | null; branches: BranchOption[]; onClose: () => void }) {
   const isEdit = !!salary;
   const [name, setName] = useState("");
   const [branchId, setBranchId] = useState("");
@@ -602,13 +623,19 @@ function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: {
   const [create, { isLoading: creating }] = useCreateEmployeeSalaryMutation();
   const [update, { isLoading: updating }] = useUpdateEmployeeSalaryMutation();
   const isLoading = creating || updating;
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
+  const access = useFieldAccess(SALARY, salary);
+  const grossOpen = !access.isReadOnly("gross_amount");
+  // A breakdown worked out from a figure the user cannot see would show it, or show zero.
+  const showBreakdown = visibleFigures(access).length === FIGURES.length && !access.isHidden("components");
 
-  // Seed the form to the row being edited when the drawer opens (amounts only
-  // populate if not FLS-stripped). Adjusted during render, not in an effect.
+  // Seed the form to the row being edited when the drawer opens (a hidden amount
+  // is absent and seeds as zero). Adjusted during render, not in an effect.
   const seedKey = salary?.id ?? "new";
   const [seededFor, setSeededFor] = useState<number | string | null>(null);
   if (open && seededFor !== seedKey) {
     setSeededFor(seedKey);
+    setDenied(null);
     if (salary) { setName(salary.name); setBranchId(salary.branch_id ? String(salary.branch_id) : ""); setStructureId(salary.structure_id ? String(salary.structure_id) : ""); setGross(salary.gross_amount ?? 0); setPaye(salary.paye_amount ?? 0); setPension(salary.pension_amount ?? 0); setCostCenter(salary.cost_center ?? ""); setActive(salary.is_active); }
     else { setName(""); setBranchId(""); setStructureId(""); setGross(0); setPaye(0); setPension(0); setCostCenter(""); setActive(true); }
   }
@@ -624,15 +651,16 @@ function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: {
   const branchPatch = branchChanged ? { branch: branchId ? Number(branchId) : null } : {};
 
   const submit = async () => {
+    setDenied(null);
     try {
-      const base = { name: name.trim(), gross_amount: gross, cost_center: costCenter || undefined,
-        structure: structure ? structure.id : (null as number | null),
-        // In flat mode the manual figures are sent; with a structure they're derived server-side.
-        ...(structure ? {} : { paye_amount: paye, pension_amount: pension }) };
+      // In flat mode the manual figures are sent; with a structure they're derived server-side.
+      const figures = access.writableOnly({ gross_amount: gross, ...(structure ? {} : { paye_amount: paye, pension_amount: pension }) });
+      const base = { name: name.trim(), cost_center: costCenter || undefined,
+        structure: structure ? structure.id : (null as number | null), ...figures };
       if (isEdit && salary) { const r = await update({ id: salary.id, entity, is_active: active, ...base, ...branchPatch }).unwrap(); toast.success(r.message || "Updated."); }
       else { const r = await create({ entity, ...base, structure: structure ? structure.id : undefined, ...(branchId ? { branch: Number(branchId) } : {}) }).unwrap(); toast.success(r.message || "Employee added."); }
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
@@ -641,7 +669,7 @@ function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: {
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !name.trim() || gross <= 0} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Saving…" : isEdit ? "Save changes" : "Add employee"}</Button>
+        <Button disabled={isLoading || !name.trim() || (grossOpen && gross <= 0)} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Saving…" : isEdit ? "Save changes" : "Add employee"}</Button>
       </>}>
       <div className="space-y-4">
         <FormField label="Employee name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="h-9 bg-white" /></FormField>
@@ -657,7 +685,7 @@ function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: {
           </div>
         ) : null}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Gross (monthly)" required><MoneyInput valueKobo={gross} onChangeKobo={setGross} currency={currency} className="[&_input]:h-9" /></FormField>
+          <AccessField access={access} name="gross_amount" label="Gross (monthly)" required={grossOpen} errors={denied}><MoneyInput valueKobo={gross} onChangeKobo={setGross} currency={currency} className="[&_input]:h-9" /></AccessField>
           <FormField label="Cost center"><CostCenterPicker entity={entity} value={costCenter} onChange={setCostCenter} /></FormField>
         </div>
         <div>
@@ -667,10 +695,10 @@ function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: {
               {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </FormField>
-          <p className="mt-1 font-mont text-[11px] text-gray-05">{structure ? "PAYE, pension and net are derived from the structure applied to gross." : "Flat - enter PAYE and pension manually below."}</p>
+          {showBreakdown ? <p className="mt-1 font-mont text-[11px] text-gray-05">{structure ? "PAYE, pension and net are derived from the structure applied to gross." : "Flat - enter PAYE and pension manually below."}</p> : null}
         </div>
 
-        {structure && derived ? (
+        {structure && derived ? showBreakdown ? (
           <div className="rounded-md border border-white-02 bg-white">
             <p className="border-b border-white-02 px-3 py-2 font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">Derived breakdown</p>
             <div className="divide-y divide-white-02">
@@ -686,16 +714,20 @@ function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: {
               </div>
             </div>
           </div>
-        ) : (
+        ) : null : (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="PAYE"><MoneyInput valueKobo={paye} onChangeKobo={setPaye} currency={currency} className="[&_input]:h-9" /></FormField>
-              <FormField label="Pension"><MoneyInput valueKobo={pension} onChangeKobo={setPension} currency={currency} className="[&_input]:h-9" /></FormField>
-            </div>
-            <div className="flex items-center justify-between rounded-md border border-gray-03 bg-gray-03 px-3 py-2">
-              <span className="font-mont text-[11px] text-gray-05">Net (take-home)</span>
-              <span className="font-mont text-sm font-semibold tabular-nums text-black-01">{formatMoney(gross - paye - pension, currency)}</span>
-            </div>
+            {access.anyVisible("paye_amount", "pension_amount") ? (
+              <div className="grid grid-cols-2 gap-3">
+                <AccessField access={access} name="paye_amount" label="PAYE" errors={denied}><MoneyInput valueKobo={paye} onChangeKobo={setPaye} currency={currency} className="[&_input]:h-9" /></AccessField>
+                <AccessField access={access} name="pension_amount" label="Pension" errors={denied}><MoneyInput valueKobo={pension} onChangeKobo={setPension} currency={currency} className="[&_input]:h-9" /></AccessField>
+              </div>
+            ) : null}
+            {visibleFigures(access).length === FIGURES.length ? (
+              <div className="flex items-center justify-between rounded-md border border-gray-03 bg-gray-03 px-3 py-2">
+                <span className="font-mont text-[11px] text-gray-05">Net (take-home)</span>
+                <span className="font-mont text-sm font-semibold tabular-nums text-black-01">{formatMoney(gross - paye - pension, currency)}</span>
+              </div>
+            ) : null}
           </>
         )}
         {isEdit ? <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active (included in generated runs)</label> : null}
@@ -877,6 +909,9 @@ function PayslipsTab({ entity, currency }: { entity: string; currency?: string |
   // This view flattens *every* run into payslips, so pull a wide page rather than the
   // default 25 (no per-payslip endpoint exists yet).
   const { data, isLoading, isFetching, isError, refetch } = useGetPayrollRunsQuery({ entity, page_size: 100 });
+  const access = useFieldAccess(PAYROLL_LINE);
+  const payslips = canPrintPayslip(access);
+  const opensBreakdown = access.anyVisible("gross_amount", "paye_amount", "pension_amount", "net_amount", "components");
   const runs = useMemo(() => toArray(data?.data), [data]);
   const rows = useMemo<PayslipRow[]>(() => {
     const flat = runs.flatMap((run) => run.lines.map((line) => ({ run, line })));
@@ -885,16 +920,15 @@ function PayslipsTab({ entity, currency }: { entity: string; currency?: string |
   }, [runs, searchInput]);
 
   const cols: Column<PayslipRow>[] = [
-    { header: "Employee", cell: ({ line }) => isStripped(line, "employee_name") ? <span className="text-gray-05">••••</span> : <span className="font-medium text-gray-01">{line.employee_name || "-"}</span> },
+    ...(access.isHidden("employee_name") ? [] : [{ header: "Employee", cell: ({ line }: PayslipRow) => <span className="font-medium text-gray-01">{line.employee_name || "-"}</span> }]),
     { header: "Period", cell: ({ run }) => run.period_label || "-" },
     { header: "Run no.", cell: ({ run }) => <span className="tabular-nums text-gray-05">{run.document_number}</span> },
     { header: "Pay date", cell: ({ run }) => <span className="tabular-nums text-gray-05">{fmtDate(run.pay_date)}</span> },
-    { header: "Gross", align: "right", cell: ({ line }) => maskedMoney(line, "gross_amount", line.gross_amount, currency) },
-    { header: "Net", align: "right", cell: ({ line }) => maskedMoney(line, "net_amount", line.net_amount, currency) },
+    ...visibleFigures(access, ["gross_amount", "net_amount"]).map(([name, label]): Column<PayslipRow> => ({ header: label, align: "right", cell: ({ line }) => <Money kobo={line[name] ?? 0} currency={currency} align="right" /> })),
     { header: "Status", cell: ({ run }) => <RunPill status={run.run_status} /> },
-    { header: "", align: "right", cell: ({ run, line }) => !isStripped(line, "net_amount")
-      ? <button type="button" onClick={(e) => { e.stopPropagation(); printPayslip(run, line, currency); }} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Print</button>
-      : null },
+    ...(payslips ? [{ header: "", align: "right" as const, cell: ({ run, line }: PayslipRow) => (
+      <button type="button" onClick={(e) => { e.stopPropagation(); printPayslip(run, line, currency); }} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Print</button>
+    ) }] : []),
   ];
 
   return (
@@ -904,21 +938,26 @@ function PayslipsTab({ entity, currency }: { entity: string; currency?: string |
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
           <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search employee" className="h-9 w-64 bg-white pl-8 font-mont" />
         </div>
-        <p className="font-mont text-[11px] text-gray-05">Every payslip across all runs - click a row for the breakdown. Figures need the sensitive payroll grant.</p>
+        <p className="font-mont text-[11px] text-gray-05">Every payslip across all runs{opensBreakdown ? " - click a row for the breakdown" : ""}.</p>
       </div>
       <DataTable columns={cols} rows={rows} rowKey={({ run, line }) => `${run.id}-${line.id}`}
-        loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(r) => !isStripped(r.line, "net_amount") && setSelected(r)}
+        loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={opensBreakdown ? setSelected : undefined}
         emptyTitle={searchInput ? "No matching payslips" : "No payslips yet"}
         emptyMessage={searchInput ? "Try a different search." : "Generate and post a payroll run to produce payslips."} />
-      <PayslipDrawer row={selected} currency={currency} onClose={() => setSelected(null)} />
+      <PayslipDrawer row={selected} access={access} currency={currency} onClose={() => setSelected(null)} />
     </div>
   );
 }
 
-// Shared earnings/deductions/net breakdown - itemised when a structure populated the
-// line's components, else the flat gross / PAYE / pension / net summary.
-function PayslipBreakdown({ line, currency }: { line: PayrollLine; currency?: string | null }) {
+/**
+ * A payslip's earnings, deductions and net: itemised when a structure populated the
+ * line's components, else the flat gross / PAYE / pension summary. Each figure the
+ * user cannot see is left out; components are absent when hidden, which falls back
+ * to the flat summary.
+ */
+function PayslipBreakdown({ line, access, currency }: { line: PayrollLine; access: FieldAccess; currency?: string | null }) {
   const comps = line.components ?? [];
+  const shows = (name: Figure) => !access.isHidden(name);
   type BreakdownRow =
     | { sec: string }
     | { label: string; amount: number; ded: boolean; strong?: boolean };
@@ -926,14 +965,14 @@ function PayslipBreakdown({ line, currency }: { line: PayrollLine; currency?: st
     ? [
         { sec: "Earnings" as const },
         ...comps.filter((c) => c.kind === "EARNING").map((c) => ({ label: c.name, amount: c.amount, ded: false })),
-        { label: "Gross pay", amount: line.gross_amount ?? 0, ded: false, strong: true },
+        ...(shows("gross_amount") ? [{ label: "Gross pay", amount: line.gross_amount ?? 0, ded: false, strong: true }] : []),
         { sec: "Deductions" as const },
         ...comps.filter((c) => c.kind === "DEDUCTION").map((c) => ({ label: `${c.name} (${c.statutory_type})`, amount: c.amount, ded: true })),
       ]
     : [
-        { label: "Gross pay", amount: line.gross_amount ?? 0, ded: false },
-        { label: "PAYE (income tax)", amount: line.paye_amount ?? 0, ded: true },
-        { label: "Pension", amount: line.pension_amount ?? 0, ded: true },
+        ...(shows("gross_amount") ? [{ label: "Gross pay", amount: line.gross_amount ?? 0, ded: false }] : []),
+        ...(shows("paye_amount") ? [{ label: "PAYE (income tax)", amount: line.paye_amount ?? 0, ded: true }] : []),
+        ...(shows("pension_amount") ? [{ label: "Pension", amount: line.pension_amount ?? 0, ded: true }] : []),
       ];
   return (
     <div className="overflow-hidden rounded-md border border-white-02 bg-white">
@@ -946,31 +985,35 @@ function PayslipBreakdown({ line, currency }: { line: PayrollLine; currency?: st
               <span className={cn("tabular-nums", r.ded ? "text-destructive" : "text-black-01")}>{r.ded ? "− " : ""}{formatMoney(r.amount, currency)}</span>
             </div>
           ))}
-        <div className="flex items-center justify-between bg-gray-03 px-3 py-2.5 font-mont text-sm font-semibold">
-          <span>Net pay</span><span className="tabular-nums">{formatMoney(line.net_amount ?? 0, currency)}</span>
-        </div>
+        {shows("net_amount") ? (
+          <div className="flex items-center justify-between bg-gray-03 px-3 py-2.5 font-mont text-sm font-semibold">
+            <span>Net pay</span><span className="tabular-nums">{formatMoney(line.net_amount ?? 0, currency)}</span>
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-function PayslipDrawer({ row, currency, onClose }: { row: PayslipRow | null; currency?: string | null; onClose: () => void }) {
+function PayslipDrawer({ row, access, currency, onClose }: { row: PayslipRow | null; access: FieldAccess; currency?: string | null; onClose: () => void }) {
   if (!row) return null;
   const { run, line } = row;
+  const metrics = visibleFigures(access, ["gross_amount", "net_amount"]);
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title={line.employee_name || "Payslip"} description={`${run.period_label || "-"} · ${run.document_number} · paid ${fmtDate(run.pay_date)}`}
+      title={(!access.isHidden("employee_name") && line.employee_name) || "Payslip"} description={`${run.period_label || "-"} · ${run.document_number} · paid ${fmtDate(run.pay_date)}`}
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" onClick={onClose}>Close</Button>
-        <Button onClick={() => printPayslip(run, line, currency)} className="gap-1.5"><Printer className="size-4" /> Print payslip</Button>
+        {canPrintPayslip(access) ? <Button onClick={() => printPayslip(run, line, currency)} className="gap-1.5"><Printer className="size-4" /> Print payslip</Button> : null}
       </>}>
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <Metric label="Gross" kobo={line.gross_amount ?? 0} currency={currency} />
-          <Metric label="Net pay" kobo={line.net_amount ?? 0} currency={currency} />
-        </div>
-        <PayslipBreakdown line={line} currency={currency} />
+        {metrics.length ? (
+          <div className="grid grid-cols-2 gap-3">
+            {metrics.map(([name, label]) => <Metric key={name} label={name === "net_amount" ? "Net pay" : label} kobo={line[name] ?? 0} currency={currency} />)}
+          </div>
+        ) : null}
+        <PayslipBreakdown line={line} access={access} currency={currency} />
         {line.cost_center ? <p className="font-mont text-[11px] text-gray-05">Cost center · {line.cost_center}</p> : null}
       </div>
     </DetailDrawer>
@@ -978,15 +1021,13 @@ function PayslipDrawer({ row, currency, onClose }: { row: PayslipRow | null; cur
 }
 
 // ── Statutory returns (filing-ready PAYE / pension schedules) ─────────────────
-function schedStripped(run: PayrollRun, kind: "PAYE" | "PENSION") {
-  return run.lines.some((l) => isStripped(l, kind === "PAYE" ? "paye_amount" : "pension_amount"));
-}
-function SchedButton({ run, kind, currency, label }: { run: PayrollRun; kind: "PAYE" | "PENSION"; currency?: string | null; label?: string }) {
-  const stripped = schedStripped(run, kind);
+/** A schedule lists each employee's name and figure, so it prints only when both are visible. */
+function SchedButton({ run, kind, access, currency, label }: { run: PayrollRun; kind: "PAYE" | "PENSION"; access: FieldAccess; currency?: string | null; label?: string }) {
+  if (access.isHidden("employee_name") || access.isHidden(kind === "PAYE" ? "paye_amount" : "pension_amount")) return null;
   return (
-    <button type="button" disabled={stripped} onClick={(e) => { e.stopPropagation(); printPayrollSchedule(run, kind, currency); }}
-      title={stripped ? "Needs the sensitive payroll grant to list per-employee figures" : `Print the ${kind} schedule`}
-      className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:text-gray-05 disabled:no-underline">
+    <button type="button" onClick={(e) => { e.stopPropagation(); printPayrollSchedule(run, kind, currency); }}
+      title={`Print the ${kind} schedule`}
+      className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline">
       <Printer className="size-3" /> {label ?? (kind === "PAYE" ? "PAYE" : "Pension")}
     </button>
   );
@@ -994,6 +1035,8 @@ function SchedButton({ run, kind, currency, label }: { run: PayrollRun; kind: "P
 
 function StatutoryTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [selected, setSelected] = useState<PayrollRun | null>(null);
+  const access = useFieldAccess(PAYROLL_LINE);
+  const schedules = !access.isHidden("employee_name") && access.anyVisible("paye_amount", "pension_amount");
   // Roll-up of statutory liabilities across all posted runs - pull a wide page.
   const { data, isLoading, isFetching, isError, refetch } = useGetPayrollRunsQuery({ entity, page_size: 100 });
   const runs = useMemo(() => toArray(data?.data).filter((r) => r.run_status === "POSTED" || r.run_status === "PAID"), [data]);
@@ -1009,7 +1052,7 @@ function StatutoryTab({ entity, currency }: { entity: string; currency?: string 
     { header: "PAYE payable", align: "right", cell: (r) => <Money kobo={r.paye_total} currency={currency} align="right" /> },
     { header: "Pension payable", align: "right", cell: (r) => <Money kobo={r.pension_total} currency={currency} align="right" /> },
     { header: "Status", cell: (r) => <RunPill status={r.run_status} /> },
-    { header: "Schedules", align: "right", cell: (r) => <span className="inline-flex items-center gap-3"><SchedButton run={r} kind="PAYE" currency={currency} /><SchedButton run={r} kind="PENSION" currency={currency} /></span> },
+    ...(schedules ? [{ header: "Schedules", align: "right" as const, cell: (r: PayrollRun) => <span className="inline-flex items-center gap-3"><SchedButton run={r} kind="PAYE" access={access} currency={currency} /><SchedButton run={r} kind="PENSION" access={access} currency={currency} /></span> }] : []),
   ];
 
   return (
@@ -1023,12 +1066,12 @@ function StatutoryTab({ entity, currency }: { entity: string; currency?: string 
       <DataTable columns={cols} rows={runs} rowKey={(r) => r.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(r) => setSelected(r)}
         emptyTitle="No statutory returns yet" emptyMessage="Post a payroll run to raise PAYE and pension liabilities to file." />
-      <StatutoryDrawer run={selected} entity={entity} currency={currency} onClose={() => setSelected(null)} />
+      <StatutoryDrawer run={selected} entity={entity} access={access} currency={currency} onClose={() => setSelected(null)} />
     </div>
   );
 }
 
-function StatutoryDrawer({ run, entity, currency, onClose }: { run: PayrollRun | null; entity: string; currency?: string | null; onClose: () => void }) {
+function StatutoryDrawer({ run, entity, access, currency, onClose }: { run: PayrollRun | null; entity: string; access: FieldAccess; currency?: string | null; onClose: () => void }) {
   // Real outstanding balance of the run's PAYE / pension payable accounts (from the
   // trial balance). Honest: this is the entity-wide unremitted liability for that
   // account - remittance isn't tracked per run, so we never fake a per-run "remitted".
@@ -1044,14 +1087,17 @@ function StatutoryDrawer({ run, entity, currency, onClose }: { run: PayrollRun |
   if (!run) return null;
   const payeOut = outstanding(run.paye_payable_account_id);
   const pensionOut = outstanding(run.pension_payable_account_id);
+  const showName = !access.isHidden("employee_name");
+  const figures = visibleFigures(access, ["paye_amount", "pension_amount"]);
+  const totals: Record<string, number> = { paye_amount: run.paye_total, pension_amount: run.pension_total };
 
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
       title={`Statutory · ${run.period_label || run.document_number}`} description={`${run.document_number} · pay date ${fmtDate(run.pay_date)}`}
       widthClass="sm:max-w-2xl"
       footer={<>
-        <SchedButton run={run} kind="PAYE" currency={currency} label="PAYE schedule" />
-        <SchedButton run={run} kind="PENSION" currency={currency} label="Pension schedule" />
+        <SchedButton run={run} kind="PAYE" access={access} currency={currency} label="PAYE schedule" />
+        <SchedButton run={run} kind="PENSION" access={access} currency={currency} label="Pension schedule" />
         <div className="flex-1" />
         <Button variant="outline" onClick={onClose}>Close</Button>
       </>}>
@@ -1073,30 +1119,31 @@ function StatutoryDrawer({ run, entity, currency, onClose }: { run: PayrollRun |
           <p className="border-t border-white-02 px-3 py-2 font-mont text-[11px] text-gray-05">Outstanding is the current balance on the liability account (all runs, this entity) - remittance is tracked against the account, not per run. Settle it under Tax Remittance.</p>
         </div>
 
-        <div>
-          <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Per-employee schedule · {run.lines.length}</p>
-          <div className="overflow-hidden rounded-md border border-white-02">
-            <table className="w-full border-collapse">
-              <thead><tr>
-                <th className={thCls}>Employee</th><th className={cn(thCls, "text-right")}>PAYE</th><th className={cn(thCls, "text-right")}>Pension</th>
-              </tr></thead>
-              <tbody>
-                {run.lines.map((l) => (
-                  <tr key={l.id}>
-                    <td className={tdCls}>{isStripped(l, "employee_name") ? <span className="text-gray-05">••••</span> : l.employee_name || "-"}</td>
-                    <td className={cn(tdCls, "text-right tabular-nums")}>{maskedMoney(l, "paye_amount", l.paye_amount, currency)}</td>
-                    <td className={cn(tdCls, "text-right tabular-nums")}>{maskedMoney(l, "pension_amount", l.pension_amount, currency)}</td>
+        {showName && figures.length ? (
+          <div>
+            <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Per-employee schedule · {run.lines.length}</p>
+            <div className="overflow-hidden rounded-md border border-white-02">
+              <table className="w-full border-collapse">
+                <thead><tr>
+                  <th className={thCls}>Employee</th>
+                  {figures.map(([name, label]) => <th key={name} className={cn(thCls, "text-right")}>{label}</th>)}
+                </tr></thead>
+                <tbody>
+                  {run.lines.map((l) => (
+                    <tr key={l.id}>
+                      <td className={tdCls}>{l.employee_name || "-"}</td>
+                      {figures.map(([name]) => <td key={name} className={cn(tdCls, "text-right tabular-nums")}><Money kobo={l[name] ?? 0} currency={currency} align="right" /></td>)}
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className={cn(tdCls, "font-semibold")}>Total</td>
+                    {figures.map(([name]) => <td key={name} className={cn(tdCls, "text-right font-semibold tabular-nums")}>{formatMoney(totals[name], currency)}</td>)}
                   </tr>
-                ))}
-                <tr>
-                  <td className={cn(tdCls, "font-semibold")}>Total</td>
-                  <td className={cn(tdCls, "text-right font-semibold tabular-nums")}>{formatMoney(run.paye_total, currency)}</td>
-                  <td className={cn(tdCls, "text-right font-semibold tabular-nums")}>{formatMoney(run.pension_total, currency)}</td>
-                </tr>
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </DetailDrawer>
   );

@@ -15,6 +15,12 @@ export { DocumentEmailAction, type DocumentEmailActionProps } from "./document-e
 export { ActionButton } from "./action-button";
 export { EntitySelect } from "./entity-select";
 export { FormModal, FormDrawer, FormField } from "./form-modal";
+export {
+  useFieldAccess, resolveFieldAccess, fieldWriteErrors,
+  type FieldAccess, type FieldAccessMap, type FieldAccessRecord, type FieldErrors,
+  type ResourceFieldAccess, type ReadOnlyOptions,
+} from "./field-access";
+export { AccessField, type AccessFieldProps } from "./access-field";
 export { PostingDateField } from "./posting-date-field";
 export { usePostingWindow, type PostingWindowState } from "./use-posting-window";
 export { Segmented } from "./segmented";

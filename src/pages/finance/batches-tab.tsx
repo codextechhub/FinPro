@@ -7,7 +7,12 @@
  * Backed by the real model: a batch is many PayoutInstructions; each line settles a
  * vendor's payable on confirmation (Dr AP gross / Cr bank net / Cr WHT payable). Submit
  * dispatches the pending items to the provider; settlement books via webhook/PSP. Honest:
- * "Bank file" is a CSV (no proprietary format); beneficiary details are FLS-masked.
+ * "Bank file" is a CSV (no proprietary format).
+ *
+ * Beneficiary fields follow Field Access on `payments.payout`: a hidden one has no
+ * column, no line and no CSV column. The builder names vendors only: the backend
+ * copies each line's beneficiary from the vendor's verified record, so a line
+ * never carries bank details the builder would have to read first.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -15,14 +20,13 @@ import { useSearchParams } from "react-router";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { Plus, Upload, Download, Send, X } from "lucide-react";
-import { DataTable, Money, MoneyInput, DetailDrawer, FormField, VendorPicker, AccountPicker, PostingRecap, KpiCard, toArray, type Column, type RecapRow } from "@/components/finance-ui";
+import { DataTable, Money, MoneyInput, DetailDrawer, FormField, VendorPicker, AccountPicker, PostingRecap, KpiCard, toArray, useFieldAccess, type Column, type FieldAccess, type RecapRow } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { isStripped } from "@/utils/fls";
 import { P } from "../../permissions";
 import { useGetPayoutBatchesQuery, useGetPayoutBatchesSummaryQuery, useCreatePayoutBatchMutation, useGetPayoutBatchQuery, useSubmitPayoutBatchMutation, useSubmitPayoutBatchForApprovalMutation } from "@/redux/services/payments/payments-api";
 import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
@@ -31,7 +35,8 @@ import type { Vendor } from "@/redux/services/procurement/procurement-types";
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
-const MASK = "••••";
+/** Field Access resource for a payout instruction, which is what a batch line becomes. */
+const PAYOUT = "payments.payout";
 const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : "-");
 
 const BATCH_STATUS: Record<string, { label: string; cls: string }> = {
@@ -136,9 +141,6 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-const benName = (v?: Vendor) => v?.bank_account_name || v?.name || "";
-const benAcct = (v?: Vendor) => v?.bank_account_number || "";
-
 // ── Build batch ──────────────────────────────────────────────────────────────
 type Line = { id: number; vendor: string; amount: number; wht: number };
 let LINE_SEQ = 1;
@@ -160,15 +162,11 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
   const close = () => { reset(); onClose(); };
   const setLine = (id: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
 
-  // A line is valid when it has a vendor (with a resolvable bank account) + amount.
-  // Look vendors up inline so the memo depends on `vendors` directly (not the
-  // per-render vendorByCode closure), which the React Compiler can preserve.
+  // A line is valid with a vendor and an amount; the backend resolves its bank account.
   const validItems = useMemo<PayoutBatchItemPayload[]>(() => lines.flatMap((l) => {
-    const v = vendors.find((vd) => vd.code === l.vendor);
-    const acct = benAcct(v);
-    if (!v || l.amount <= 0 || !acct || l.wht > l.amount) return [];
-    return [{ vendor: l.vendor, amount: l.amount, beneficiary_name: benName(v), beneficiary_account_number: acct, wht_amount: l.wht || undefined }];
-  }), [lines, vendors]);
+    if (!l.vendor || l.amount <= 0 || l.wht > l.amount) return [];
+    return [{ vendor: l.vendor, amount: l.amount, wht_amount: l.wht || undefined }];
+  }), [lines]);
 
   const gross = lines.reduce((s, l) => s + (l.amount || 0), 0);
   const wht = lines.reduce((s, l) => s + (l.wht || 0), 0);
@@ -225,9 +223,7 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
           <div className="space-y-2">
             {lines.map((l) => {
               const v = vendorByCode(l.vendor);
-              const acct = benAcct(v);
               const lineNet = (l.amount || 0) - (l.wht || 0);
-              const warn = !!l.vendor && !acct;
               return (
                 <div key={l.id} className="rounded-md border border-white-02 bg-white p-2.5">
                   {/* Phone: vendor takes its own row; amounts + remove share the second. */}
@@ -240,8 +236,8 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
                     <Button variant="ghost" size="icon" onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.id !== l.id) : ls))} className="size-9 text-gray-05 hover:text-destructive"><X className="size-4" /></Button>
                   </div>
                   <div className="mt-1.5 flex items-center justify-between font-mont text-[11px]">
-                    <span className={cn(warn ? "text-destructive" : "text-gray-05")}>
-                      {warn ? "This vendor has no bank account on file" : v ? `${benName(v)}${acct ? ` · ${acct}` : ""}` : "Pick a vendor to disburse to"}
+                    <span className="text-gray-05">
+                      {v ? `Paid to ${v.name}'s bank account on file` : "Pick a vendor to disburse to"}
                     </span>
                     {l.amount > 0 ? <span className="tabular-nums text-gray-05">Net {formatMoney(lineNet, currency)}</span> : null}
                   </div>
@@ -268,6 +264,7 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
   const [submitForApproval, { isLoading: routing }] = useSubmitPayoutBatchForApprovalMutation();
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "payout batch" });
   const batch = data?.data ?? null;
+  const access = useFieldAccess(PAYOUT);
   if (batchId == null) return null;
 
   const items = batch?.instructions ?? [];
@@ -299,14 +296,13 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
     catch { /* central */ }
   };
 
+  const accountLine = (p: PayoutInstruction) => [p.beneficiary_bank_code, p.beneficiary_account_number].filter(Boolean).join(" · ");
   const itemCols: Column<PayoutInstruction>[] = [
-    {
-      header: "Beneficiary", cell: (p) => {
-        const name = isStripped(p, "beneficiary_name") ? MASK : p.beneficiary_name || "-";
-        const acct = isStripped(p, "beneficiary_account_number") ? MASK : p.beneficiary_account_number || "";
-        return <span><span className="font-medium text-gray-01">{name}</span>{acct ? <span className="block font-mont text-[11px] tabular-nums text-gray-05">{p.beneficiary_bank_code ? `${p.beneficiary_bank_code} · ` : ""}{acct}</span> : null}</span>;
-      },
-    },
+    ...(access.anyVisible("beneficiary_name", "beneficiary_account_number", "beneficiary_bank_code") ? [{
+      header: "Beneficiary", cell: (p: PayoutInstruction) => (
+        <span>{access.isHidden("beneficiary_name") ? null : <span className="font-medium text-gray-01">{p.beneficiary_name || "-"}</span>}{accountLine(p) ? <span className="block font-mont text-[11px] tabular-nums text-gray-05">{accountLine(p)}</span> : null}</span>
+      ),
+    }] : []),
     { header: "Amount", align: "right", cell: (p) => <Money kobo={p.amount} currency={currency} align="right" /> },
     { header: "WHT", align: "right", cell: (p) => <span className="tabular-nums text-gray-05">{p.wht_amount ? formatMoney(p.wht_amount, currency) : "-"}</span> },
     { header: "Net", align: "right", cell: (p) => <span className="tabular-nums">{formatMoney(p.amount - (p.wht_amount || 0), currency)}</span> },
@@ -320,7 +316,7 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
         <span className="font-mont text-xs text-gray-05">{settled} settled · {failed} failed · {items.length} items</span>
         <div className="flex-1" />
         {awaitingApproval ? <span className={cn(PILL, "bg-amber-50 text-amber-700")}>Awaiting approval</span> : null}
-        <Button variant="outline" disabled={!items.length} onClick={() => batch && exportBankFile(batch.reference, items, currency)} className="gap-1.5"><Download className="size-4" /> Bank file</Button>
+        <Button variant="outline" disabled={!items.length} onClick={() => batch && exportBankFile(batch.reference, items, access, currency)} className="gap-1.5"><Download className="size-4" /> Bank file</Button>
         {canSubmit && gated !== false ? (
           <Can permission={P.PAY_SUBMIT_PAYOUT_BATCH}>
             <Button disabled={routing} onClick={doSubmitForApproval} className="gap-1.5"><Send className="size-4" />{routing ? "Submitting…" : "Submit for approval"}</Button>
@@ -347,12 +343,16 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
   );
 }
 
-function exportBankFile(reference: string, items: PayoutInstruction[], currency?: string | null) {
-  const head = ["Beneficiary", "Bank code", "Account", "Amount", "WHT", "Net", "Status"];
+/** The batch as a CSV. A beneficiary column the user cannot read is left out, not blanked. */
+function exportBankFile(reference: string, items: PayoutInstruction[], access: FieldAccess, currency?: string | null) {
+  const columns: [keyof PayoutInstruction & string, string][] = [
+    ["beneficiary_name", "Beneficiary"], ["beneficiary_bank_code", "Bank code"], ["beneficiary_account_number", "Account"],
+  ];
+  const beneficiary = columns.filter(([name]) => !access.isHidden(name));
+  const head = [...beneficiary.map(([, header]) => header), "Amount", "WHT", "Net", "Status"];
   const esc = (v: string | number | undefined) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const body = items.map((p) => [
-    isStripped(p, "beneficiary_name") ? "••••" : p.beneficiary_name, p.beneficiary_bank_code || "",
-    isStripped(p, "beneficiary_account_number") ? "••••" : p.beneficiary_account_number,
+    ...beneficiary.map(([name]) => String(p[name] ?? "")),
     formatMoney(p.amount, currency), p.wht_amount ? formatMoney(p.wht_amount, currency) : "",
     formatMoney(p.amount - (p.wht_amount || 0), currency), p.status,
   ].map(esc).join(","));

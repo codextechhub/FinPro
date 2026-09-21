@@ -3,8 +3,9 @@
  * through a payment gateway (Paystack / Fake-for-dev). Money transferred
  * to a customer's number arrives as a Collection that reconciles to their AR.
  *
- * The funding account number/name are FLS-stripped unless the caller holds
- * payments.virtual_account.view_sensitive → render "••••" rather than crash.
+ * The funding account number and name follow Field Access on
+ * `payments.virtual_account`: a hidden one has no column and no line in the
+ * drawer. The provider issues both, so neither is ever edited here.
  * No prototype exists for this screen; built in the house theme to match AR.
  */
 
@@ -14,14 +15,13 @@ import { toast } from "sonner";
 import { Plus, Search, Landmark, Power, PowerOff } from "lucide-react";
 import {
   DataTable, StatusPill, Money, DetailDrawer, FormField,
-  CustomerPicker, AccountPicker, toArray, type Column,
+  CustomerPicker, AccountPicker, toArray, useFieldAccess, type Column,
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
 import { P } from "../../../permissions";
-import { isStripped } from "@/utils/fls";
 import {
   useGetVirtualAccountsQuery, useCreateVirtualAccountMutation,
   useUpdateVirtualAccountMutation, useGetCollectionsQuery,
@@ -50,10 +50,8 @@ function Initials({ name }: { name: string }) {
   return <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-pry-01 font-mont text-[10px] font-semibold text-primary">{init || "-"}</span>;
 }
 
-function masked(va: VirtualAccount, field: "account_number" | "account_name"): React.ReactNode {
-  if (isStripped(va, field)) return <span className="text-gray-05" title="Hidden - needs the view-sensitive grant">••••</span>;
-  return va[field] || "-";
-}
+/** Field Access resource for a virtual account. */
+const VIRTUAL_ACCOUNT = "payments.virtual_account";
 
 export function VirtualAccountsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [searchInput, setSearchInput] = useState("");
@@ -74,6 +72,7 @@ export function VirtualAccountsTab({ entity, currency }: { entity: string; curre
   const rows = data?.data ?? [];
   const pg = data?.pagination;
   const kpis = data?.kpis;
+  const access = useFieldAccess(VIRTUAL_ACCOUNT);
 
   const columns: Column<VirtualAccount>[] = [
     { header: "Customer", cell: (v) => (
@@ -83,7 +82,7 @@ export function VirtualAccountsTab({ entity, currency }: { entity: string; curre
       </span>
     ) },
     { header: "Bank", cell: (v) => v.bank_name || "-" },
-    { header: "Account number", cell: (v) => <span className="tabular-nums">{masked(v, "account_number")}</span> },
+    ...(access.isHidden("account_number") ? [] : [{ header: "Account number", cell: (v: VirtualAccount) => <span className="tabular-nums">{v.account_number || "-"}</span> }]),
     { header: "Provider", cell: (v) => providerLabel(v.provider) },
     { header: "Status", cell: (v) => <StatusPill status={v.status} /> },
   ];
@@ -149,6 +148,7 @@ function VirtualAccountDetailDrawer({ va, entity, currency, onClose, onUpdated }
   onClose: () => void; onUpdated: (v: VirtualAccount) => void;
 }) {
   const { can } = useCan();
+  const access = useFieldAccess(VIRTUAL_ACCOUNT, va);
   const [update, { isLoading }] = useUpdateVirtualAccountMutation();
   const { data: collData, isFetching: collLoading } = useGetCollectionsQuery(
     { entity, virtual_account: va?.id ?? 0 }, { skip: !va });
@@ -189,8 +189,8 @@ function VirtualAccountDetailDrawer({ va, entity, currency, onClose, onUpdated }
           <Field label="Provider">{providerLabel(va.provider)}</Field>
           <Field label="Bank">{va.bank_name || "-"}</Field>
           <Field label="Currency">{va.currency_code || "-"}</Field>
-          <Field label="Account number">{masked(va, "account_number")}</Field>
-          <Field label="Account name">{masked(va, "account_name")}</Field>
+          {access.isHidden("account_number") ? null : <Field label="Account number">{va.account_number || "-"}</Field>}
+          {access.isHidden("account_name") ? null : <Field label="Account name">{va.account_name || "-"}</Field>}
           <Field label="Provider reference">{va.provider_reference || "-"}</Field>
           <Field label="Deposit (GL) account">{va.deposit_account_code ? `${va.deposit_account_code} · ${va.deposit_account_name}` : "-"}</Field>
           <Field label="Created">{new Date(va.created_at).toLocaleDateString()}</Field>

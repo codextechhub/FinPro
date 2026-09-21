@@ -1,5 +1,7 @@
-// vs_procurement types - mirror the serializers. Money is integer kobo. Vendor
-// bank fields are FLS-stripped unless procurement.vendor.view_sensitive.
+// vs_procurement types - mirror the serializers. Money is integer kobo. A
+// vendor's contact and banking fields carry Field Access switches: a field the
+// caller cannot read is absent, so each is optional, and the vendor detail
+// response lists the present ones they cannot change in `_read_only_fields`.
 
 export interface VendorCategory {
   id: number;
@@ -34,9 +36,10 @@ export interface Vendor {
   phone?: string;
   address?: string;
   tax_id?: string;
-  bank_name?: string; // FLS
-  bank_account_number?: string; // FLS
-  bank_account_name?: string; // FLS
+  bank_name?: string;
+  bank_code?: string;
+  bank_account_number?: string;
+  bank_account_name?: string;
   payable_account_id?: number | null;
   payable_code?: string | null;
   default_expense_account_id?: number | null;
@@ -50,7 +53,7 @@ export interface Vendor {
   is_active: boolean;
   active_po_count?: number;
   contacts?: Array<{ id?: number; name: string; email: string; phone: string; is_primary: boolean; receives_rfqs: boolean; receives_purchase_orders: boolean; is_active: boolean }>;
-  _stripped_fields?: string[];
+  _read_only_fields?: string[];
 }
 
 export interface VendorSummary {

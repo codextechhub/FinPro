@@ -7,8 +7,12 @@
  * Backed by the real model: initiate asks the provider to transfer out (PROCESSING); the
  * ledger entry books on confirmation (webhook / PSP), never here. A payout settles a
  * vendor's payable, so it books a VendorPayment (Dr AP / Cr bank) - the recap mirrors that
- * real journal. Beneficiary name/account are FLS-masked to •••• without
- * payments.payout.view_sensitive. Settlement is webhook-driven - no fake "re-verify".
+ * real journal. Settlement is webhook-driven - no fake "re-verify".
+ *
+ * Beneficiary fields follow Field Access on `payments.payout`: a hidden one has
+ * no column and no line in the drawer. None of them is writable by anyone: the
+ * backend copies the beneficiary from the vendor's verified record, so the New
+ * payout form shows them greyed, filled from the vendor, and never sends them.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -16,24 +20,24 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Plus, Layers, Banknote } from "lucide-react";
-import { DataTable, Money, MoneyInput, DetailDrawer, FormField, VendorPicker, AccountPicker, PostingRecap, KpiCard, toArray, type Column, type RecapRow } from "@/components/finance-ui";
+import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, VendorPicker, AccountPicker, PostingRecap, KpiCard, toArray, useFieldAccess, fieldWriteErrors, type Column, type FieldErrors, type RecapRow } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { isStripped } from "@/utils/fls";
 import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import { useGetPayoutsQuery, useGetPayoutsSummaryQuery, useInitiatePayoutMutation } from "@/redux/services/payments/payments-api";
-import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
+import { useGetVendorQuery, useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
 import { useGetAccountsQuery } from "@/redux/services/finance/setup-api";
 import type { PayoutInstruction } from "@/redux/services/payments/payments-types";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const fmtDateTime = (s?: string | null) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "-");
-const MASK = "••••";
+/** Field Access resource for a payout instruction. */
+const PAYOUT = "payments.payout";
 
 // payout status → prototype group (Pending / Settled / Failed)
 const STATUS_GROUP: Record<string, "PENDING" | "PAID" | "FAILED"> = {
@@ -67,8 +71,8 @@ function Select({ value, onChange, children, className }: { value: string; onCha
   );
 }
 
-const beneficiary = (p: PayoutInstruction) => (isStripped(p, "beneficiary_name") ? MASK : p.beneficiary_name || "-");
-const account = (p: PayoutInstruction) => (isStripped(p, "beneficiary_account_number") ? MASK : p.beneficiary_account_number || "");
+/** Bank code and account number on one line, leaving out whichever is hidden or blank. */
+const accountLine = (p: PayoutInstruction) => [p.beneficiary_bank_code, p.beneficiary_account_number].filter(Boolean).join(" · ");
 
 export function PayoutsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const navigate = useNavigate();
@@ -90,11 +94,13 @@ export function PayoutsTab({ entity, currency }: { entity: string; currency?: st
   const rows = useMemo(() => toArray<PayoutInstruction>(data?.data), [data]);
   const pg = data?.pagination;
   const s = summaryRes?.data;
+  const access = useFieldAccess(PAYOUT);
+  const showRecipient = access.anyVisible("beneficiary_name", "beneficiary_account_number", "beneficiary_bank_code");
 
   const columns: Column<PayoutInstruction>[] = [
     { header: "Reference", cell: (p) => <span className="font-semibold tabular-nums text-gray-01">{p.reference}</span> },
     { header: "Created", cell: (p) => <span className="tabular-nums text-gray-05">{fmtDateTime(p.created_at)}</span> },
-    { header: "Recipient", cell: (p) => <span><span className="font-medium text-gray-01">{beneficiary(p)}</span>{account(p) ? <span className="block font-mont text-[11px] tabular-nums text-gray-05">{p.beneficiary_bank_code ? `${p.beneficiary_bank_code} · ` : ""}{account(p)}</span> : null}</span> },
+    ...(showRecipient ? [{ header: "Recipient", cell: (p: PayoutInstruction) => <span>{access.isHidden("beneficiary_name") ? null : <span className="font-medium text-gray-01">{p.beneficiary_name || "-"}</span>}{accountLine(p) ? <span className="block font-mont text-[11px] tabular-nums text-gray-05">{accountLine(p)}</span> : null}</span> }] : []),
     { header: "Provider", cell: (p) => <ProviderTag provider={p.provider} /> },
     { header: "Amount", align: "right", cell: (p) => <Money kobo={p.amount} currency={currency} align="right" /> },
     { header: "Status", cell: (p) => <StatusPill status={p.status} /> },
@@ -171,6 +177,7 @@ function TimelineStep({ done, current, title, sub }: { done: boolean; current?: 
 
 function PayoutDrawer({ payoutId, payouts, currency, onClose }: { payoutId: number | null; payouts: PayoutInstruction[]; currency?: string | null; onClose: () => void }) {
   const p = useMemo(() => payouts.find((x) => x.id === payoutId) ?? null, [payouts, payoutId]);
+  const access = useFieldAccess(PAYOUT, p);
   if (payoutId == null || !p) return null;
 
   const paid = p.status === "PAID";
@@ -181,7 +188,7 @@ function PayoutDrawer({ payoutId, payouts, currency, onClose }: { payoutId: numb
 
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title={p.reference} description={`${beneficiary(p)} · ${formatMoney(p.amount, currency)}`} widthClass="sm:max-w-2xl"
+      title={p.reference} description={[...(access.isHidden("beneficiary_name") ? [] : [p.beneficiary_name || "-"]), formatMoney(p.amount, currency)].join(" · ")} widthClass="sm:max-w-2xl"
       footer={<StatusPill status={p.status} />}>
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -215,7 +222,7 @@ function PayoutDrawer({ payoutId, payouts, currency, onClose }: { payoutId: numb
   );
 }
 
-function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {
+export function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {
   const [vendor, setVendor] = useState("");
   const [name, setName] = useState("");
   const [acct, setAcct] = useState("");
@@ -224,42 +231,52 @@ function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boolean; o
   const [amount, setAmount] = useState(0);
   const [provider, setProvider] = useState("PAYSTACK");
   const [narration, setNarration] = useState("");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [initiate, { isLoading }] = useInitiatePayoutMutation();
+  const access = useFieldAccess(PAYOUT);
 
-  // Vendor prefill: when a vendor is picked, fill the beneficiary fields from its
-  // saved bank details (editable). RTK dedupes this with the picker's own query.
   const { data: vendorsData } = useGetVendorsQuery({ entity });
   const { data: acctData } = useGetAccountsQuery({ entity });
   const acctName = (code: string) => toArray(acctData?.data).find((a) => a.code === code)?.name;
-  // Prefill beneficiary fields once per selected vendor, as soon as its row is
-  // available - adjusted during render so a background vendor refetch never
-  // clobbers edits the user made after picking.
+  // The list row carries no bank details, so the picked vendor's record supplies them.
   const vendorRow = vendor ? toArray(vendorsData?.data).find((x) => x.code === vendor) : undefined;
+  const { data: vendorDetailData } = useGetVendorQuery({ id: vendorRow?.id ?? 0, entity }, { skip: !vendorRow });
+  const vendorDetail = vendorRow && vendorDetailData?.data?.id === vendorRow.id ? vendorDetailData.data : undefined;
+  const vendorAccess = useFieldAccess("procurement.vendor", vendorDetail);
+  const showAcct = !vendorAccess.isHidden("bank_account_number");
+  const showCode = !vendorAccess.isHidden("bank_code");
+  // Prefill once per vendor, during render, so a refetch never clobbers later edits.
   const [prefilledFor, setPrefilledFor] = useState<string | null>(null);
-  if (vendor && vendorRow && prefilledFor !== vendor) {
+  if (vendor && vendorDetail && prefilledFor !== vendor) {
     setPrefilledFor(vendor);
-    setName(vendorRow.bank_account_name || vendorRow.name);
-    setAcct(vendorRow.bank_account_number || "");
+    setName(vendorDetail.bank_account_name || vendorDetail.name);
+    setAcct(vendorDetail.bank_account_number || "");
+    setBankCode(vendorDetail.bank_code || "");
   }
   if (!vendor && prefilledFor !== null) setPrefilledFor(null);
 
   const close = () => {
     setVendor(""); setName(""); setAcct(""); setBankCode("");
-    setSourceAccount(""); setAmount(0); setProvider("PAYSTACK"); setNarration(""); onClose();
+    setSourceAccount(""); setAmount(0); setProvider("PAYSTACK"); setNarration(""); setDenied(null); onClose();
   };
 
-  const valid = amount > 0 && !!vendor && name.trim() && acct.trim();
+  const valid = amount > 0 && !!vendor;
 
   const submit = async () => {
+    setDenied(null);
     try {
       await initiate({
-        entity, vendor, amount, beneficiary_name: name.trim(), beneficiary_account_number: acct.trim(),
-        beneficiary_bank_code: bankCode.trim() || undefined, provider,
-        source_account: sourceAccount || undefined, narration: narration.trim() || undefined,
+        entity, vendor, amount,
+        ...access.writableOnly({
+          beneficiary_name: name.trim() || undefined,
+          beneficiary_account_number: acct.trim() || undefined,
+          beneficiary_bank_code: bankCode.trim() || undefined,
+        }),
+        provider, source_account: sourceAccount || undefined, narration: narration.trim() || undefined,
       }).unwrap();
       toast.success("Payout sent to the provider.");
       close();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   const dr: RecapRow[] = [{ code: "", name: "Accounts payable (vendor)", amount: amount || 0 }];
@@ -275,14 +292,16 @@ function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boolean; o
       <div className="space-y-4">
         <FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={setVendor} /></FormField>
 
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Recipient name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Beneficiary" className="h-9 bg-white" /></FormField>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <AccessField access={access} name="beneficiary_name" label="Recipient name" errors={denied}><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="From the vendor's bank details" className="h-9 bg-white" /></AccessField>
           <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></FormField>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Account number" required><Input value={acct} onChange={(e) => setAcct(e.target.value)} placeholder="0123456789" className="h-9 bg-white" /></FormField>
-          <FormField label="Bank code"><Input value={bankCode} onChange={(e) => setBankCode(e.target.value)} placeholder="e.g. 058" className="h-9 bg-white" /></FormField>
-        </div>
+        {(showAcct && !access.isHidden("beneficiary_account_number")) || (showCode && !access.isHidden("beneficiary_bank_code")) ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {showAcct ? <AccessField access={access} name="beneficiary_account_number" label="Account number" errors={denied}><Input value={acct} onChange={(e) => setAcct(e.target.value)} placeholder="From the vendor's bank details" className="h-9 bg-white" /></AccessField> : null}
+            {showCode ? <AccessField access={access} name="beneficiary_bank_code" label="Bank code" errors={denied}><Input value={bankCode} onChange={(e) => setBankCode(e.target.value)} placeholder="From the vendor's bank details" className="h-9 bg-white" /></AccessField> : null}
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-2 gap-3">
           <div><p className="mb-1 font-mont text-xs text-gray-05">Provider</p><Select value={provider} onChange={setProvider} className="w-full">{Object.entries(PROVIDERS).map(([v, pr]) => <option key={v} value={v}>{pr.label}</option>)}</Select></div>

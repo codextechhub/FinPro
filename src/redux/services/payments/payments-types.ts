@@ -1,6 +1,8 @@
 // vs_payments gateway types - collections (cash-in), virtual accounts, payouts
-// (cash-out) and batches. Bank/beneficiary fields are FLS-stripped unless the
-// caller holds the matching *.view_sensitive grant (use @/utils/fls).
+// (cash-out) and batches. Bank and beneficiary fields carry Field Access
+// switches: a field the caller cannot read is absent, so each is optional, and a
+// detail response lists the present ones they cannot change in
+// `_read_only_fields`. Read them through `useFieldAccess`.
 
 export type CollectionStatus = "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "ABANDONED" | "REFUNDED";
 
@@ -34,16 +36,16 @@ export interface VirtualAccount {
   provider: string;
   customer_code: string | null;
   customer_name: string | null;
-  account_number?: string; // FLS - stripped without view_sensitive
+  account_number?: string; // Field Access: payments.virtual_account
   bank_name: string;
-  account_name?: string; // FLS
+  account_name?: string; // Field Access: payments.virtual_account
   provider_reference: string | null;
   deposit_account_code: string | null;
   deposit_account_name: string | null;
   currency_code: string | null;
   status: string;
   created_at: string;
-  _stripped_fields?: string[];
+  _read_only_fields?: string[];
 }
 
 export interface VirtualAccountKpis {
@@ -63,9 +65,9 @@ export interface PayoutInstruction {
   amount: number;
   amount_naira: string;
   status: string;
-  beneficiary_name?: string; // FLS
-  beneficiary_account_number?: string; // FLS
-  beneficiary_bank_code: string;
+  beneficiary_name?: string; // Field Access: payments.payout
+  beneficiary_account_number?: string; // Field Access: payments.payout
+  beneficiary_bank_code?: string; // Field Access: payments.payout
   narration: string;
   source_account_code: string | null;
   source_account_name: string | null;
@@ -74,14 +76,17 @@ export interface PayoutInstruction {
   failure_reason: string | null;
   confirmed_at: string | null;
   created_at: string;
-  _stripped_fields?: string[];
+  _read_only_fields?: string[];
 }
 
+/** One batch line. The beneficiary is copied from the vendor's verified record;
+ *  the beneficiary fields are compatibility inputs that are only compared with
+ *  it, and a caller sends them only where Field Access lets them write. */
 export interface PayoutBatchItemPayload {
   vendor: string | number;
   amount: number; // kobo
-  beneficiary_name: string;
-  beneficiary_account_number: string;
+  beneficiary_name?: string;
+  beneficiary_account_number?: string;
   beneficiary_bank_code?: string;
   wht_amount?: number; // kobo
   narration?: string;
@@ -101,8 +106,8 @@ export interface InitiatePayoutPayload {
   entity: string;
   vendor: string | number; // a payout settles the vendor's payable
   amount: number; // kobo
-  beneficiary_name: string;
-  beneficiary_account_number: string;
+  beneficiary_name?: string;
+  beneficiary_account_number?: string;
   beneficiary_bank_code?: string;
   source_account?: string;
   provider?: string;
@@ -239,14 +244,16 @@ export interface PayoutBatchKpis {
   drafts: number;
 }
 
-// Unified money-movement feed row (collections in + payouts out).
+// Unified money-movement feed row (collections in + payouts out). On a payout
+// row `party` and `beneficiary_account` are the beneficiary name and account
+// number, absent when Field Access on payments.payout hides them.
 export interface Movement {
   kind: "collection" | "payout";
   gateway_id: number;
   reference: string;
   created_at: string | null;
   direction: "in" | "out";
-  party: string;
+  party?: string;
   provider: string;
   amount: number;
   amount_naira: string;
@@ -258,7 +265,7 @@ export interface Movement {
   email: string;
   account_code: string | null;
   account_name: string | null;
-  beneficiary_account: string;
+  beneficiary_account?: string;
 }
 
 export interface MovementsSummary {

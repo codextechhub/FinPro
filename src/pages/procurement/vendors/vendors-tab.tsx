@@ -8,9 +8,10 @@ import {
 import { toast } from "sonner";
 
 import {
-  AccountPicker, DataTable, DetailDrawer, ErrorState, FormDrawer,
+  AccessField, AccountPicker, DataTable, DetailDrawer, ErrorState, FormDrawer,
   FormField, LoadingState, StatCard, StatusPill, TabStrip, TaxCodePicker, toArray,
-  type Column, type TabStripItem,
+  fieldWriteErrors, useFieldAccess,
+  type Column, type FieldAccess, type FieldErrors, type TabStripItem,
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
@@ -29,7 +30,6 @@ import { useGetContractsQuery } from "@/redux/services/procurement/procurement-e
 import type {
   PurchaseOrder, Vendor, VendorContract, VendorInsights, VendorInvoice,
 } from "@/redux/services/procurement/procurement-types";
-import { isStripped } from "@/utils/fls";
 import { formatMoney } from "@/utils/money";
 import { CategoryPicker } from "../pickers";
 import { buildVendorUpdatePayload, type VendorFormValues } from "./vendor-update-payload";
@@ -44,6 +44,10 @@ const DETAIL_TABS = [
   ["performance", "Performance", TrendingUp],
 ] as const;
 const PAYMENT_TERMS = ["NET_0", "NET_7", "NET_14", "NET_30", "NET_60", "NET_90"];
+/** Field Access resource for a vendor: its contact and banking fields carry switches. */
+const VENDOR = "procurement.vendor";
+const CONTACT_FIELDS = ["email", "phone", "address", "contacts"];
+const PAYMENT_FIELDS = ["bank_name", "bank_account_number", "bank_account_name"];
 
 /** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
 const STATUS_TAB_ITEMS: TabStripItem<(typeof STATUS_TABS)[number][1]>[] = STATUS_TABS.map(([label, value]) => ({ value, label }));
@@ -51,6 +55,8 @@ const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label,
   value,
   label: <><Icon className="size-3.5" />{label}</>,
 }));
+/** The Contacts tab holds nothing but contact fields, so it goes when they are all hidden. */
+const NO_CONTACTS_TAB_ITEMS = DETAIL_TAB_ITEMS.filter((item) => item.value !== "contacts");
 
 function isForbidden(error: unknown) {
   return !!error && typeof error === "object" && "status" in error && error.status === 403;
@@ -172,7 +178,7 @@ export function VendorsTab({ entity, currency }: { entity: string; currency?: st
     </section>
 
     <VendorDrawer key={selectedId ?? "closed"} id={selectedId} entity={entity} currency={currency} onClose={() => setSelectedId(null)} />
-    {creating && <VendorForm entity={entity} canSensitive={can(P.PROC_VIEW_VENDOR_SENSITIVE)} canManage={can(P.PROC_MANAGE_VENDOR)} onClose={() => setCreating(false)} />}
+    {creating && <VendorForm entity={entity} canManage={can(P.PROC_MANAGE_VENDOR)} onClose={() => setCreating(false)} />}
   </>;
 }
 
@@ -188,6 +194,8 @@ function VendorDrawer({ id, entity, currency, onClose }: { id: number | null; en
   const [editing, setEditing] = useState(false);
   const { data, isLoading, isError, refetch } = useGetVendorQuery({ id: id!, entity }, { skip: id == null });
   const vendor = data?.data;
+  const access = useFieldAccess(VENDOR, vendor);
+  const showContacts = access.anyVisible(...CONTACT_FIELDS);
   const reportAllowed = can(P.PROC_VIEW_PROC_REPORTS);
   const contractAllowed = can(P.PROC_VIEW_CONTRACTS);
   const poAllowed = can(P.PROC_VIEW_PURCHASE_ORDERS);
@@ -211,7 +219,7 @@ function VendorDrawer({ id, entity, currency, onClose }: { id: number | null; en
       {isLoading ? <LoadingState /> : isError || !vendor ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
         <div className="flex flex-wrap gap-1.5"><StatusPill status={vendorState(vendor)} /><StatusPill status={vendor.kyc_status} /><StatusPill status={vendor.risk} /></div>
         <TabStrip
-          items={DETAIL_TAB_ITEMS}
+          items={showContacts ? DETAIL_TAB_ITEMS : NO_CONTACTS_TAB_ITEMS}
           value={tab}
           onChange={setTab}
           variant="underline"
@@ -219,30 +227,36 @@ function VendorDrawer({ id, entity, currency, onClose }: { id: number | null; en
           className="w-full gap-1"
           buttonClassName="flex items-center gap-1.5 px-3"
         />
-        {tab === "profile" && <ProfileTab vendor={vendor} insights={reportAllowed ? insights : undefined} currency={currency} reportRestricted={!reportAllowed} />}
-        {tab === "contacts" && <ContactsTab vendor={vendor} />}
-        {tab === "bank" && <BankTab vendor={vendor} />}
+        {tab === "profile" && <ProfileTab vendor={vendor} access={access} insights={reportAllowed ? insights : undefined} currency={currency} reportRestricted={!reportAllowed} />}
+        {tab === "contacts" && showContacts && <ContactsTab vendor={vendor} access={access} />}
+        {tab === "bank" && <BankTab vendor={vendor} access={access} />}
         {tab === "history" && <HistoryTab contracts={contracts} pos={pos} invoices={invoices} loading={contractsLoading || posLoading || invoicesLoading} contractAllowed={contractAllowed} poAllowed={poAllowed} invoiceAllowed={invoiceAllowed} currency={currency} />}
         {tab === "performance" && <PerformanceTab insights={insights} loading={insightLoading} error={insightError} restricted={!reportAllowed} currency={currency} />}
       </div>}
     </DetailDrawer>
-    {editing && vendor && <VendorForm key={vendor.id} entity={entity} initial={vendor} canSensitive={can(P.PROC_VIEW_VENDOR_SENSITIVE)} canManage={can(P.PROC_MANAGE_VENDOR)} onClose={() => setEditing(false)} />}
+    {editing && vendor && <VendorForm key={vendor.id} entity={entity} initial={vendor} canManage={can(P.PROC_MANAGE_VENDOR)} onClose={() => setEditing(false)} />}
   </>;
 }
 
-function ProfileTab({ vendor, insights, currency, reportRestricted }: { vendor: Vendor; insights?: VendorInsights; currency?: string | null; reportRestricted: boolean }) {
-  return <div className="space-y-5"><dl className="grid grid-cols-1 gap-4 sm:grid-cols-2"><Field label="Vendor code" value={vendor.code} /><Field label="Category" value={vendor.category_code || "Uncategorised"} /><Field label="Payment terms" value={titleCase(vendor.payment_terms)} /><Field label="Payable account" value={vendor.payable_code} /><Field label="Default expense" value={vendor.default_expense_code} /><Field label="Default WHT" value={vendor.default_wht_tax_code_value} /><Field label="YTD spend" value={reportRestricted ? "Restricted" : formatMoney(insights?.spend_ytd || 0, currency)} /><Field label="Active purchase orders" value={vendor.active_po_count ?? insights?.po_count ?? 0} /></dl><div><p className="mb-2 font-mont text-xs font-semibold text-black-01">Registered address</p><div className="rounded-md border border-white-02 p-3"><Field label="Address" value={isStripped(vendor, "address") ? "Restricted" : vendor.address} prose /></div></div></div>;
+function ProfileTab({ vendor, access, insights, currency, reportRestricted }: { vendor: Vendor; access: FieldAccess; insights?: VendorInsights; currency?: string | null; reportRestricted: boolean }) {
+  return <div className="space-y-5"><dl className="grid grid-cols-1 gap-4 sm:grid-cols-2"><Field label="Vendor code" value={vendor.code} /><Field label="Category" value={vendor.category_code || "Uncategorised"} /><Field label="Payment terms" value={titleCase(vendor.payment_terms)} /><Field label="Payable account" value={vendor.payable_code} /><Field label="Default expense" value={vendor.default_expense_code} /><Field label="Default WHT" value={vendor.default_wht_tax_code_value} /><Field label="YTD spend" value={reportRestricted ? "Restricted" : formatMoney(insights?.spend_ytd || 0, currency)} /><Field label="Active purchase orders" value={vendor.active_po_count ?? insights?.po_count ?? 0} /></dl>{access.isHidden("address") ? null : <div><p className="mb-2 font-mont text-xs font-semibold text-black-01">Registered address</p><div className="rounded-md border border-white-02 p-3"><Field label="Address" value={vendor.address} prose /></div></div>}</div>;
 }
-function ContactsTab({ vendor }: { vendor: Vendor }) {
-  const restricted = isStripped(vendor, "email") || isStripped(vendor, "phone");
-  if (restricted) return <EmptyPanel>Contact details are restricted to users with sensitive vendor access.</EmptyPanel>;
-  return <div className="space-y-3"><div className="flex items-start gap-3 rounded-md border border-white-02 p-4"><Mail className="mt-0.5 size-4 text-primary" /><Field label="Primary email" value={vendor.email} /></div>{(vendor.contacts || []).map((contact) => <div key={contact.id || contact.email} className="flex items-start gap-3 rounded-md border border-white-02 p-4"><Users className="mt-0.5 size-4 text-primary" /><div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2"><Field label={contact.is_primary ? "Primary vendor contact" : "Vendor contact"} value={contact.name || contact.email} /><Field label="Email" value={contact.email} /><Field label="Phone" value={contact.phone} /><Field label="Receives RFQs" value={contact.receives_rfqs && contact.is_active ? "Yes" : "No"} /><Field label="Receives purchase orders" value={contact.receives_purchase_orders && contact.is_active ? "Yes" : "No"} /></div></div>)}<div className="flex items-start gap-3 rounded-md border border-white-02 p-4"><Phone className="mt-0.5 size-4 text-primary" /><Field label="Primary phone" value={vendor.phone} /></div><div className="flex items-start gap-3 rounded-md border border-white-02 p-4"><MapPin className="mt-0.5 size-4 text-primary" /><Field label="Registered office" value={vendor.address} prose /></div></div>;
+/** A vendor's contact details. Each block appears only when its field is visible to this user. */
+function ContactsTab({ vendor, access }: { vendor: Vendor; access: FieldAccess }) {
+  return <div className="space-y-3">
+    {access.isHidden("email") ? null : <div className="flex items-start gap-3 rounded-md border border-white-02 p-4"><Mail className="mt-0.5 size-4 text-primary" /><Field label="Primary email" value={vendor.email} /></div>}
+    {access.isHidden("contacts") ? null : (vendor.contacts || []).map((contact) => <div key={contact.id || contact.email} className="flex items-start gap-3 rounded-md border border-white-02 p-4"><Users className="mt-0.5 size-4 text-primary" /><div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2"><Field label={contact.is_primary ? "Primary vendor contact" : "Vendor contact"} value={contact.name || contact.email} /><Field label="Email" value={contact.email} /><Field label="Phone" value={contact.phone} /><Field label="Receives RFQs" value={contact.receives_rfqs && contact.is_active ? "Yes" : "No"} /><Field label="Receives purchase orders" value={contact.receives_purchase_orders && contact.is_active ? "Yes" : "No"} /></div></div>)}
+    {access.isHidden("phone") ? null : <div className="flex items-start gap-3 rounded-md border border-white-02 p-4"><Phone className="mt-0.5 size-4 text-primary" /><Field label="Primary phone" value={vendor.phone} /></div>}
+    {access.isHidden("address") ? null : <div className="flex items-start gap-3 rounded-md border border-white-02 p-4"><MapPin className="mt-0.5 size-4 text-primary" /><Field label="Registered office" value={vendor.address} prose /></div>}
+  </div>;
 }
-function BankTab({ vendor }: { vendor: Vendor }) {
-  const restricted = isStripped(vendor, "bank_account_number") || isStripped(vendor, "tax_id");
-  if (restricted) return <EmptyPanel>Bank, tax, and contact data are redacted by backend field-level security.</EmptyPanel>;
+/** Payment and compliance. The payment section goes when all its fields are hidden; compliance always has status to show. */
+function BankTab({ vendor, access }: { vendor: Vendor; access: FieldAccess }) {
   const account = vendor.bank_account_number ? `•••• ${vendor.bank_account_number.slice(-4)}` : "-";
-  return <div className="space-y-5"><section><div className="mb-3 flex items-center gap-2"><Landmark className="size-4 text-primary" /><h3 className="font-mont text-sm font-semibold">Payment information</h3></div><dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Bank" value={vendor.bank_name} /><Field label="Account number" value={account} /><Field label="Account name" value={vendor.bank_account_name} /></dl></section><section><div className="mb-3 flex items-center gap-2"><ShieldCheck className="size-4 text-primary" /><h3 className="font-mont text-sm font-semibold">Compliance status</h3></div><dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Tax identifier" value={vendor.tax_id} /><Field label="KYC status" value={<StatusPill status={vendor.kyc_status} />} /><Field label="Risk level" value={<StatusPill status={vendor.risk} />} /><Field label="Purchasing status" value={<StatusPill status={vendorState(vendor)} />} /></dl><p className="mt-3 text-xs text-gray-05">Verification documents and KYC results are not stored by the current Procurement service, so none are implied here.</p></section></div>;
+  return <div className="space-y-5">
+    {access.anyVisible(...PAYMENT_FIELDS) ? <section><div className="mb-3 flex items-center gap-2"><Landmark className="size-4 text-primary" /><h3 className="font-mont text-sm font-semibold">Payment information</h3></div><dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">{access.isHidden("bank_name") ? null : <Field label="Bank" value={vendor.bank_name} />}{access.isHidden("bank_account_number") ? null : <Field label="Account number" value={account} />}{access.isHidden("bank_account_name") ? null : <Field label="Account name" value={vendor.bank_account_name} />}</dl></section> : null}
+    <section><div className="mb-3 flex items-center gap-2"><ShieldCheck className="size-4 text-primary" /><h3 className="font-mont text-sm font-semibold">Compliance status</h3></div><dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">{access.isHidden("tax_id") ? null : <Field label="Tax identifier" value={vendor.tax_id} />}<Field label="KYC status" value={<StatusPill status={vendor.kyc_status} />} /><Field label="Risk level" value={<StatusPill status={vendor.risk} />} /><Field label="Purchasing status" value={<StatusPill status={vendorState(vendor)} />} /></dl><p className="mt-3 text-xs text-gray-05">Verification documents and KYC results are not stored by the current Procurement service, so none are implied here.</p></section>
+  </div>;
 }
 function HistoryTab({ contracts, pos, invoices, loading, contractAllowed, poAllowed, invoiceAllowed, currency }: { contracts: VendorContract[]; pos: PurchaseOrder[]; invoices: VendorInvoice[]; loading: boolean; contractAllowed: boolean; poAllowed: boolean; invoiceAllowed: boolean; currency?: string | null }) {
   if (loading) return <LoadingState rows={4} />;
@@ -266,7 +280,15 @@ function Metric({ label, value }: { label: string; value: string }) {
   return <div className="rounded-md border border-white-02 p-3"><p className="font-mont text-[11px] text-gray-05">{label}</p><p className="mt-1 font-mont text-sm font-semibold tabular-nums">{value}</p></div>;
 }
 
-function VendorForm({ entity, initial, canSensitive, canManage, onClose }: { entity: string; initial?: Vendor; canSensitive: boolean; canManage: boolean; onClose: () => void }) {
+/**
+ * Add or edit a vendor.
+ *
+ * Contact and banking fields follow Field Access on `procurement.vendor`: a
+ * hidden one is not on the form, a read-only one is greyed and never sent, and
+ * a section with nothing visible is left out. On edit the vendor's own
+ * `_read_only_fields` decides; on Add the signed-in user's map does.
+ */
+export function VendorForm({ entity, initial, canManage, onClose }: { entity: string; initial?: Vendor; canManage: boolean; onClose: () => void }) {
   const [name, setName] = useState(initial?.name || "");
   const [category, setCategory] = useState(initial?.category_code || "");
   const [email, setEmail] = useState(initial?.email || "");
@@ -285,28 +307,35 @@ function VendorForm({ entity, initial, canSensitive, canManage, onClose }: { ent
   const [onHold, setOnHold] = useState(initial?.on_hold || false);
   const [active, setActive] = useState(initial?.is_active ?? true);
   const [contacts, setContacts] = useState(() => (initial?.contacts || []).map((row) => ({ ...row, receives_purchase_orders: row.receives_purchase_orders ?? false })));
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [create, { isLoading: creating }] = useCreateVendorMutation();
   const [update, { isLoading: updating }] = useUpdateVendorMutation();
+  const access = useFieldAccess(VENDOR, initial);
   const values: VendorFormValues = { name, category, email, phone, address, taxId, bankName, bankNumber, bankAccountName, payable, expense, wht, terms, kyc, risk, onHold, active };
-  const updatePayload = initial ? buildVendorUpdatePayload(initial, values, { canSensitive, canManage }) : null;
-  const contactsDirty = JSON.stringify(contacts) !== JSON.stringify(initial?.contacts || []);
+  const updatePayload = initial ? buildVendorUpdatePayload(initial, values, { fields: access, canManage }) : null;
+  const contactsDirty = !access.isReadOnly("contacts") && JSON.stringify(contacts) !== JSON.stringify(initial?.contacts || []);
   const canSubmit = !!name.trim() && (!initial || Object.keys(updatePayload || {}).length > 0 || contactsDirty);
   const saving = creating || updating;
   const save = async () => {
-    const common = { name: name.trim(), category, payable_account: payable, default_expense_account: expense, default_wht_tax_code: wht, payment_terms: terms, ...(canSensitive ? { email, phone, address, tax_id: taxId, bank_name: bankName, bank_account_number: bankNumber, bank_account_name: bankAccountName, ...(contacts.length ? { contacts } : {}) } : {}) };
+    const guarded = access.writableOnly({ email, phone, address, tax_id: taxId, bank_name: bankName, bank_account_number: bankNumber, bank_account_name: bankAccountName, ...(contacts.length ? { contacts } : {}) }, { creating: true });
+    const common = { name: name.trim(), category, payable_account: payable, default_expense_account: expense, default_wht_tax_code: wht, payment_terms: terms, ...guarded };
+    setDenied(null);
     try {
       const result = initial
-        ? await update({ id: initial.id, entity, ...updatePayload, ...(canSensitive && contactsDirty ? { contacts } : {}) }).unwrap()
+        ? await update({ id: initial.id, entity, ...updatePayload, ...(contactsDirty ? { contacts } : {}) }).unwrap()
         : await create({ entity, ...common }).unwrap();
       toast.success(result.message || (initial ? "Vendor updated." : "Vendor created."));
       onClose();
-    } catch { /* central API handler renders field errors */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
+  const field = (fieldName: string, label: string, control: React.ReactNode, className?: string) => (
+    <AccessField access={access} name={fieldName} label={label} errors={denied} className={className}>{control}</AccessField>
+  );
   return <FormDrawer open onOpenChange={(open) => !open && onClose()} title={initial ? `Edit ${initial.name}` : "Add Vendor"} description={initial ? "Update the supplier master without rewriting historical transactions." : "Create a supplier master record. New vendors begin with KYC pending."} widthClass="sm:max-w-[720px]" onSubmit={save} submitText={initial ? "Save Changes" : "Create Vendor"} loading={saving} canSubmit={canSubmit}>
     <section className="space-y-3"><div className="flex items-center gap-2"><Building2 className="size-4 text-primary" /><p className="font-mont text-xs font-semibold text-black-01">Company</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><div className="sm:col-span-2"><FormField label="Company name" required><Input value={name} onChange={(event) => setName(event.target.value)} className="bg-white" /></FormField></div><FormField label="Category"><CategoryPicker entity={entity} value={category} onChange={setCategory} /></FormField><FormField label="Payment terms"><select value={terms} onChange={(event) => setTerms(event.target.value)} className="h-9 w-full rounded-md border bg-white px-3 font-mont text-sm">{PAYMENT_TERMS.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}</select></FormField></div></section>
-    {canSensitive ? <section className="space-y-3"><div className="flex items-center gap-2"><Users className="size-4 text-primary" /><p className="font-mont text-xs font-semibold text-black-01">Contact & tax</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FormField label="Email"><Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="bg-white" /></FormField><FormField label="Phone"><Input value={phone} onChange={(event) => setPhone(event.target.value)} className="bg-white" /></FormField><FormField label="Tax identifier"><Input value={taxId} onChange={(event) => setTaxId(event.target.value)} className="bg-white uppercase" /></FormField><div className="sm:col-span-2"><FormField label="Registered address"><Textarea value={address} onChange={(event) => setAddress(event.target.value)} className="min-h-20 bg-white" /></FormField></div></div><div className="rounded-md border border-white-02 p-3"><div className="flex items-center justify-between gap-3"><div><p className="font-mont text-xs font-semibold">Vendor contacts</p><p className="mt-1 text-[11px] text-gray-05">Choose who receives RFQs and approved purchase orders.</p></div><Button type="button" size="sm" variant="outline" onClick={() => setContacts((rows) => [...rows, { name: "", email: "", phone: "", is_primary: rows.length === 0, receives_rfqs: true, receives_purchase_orders: false, is_active: true }])}><Plus className="size-3.5" /> Add contact</Button></div><div className="mt-3 space-y-3">{contacts.map((contact, index) => <div key={contact.id || index} className="grid grid-cols-1 gap-2 rounded border border-white-02 bg-gray-50 p-3 sm:grid-cols-2"><Input value={contact.name} onChange={(event) => setContacts((rows) => rows.map((row, position) => position === index ? { ...row, name: event.target.value } : row))} placeholder="Contact name" /><Input type="email" value={contact.email} onChange={(event) => setContacts((rows) => rows.map((row, position) => position === index ? { ...row, email: event.target.value } : row))} placeholder="Contact email" /><Input value={contact.phone} onChange={(event) => setContacts((rows) => rows.map((row, position) => position === index ? { ...row, phone: event.target.value } : row))} placeholder="Phone (optional)" /><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-1.5 text-xs"><input type="radio" name="primary-contact" checked={contact.is_primary} onChange={() => setContacts((rows) => rows.map((row, position) => ({ ...row, is_primary: position === index })))} /> Primary</label><label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={contact.receives_rfqs} onChange={(event) => setContacts((rows) => rows.map((row, position) => position === index ? { ...row, receives_rfqs: event.target.checked } : row))} /> Receives RFQs</label><label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={contact.receives_purchase_orders} onChange={(event) => setContacts((rows) => rows.map((row, position) => position === index ? { ...row, receives_purchase_orders: event.target.checked } : row))} /> Receives purchase orders</label><Button type="button" size="icon" variant="ghost" className="ml-auto" onClick={() => setContacts((rows) => rows.filter((_, position) => position !== index))}><Trash2 className="size-4 text-destructive" /></Button></div></div>)}{contacts.length === 0 && <p className="py-2 text-center text-xs text-gray-05">The primary vendor email will be used until contacts are added.</p>}</div></div></section> : <div className="rounded-md border border-dashed border-white-02 p-3 text-xs text-gray-05">Contact, tax, and bank fields require sensitive vendor access.</div>}
+    {access.anyVisible("email", "phone", "tax_id", "address", "contacts") ? <section className="space-y-3"><div className="flex items-center gap-2"><Users className="size-4 text-primary" /><p className="font-mont text-xs font-semibold text-black-01">Contact & tax</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{field("email", "Email", <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="bg-white" />)}{field("phone", "Phone", <Input value={phone} onChange={(event) => setPhone(event.target.value)} className="bg-white" />)}{field("tax_id", "Tax identifier", <Input value={taxId} onChange={(event) => setTaxId(event.target.value)} className="bg-white uppercase" />)}{field("address", "Registered address", <Textarea value={address} onChange={(event) => setAddress(event.target.value)} className="min-h-20 bg-white" />, "sm:col-span-2")}</div>{access.isHidden("contacts") ? null : <AccessField access={access} name="contacts" errors={denied} className="rounded-md border border-white-02 p-3"><div className="flex items-center justify-between gap-3"><div><p className="font-mont text-xs font-semibold">Vendor contacts</p><p className="mt-1 text-[11px] text-gray-05">Choose who receives RFQs and approved purchase orders.</p></div><Button type="button" size="sm" variant="outline" onClick={() => setContacts((rows) => [...rows, { name: "", email: "", phone: "", is_primary: rows.length === 0, receives_rfqs: true, receives_purchase_orders: false, is_active: true }])}><Plus className="size-3.5" /> Add contact</Button></div><div className="mt-3 space-y-3">{contacts.map((contact, index) => <div key={contact.id || index} className="grid grid-cols-1 gap-2 rounded border border-white-02 bg-gray-50 p-3 sm:grid-cols-2"><Input value={contact.name} onChange={(event) => setContacts((rows) => rows.map((row, position) => position === index ? { ...row, name: event.target.value } : row))} placeholder="Contact name" /><Input type="email" value={contact.email} onChange={(event) => setContacts((rows) => rows.map((row, position) => position === index ? { ...row, email: event.target.value } : row))} placeholder="Contact email" /><Input value={contact.phone} onChange={(event) => setContacts((rows) => rows.map((row, position) => position === index ? { ...row, phone: event.target.value } : row))} placeholder="Phone (optional)" /><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-1.5 text-xs"><input type="radio" name="primary-contact" checked={contact.is_primary} onChange={() => setContacts((rows) => rows.map((row, position) => ({ ...row, is_primary: position === index })))} /> Primary</label><label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={contact.receives_rfqs} onChange={(event) => setContacts((rows) => rows.map((row, position) => position === index ? { ...row, receives_rfqs: event.target.checked } : row))} /> Receives RFQs</label><label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={contact.receives_purchase_orders} onChange={(event) => setContacts((rows) => rows.map((row, position) => position === index ? { ...row, receives_purchase_orders: event.target.checked } : row))} /> Receives purchase orders</label><Button type="button" size="icon" variant="ghost" className="ml-auto" onClick={() => setContacts((rows) => rows.filter((_, position) => position !== index))}><Trash2 className="size-4 text-destructive" /></Button></div></div>)}{contacts.length === 0 && <p className="py-2 text-center text-xs text-gray-05">The primary vendor email will be used until contacts are added.</p>}</div></AccessField>}</section> : null}
     <section className="space-y-3"><div className="flex items-center gap-2"><CircleDollarSign className="size-4 text-primary" /><p className="font-mont text-xs font-semibold text-black-01">Accounting defaults</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FormField label="Payable account"><AccountPicker entity={entity} value={payable} onChange={setPayable} accountType="LIABILITY" postableOnly /></FormField><FormField label="Default expense account"><AccountPicker entity={entity} value={expense} onChange={setExpense} accountType="EXPENSE" postableOnly /></FormField><FormField label="Default WHT code"><TaxCodePicker entity={entity} value={wht} onChange={setWht} placeholder="No default WHT" /></FormField></div></section>
-    {canSensitive && <section className="space-y-3"><div className="flex items-center gap-2"><Landmark className="size-4 text-primary" /><p className="font-mont text-xs font-semibold text-black-01">Bank details</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FormField label="Bank"><Input value={bankName} onChange={(event) => setBankName(event.target.value)} className="bg-white" /></FormField><FormField label="Account number"><Input value={bankNumber} onChange={(event) => setBankNumber(event.target.value)} inputMode="numeric" className="bg-white" /></FormField><div className="sm:col-span-2"><FormField label="Account name"><Input value={bankAccountName} onChange={(event) => setBankAccountName(event.target.value)} className="bg-white" /></FormField></div></div></section>}
+    {access.anyVisible(...PAYMENT_FIELDS) && <section className="space-y-3"><div className="flex items-center gap-2"><Landmark className="size-4 text-primary" /><p className="font-mont text-xs font-semibold text-black-01">Bank details</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{field("bank_name", "Bank", <Input value={bankName} onChange={(event) => setBankName(event.target.value)} className="bg-white" />)}{field("bank_account_number", "Account number", <Input value={bankNumber} onChange={(event) => setBankNumber(event.target.value)} inputMode="numeric" className="bg-white" />)}{field("bank_account_name", "Account name", <Input value={bankAccountName} onChange={(event) => setBankAccountName(event.target.value)} className="bg-white" />, "sm:col-span-2")}</div></section>}
     {initial && <section className="space-y-3"><div className="flex items-center gap-2"><ShieldCheck className="size-4 text-primary" /><p className="font-mont text-xs font-semibold text-black-01">Status & Governance</p></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /> Active</label><VendorGovernanceFields canManage={canManage} kyc={kyc} risk={risk} onHold={onHold} onKycChange={setKyc} onRiskChange={setRisk} onHoldChange={setOnHold} /></section>}
   </FormDrawer>;
 }
