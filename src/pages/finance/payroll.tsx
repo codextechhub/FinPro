@@ -625,7 +625,8 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
   const isLoading = creating || updating;
   const [denied, setDenied] = useState<FieldErrors | null>(null);
   const access = useFieldAccess(SALARY, salary);
-  const grossOpen = !access.isReadOnly("gross_amount");
+  const mode = { creating: !salary };
+  const grossOpen = !access.isReadOnly("gross_amount", mode);
   // A breakdown worked out from a figure the user cannot see would show it, or show zero.
   const showBreakdown = visibleFigures(access).length === FIGURES.length && !access.isHidden("components");
 
@@ -654,7 +655,7 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
     setDenied(null);
     try {
       // In flat mode the manual figures are sent; with a structure they're derived server-side.
-      const figures = access.writableOnly({ gross_amount: gross, ...(structure ? {} : { paye_amount: paye, pension_amount: pension }) });
+      const figures = access.writableOnly({ gross_amount: gross, ...(structure ? {} : { paye_amount: paye, pension_amount: pension }) }, mode);
       const base = { name: name.trim(), cost_center: costCenter || undefined,
         structure: structure ? structure.id : (null as number | null), ...figures };
       if (isEdit && salary) { const r = await update({ id: salary.id, entity, is_active: active, ...base, ...branchPatch }).unwrap(); toast.success(r.message || "Updated."); }
@@ -685,7 +686,7 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
           </div>
         ) : null}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <AccessField access={access} name="gross_amount" label="Gross (monthly)" required={grossOpen} errors={denied}><MoneyInput valueKobo={gross} onChangeKobo={setGross} currency={currency} className="[&_input]:h-9" /></AccessField>
+          <AccessField access={access} name="gross_amount" label="Gross (monthly)" required={grossOpen} creating={mode.creating} errors={denied}><MoneyInput valueKobo={gross} onChangeKobo={setGross} currency={currency} className="[&_input]:h-9" /></AccessField>
           <FormField label="Cost center"><CostCenterPicker entity={entity} value={costCenter} onChange={setCostCenter} /></FormField>
         </div>
         <div>
@@ -716,10 +717,10 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
           </div>
         ) : null : (
           <>
-            {access.anyVisible("paye_amount", "pension_amount") ? (
+            {access.anyVisible("paye_amount", "pension_amount", mode) ? (
               <div className="grid grid-cols-2 gap-3">
-                <AccessField access={access} name="paye_amount" label="PAYE" errors={denied}><MoneyInput valueKobo={paye} onChangeKobo={setPaye} currency={currency} className="[&_input]:h-9" /></AccessField>
-                <AccessField access={access} name="pension_amount" label="Pension" errors={denied}><MoneyInput valueKobo={pension} onChangeKobo={setPension} currency={currency} className="[&_input]:h-9" /></AccessField>
+                <AccessField access={access} name="paye_amount" label="PAYE" creating={mode.creating} errors={denied}><MoneyInput valueKobo={paye} onChangeKobo={setPaye} currency={currency} className="[&_input]:h-9" /></AccessField>
+                <AccessField access={access} name="pension_amount" label="Pension" creating={mode.creating} errors={denied}><MoneyInput valueKobo={pension} onChangeKobo={setPension} currency={currency} className="[&_input]:h-9" /></AccessField>
               </div>
             ) : null}
             {visibleFigures(access).length === FIGURES.length ? (

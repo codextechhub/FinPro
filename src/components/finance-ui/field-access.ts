@@ -19,8 +19,16 @@
  *     because it carries rules the map cannot know, such as a person always
  *     editing their own details.
  *
- * `open_on_create` names are read-only on an existing record but may be set
- * freely while the record is being created.
+ * `open_on_create` names are the fields a user may set freely while a record
+ * is being created, though not afterwards. The backend lists such a field there
+ * whenever the user lacks full access to it, and a field may also appear in
+ * `hidden` or `read_only`. On an Add form (`{ creating: true }`) an
+ * `open_on_create` name is visible, editable and sent, whichever other list
+ * names it: a staff member's email is the example, since every new account needs
+ * one and a role that may not read it afterwards must still be able to give it.
+ * On an existing record `open_on_create` changes nothing: a hidden field stays
+ * hidden, a read-only one stays greyed, and the record's `_read_only_fields`
+ * still wins over the map.
  *
  * What a screen does with the answer is fixed. A hidden field is not there at
  * all: no label, no lock, no placeholder, no empty column, and a section whose
@@ -52,19 +60,29 @@ export interface FieldAccessRecord {
 export type FieldErrors = Readonly<Record<string, string>>;
 
 export interface ReadOnlyOptions {
-  /** True on an Add form, where `open_on_create` names stay editable.
-   *  Defaults to true when no record was given, false when one was. */
+  /** True on an Add form, where `open_on_create` names are visible and editable.
+   *
+   *  For `isReadOnly` and `writableOnly` it defaults to true when no record was
+   *  given and false when one was. `isHidden` and `anyVisible` open a hidden
+   *  field only when it is passed explicitly, because a call without a record
+   *  also decides table columns and section headings, and those must stay hidden
+   *  whatever creation allows. */
   creating?: boolean;
 }
 
 /** The answers one screen needs about one resource. */
 export interface FieldAccess {
-  /** The user may not read this field, so it is not rendered at all. */
-  isHidden(name: string): boolean;
+  /** The user may not read this field, so it is not rendered at all. With
+   *  `{ creating: true }` an `open_on_create` name is never hidden. */
+  isHidden(name: string, options?: ReadOnlyOptions): boolean;
   /** The user may see this field but not change it: greyed, disabled, never sent. */
   isReadOnly(name: string, options?: ReadOnlyOptions): boolean;
-  /** True when at least one of these fields is visible, for a section heading. */
+  /** True when at least one of these fields is visible, for a section heading.
+   *  An Add form passes `{ creating: true }` last, so a section whose only
+   *  offered field is open on create still appears; without it the answer is
+   *  the one `isHidden(name)` gives. */
   anyVisible(...names: string[]): boolean;
+  anyVisible(...args: [...names: string[], options: ReadOnlyOptions]): boolean;
   /** The body without the fields this user may not write, so a form never sends one. */
   writableOnly<T extends object>(body: T, options?: ReadOnlyOptions): T;
 }
@@ -76,7 +94,8 @@ const NO_NAMES: readonly string[] = [];
  *
  * With a record, a field present in it is visible whatever the map says, and
  * the record's own `_read_only_fields` decides what may change. A list row
- * carries no `_read_only_fields`, so for a row the map decides.
+ * carries no `_read_only_fields`, so for a row the map decides. While creating,
+ * an `open_on_create` name is open before either list is consulted.
  */
 export function resolveFieldAccess(
   map: FieldAccessMap | null | undefined,
@@ -89,23 +108,29 @@ export function resolveFieldAccess(
   const openOnCreate = entry?.open_on_create ?? NO_NAMES;
   const recordReadOnly = record ? (record as FieldAccessRecord)._read_only_fields : undefined;
 
-  const isHidden = (name: string) => {
+  const isHidden = (name: string, options?: ReadOnlyOptions) => {
     if (record && name in record) return false;
+    if (options?.creating === true && openOnCreate.includes(name)) return false;
     return hidden.includes(name);
   };
 
   const isReadOnly = (name: string, options?: ReadOnlyOptions) => {
-    if (isHidden(name)) return true;
+    if (isHidden(name, options)) return true;
     const creating = options?.creating ?? !record;
+    if (creating && openOnCreate.includes(name)) return false;
     if (!creating && Array.isArray(recordReadOnly)) return recordReadOnly.includes(name);
-    if (!readOnly.includes(name)) return false;
-    return !(creating && openOnCreate.includes(name));
+    return readOnly.includes(name);
   };
 
   return {
     isHidden,
     isReadOnly,
-    anyVisible: (...names) => names.some((name) => !isHidden(name)),
+    anyVisible: (...args: Array<string | ReadOnlyOptions>) => {
+      const last = args[args.length - 1];
+      const options = typeof last === "object" ? last : undefined;
+      const names = args.filter((arg): arg is string => typeof arg === "string");
+      return names.some((name) => !isHidden(name, options));
+    },
     writableOnly: (body, options) => Object.fromEntries(
       Object.entries(body).filter(([name]) => !isReadOnly(name, options)),
     ) as typeof body,

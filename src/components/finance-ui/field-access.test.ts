@@ -6,7 +6,8 @@
  *   2. on an existing record the record wins over the map, both for what is
  *      visible (a field present in the payload is readable, which is how a
  *      person's own details stay open to them) and for what may change;
- *   3. on an Add form the map decides, with `open_on_create` names editable;
+ *   3. on an Add form the map decides, and an `open_on_create` name is visible,
+ *      editable and sent even where the map also hides it or greys it;
  *   4. a hidden or read-only field is never sent;
  *   5. a 403 `field_write_denied` becomes one message per field, and any other
  *      error is not mistaken for it.
@@ -116,6 +117,86 @@ describe("resolveFieldAccess against a record", () => {
   it("does not open an open_on_create name on an existing record", () => {
     const access = resolveFieldAccess(MAP, VENDOR, { tax_id: "TIN-1" });
     expect(access.isReadOnly("tax_id")).toBe(true);
+  });
+});
+
+describe("open_on_create on an Add form and on an existing record", () => {
+  // A role that may give a new staff member an email and a start date, but may
+  // not read the email afterwards or change the start date.
+  const STAFF = "staff.staff";
+  const STAFF_MAP: FieldAccessMap = {
+    [STAFF]: {
+      hidden: ["email", "salary"],
+      read_only: ["hire_date", "phone"],
+      open_on_create: ["email", "hire_date"],
+    },
+  };
+
+  it("offers and sends a hidden, open-on-create field while creating", () => {
+    const access = resolveFieldAccess(STAFF_MAP, STAFF);
+    expect(access.isHidden("email", { creating: true })).toBe(false);
+    expect(access.isReadOnly("email", { creating: true })).toBe(false);
+    expect(access.writableOnly({ email: "tunde@brightstar.ng", salary: 1 }, { creating: true }))
+      .toEqual({ email: "tunde@brightstar.ng" });
+  });
+
+  it("keeps a hidden, open-on-create field hidden on an existing record", () => {
+    const access = resolveFieldAccess(STAFF_MAP, STAFF, { first_name: "Tunde", _read_only_fields: [] });
+    expect(access.isHidden("email")).toBe(true);
+    expect(access.isHidden("email", { creating: false })).toBe(true);
+    expect(access.isReadOnly("email")).toBe(true);
+    expect(access.writableOnly({ email: "x@y.z", first_name: "Tunde" })).toEqual({ first_name: "Tunde" });
+  });
+
+  it("keeps a hidden, open-on-create column hidden when no Add form is asked for", () => {
+    const access = resolveFieldAccess(STAFF_MAP, STAFF);
+    expect(access.isHidden("email")).toBe(true);
+    expect(access.writableOnly({ email: "x@y.z" })).toEqual({});
+  });
+
+  it("makes a read-only, open-on-create field editable on create and greyed on edit", () => {
+    const creating = resolveFieldAccess(STAFF_MAP, STAFF);
+    expect(creating.isHidden("hire_date", { creating: true })).toBe(false);
+    expect(creating.isReadOnly("hire_date", { creating: true })).toBe(false);
+    expect(creating.writableOnly({ hire_date: "2026-09-01" }, { creating: true })).toEqual({ hire_date: "2026-09-01" });
+
+    const editing = resolveFieldAccess(STAFF_MAP, STAFF, { hire_date: "2026-09-01" });
+    expect(editing.isHidden("hire_date")).toBe(false);
+    expect(editing.isReadOnly("hire_date")).toBe(true);
+    expect(editing.writableOnly({ hire_date: "2026-10-01" })).toEqual({});
+  });
+
+  it("lets the record's _read_only_fields win over open_on_create on an existing record", () => {
+    const access = resolveFieldAccess(STAFF_MAP, STAFF, { hire_date: "2026-09-01", _read_only_fields: ["hire_date"] });
+    expect(access.isReadOnly("hire_date")).toBe(true);
+  });
+
+  it("shows a section whose only offered field is hidden and open on create, only when creating", () => {
+    const blank = resolveFieldAccess(STAFF_MAP, STAFF);
+    expect(blank.anyVisible("email", "salary", { creating: true })).toBe(true);
+    expect(blank.anyVisible("email", "salary", { creating: false })).toBe(false);
+    expect(blank.anyVisible("email", "salary")).toBe(false);
+    const existing = resolveFieldAccess(STAFF_MAP, STAFF, { first_name: "Tunde", _read_only_fields: [] });
+    expect(existing.anyVisible("email", "salary")).toBe(false);
+  });
+
+  it("leaves a section with no open-on-create field as it was", () => {
+    const access = resolveFieldAccess(STAFF_MAP, STAFF);
+    expect(access.anyVisible("salary", { creating: true })).toBe(false);
+    expect(access.anyVisible("salary", "phone", { creating: true })).toBe(true);
+    expect(access.anyVisible("salary", "phone")).toBe(true);
+  });
+
+  it("leaves a field that is not open on create as it was", () => {
+    const access = resolveFieldAccess(STAFF_MAP, STAFF);
+    expect(access.isHidden("salary", { creating: true })).toBe(true);
+    expect(access.isReadOnly("salary", { creating: true })).toBe(true);
+    expect(access.isHidden("phone", { creating: true })).toBe(false);
+    expect(access.isReadOnly("phone", { creating: true })).toBe(true);
+    expect(access.isHidden("first_name", { creating: true })).toBe(false);
+    expect(access.isReadOnly("first_name", { creating: true })).toBe(false);
+    expect(access.writableOnly({ salary: 1, phone: "0803", first_name: "Tunde" }, { creating: true }))
+      .toEqual({ first_name: "Tunde" });
   });
 });
 

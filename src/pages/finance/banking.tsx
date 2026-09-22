@@ -1039,7 +1039,7 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
     try {
       const res = await create({
         entity, name: name.trim(), bank_name: bankName.trim() || undefined,
-        ...access.writableOnly({ account_number: accountNumber.trim() || undefined }),
+        ...access.writableOnly({ account_number: accountNumber.trim() || undefined }, { creating: true }),
         gl_account: glAccount,
         currency: currency || undefined, is_active: active, is_primary: primary,
         is_primary_collection: primaryCollection,
@@ -1066,7 +1066,7 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
         <FormField label="Account name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. GTBank Operations" className="bg-white" /></FormField>
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Bank name"><Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" className="bg-white" /></FormField>
-          <AccessField access={access} name="account_number" label="Account number" errors={denied}>
+          <AccessField access={access} name="account_number" label="Account number" creating errors={denied}>
             <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" className="bg-white font-mont" />
           </AccessField>
         </div>

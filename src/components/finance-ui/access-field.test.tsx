@@ -5,7 +5,9 @@
  *   1. a hidden field renders nothing at all: no label, no lock, no placeholder;
  *   2. a read-only field is shown, greyed and disabled, and a form building its
  *      body through `writableOnly` never sends it;
- *   3. a refused save shows its message under the field it names.
+ *   3. a refused save shows its message under the field it names;
+ *   4. on an Add form a field open on create is offered for editing even where
+ *      the user may not read it on an existing record.
  */
 
 import { act, useState } from "react";
@@ -68,6 +70,22 @@ describe("AccessField", () => {
     render(<AccessField access={access} name="account_number" label="Account number"><input /></AccessField>);
     expect(container.querySelector("fieldset")!.disabled).toBe(false);
     expect(container.querySelector("fieldset")!.hasAttribute("data-read-only")).toBe(false);
+  });
+
+  it("renders an editable input for a hidden, open-on-create field when creating", () => {
+    const map = { [RESOURCE]: { hidden: ["account_number"], open_on_create: ["account_number"] } };
+    render(<AccessField access={resolveFieldAccess(map, RESOURCE)} name="account_number" label="Account number" creating><input /></AccessField>);
+    const fieldset = container.querySelector("fieldset")!;
+    expect(container.textContent).toContain("Account number");
+    expect(fieldset.disabled).toBe(false);
+    expect(fieldset.hasAttribute("data-read-only")).toBe(false);
+    expect(container.querySelector("input")).not.toBeNull();
+  });
+
+  it("renders nothing for the same field on an existing record", () => {
+    const map = { [RESOURCE]: { hidden: ["account_number"], open_on_create: ["account_number"] } };
+    render(<AccessField access={resolveFieldAccess(map, RESOURCE, { name: "Ops" })} name="account_number" label="Account number"><input /></AccessField>);
+    expect(container.innerHTML).toBe("");
   });
 
   it("shows the refusal message under the field it names, and only there", () => {

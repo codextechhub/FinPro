@@ -271,7 +271,7 @@ export function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boo
           beneficiary_name: name.trim() || undefined,
           beneficiary_account_number: acct.trim() || undefined,
           beneficiary_bank_code: bankCode.trim() || undefined,
-        }),
+        }, { creating: true }),
         provider, source_account: sourceAccount || undefined, narration: narration.trim() || undefined,
       }).unwrap();
       toast.success("Payout sent to the provider.");
@@ -293,13 +293,13 @@ export function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boo
         <FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={setVendor} /></FormField>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <AccessField access={access} name="beneficiary_name" label="Recipient name" errors={denied}><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="From the vendor's bank details" className="h-9 bg-white" /></AccessField>
+          <AccessField access={access} name="beneficiary_name" label="Recipient name" creating errors={denied}><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="From the vendor's bank details" className="h-9 bg-white" /></AccessField>
           <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></FormField>
         </div>
-        {(showAcct && !access.isHidden("beneficiary_account_number")) || (showCode && !access.isHidden("beneficiary_bank_code")) ? (
+        {(showAcct && !access.isHidden("beneficiary_account_number", { creating: true })) || (showCode && !access.isHidden("beneficiary_bank_code", { creating: true })) ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {showAcct ? <AccessField access={access} name="beneficiary_account_number" label="Account number" errors={denied}><Input value={acct} onChange={(e) => setAcct(e.target.value)} placeholder="From the vendor's bank details" className="h-9 bg-white" /></AccessField> : null}
-            {showCode ? <AccessField access={access} name="beneficiary_bank_code" label="Bank code" errors={denied}><Input value={bankCode} onChange={(e) => setBankCode(e.target.value)} placeholder="From the vendor's bank details" className="h-9 bg-white" /></AccessField> : null}
+            {showAcct ? <AccessField access={access} name="beneficiary_account_number" label="Account number" creating errors={denied}><Input value={acct} onChange={(e) => setAcct(e.target.value)} placeholder="From the vendor's bank details" className="h-9 bg-white" /></AccessField> : null}
+            {showCode ? <AccessField access={access} name="beneficiary_bank_code" label="Bank code" creating errors={denied}><Input value={bankCode} onChange={(e) => setBankCode(e.target.value)} placeholder="From the vendor's bank details" className="h-9 bg-white" /></AccessField> : null}
           </div>
         ) : null}
 

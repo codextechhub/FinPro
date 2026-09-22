@@ -12,6 +12,9 @@
  * Without one the children render as they are, which suits a block holding
  * several controls, such as a list of contact people.
  *
+ * On an Add form pass `creating`: a field open on create then renders editable
+ * even where the user may not read or change it on an existing record.
+ *
  * When a save is refused with 403 `field_write_denied`, pass the parsed
  * messages as `errors` and each appears under its own field.
  */
@@ -26,7 +29,7 @@ export interface AccessFieldProps {
   name: string;
   label?: string;
   required?: boolean;
-  /** True on an Add form; see `FieldAccess.isReadOnly`. */
+  /** True on an Add form, where `open_on_create` names are shown and editable. */
   creating?: boolean;
   /** Per-field messages from `fieldWriteErrors`. */
   errors?: FieldErrors | null;
@@ -37,8 +40,9 @@ export interface AccessFieldProps {
 export function AccessField({
   access, name, label, required, creating, errors, className, children,
 }: AccessFieldProps) {
-  if (access.isHidden(name)) return null;
-  const readOnly = access.isReadOnly(name, creating === undefined ? undefined : { creating });
+  const options = creating === undefined ? undefined : { creating };
+  if (access.isHidden(name, options)) return null;
+  const readOnly = access.isReadOnly(name, options);
   const error = errors?.[name];
   const content = typeof children === "function" ? children({ readOnly }) : children;
   return (
