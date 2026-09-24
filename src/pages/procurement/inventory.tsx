@@ -119,7 +119,7 @@ function ItemsSection({ entity, currency }: { entity: string; currency?: string 
   const [store, setStore] = useState("");
   const { locations, multi } = useStockLocations(entity);
   const { can } = useCan();
-  useActionParam("new", can(P.PROC_MANAGE_STOCK), () => setCreating(true));
+  useActionParam("new", can(P.PROC_CREATE_STOCK), () => setCreating(true));
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(search.trim()), 350);
     return () => window.clearTimeout(timer);
@@ -163,7 +163,7 @@ function ItemsSection({ entity, currency }: { entity: string; currency?: string 
                 : "On-hand inventory with reorder thresholds and valuation."}
             </p>
           </div>
-          <Can permission={P.PROC_MANAGE_STOCK}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New stock item</Button></Can>
+          <Can permission={P.PROC_CREATE_STOCK}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New stock item</Button></Can>
         </header>
 
         <div data-guide="procurement-stock-items.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -230,7 +230,7 @@ function StockItemDrawer({ id, entity, currency, onClose }: { id: number | null;
       description={item ? `${item.code} · ${item.unit_of_measure}` : "Loading stock item"}
       widthClass="sm:max-w-2xl"
       footer={item && <>
-        <Can permission={P.PROC_MANAGE_STOCK}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>
+        <Can permission={P.PROC_UPDATE_STOCK}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>
         <Can permission={P.PROC_ISSUE_STOCK}><Button variant="outline" onClick={() => setIssuing(true)}><PackageMinus className="size-4" /> Issue</Button></Can>
         <Can permission={P.PROC_ADJUST_STOCK}><Button variant="outline" onClick={() => setAdjusting(true)}><SlidersHorizontal className="size-4" /> Adjust</Button></Can>
       </>}

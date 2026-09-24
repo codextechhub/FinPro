@@ -97,7 +97,7 @@ export function DunningTab({ entity, currency }: { entity: string; currency?: st
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <TabStrip items={viewTabs} value={tab} onChange={setTab} variant="segmented" ariaLabel="Dunning view" />
         <div className="flex items-center gap-2">
-          <Can permission={P.FIN_MANAGE_DUNNING}>
+          <Can permission={P.FIN_UPDATE_DUNNING}>
             <Button variant="outline" onClick={() => setTab("policies")} className="gap-1.5"><SlidersHorizontal className="size-4" /> Configure cadence</Button>
           </Can>
           <Can permission={P.FIN_GENERATE_DUNNING}>
@@ -216,7 +216,8 @@ function PoliciesPanel({ entity, policies }: { entity: string; policies: Dunning
   const [generate] = useGenerateDunningMutation();
   const [update] = useUpdateDunningPolicyMutation();
   const { can } = useCan();
-  const manage = can(P.FIN_MANAGE_DUNNING);
+  const canCreate = can(P.FIN_CREATE_DUNNING);
+  const canUpdate = can(P.FIN_UPDATE_DUNNING);
 
   const toggleActive = async (p: DunningPolicy) => {
     try { await update({ id: p.id, entity, is_active: !p.is_active }).unwrap(); toast.success(p.is_active ? "Policy deactivated." : "Policy activated."); } catch { /* central */ }
@@ -227,7 +228,7 @@ function PoliciesPanel({ entity, policies }: { entity: string; policies: Dunning
 
   return (
     <div className="space-y-4">
-      {manage ? <div className="flex justify-end"><Button variant="outline" onClick={() => setEditing("new")} className="gap-1.5"><Plus className="size-4" /> New policy</Button></div> : null}
+      {canCreate ? <div className="flex justify-end"><Button variant="outline" onClick={() => setEditing("new")} className="gap-1.5"><Plus className="size-4" /> New policy</Button></div> : null}
       {policies.length === 0 ? (
         <div className="rounded-md bg-white p-8 text-center ring-1 ring-white-02">
           <p className="font-mont text-sm text-gray-05">No reminder policies yet. Create one to define the dunning cadence.</p>
@@ -240,13 +241,13 @@ function PoliciesPanel({ entity, policies }: { entity: string; policies: Dunning
               <p className="font-mont text-[11px] text-gray-05">{p.stages.length} stage{p.stages.length === 1 ? "" : "s"}</p>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => manage && toggleActive(p)} disabled={!manage} aria-pressed={p.is_active}
+              <button type="button" onClick={() => canUpdate && toggleActive(p)} disabled={!canUpdate} aria-pressed={p.is_active}
                 className={cn("inline-flex h-6 w-10 items-center rounded-full p-0.5 transition-colors disabled:opacity-50", p.is_active ? "bg-primary" : "bg-gray-02")}>
                 <span className={cn("size-5 rounded-full bg-white shadow-sm transition-transform", p.is_active && "translate-x-4")} />
               </button>
               <span className="font-mont text-xs text-gray-05">{p.is_active ? "Active" : "Inactive"}</span>
               <Can permission={P.FIN_GENERATE_DUNNING}><Button variant="outline" size="sm" onClick={() => genFor(p)} className="gap-1.5"><Play className="size-3.5" /> Generate notices</Button></Can>
-              {manage ? <Button variant="outline" size="sm" onClick={() => setEditing(p)} className="gap-1.5"><Pencil className="size-3.5" /> Edit</Button> : null}
+              {canUpdate ? <Button variant="outline" size="sm" onClick={() => setEditing(p)} className="gap-1.5"><Pencil className="size-3.5" /> Edit</Button> : null}
             </div>
           </div>
           <div className="overflow-x-auto">

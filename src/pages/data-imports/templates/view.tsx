@@ -61,7 +61,7 @@ export default function ViewTemplate() {
   const canView = hasPermission(P.VIEW_IMPORT_TEMPLATES);
   // Was `user.user_type === "CX_STAFF"`, a field the API never returns, so it
   // was always false and these affordances never appeared. RBAC owns this.
-  const canManageTemplates = hasPermission(P.MANAGE_IMPORT_TEMPLATES);
+  const canManageTemplates = hasPermission(P.UPDATE_IMPORT_TEMPLATE);
   const [downloadTemplate, downloadState] = useDownloadImportTemplateMutation();
 
   const { data, isLoading, isError, refetch } = useGetImportTemplateQuery(templateId, {
@@ -136,7 +136,7 @@ export default function ViewTemplate() {
               <RefreshCw className="size-3.5" /> Refresh
             </Button>
             {canManageTemplates && (
-              <PermissionGate permission={P.MANAGE_IMPORT_TEMPLATES}>
+              <PermissionGate permission={P.UPDATE_IMPORT_TEMPLATE}>
                 <Button
                   size="sm"
                   onClick={() => navigate(routesPath.PROTECTED.DATA_IMPORTS.TEMPLATES.EDIT(templateId))}

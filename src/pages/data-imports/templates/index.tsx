@@ -82,7 +82,7 @@ export default function ImportTemplatesList() {
   const canView = hasPermission(P.VIEW_IMPORT_TEMPLATES);
   // Was `user.user_type === "CX_STAFF"`, a field the API never returns, so it
   // was always false and these affordances never appeared. RBAC owns this.
-  const canManageTemplates = hasPermission(P.MANAGE_IMPORT_TEMPLATES);
+  const canManageTemplates = hasPermission(P.UPDATE_IMPORT_TEMPLATE);
 
   const params = useMemo(() => {
     const p: Record<string, string | number> = { page, page_size: 100 };
@@ -300,7 +300,7 @@ export default function ImportTemplatesList() {
                     navigate(routesPath.PROTECTED.DATA_IMPORTS.TEMPLATES.VIEW(tpl.id)),
                 },
               ];
-              if (canManageTemplates && hasPermission(P.MANAGE_IMPORT_TEMPLATES)) {
+              if (canManageTemplates && hasPermission(P.UPDATE_IMPORT_TEMPLATE)) {
                 items.push({
                   label: "Edit Template",
                   className: "",

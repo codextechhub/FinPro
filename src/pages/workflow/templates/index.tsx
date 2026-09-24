@@ -82,7 +82,7 @@ export default function WorkflowTemplates() {
               reader is: its templates arrive published and are adjusted, not
               written from nothing. */}
           {createsWorkflowTemplates && (
-            <PermissionGate permission={P.MANAGE_WORKFLOW_TEMPLATES}>
+            <PermissionGate permission={P.UPDATE_WORKFLOW_TEMPLATE}>
               <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.WORKFLOW.TEMPLATE_NEW)}>
                 <Plus /> New Template
               </Button>

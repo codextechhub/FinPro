@@ -135,7 +135,7 @@ export default function TemplateDetail() {
                   <p className="mt-2 max-w-2xl text-sm text-gray-01">{template.description}</p>
                 )}
               </div>
-              <PermissionGate permission={P.MANAGE_WORKFLOW_TEMPLATES}>
+              <PermissionGate permission={P.UPDATE_WORKFLOW_TEMPLATE}>
                 <div className="flex flex-wrap items-center gap-2">
                   {!template.is_platform && !isPlatformTenant && (
                     <Button variant="outline" onClick={() => setResetOpen(true)}>

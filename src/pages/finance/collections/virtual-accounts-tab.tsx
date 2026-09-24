@@ -174,7 +174,7 @@ function VirtualAccountDetailDrawer({ va, entity, currency, onClose, onUpdated }
         <>
           <StatusPill status={va.status} />
           <div className="flex-1" />
-          {can(P.PAY_MANAGE_VIRTUAL_ACCOUNT) ? (
+          {can(P.PAY_UPDATE_VIRTUAL_ACCOUNT) ? (
             <Button variant="outline" disabled={isLoading} onClick={toggle} className="gap-1.5">
               {isActive ? <PowerOff className="size-4" /> : <Power className="size-4" />}
               {isLoading ? "Saving…" : isActive ? "Deactivate" : "Reactivate"}

@@ -178,7 +178,7 @@ export function VendorsTab({ entity, currency }: { entity: string; currency?: st
     </section>
 
     <VendorDrawer key={selectedId ?? "closed"} id={selectedId} entity={entity} currency={currency} onClose={() => setSelectedId(null)} />
-    {creating && <VendorForm entity={entity} canManage={can(P.PROC_MANAGE_VENDOR)} onClose={() => setCreating(false)} />}
+    {creating && <VendorForm entity={entity} canManage={can(P.PROC_VERIFY_VENDOR)} onClose={() => setCreating(false)} />}
   </>;
 }
 
@@ -234,7 +234,7 @@ function VendorDrawer({ id, entity, currency, onClose }: { id: number | null; en
         {tab === "performance" && <PerformanceTab insights={insights} loading={insightLoading} error={insightError} restricted={!reportAllowed} currency={currency} />}
       </div>}
     </DetailDrawer>
-    {editing && vendor && <VendorForm key={vendor.id} entity={entity} initial={vendor} canManage={can(P.PROC_MANAGE_VENDOR)} onClose={() => setEditing(false)} />}
+    {editing && vendor && <VendorForm key={vendor.id} entity={entity} initial={vendor} canManage={can(P.PROC_VERIFY_VENDOR)} onClose={() => setEditing(false)} />}
   </>;
 }
 

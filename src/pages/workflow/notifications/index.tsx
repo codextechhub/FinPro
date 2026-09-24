@@ -36,7 +36,7 @@ const MOMENTS = [
  */
 export default function WorkflowNotifications() {
   const { hasPermission } = usePermissions();
-  const canManage = hasPermission(P.MANAGE_WORKFLOW_TEMPLATES);
+  const canManage = hasPermission(P.UPDATE_WORKFLOW_TEMPLATE);
   const { data, isLoading } = useGetWorkflowNotificationSettingQuery();
   const [save, { isLoading: saving }] = useSetWorkflowNotificationSettingMutation();
   // Notifying is what the engine does when a school has chosen nothing, so the

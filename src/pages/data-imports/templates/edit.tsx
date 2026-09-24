@@ -85,7 +85,7 @@ export default function EditTemplate() {
   const { id } = useParams<{ id: string }>();
   const templateId = Number(id);
 
-  const canEdit = hasPermission(P.MANAGE_IMPORT_TEMPLATES);
+  const canEdit = hasPermission(P.UPDATE_IMPORT_TEMPLATE);
 
   const { data: raw, isLoading: fetching, isError: fetchError } = useGetImportTemplateQuery(
     templateId,

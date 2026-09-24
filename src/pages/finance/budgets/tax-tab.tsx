@@ -101,7 +101,7 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
         </Select>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={() => printTaxFilingPack(rows, currency)} disabled={!rows.length} className="gap-1.5"><Printer className="size-4" /> Filing pack</Button>
-          <Can permission={P.FIN_MANAGE_TAX}>
+          <Can permission={P.FIN_CREATE_TAX}>
             <Button variant="outline" onClick={() => setNewObligation(true)} className="gap-1.5"><Plus className="size-4" /> New obligation</Button>
           </Can>
           <Can permission={P.FIN_FILE_TAX}>

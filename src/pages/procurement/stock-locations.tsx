@@ -50,7 +50,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<StockLocation | null>(null);
   const [balancesFor, setBalancesFor] = useState<StockLocation | null>(null);
-  useActionParam("new", can(P.PROC_MANAGE_STOCK), () => setCreating(true));
+  useActionParam("new", can(P.PROC_CREATE_STOCK), () => setCreating(true));
 
   // Every location, active and archived: this is the screen that manages them, so
   // unlike useStockLocations it must not hide the ones it exists to reactivate.
@@ -89,7 +89,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
     {
       header: "",
       align: "right",
-      cell: (l) => (can(P.PROC_MANAGE_STOCK) ? (
+      cell: (l) => (can(P.PROC_UPDATE_STOCK) ? (
         <div className="flex flex-wrap items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           <Button size="sm" variant="outline" onClick={() => setEditing(l)}><FilePenLine className="size-3.5" /> Edit</Button>
           {/* Exactly one default per entity, so this moves the flag rather than
@@ -113,7 +113,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
             <h1 className="font-mont text-lg font-semibold text-gray-01">Stock Locations</h1>
             <p className="mt-0.5 font-mont text-xs text-gray-05">The stores stock is held in. Each holds its own quantity, value and average cost.</p>
           </div>
-          <Can permission={P.PROC_MANAGE_STOCK}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New location</Button></Can>
+          <Can permission={P.PROC_CREATE_STOCK}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New location</Button></Can>
         </header>
 
         {singleStore && (

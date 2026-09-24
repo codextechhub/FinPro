@@ -209,7 +209,7 @@ export interface HostContract {
    *  there invites somebody to author a path from scratch alongside the seeded
    *  ones, which is a second answer to a question that already has one.
    *
-   *  Not a permission. A tenant admin holds ``workflow.template.manage`` and
+   *  Not a permission. A tenant admin holds ``workflow.template.update`` and
    *  needs it, because adjusting a template is what that key is for; this says
    *  the *product* has no create story here, which no permission can express. */
   createsWorkflowTemplates: boolean;

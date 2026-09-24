@@ -83,7 +83,7 @@ function errorMessage(err: unknown, fallback: string): string {
 
 export default function GroupsTab() {
   const { hasPermission } = usePermissions();
-  const canManage = hasPermission(P.MANAGE_APPROVER_GROUPS);
+  const canUpdate = hasPermission(P.UPDATE_APPROVER_GROUP);
 
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string>("");
@@ -215,7 +215,7 @@ export default function GroupsTab() {
             <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
               <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
             </Button>
-            <PermissionGate permission={P.MANAGE_APPROVER_GROUPS}>
+            <PermissionGate permission={P.CREATE_APPROVER_GROUP}>
               <Button size="lg" onClick={() => setNewOpen(true)}>
                 <Plus /> New group
               </Button>
@@ -315,7 +315,7 @@ export default function GroupsTab() {
                 <p className="mt-3 text-sm text-gray-01">
                   No approver groups yet. Create one to route a workflow step at a named pool.
                 </p>
-                <PermissionGate permission={P.MANAGE_APPROVER_GROUPS}>
+                <PermissionGate permission={P.CREATE_APPROVER_GROUP}>
                   <Button className="mt-4" onClick={() => setNewOpen(true)}>
                     <Plus /> New group
                   </Button>
@@ -363,11 +363,13 @@ export default function GroupsTab() {
                       </div>
                     </div>
 
-                    <PermissionGate permission={P.MANAGE_APPROVER_GROUPS}>
-                      <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <PermissionGate permission={P.UPDATE_APPROVER_GROUP}>
                         <Button variant="outline" size="sm" onClick={toggleActive} disabled={isUpdating}>
                           {selected.is_active ? "Deactivate" : "Reactivate"}
                         </Button>
+                      </PermissionGate>
+                      <PermissionGate permission={P.DELETE_APPROVER_GROUP}>
                         <Button
                           variant="outline"
                           size="sm"
@@ -378,8 +380,8 @@ export default function GroupsTab() {
                         >
                           <Trash2 /> Delete
                         </Button>
-                      </div>
-                    </PermissionGate>
+                      </PermissionGate>
+                    </div>
                   </div>
                 </div>
 
@@ -460,7 +462,7 @@ export default function GroupsTab() {
                         {selected.member_count}
                       </span>
                     </p>
-                    <PermissionGate permission={P.MANAGE_APPROVER_GROUPS}>
+                    <PermissionGate permission={P.UPDATE_APPROVER_GROUP}>
                       <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
                         <Plus /> Add member
                       </Button>
@@ -475,7 +477,7 @@ export default function GroupsTab() {
                           ? "Steps routed to this group cannot be approved until someone is added."
                           : "Add people, roles, or positions. Roles and positions keep themselves current as staff change."}
                       </p>
-                      {canManage && (
+                      {canUpdate && (
                         <Button className="mt-4" size="sm" onClick={() => setAddOpen(true)}>
                           <Plus /> Add member
                         </Button>
@@ -560,7 +562,7 @@ export default function GroupsTab() {
                                     </span>
                                   </button>
                                 )}
-                                {canManage && (
+                                {canUpdate && (
                                   <button
                                     type="button"
                                     onClick={() => doRemove(m)}

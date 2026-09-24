@@ -57,19 +57,21 @@ const EVERY_DOCUMENT: string[] = [];
  * not - so its rules are shown numbered and in words, beside a tester that runs
  * the engine's own matching for a requester and an amount.
  *
- * Creating and editing need the approver-group manage key. The same key gates
- * `?action=new`, so the address cannot open a drawer the button would not.
+ * Creating and editing follow their respective approver-group permissions.
+ * The create permission also gates `?action=new`.
  */
 export default function DynamicRolesTab() {
   const { hasPermission } = usePermissions();
-  const canManage = hasPermission(P.MANAGE_APPROVER_GROUPS);
+  const canCreate = hasPermission(P.CREATE_APPROVER_GROUP);
+  const canUpdate = hasPermission(P.UPDATE_APPROVER_GROUP);
+  const canDelete = hasPermission(P.DELETE_APPROVER_GROUP);
 
   const [selectedId, setSelectedId] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
   const [deleteTarget, setDeleteTarget] = useState<DynamicRole | null>(null);
   const [inUse, setInUse] = useState("");
 
-  useActionParam("new", canManage, () => setEditor({ role: null }));
+  useActionParam("new", canCreate, () => setEditor({ role: null }));
 
   const { data, isLoading, isFetching, refetch } = useGetDynamicRolesQuery(
     { page: 1, page_size: 100 },
@@ -127,7 +129,7 @@ export default function DynamicRolesTab() {
             <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
               <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
             </Button>
-            <PermissionGate permission={P.MANAGE_APPROVER_GROUPS}>
+            <PermissionGate permission={P.CREATE_APPROVER_GROUP}>
               <Button size="lg" onClick={() => setEditor({ role: null })}>
                 <Plus /> New Dynamic Role
               </Button>
@@ -202,7 +204,7 @@ export default function DynamicRolesTab() {
                   No Dynamic Roles yet. Build one to send big purchases to the principal and
                   the rest to the bursar, then pick it in any stage.
                 </p>
-                <PermissionGate permission={P.MANAGE_APPROVER_GROUPS}>
+                <PermissionGate permission={P.CREATE_APPROVER_GROUP}>
                   <Button className="mt-4" onClick={() => setEditor({ role: null })}>
                     <Plus /> New Dynamic Role
                   </Button>
@@ -212,7 +214,8 @@ export default function DynamicRolesTab() {
               <DynamicRoleDetail
                 key={selected.id}
                 role={selected}
-                canManage={canManage}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
                 busy={isUpdating}
                 onEdit={() => setEditor({ role: selected })}
                 onToggleActive={toggleActive}
@@ -279,14 +282,16 @@ export default function DynamicRolesTab() {
 /** One Dynamic Role: what it serves, its rules in words, a tester, and where it is used. */
 function DynamicRoleDetail({
   role,
-  canManage,
+  canUpdate,
+  canDelete,
   busy,
   onEdit,
   onToggleActive,
   onDelete,
 }: {
   role: DynamicRole;
-  canManage: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
   busy: boolean;
   onEdit: () => void;
   onToggleActive: () => void;
@@ -320,17 +325,17 @@ function DynamicRoleDetail({
             </div>
             {role.description && <p className="mt-1 text-xs text-gray-01">{role.description}</p>}
           </div>
-          {canManage && (
+          {(canUpdate || canDelete) && (
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={onEdit}>
+              {canUpdate && <Button variant="outline" size="sm" onClick={onEdit}>
                 <Pencil className="size-3.5" /> Edit
-              </Button>
-              <Button variant="outline" size="sm" onClick={onToggleActive} disabled={busy}>
+              </Button>}
+              {canUpdate && <Button variant="outline" size="sm" onClick={onToggleActive} disabled={busy}>
                 {role.is_active ? "Deactivate" : "Reactivate"}
-              </Button>
-              <Button variant="outline" size="sm" onClick={onDelete}>
+              </Button>}
+              {canDelete && <Button variant="outline" size="sm" onClick={onDelete}>
                 <Trash2 className="size-3.5" /> Delete
-              </Button>
+              </Button>}
             </div>
           )}
         </div>
