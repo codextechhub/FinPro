@@ -212,6 +212,20 @@ export interface BudgetLineMetric {
  * posting in the entity fails at once - so the backend reads the runway ahead of
  * that date. Always read as of today, even on a dashboard pinned to a past period.
  */
+/**
+ * A span the window-aware cards read. `billed_for` counts the fees billed for a
+ * billing period (a school's term) whenever they were paid; `dates` counts what
+ * was invoiced and received between `start` and `end`.
+ */
+export interface DashboardWindow {
+  key: string;
+  label: string;
+  name: string;
+  start: string;
+  end: string;
+  basis: "billed_for" | "dates";
+}
+
 export interface FiscalRunway {
   status: "HEALTHY" | "EXPIRING" | "EXPIRED";
   calendar_end: string | null;    // Last postable day; null when there are no periods at all.
@@ -230,6 +244,92 @@ export interface FiscalRunway {
  */
 export interface FinanceDashboard {
   entity: string;
+  /** Whose books these are: a school's get school words and a term window. */
+  books: "school" | "general";
+  /** The reader's first name, for the greeting; null when the account has none. */
+  reader_first_name: string | null;
+  /** The span the window-aware cards read, and every span on offer (default first). */
+  window: DashboardWindow;
+  windows: { key: string; label: string; name: string }[];
+  collections: {
+    billed: ReportMoney | null;
+    invoice_count: number | null;
+    collected: ReportMoney | null;
+    rate_pct: number | null;
+  } | null;
+  channels: {
+    total: ReportMoney;
+    receipts: number;
+    items: { key: string; label: string; amount: ReportMoney; receipts: number; pct: number | null }[];
+  } | null;
+  /** Per-branch comparison; null for a branch reader and for a one-branch school. */
+  branches: {
+    branch_id: number | null;
+    name: string | null;
+    billed: ReportMoney;
+    collected: ReportMoney;
+    rate_pct: number | null;
+    overdue: ReportMoney;
+  }[] | null;
+  bank_accounts: {
+    id: number;
+    name: string;
+    bank_name: string;
+    balance: ReportMoney;
+    unmatched_lines: number;
+    unmatched_amount: ReportMoney;
+    last_reconciled: string | null;
+    /** Month-end balances over the same window as the headline tiles, oldest first. */
+    spark: number[];
+  }[] | null;
+  /** The school's plan line by line, with how much of the year has gone. */
+  budget: {
+    budget_name: string;
+    year_elapsed_pct: number;
+    lines: { label: string; kind: "income" | "expense"; actual: ReportMoney; plan: ReportMoney; pct: number | null }[];
+  } | null;
+  top_payers: {
+    customer_id: number;
+    name: string;
+    code: string;
+    branch: string | null;
+    amount: ReportMoney;
+    invoices: number;
+    days_overdue: number;
+  }[] | null;
+  /** Payers owing, overdue and falling due within 7 days (counts of payers). */
+  receivables_summary: {
+    owing_payers: number;
+    overdue_payers: number;
+    overdue_amount: ReportMoney;
+    oldest_days_overdue: number | null;
+    due_soon_payers: number;
+    due_soon_amount: ReportMoney;
+  } | null;
+  /** Things to act on, most urgent first; each appears only for its key holders. */
+  attention: {
+    key: string;
+    tone: "urgent" | "warning" | "info";
+    title: string;
+    detail: string;
+    count: number;
+    amount: ReportMoney | null;
+  }[];
+  /** Money due in or out over the next 30 days, soonest first. */
+  upcoming: {
+    date: string;
+    kind: "payroll" | "instalments" | "vendor_bills" | "tax";
+    direction: "in" | "out";
+    title: string;
+    detail: string;
+    amount: ReportMoney;
+  }[];
+  payables_due: {
+    due_count: number;
+    due_amount: ReportMoney;
+    overdue_count: number;
+    overdue_amount: ReportMoney;
+  } | null;
   fiscal_year: string | null;
   period: string | null;
   as_of: string;
@@ -279,6 +379,8 @@ export interface FinanceDashboard {
     document_number: string;
     date: string;
     source: string;
+    /** The document that raised the journal. */
+    kind: "receipt" | "invoice" | "payroll" | "manual" | "other";
     narration: string;
     amount: ReportMoney;
     status: string;
