@@ -73,26 +73,35 @@ export interface ProcurementApprovalDetail extends ProcurementApprovalRow {
   }[];
 }
 
+/**
+ * The Procurement dashboard as one reader may see it.
+ *
+ * The endpoint opens to anyone working in procurement and computes each block
+ * only for a reader who holds the key behind it, so a block may be `null`. The
+ * approval queue is the reader's own and always present. `narrowed` says the
+ * figures cover only the reader's branches.
+ */
 export interface ProcurementDashboard {
   entity: string;
   currency: string;
   as_of: string;
   month_start: string;
+  narrowed: boolean;
   kpis: {
-    total_spend_mtd: { value: ReportMoney; prior_value: ReportMoney; delta_pct: number | null };
-    open_purchase_orders: { count: number; partial_count: number };
+    total_spend_mtd: { value: ReportMoney; prior_value: ReportMoney; delta_pct: number | null } | null;
+    open_purchase_orders: { count: number; partial_count: number } | null;
     pending_approvals: { count: number };
-    overdue_invoices: { count: number; amount: ReportMoney };
-    active_vendors: { count: number; on_hold_count: number };
+    overdue_invoices: { count: number; amount: ReportMoney } | null;
+    active_vendors: { count: number; on_hold_count: number } | null;
   };
   spend_by_category: {
     total: ReportMoney;
     items: { key: string; label: string; amount: ReportMoney }[];
-  };
+  } | null;
   purchase_order_status: {
     items: { key: string; label: string; count: number }[];
-  };
-  monthly_spend_trend: { labels: string[]; values: number[] };
+  } | null;
+  monthly_spend_trend: { labels: string[]; values: number[] } | null;
   recent_activity: {
     id: number;
     action: string;
@@ -101,7 +110,7 @@ export interface ProcurementDashboard {
     reference: string;
     actor: string;
     occurred_at: string;
-  }[];
+  }[] | null;
   approvals_awaiting_user: {
     workflow_id: string;
     document_type: string;

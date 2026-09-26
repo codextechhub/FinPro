@@ -205,17 +205,27 @@ export interface FiscalRunway {
   threshold_days: number;         // The notice window the status was decided against.
 }
 
+/**
+ * The Finance overview as one reader may see it.
+ *
+ * The endpoint opens to anyone working in finance and computes each block only
+ * for a reader who holds the key behind it, so every block may be `null`: absent,
+ * not empty. `narrowed` says the document-derived figures cover only the reader's
+ * branches; the ledger blocks (cash, payables, net income, budget, close) are then
+ * always `null`, because the ledger cannot be split by branch.
+ */
 export interface FinanceDashboard {
   entity: string;
   fiscal_year: string | null;
   period: string | null;
   as_of: string;
+  narrowed: boolean;
   fiscal_runway: FiscalRunway;
   kpis: {
-    cash_position: DashboardKpi;
-    receivables: DashboardKpi;
-    payables: DashboardKpi;
-    net_income_ytd: DashboardKpi;
+    cash_position: DashboardKpi | null;
+    receivables: DashboardKpi | null;
+    payables: DashboardKpi | null;
+    net_income_ytd: DashboardKpi | null;
   };
   revenue_vs_budget: {
     has_budget: boolean;
@@ -223,27 +233,28 @@ export interface FinanceDashboard {
     revenue: BudgetLineMetric;
     expense: BudgetLineMetric;
     net: { actual: ReportMoney; delta_pct: number | null };
-  };
+  } | null;
   ar_aging: {
     buckets: { key: string; pct: number; amount: ReportMoney }[];
     total: ReportMoney;
-  };
-  trend: { labels: string[]; issued: number[]; collected: number[] };
+  } | null;
+  /** A series the reader may not read is `null`, never a row of zeros. */
+  trend: { labels: string[]; issued: number[] | null; collected: number[] | null } | null;
   top_overdue: {
     customer: string;
     customer_code: string;
     reference: string;
     amount: ReportMoney;
     days_overdue: number;
-  }[];
+  }[] | null;
   vendor_due: {
     vendor: string;
     reference: string;
     due_date: string;
     amount: ReportMoney;
     days_until: number;
-  }[];
-  approvals: { items: { label: string; count: number }[]; total: number };
+  }[] | null;
+  approvals: { items: { label: string; count: number }[]; total: number } | null;
   close_progress: {
     period: string;
     done: number;
@@ -258,5 +269,5 @@ export interface FinanceDashboard {
     amount: ReportMoney;
     status: string;
     created_by: string;
-  }[];
+  }[] | null;
 }

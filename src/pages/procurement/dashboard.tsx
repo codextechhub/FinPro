@@ -7,7 +7,7 @@ import { useNavigate } from "react-router";
 
 import { ProcurementShell } from "./procurement-shell";
 import {
-  BarChart, CHART_COLORS, Donut, EmptyState, ErrorState, InfoHint,
+  BarChart, CHART_COLORS, Donut, ErrorState, InfoHint,
   LoadingState, StatCard, StatusPill, TrendArea, useActiveEntity,
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
@@ -91,15 +91,23 @@ function CardLink({ label, onClick, text = false }: {
   );
 }
 
+/**
+ * The Procurement dashboard.
+ *
+ * Opens for anyone in the Procurement console. The server sends each block only
+ * to a reader who holds its key (see ProcurementDashboard in the types), and
+ * this page draws the blocks that arrive: a storekeeper who raises requisitions
+ * sees their approval queue, not an empty spend chart. The approval queue is the
+ * reader's own and always shown.
+ */
 export default function ProcurementDashboard() {
   const navigate = useNavigate();
   const { code: entity, currency } = useActiveEntity();
   const { can } = useCan();
-  const canAnalytics = can(P.PROC_VIEW_ANALYTICS);
   const canAudit = can(P.VIEW_AUDIT);
   const { data, isLoading, isError, refetch } = useGetProcurementDashboardQuery(
     { entity: entity! },
-    { skip: !entity || !canAnalytics },
+    { skip: !entity },
   );
   const d = data?.data;
   const money = (kobo: number) => formatMoney(kobo, currency ?? d?.currency);
@@ -121,10 +129,11 @@ export default function ProcurementDashboard() {
     return `${sign}${symbol}${rendered}${unit.suffix}`;
   };
 
-  const spendDelta = d?.kpis.total_spend_mtd.delta_pct;
+  const spendDelta = d?.kpis.total_spend_mtd?.delta_pct;
   const SpendIcon = (spendDelta ?? 0) >= 0 ? TrendingUp : TrendingDown;
-  const hasPoData = (d?.purchase_order_status.items ?? []).some((item) => item.count > 0);
-  const hasTrendData = (d?.monthly_spend_trend.values ?? []).some((value) => value > 0);
+  const hasPoData = (d?.purchase_order_status?.items ?? []).some((item) => item.count > 0);
+  const hasTrendData = (d?.monthly_spend_trend?.values ?? []).some((value) => value > 0);
+  const charts = d ? [d.spend_by_category, d.purchase_order_status, d.monthly_spend_trend].filter(Boolean).length : 0;
 
   return (
     <ProcurementShell>
@@ -135,14 +144,12 @@ export default function ProcurementDashboard() {
             <InfoHint ariaLabel="About the procurement dashboard">Live procurement activity for the selected ledger entity. Spend is based on posted vendor invoices and approvals are personalized to you.</InfoHint>
           </div>
           <p className="mt-0.5 font-mont text-xs text-gray-05">
-            {entity ? `Procurement overview for ${entity} · MTD${d?.as_of ? ` · As of ${fmtDate(d.as_of)}` : ""}` : "Procurement overview"}
+            {entity ? `Procurement overview for ${entity} · MTD${d?.as_of ? ` · As of ${fmtDate(d.as_of)}` : ""}${d?.narrowed ? " · Your branches only" : ""}` : "Procurement overview"}
           </p>
         </header>
 
         {!entity ? (
           <NoEntityState message="Choose a ledger entity to see its procurement dashboard." />
-        ) : !canAnalytics ? (
-          <EmptyState title="No procurement analytics access" message="You don’t hold procurement.analytics.view, which the dashboard figures need." />
         ) : isLoading ? (
           <LoadingState rows={9} />
         ) : isError || !d ? (
@@ -150,33 +157,43 @@ export default function ProcurementDashboard() {
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <StatCard
-                label="Total Spend (MTD)"
-                value={money(d.kpis.total_spend_mtd.value.kobo)}
-                icon={Banknote}
-                ariaLabel="Open spend report"
-                onClick={() => navigate(`${routesPath.PROTECTED.PROCUREMENT.ANALYTICS}/spend`)}
-                sub={spendDelta == null ? "No comparable prior spend" : (
-                  <span className={cn("inline-flex items-center gap-1 font-semibold", spendDelta >= 0 ? "text-green-01" : "text-destructive")}>
-                    <SpendIcon className="size-3" />{spendDelta > 0 ? "+" : ""}{spendDelta}% <span className="font-normal text-gray-05">vs prior MTD</span>
-                  </span>
-                )}
-              />
-              <StatCard label="Open Purchase Orders" value={d.kpis.open_purchase_orders.count} icon={ShoppingCart}
-                ariaLabel="Open purchase orders" onClick={() => navigate(routesPath.PROTECTED.PROCUREMENT.PURCHASE_ORDERS)}
-                sub={`${d.kpis.open_purchase_orders.partial_count} partial`} />
+              {d.kpis.total_spend_mtd && (
+                <StatCard
+                  label="Total Spend (MTD)"
+                  value={money(d.kpis.total_spend_mtd.value.kobo)}
+                  icon={Banknote}
+                  ariaLabel="Open spend report"
+                  onClick={() => navigate(`${routesPath.PROTECTED.PROCUREMENT.ANALYTICS}/spend`)}
+                  sub={spendDelta == null ? "No comparable prior spend" : (
+                    <span className={cn("inline-flex items-center gap-1 font-semibold", spendDelta >= 0 ? "text-green-01" : "text-destructive")}>
+                      <SpendIcon className="size-3" />{spendDelta > 0 ? "+" : ""}{spendDelta}% <span className="font-normal text-gray-05">vs prior MTD</span>
+                    </span>
+                  )}
+                />
+              )}
+              {d.kpis.open_purchase_orders && (
+                <StatCard label="Open Purchase Orders" value={d.kpis.open_purchase_orders.count} icon={ShoppingCart}
+                  ariaLabel="Open purchase orders" onClick={() => navigate(routesPath.PROTECTED.PROCUREMENT.PURCHASE_ORDERS)}
+                  sub={`${d.kpis.open_purchase_orders.partial_count} partial`} />
+              )}
               <StatCard label="Pending Approvals" value={d.kpis.pending_approvals.count} icon={ClipboardCheck} tone="amber"
                 ariaLabel="Open approvals queue" onClick={() => navigate(PROC.APPROVALS)}
                 sub="awaiting you" />
-              <StatCard label="Overdue Invoices" value={d.kpis.overdue_invoices.count} icon={CircleAlert} tone="red"
-                ariaLabel="Open vendor invoices" onClick={() => navigate(routesPath.PROTECTED.PROCUREMENT.VENDOR_INVOICES)}
-                sub={<span><span className="font-semibold text-destructive">{compactMoney(d.kpis.overdue_invoices.amount.kobo)}</span> past due</span>} />
-              <StatCard label="Active Vendors" value={d.kpis.active_vendors.count} icon={Store} tone="green"
-                ariaLabel="Open vendors" onClick={() => navigate(`${routesPath.PROTECTED.PROCUREMENT.VENDORS}/vendors`)}
-                sub={`${d.kpis.active_vendors.on_hold_count} on hold`} />
+              {d.kpis.overdue_invoices && (
+                <StatCard label="Overdue Invoices" value={d.kpis.overdue_invoices.count} icon={CircleAlert} tone="red"
+                  ariaLabel="Open vendor invoices" onClick={() => navigate(routesPath.PROTECTED.PROCUREMENT.VENDOR_INVOICES)}
+                  sub={<span><span className="font-semibold text-destructive">{compactMoney(d.kpis.overdue_invoices.amount.kobo)}</span> past due</span>} />
+              )}
+              {d.kpis.active_vendors && (
+                <StatCard label="Active Vendors" value={d.kpis.active_vendors.count} icon={Store} tone="green"
+                  ariaLabel="Open vendors" onClick={() => navigate(`${routesPath.PROTECTED.PROCUREMENT.VENDORS}/vendors`)}
+                  sub={`${d.kpis.active_vendors.on_hold_count} on hold`} />
+              )}
             </div>
 
-            <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-3">
+            {charts > 0 && (
+            <div className={cn("grid min-w-0 grid-cols-1 gap-5", charts === 3 ? "xl:grid-cols-3" : charts === 2 && "xl:grid-cols-2")}>
+              {d.spend_by_category && (
               <Card title="Spend by Category" subtitle="MTD"
                 action={<CardLink label="Open spend report" onClick={() => navigate(`${routesPath.PROTECTED.PROCUREMENT.ANALYTICS}/spend`)} />}>
                 {d.spend_by_category.items.length === 0 ? <EmptyBlock>No posted spend this month.</EmptyBlock> : (
@@ -191,7 +208,9 @@ export default function ProcurementDashboard() {
                   />
                 )}
               </Card>
+              )}
 
+              {d.purchase_order_status && (
               <Card title="Purchase Order Status" subtitle="Documents by approval and receipt stage"
                 action={<CardLink label="Open purchase orders" onClick={() => navigate(routesPath.PROTECTED.PROCUREMENT.PURCHASE_ORDERS)} />}>
                 {!hasPoData ? <EmptyBlock>No purchase orders yet.</EmptyBlock> : (
@@ -204,7 +223,9 @@ export default function ProcurementDashboard() {
                   />
                 )}
               </Card>
+              )}
 
+              {d.monthly_spend_trend && (
               <Card title="Monthly Spend Trend" subtitle="Last 8 months · posted vendor invoices"
                 action={<CardLink label="Open spend report" onClick={() => navigate(`${routesPath.PROTECTED.PROCUREMENT.ANALYTICS}/spend`)} />}>
                 {!hasTrendData ? <EmptyBlock>No posted spend in the last eight months.</EmptyBlock> : (
@@ -217,9 +238,12 @@ export default function ProcurementDashboard() {
                   />
                 )}
               </Card>
+              )}
             </div>
+            )}
 
-            <div className="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+            <div className={cn("grid min-w-0 grid-cols-1 items-start gap-5", d.recent_activity && "xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]")}>
+              {d.recent_activity && (
               <Card title="Recent Activity" subtitle="Latest successful procurement actions"
                 action={d.recent_activity.length > 0 && canAudit
                   ? <CardLink label="View all" text onClick={() => navigate(routesPath.PROTECTED.AUDIT.EVENTS)} />
@@ -241,6 +265,7 @@ export default function ProcurementDashboard() {
                   </div>
                 )}
               </Card>
+              )}
 
               <Card title="Approvals Awaiting You" subtitle="Your active procurement workflow stages">
                 {d.approvals_awaiting_user.length === 0 ? <EmptyBlock>You’re all caught up.</EmptyBlock> : (
