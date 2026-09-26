@@ -207,7 +207,7 @@ export function ScoreInput({ label, weight, value, onChange }: {
   return (
     <div>
       <div className="flex items-baseline justify-between font-mont">
-        <span className="text-xs text-gray-05">{label} <span className="text-gray-04">· {Math.round(weight * 100)}%</span></span>
+        <span className="text-xs text-gray-05">{label} <span className="text-gray-05">· {Math.round(weight * 100)}%</span></span>
         <span className="text-sm font-semibold tabular-nums text-black-01">{value}</span>
       </div>
       <div className="mt-1.5 flex items-center gap-3">

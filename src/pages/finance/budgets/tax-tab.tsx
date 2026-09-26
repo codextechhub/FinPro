@@ -135,7 +135,7 @@ function Step({ state, title, sub }: { state: "done" | "current" | "todo"; title
   const Icon = state === "done" ? CheckCircle2 : state === "current" ? CircleDot : Circle;
   return (
     <div className="flex items-start gap-2.5">
-      <Icon className={cn("mt-0.5 size-4 shrink-0", state === "done" ? "text-green-01" : state === "current" ? "text-primary" : "text-gray-03")} />
+      <Icon className={cn("mt-0.5 size-4 shrink-0", state === "done" ? "text-green-01" : state === "current" ? "text-primary" : "text-gray-02")} />
       <div>
         <p className={cn("font-mont text-xs font-semibold", state === "todo" ? "text-gray-05" : "text-black-01")}>{title}</p>
         <p className="font-mont text-[11px] text-gray-05">{sub}</p>

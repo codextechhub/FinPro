@@ -91,7 +91,7 @@ export default function QuotationsPage() {
     { header: "Lead time", align: "right", cell: (q) => q.lead_time_days == null ? "-" : `${q.lead_time_days}d` },
     { header: "Total", align: "right", cell: (q) => <span className="tabular-nums">{formatMoney(q.total, currency)}</span> },
     { header: "Status", cell: (q) => <div className="flex flex-wrap items-center gap-1.5"><StatusPill status={q.quotation_status} />{q.is_expired && <ExpiredPill />}</div> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its quotations." /></PageShell></ProcurementShell>;

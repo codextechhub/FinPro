@@ -43,7 +43,7 @@ function CompareToggle({ label, checked, onChange }: { label: string; checked: b
 const thBase = "px-3 py-2 font-mont text-xs font-semibold text-gray-01";
 // Favourable variance reads positive (revenue over / expense under budget) → green.
 function Variance({ kobo, currency }: { kobo: number; currency?: string | null }) {
-  if (!kobo) return <span className="text-gray-04">-</span>;
+  if (!kobo) return <span className="text-gray-05">-</span>;
   return <span className={cn("font-semibold tabular-nums", kobo > 0 ? "text-green-01" : "text-destructive")}>
     {kobo < 0 ? "−" : ""}{formatMoney(Math.abs(kobo), currency)}
   </span>;

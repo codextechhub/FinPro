@@ -124,7 +124,7 @@ export default function VendorInvoicesPage() {
     { header: "Amount", align: "right", cell: (invoice) => <span className="tabular-nums">{money(invoice.total)}</span> },
     { header: "Paid", align: "right", cell: (invoice) => <span className="tabular-nums">{money(invoice.amount_paid)}</span> },
     { header: "Status", cell: (invoice) => <div className="flex flex-wrap gap-1"><StatusPill status={invoice.status} />{invoice.display_status !== invoice.status && <StatusPill status={invoice.display_status} />}</div> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its vendor invoices." /></PageShell></ProcurementShell>;
   return <ProcurementShell>

@@ -122,7 +122,7 @@ export function CatalogTab({ entity, currency }: { entity: string; currency?: st
     { header: "Lead time", cell: (item) => item.lead_time_days == null ? "-" : `${item.lead_time_days} day${item.lead_time_days === 1 ? "" : "s"}` },
     ...(canStock ? [{ header: "Stock", cell: (item: CatalogItem) => <StatusPill status={stockLabel(item.stock_status)} /> } satisfies Column<CatalogItem>] : []),
     { header: "Status", cell: (item) => <StatusPill status={item.is_active ? "ACTIVE" : "INACTIVE"} /> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
   return <>

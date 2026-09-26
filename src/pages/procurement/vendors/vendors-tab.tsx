@@ -117,7 +117,7 @@ export function VendorsTab({ entity, currency }: { entity: string; currency?: st
     { header: "Active POs", align: "right", cell: (vendor) => <span className="tabular-nums">{vendor.active_po_count ?? 0}</span> },
     { header: "KYC", cell: (vendor) => <StatusPill status={vendor.kyc_status} /> },
     { header: "Status", cell: (vendor) => <StatusPill status={vendorState(vendor)} /> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
   return <>

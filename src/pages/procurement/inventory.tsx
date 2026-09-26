@@ -149,7 +149,7 @@ function ItemsSection({ entity, currency }: { entity: string; currency?: string 
     { header: "Unit cost", align: "right", cell: (i) => <Money kobo={i.unit_cost} currency={currency} align="right" /> },
     { header: "Value", align: "right", cell: (i) => <Money kobo={i.stock_value} currency={currency} align="right" /> },
     { header: "Status", cell: (i) => <StatusPill status={itemStatus(i)} /> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
   return (

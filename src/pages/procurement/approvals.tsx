@@ -106,7 +106,7 @@ export default function ProcurementApprovalsPage() {
     { header: "Submitted", cell: (row) => dateTime(row.submitted_at) },
     { header: "Age", cell: (row) => age(row.awaiting_since) },
     { header: "Status", cell: () => <StatusPill status="PENDING_APPROVAL" /> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
   const closeDrawer = () => {
@@ -134,7 +134,7 @@ export default function ProcurementApprovalsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <label className="relative w-full sm:max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-04" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search document or requester"
                 className="h-9 w-full rounded-md border border-white-02 bg-white pl-9 pr-3 font-mont text-sm outline-none focus:border-primary" />
             </label>

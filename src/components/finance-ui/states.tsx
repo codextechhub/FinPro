@@ -102,7 +102,7 @@ export function EmptyState({
 }) {
   return (
     <Centered>
-      <Inbox className="mb-3 size-8 text-gray-03" />
+      <Inbox className="mb-3 size-8 text-gray-02" />
       <p className="font-mont text-sm font-semibold text-gray-01">{title}</p>
       {message && <p className="mt-1 max-w-md font-mont text-xs text-gray-05">{message}</p>}
     </Centered>
@@ -136,7 +136,7 @@ export function ForbiddenState({
 }) {
   return (
     <Centered>
-      <Ban className="mb-3 size-8 text-gray-03" />
+      <Ban className="mb-3 size-8 text-gray-02" />
       <p className="font-mont text-sm font-semibold text-gray-01">Access restricted</p>
       <p className="mt-1 max-w-md font-mont text-xs text-gray-05">{message}</p>
     </Centered>

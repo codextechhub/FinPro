@@ -368,7 +368,7 @@ export function WorkflowStrip({ steps }: { steps: { label: string; state: "done"
             <span className="size-1.5 rounded-full bg-current opacity-70" />
             {s.label}
           </span>
-          {i < steps.length - 1 && <span className="text-gray-03">›</span>}
+          {i < steps.length - 1 && <span className="text-gray-02">›</span>}
         </span>
       ))}
     </div>

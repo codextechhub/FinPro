@@ -101,7 +101,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
             ? <Button size="sm" variant="outline-dest" disabled={updating || l.is_default} title={l.is_default ? "The default location cannot be deactivated. Make another location the default first." : undefined} onClick={() => act(l, { is_active: false })}>Deactivate</Button>
             : <Button size="sm" variant="outline" disabled={updating} onClick={() => act(l, { is_active: true })}>Activate</Button>}
         </div>
-      ) : <ChevronRight className="ml-auto size-4 text-gray-04" />),
+      ) : <ChevronRight className="ml-auto size-4 text-gray-05" />),
     },
   ];
 

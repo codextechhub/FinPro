@@ -102,7 +102,7 @@ export function CompareModal({ entity, currency, open, onClose }: { entity: stri
                       )}
                     >
                       {r.document_number}
-                      <span className="ml-1.5 text-gray-04">· {r.response_count} bid{r.response_count === 1 ? "" : "s"}</span>
+                      <span className="ml-1.5 text-gray-05">· {r.response_count} bid{r.response_count === 1 ? "" : "s"}</span>
                     </button>
                   ))}
                 </div>
@@ -243,7 +243,7 @@ function CompareMatrix({ rfqId, entity, currency, onAwarded }: { rfqId: number; 
                   ) : q.awarded_po_id ? (
                     <span className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-emerald-700"><Award className="size-3" /> Awarded</span>
                   ) : (
-                    <span className="font-mont text-[11px] text-gray-04">-</span>
+                    <span className="font-mont text-[11px] text-gray-05">-</span>
                   )}
                 </td>
               ))}

@@ -100,7 +100,7 @@ export default function ContractsPage() {
     { header: "End date", cell: (c) => shortDate(c.end_date) },
     { header: "Value", align: "right", cell: (c) => <span className="tabular-nums">{formatMoney(c.contract_value, currency)}</span> },
     { header: "Status", cell: (c) => <div className="flex flex-wrap items-center gap-1.5"><StatusPill status={c.status} />{c.is_expired && <ExpiredOverlay />}</div> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its contracts." /></PageShell></ProcurementShell>;

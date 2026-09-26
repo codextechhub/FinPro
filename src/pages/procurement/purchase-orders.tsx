@@ -141,7 +141,7 @@ export default function PurchaseOrdersPage() {
     { header: "Total", align: "right", cell: (po) => <span className="tabular-nums">{money(po.total)}</span> },
     { header: "Received", cell: (po) => <span className="tabular-nums">{percent(po.received_pct)}</span> },
     { header: "Status", cell: (po) => <StatusPill status={po.display_status} /> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its purchase orders." /></PageShell></ProcurementShell>;
@@ -350,7 +350,7 @@ function EmptyBlock({ text }: { text: string }) {
 }
 
 function DocumentLink({ label, value, disabled, onClick }: { label: string; value: string; disabled?: boolean; onClick: () => void }) {
-  return <button type="button" disabled={disabled} onClick={onClick} className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-white-02 px-3 py-2 text-left enabled:hover:bg-gray-50 disabled:cursor-default disabled:opacity-60"><span className="min-w-0"><span className="block font-mont text-[11px] text-gray-05">{label}</span><span className="mt-1 block truncate font-mont text-sm font-semibold text-black-01">{value}</span></span>{!disabled && <ChevronRight className="size-4 shrink-0 text-gray-04" />}</button>;
+  return <button type="button" disabled={disabled} onClick={onClick} className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-white-02 px-3 py-2 text-left enabled:hover:bg-gray-50 disabled:cursor-default disabled:opacity-60"><span className="min-w-0"><span className="block font-mont text-[11px] text-gray-05">{label}</span><span className="mt-1 block truncate font-mont text-sm font-semibold text-black-01">{value}</span></span>{!disabled && <ChevronRight className="size-4 shrink-0 text-gray-05" />}</button>;
 }
 
 function EditPurchaseOrderDrawer({ po, entity, currency, onClose }: { po: PurchaseOrder; entity: string; currency?: string | null; onClose: () => void }) {

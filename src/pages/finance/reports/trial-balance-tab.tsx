@@ -156,7 +156,7 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
                   {comparing ? (
                     <>
                       <td className="px-3 py-2 text-right tabular-nums text-gray-05">{pri ? formatMoney(Math.abs(pri), currency) : "-"}</td>
-                      <td className={cn("px-3 py-2 text-right tabular-nums", change > 0 ? "text-green-01" : change < 0 ? "text-destructive" : "text-gray-04")}>{change ? signed(change, currency) : "-"}</td>
+                      <td className={cn("px-3 py-2 text-right tabular-nums", change > 0 ? "text-green-01" : change < 0 ? "text-destructive" : "text-gray-05")}>{change ? signed(change, currency) : "-"}</td>
                     </>
                   ) : null}
                 </tr>

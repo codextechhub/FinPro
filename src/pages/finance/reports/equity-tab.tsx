@@ -56,7 +56,7 @@ export function EquityReport({ entity, currency }: { entity: string; currency?: 
   const cell = "px-4 py-2 text-right tabular-nums";
   // A movement cell: "-" for zero, otherwise the money (optionally tinted).
   const amt = (kobo: number, tint?: "profit") => kobo === 0
-    ? <span className="text-gray-04">-</span>
+    ? <span className="text-gray-05">-</span>
     : <span className={cn("tabular-nums", tint === "profit" && kobo > 0 ? "text-green-01" : "text-black-01")}><Money kobo={kobo} currency={currency} align="right" /></span>;
 
   // One movement row across all component columns + the Total column.

@@ -105,7 +105,7 @@ export default function RfqsPage() {
     { header: "Issued", cell: (r) => shortDate(r.issue_date) },
     { header: "Deadline", cell: (r) => shortDate(r.response_due_date) },
     { header: "Status", cell: (r) => <RfqStatusPill status={r.rfq_status} /> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its RFQs." /></PageShell></ProcurementShell>;

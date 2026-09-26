@@ -145,7 +145,7 @@ export default function RequisitionsPage() {
     },
     { header: "Amount", align: "right", cell: (r) => <span className="tabular-nums">{money(r.estimated_total)}</span> },
     { header: "Status", cell: (r) => <StatusPill status={displayStatus(r)} /> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
   // Money KPI: percentage swing against the comparable prior period (null when

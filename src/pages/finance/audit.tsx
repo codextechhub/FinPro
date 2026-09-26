@@ -225,7 +225,7 @@ export default function FinanceAuditPage() {
             <p className="mt-0.5 font-mont text-xs text-gray-05">Every finance mutation, recorded immutably for this entity.</p>
           </div>
           <button type="button" disabled title="Audit export is not available yet"
-            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md border border-white-02 px-2.5 py-1.5 font-mont text-xs font-semibold text-gray-04 opacity-70">
+            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md border border-white-02 px-2.5 py-1.5 font-mont text-xs font-semibold text-gray-05 opacity-70">
             <Download className="size-3.5" /> Export
           </button>
         </div>

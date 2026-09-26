@@ -137,7 +137,7 @@ export function CategoriesTab({ entity, currency }: { entity: string; currency?:
     { header: "Vendors", align: "right", cell: (category) => <span className="tabular-nums">{category.vendor_count ?? 0}</span> },
     { header: "Spend MTD", align: "right", cell: (category) => <span className="tabular-nums">{spend(category)}</span> },
     { header: "Status", cell: (category) => <StatusPill status={category.is_active ? "ACTIVE" : "INACTIVE"} /> },
-    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
+    { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
   return <>
