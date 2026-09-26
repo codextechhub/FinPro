@@ -80,7 +80,7 @@ export function Panel({ title, subtitle, action, className, children, guide, foo
 }
 
 /** The middle of a short list: a line saying the rest is fine, centred in the spare height. */
-function AllClear({ children }: { children: React.ReactNode }) {
+export function AllClear({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-12 flex-1 items-center justify-center gap-2 font-mont text-xs text-green-01">
       <Check className="size-4 shrink-0" /> {children}
@@ -88,7 +88,7 @@ function AllClear({ children }: { children: React.ReactNode }) {
   );
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const dayMonth = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 export function LinkAction({ label, to }: { label: string; to: string }) {

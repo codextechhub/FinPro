@@ -20,7 +20,7 @@
  */
 
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { AlertTriangle, CalendarClock, ArrowUpRight, Plus, ReceiptText } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
 import { fiscalRunwayNotice } from "./fiscal-runway-model";
@@ -31,9 +31,10 @@ import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { useGetFinanceDashboardQuery } from "@/redux/services/finance/reports-api";
+import { useGetFinanceDashboardQuery, useGetReceivablesDashboardQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
-import type { DashboardKpi, FinanceDashboard, FiscalRunway } from "@/redux/services/finance/reports-types";
+import type { DashboardKpi, FinanceDashboard, FiscalRunway, ReceivablesDashboard } from "@/redux/services/finance/reports-types";
+import { ReceivablesTab } from "./dashboard-receivables";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { toArray } from "@/redux/services/finance/api-types";
@@ -112,15 +113,31 @@ export default function FinanceDashboard() {
   const period = mine ? picked.period : "";
   const periodValid = period !== "" && periods.some((p) => String(p.period_no) === period);
   const windowKey = mine ? picked.window : "";
-  const { data, isLoading, isFetching, isError, refetch } = useGetFinanceDashboardQuery(
-    { entity: entity!, ...(periodValid ? { period } : {}), ...(windowKey ? { window: windowKey } : {}) },
-    { skip: !entity },
-  );
-  const d = data?.data as FinanceDashboard | undefined;
-  const words = dashboardWords(d?.books);
+  // Receivables & collections is a second view of the same books, for anyone who
+  // may read invoices or receipts; the chosen view lives in the URL (?view=).
+  const [params, setParams] = useSearchParams();
+  const canReceivables = can(P.FIN_VIEW_INVOICES) || can(P.FIN_VIEW_PAYMENTS);
+  const tab: "overview" | "receivables" = params.get("view") === "receivables" && canReceivables ? "receivables" : "overview";
+  const args = { entity: entity!, ...(periodValid ? { period } : {}), ...(windowKey ? { window: windowKey } : {}) };
+  const overviewQ = useGetFinanceDashboardQuery(args, { skip: !entity || tab !== "overview" });
+  const receivablesQ = useGetReceivablesDashboardQuery(args, { skip: !entity || tab !== "receivables" });
+  const { isLoading, isFetching, isError, refetch } = tab === "overview" ? overviewQ : receivablesQ;
+  const d = tab === "overview" ? overviewQ.data?.data as FinanceDashboard | undefined : undefined;
+  const r = tab === "receivables" ? receivablesQ.data?.data as ReceivablesDashboard | undefined : undefined;
+  const head = d ?? r;
+  const words = dashboardWords(head?.books);
   const money = (kobo: number) => formatMoney(kobo, currency);
 
-  const windowTabs: TabStripItem<string>[] = (d?.windows ?? []).map((w) => ({ value: w.key, label: w.label }));
+  const windowTabs: TabStripItem<string>[] = (head?.windows ?? []).map((w) => ({ value: w.key, label: w.label }));
+  const viewTabs: TabStripItem<"overview" | "receivables">[] = [
+    { value: "overview", label: "Overview" },
+    { value: "receivables", label: "Receivables & collections" },
+  ];
+  const showView = (view: "overview" | "receivables") => setParams((prev) => {
+    const next = new URLSearchParams(prev);
+    if (view === "overview") next.delete("view"); else next.set("view", view);
+    return next;
+  }, { replace: true });
   const attentionLink = (key: string): string | null => ({
     approvals: routesPath.PROTECTED.WORKFLOW.APPROVALS,
     bank_lines: can(P.FIN_VIEW_BANK_ACCOUNTS) ? F.BANK_RECON : null,
@@ -146,8 +163,8 @@ export default function FinanceDashboard() {
       <PageShell className="space-y-5 text-black-01" data-guide="finance-overview.page">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            {d?.reader_first_name && (
-              <p className="font-mont text-xs text-gray-05">{greeting()}, {d.reader_first_name}</p>
+            {head?.reader_first_name && (
+              <p className="font-mont text-xs text-gray-05">{greeting()}, {head.reader_first_name}</p>
             )}
             <div className="mt-0.5 flex items-center gap-1.5">
               <h1 className="font-mont text-lg font-semibold text-gray-01">Finance overview</h1>
@@ -156,13 +173,13 @@ export default function FinanceDashboard() {
               </InfoHint>
             </div>
             <p className="mt-0.5 font-mont text-xs text-gray-05">
-              {d ? [d.window?.name, d.as_of ? `as of ${fmtDate(d.as_of)}` : null, d.narrowed ? "your branches only" : null]
+              {head ? [head.window?.name, head.as_of ? `as of ${fmtDate(head.as_of)}` : null, head.narrowed ? "your branches only" : null]
                 .filter(Boolean).join(" · ") : "-"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {windowTabs.length > 1 && (
-              <TabStrip items={windowTabs} value={d?.window.key ?? windowTabs[0].value}
+              <TabStrip items={windowTabs} value={head?.window.key ?? windowTabs[0].value}
                 onChange={(w) => setPicked({ entity: entity!, period, window: w })}
                 variant="pill-compact" ariaLabel="Figures for" />
             )}
@@ -191,13 +208,21 @@ export default function FinanceDashboard() {
           </div>
         </div>
 
+        {canReceivables && (
+          <TabStrip items={viewTabs} value={tab} onChange={showView} variant="underline" ariaLabel="Dashboard views" />
+        )}
+
         {!entity ? (
           <NoEntityState message="Choose a ledger entity to see its finances." />
         ) : isLoading ? (
           <LoadingState rows={8} />
-        ) : isError || !d ? (
+        ) : isError || !head ? (
           <ErrorState onRetry={refetch} />
-        ) : nothingToShow ? (
+        ) : r ? (
+          <div className={cn("transition-opacity", isFetching && "opacity-60")}>
+            <ReceivablesTab d={r} words={words} currency={currency} />
+          </div>
+        ) : !d ? null : nothingToShow ? (
           <EmptyState title="Nothing to show here yet"
             message="None of the figures on this page are in your access. Your Finance screens are in the menu on the left." />
         ) : (

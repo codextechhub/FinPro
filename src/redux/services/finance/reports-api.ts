@@ -14,6 +14,7 @@ import type {
   FinanceDashboard,
   IncomeStatement,
   ReportParams,
+  ReceivablesDashboard,
   TrialBalance,
 } from "./reports-types";
 
@@ -55,6 +56,10 @@ export const reportsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/reports/dashboard/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceReports"],
     }),
+    getReceivablesDashboard: builder.query<ApiEnvelope<ReceivablesDashboard>, ReportParams & { window?: string }>({
+      query: (p) => ({ url: `/finance/reports/dashboard/receivables/${qs(p)}`, method: "GET" }),
+      providesTags: ["FinanceReports"],
+    }),
   }),
 });
 
@@ -67,4 +72,5 @@ export const {
   useGetArAgingQuery,
   useGetAnalyticsSliceQuery,
   useGetFinanceDashboardQuery,
+  useGetReceivablesDashboardQuery,
 } = reportsApi;

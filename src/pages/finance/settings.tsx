@@ -313,14 +313,18 @@ function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate
   const [autoPost, setAutoPost] = useState(values.auto_post_manual_invoices);
   const [openingBalances, setOpeningBalances] = useState(values.allow_customer_opening_balances);
   const [bankAccount, setBankAccount] = useState(values.primary_collection_bank_account ? String(values.primary_collection_bank_account.id) : "");
+  const [target, setTarget] = useState(String(values.term_collection_target_pct));
   const [update, state] = useUpdateFinanceDocumentSettingsMutation();
   const dueDaysValue = Number(dueDays);
-  const valid = dueDays.trim() !== "" && Number.isInteger(dueDaysValue) && dueDaysValue >= 0 && dueDaysValue <= 365;
+  const targetValue = Number(target);
+  const targetValid = target.trim() !== "" && Number.isInteger(targetValue) && targetValue >= 1 && targetValue <= 100;
+  const valid = dueDays.trim() !== "" && Number.isInteger(dueDaysValue) && dueDaysValue >= 0 && dueDaysValue <= 365 && targetValid;
   const dirty = valid && (
     dueDaysValue !== values.default_invoice_due_days
     || narration.trim() !== values.default_invoice_narration
     || autoPost !== values.auto_post_manual_invoices
     || openingBalances !== values.allow_customer_opening_balances
+    || targetValue !== values.term_collection_target_pct
     || bankAccount !== (values.primary_collection_bank_account ? String(values.primary_collection_bank_account.id) : "")
   );
   const save = async () => {
@@ -331,6 +335,7 @@ function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate
         default_invoice_narration: narration,
         auto_post_manual_invoices: autoPost,
         allow_customer_opening_balances: openingBalances,
+        term_collection_target_pct: targetValue,
         primary_collection_bank_account: bankAccount ? Number(bankAccount) : null,
       }).unwrap();
       toast.success(response.message || "Finance document policy saved.");
@@ -341,11 +346,12 @@ function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate
       <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
         <label className="font-mont text-xs font-semibold text-gray-01">Default invoice due days<Input className="mt-2 bg-white" type="number" min="0" max="365" step="1" value={dueDays} onChange={(event) => setDueDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Used for manual and fee-generated invoices without a due date.</span><SettingsConsumer consumer={consumers.default_invoice_due_days} /></label>
         <label className="font-mont text-xs font-semibold text-gray-01">Primary collection account<select className="mt-2 h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={bankAccount} onChange={(event) => setBankAccount(event.target.value)} disabled={!canUpdate}><option value="">Automatic fallback</option>{values.bank_account_options.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}{bank.bank_name ? ` · ${bank.bank_name}` : ""} · {bank.currency}</option>)}</select><span className="mt-1 block font-normal leading-5 text-gray-05">Printed as the payment destination on invoices and receipts.</span><SettingsConsumer consumer={consumers.primary_collection_bank_account} /></label>
+        <label className="font-mont text-xs font-semibold text-gray-01">Term collection target (%)<Input className="mt-2 bg-white" type="number" min="1" max="100" step="1" value={target} onChange={(event) => setTarget(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">The share of a term&rsquo;s fees you aim to have collected by the end of the term. Drawn as the target on the collection curve.</span><SettingsConsumer consumer={consumers.term_collection_target_pct} /></label>
         <label className="font-mont text-xs font-semibold text-gray-01 lg:col-span-2">Default invoice narration<Textarea className="mt-2 min-h-20 bg-white font-mont text-sm" value={narration} onChange={(event) => setNarration(event.target.value)} disabled={!canUpdate} maxLength={255} placeholder="Optional text for new manual invoices" /><SettingsConsumer consumer={consumers.default_invoice_narration} /></label>
       </div>
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Post manual invoices immediately</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, a manual invoice is priced and kept as a draft unless the user explicitly chooses to post.</p><SettingsConsumer consumer={consumers.auto_post_manual_invoices} /></div><Switch checked={autoPost} onCheckedChange={setAutoPost} disabled={!canUpdate} aria-label="Post manual invoices immediately" /></div>
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Allow customer opening balances</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, customer creation and edits reject non-zero opening balances.</p><SettingsConsumer consumer={consumers.allow_customer_opening_balances} /></div><Switch checked={openingBalances} onCheckedChange={setOpeningBalances} disabled={!canUpdate} aria-label="Allow customer opening balances" /></div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use a whole number from 0 to 365 days." : canUpdate ? "Only changed values are written to audit history." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save document policy"}</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? (targetValid ? "Use a whole number from 0 to 365 days." : "Use a whole-number target from 1 to 100.") : canUpdate ? "Only changed values are written to audit history." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save document policy"}</Button></div>
     </SettingsPanel>
     <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;

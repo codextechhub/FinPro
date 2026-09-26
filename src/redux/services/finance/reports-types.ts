@@ -387,3 +387,88 @@ export interface FinanceDashboard {
     created_by: string;
   }[] | null;
 }
+
+/**
+ * The Receivables & collections tab of the Finance dashboard, as one reader may
+ * see it. Same windows and same rule as the overview: a block the reader may not
+ * see is `null` (`adjustments` is a list holding only the kinds they may read).
+ */
+export interface ReceivablesDashboard {
+  entity: string;
+  books: "school" | "general";
+  reader_first_name: string | null;
+  as_of: string;
+  narrowed: boolean;
+  window: DashboardWindow;
+  windows: { key: string; label: string; name: string }[];
+  collections: FinanceDashboard["collections"];
+  /** Median days from invoice to its final payment, over the window's settled invoices. */
+  days_to_pay: number | null;
+  receivables_summary: FinanceDashboard["receivables_summary"];
+  /** Money payers hold with the school that no invoice has used yet. */
+  credit: {
+    total: ReportMoney;
+    unapplied_receipts: number;
+    unapplied_receipts_amount: ReportMoney;
+    credit_notes_amount: ReportMoney;
+    payers: number;
+    older_than_days: number;
+    older_amount: ReportMoney;
+  } | null;
+  /**
+   * Cumulative % of the window's fees paid at the end of each week. `previous`
+   * is the last comparable window over its whole length; `projection_pct` carries
+   * this window forward along its shape, null when there is none.
+   */
+  curve: {
+    weeks: number;
+    week_now: number;
+    current: number[];
+    previous: number[] | null;
+    previous_name: string | null;
+    target_pct: number;
+    projection_pct: number | null;
+    vs_previous_pts: number | null;
+  } | null;
+  plans: {
+    active: number;
+    on_track: number;
+    on_track_amount: ReportMoney;
+    behind: number;
+    behind_amount: ReportMoney;
+    next: { date: string; plans: number; amount: ReportMoney }[];
+  } | null;
+  /** Collection per payer group the books' owner defines (a school's classes). */
+  groups: {
+    label: string;
+    items: { name: string; billed: ReportMoney; collected: ReportMoney; rate_pct: number | null }[];
+  } | null;
+  dunning: {
+    level: number;
+    stage: string;
+    min_days_overdue: number | null;
+    sent: number;
+    paid_within_days: number;
+    paid_pct: number | null;
+  }[] | null;
+  concessions: {
+    total: ReportMoney;
+    payers: number;
+    share_of_billed_pct: number | null;
+    items: { kind: string; label: string; amount: ReportMoney; payers: number }[];
+  } | null;
+  adjustments: { key: string; label: string; count: number; pending: number; amount: ReportMoney }[];
+  largest: {
+    customer_id: number;
+    name: string;
+    code: string;
+    branch: string | null;
+    group: string | null;
+    owed: ReportMoney;
+    current: ReportMoney;
+    days_1_30: ReportMoney;
+    days_31_90: ReportMoney;
+    over_90: ReportMoney;
+    last_action: string;
+  }[] | null;
+}

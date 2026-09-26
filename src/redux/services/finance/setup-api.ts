@@ -188,7 +188,7 @@ export const setupApi = baseApi.injectEndpoints({
       query: ({ entity }) => ({ url: `/finance/settings/documents/${qs({ entity })}`, method: "GET" }),
       providesTags: ["FinanceSettings"],
     }),
-    updateFinanceDocumentSettings: b.mutation<ApiEnvelope<FinanceDocumentSettingsPayload>, { entity: string; default_invoice_due_days?: number; default_invoice_narration?: string; auto_post_manual_invoices?: boolean; allow_customer_opening_balances?: boolean; primary_collection_bank_account?: number | null }>({
+    updateFinanceDocumentSettings: b.mutation<ApiEnvelope<FinanceDocumentSettingsPayload>, { entity: string; default_invoice_due_days?: number; default_invoice_narration?: string; auto_post_manual_invoices?: boolean; allow_customer_opening_balances?: boolean; term_collection_target_pct?: number; primary_collection_bank_account?: number | null }>({
       query: ({ entity, ...body }) => ({ url: `/finance/settings/documents/${qs({ entity })}`, method: "PATCH", body }),
       invalidatesTags: ["FinanceSettings", "FinanceAuditLog", "FinanceBankAccounts"],
     }),

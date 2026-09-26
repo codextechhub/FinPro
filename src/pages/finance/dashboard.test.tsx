@@ -20,7 +20,9 @@ import { FINANCE_PERMISSION_REGISTRY, type PermissionCode } from "../../permissi
 const mocks = vi.hoisted(() => ({
   held: new Set<string>(),
   dashboard: null as unknown,
+  receivables: null as unknown,
   lastArgs: null as unknown,
+  search: "",
 }));
 
 const holds = (code: PermissionCode) => mocks.held.has(FINANCE_PERMISSION_REGISTRY[code]);
@@ -38,6 +40,7 @@ vi.mock("@/hooks/use-permissions", () => ({
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useNavigate: () => vi.fn(),
+  useSearchParams: () => [new URLSearchParams(mocks.search), vi.fn()],
 }));
 
 vi.mock("./finance-shell", () => ({ FinanceShell: ({ children }: { children: React.ReactNode }) => children }));
@@ -55,6 +58,9 @@ vi.mock("@/redux/services/finance/reports-api", () => ({
     mocks.lastArgs = args;
     return { data: { data: mocks.dashboard }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() };
   },
+  useGetReceivablesDashboardQuery: () => ({
+    data: { data: mocks.receivables }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
+  }),
 }));
 
 vi.mock("@/redux/services/finance/setup-api", () => ({
@@ -96,6 +102,7 @@ let root: Root;
 
 beforeEach(() => {
   mocks.held = new Set();
+  mocks.search = "";
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -185,6 +192,27 @@ describe("Finance overview words and windows", () => {
 
   it("greets the reader by name when the server sends one", () => {
     expect(render({ ...EMPTY, reader_first_name: "Ngozi", ar_aging: AGING }, "finance.invoice.view")).toMatch(/Good (morning|afternoon|evening), Ngozi/);
+  });
+});
+
+describe("Finance dashboard views", () => {
+  it("offers the Receivables view to a reader of invoices, and not to one without", () => {
+    expect(render({ ...EMPTY, ar_aging: AGING }, "finance.invoice.view")).toContain("Receivables & collections");
+    expect(render({ ...EMPTY, bank_accounts: [] }, "finance.bankaccount.view")).not.toContain("Receivables & collections");
+  });
+
+  it("opens the Receivables view named in the address", () => {
+    mocks.search = "view=receivables";
+    mocks.receivables = {
+      entity: "HOLYCROSS", books: "school", reader_first_name: null, as_of: "2026-09-26", narrowed: false,
+      window: TERM, windows: EMPTY.windows,
+      collections: { billed: money(100), invoice_count: 1, collected: money(50), rate_pct: 50 },
+      days_to_pay: 7, receivables_summary: null, credit: null, curve: null, plans: null, groups: null,
+      dunning: null, concessions: null, adjustments: [], largest: null,
+    };
+    const text = render({ ...EMPTY, ar_aging: AGING }, "finance.invoice.view");
+    expect(text).toContain("Days to pay");
+    expect(text).not.toContain("Receivables aging");
   });
 });
 

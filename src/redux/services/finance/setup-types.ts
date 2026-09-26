@@ -224,6 +224,8 @@ export interface FinanceDocumentSettingsValues {
   default_invoice_narration: string;
   auto_post_manual_invoices: boolean;
   allow_customer_opening_balances: boolean;
+  /** Share of a term's fees the school aims to collect by its end (1 to 100). */
+  term_collection_target_pct: number;
   primary_collection_bank_account: FinanceDocumentBankOption | null;
   bank_account_options: FinanceDocumentBankOption[];
   updated_at: string | null;
