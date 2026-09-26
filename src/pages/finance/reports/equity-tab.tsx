@@ -19,6 +19,7 @@ import { useGetChangesInEquityQuery } from "@/redux/services/finance/reports-api
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { EquityColumn } from "@/redux/services/finance/reports-types";
 import { toArray } from "@/redux/services/finance/api-types";
+import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 
 function Select({ value, onChange, children, className }: { value: string; onChange: (v: string) => void; children: ReactNode; className?: string }) {
   return (
@@ -70,6 +71,7 @@ export function EquityReport({ entity, currency }: { entity: string; currency?: 
 
   return (
     <div className="space-y-5">
+      {d.narrowed && <BranchReportNote />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Select value={period} onChange={setPeriod} className="w-44">
           <option value="">Year to date</option>

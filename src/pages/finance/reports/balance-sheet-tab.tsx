@@ -18,6 +18,7 @@ import { formatMoney } from "@/utils/money";
 import { downloadReportExport } from "@/utils/finance-export";
 import { useGetBalanceSheetQuery } from "@/redux/services/finance/reports-api";
 import type { BalanceSheetSection } from "@/redux/services/finance/reports-types";
+import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 
 const BAND: Record<string, string> = {
   asset: "bg-blue-50 text-blue-700",
@@ -83,6 +84,7 @@ export function BalanceSheetReport({ entity, currency }: { entity: string; curre
 
   return (
     <div className="space-y-5">
+      {d.narrowed && <BranchReportNote />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 max-w-full items-center gap-2 font-mont text-xs text-gray-05">
           <span className="shrink-0">As of</span>

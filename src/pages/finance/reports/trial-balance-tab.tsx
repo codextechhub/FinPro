@@ -21,6 +21,7 @@ import { useGetTrialBalanceQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { TrialBalanceRow } from "@/redux/services/finance/reports-types";
 import { toArray } from "@/redux/services/finance/api-types";
+import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const TYPE_STYLE: Record<string, string> = {
@@ -84,6 +85,7 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
 
   return (
     <div className="space-y-5">
+      {tb.narrowed && <BranchReportNote />}
       <div className="flex items-center gap-1.5">
         <span className="font-mont text-sm font-semibold text-gray-01">Trial balance</span>
         <InfoHint ariaLabel="About the trial balance">

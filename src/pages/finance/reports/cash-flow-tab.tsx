@@ -18,6 +18,7 @@ import { downloadReportExport } from "@/utils/finance-export";
 import { useGetCashFlowQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import { toArray } from "@/redux/services/finance/api-types";
+import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 
 const BAND: Record<string, string> = {
   operating: "bg-green-01/10 text-green-01",
@@ -61,6 +62,7 @@ export function CashFlowReport({ entity, currency }: { entity: string; currency?
 
   return (
     <div className="space-y-5">
+      {d.narrowed && <BranchReportNote />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Select value={period} onChange={setPeriod} className="w-44">
           <option value="">Year to date</option>

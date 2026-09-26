@@ -16,6 +16,7 @@ import { downloadReportExport } from "@/utils/finance-export";
 import { useGetAnalyticsSliceQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery, useGetDimensionsQuery } from "@/redux/services/finance/setup-api";
 import { toArray } from "@/redux/services/finance/api-types";
+import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const TYPE_STYLE: Record<string, string> = {
@@ -71,6 +72,7 @@ export function AnalyticsSliceReport({ entity, currency }: { entity: string; cur
 
   return (
     <div className="space-y-5">
+      {sl.narrowed && <BranchReportNote />}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Axis" value={axisLabel} foot={periodLabel || "All periods"} />
         <KpiCard label="Buckets" value={String(Object.keys(sl.bucket_totals).length)} foot="Distinct values" />
