@@ -4,7 +4,6 @@
 import { DEFAULT_RECEIVABLES_SECTION, type ReceivablesSection } from "../console-sections";
 import { FinanceShell } from "../finance-shell";
 import { useActiveEntity, InfoHint } from "@/components/finance-ui";
-import { EmptyState } from "@/components/finance-ui/states";
 import { InvoicesTab } from "./invoices-tab";
 import { CreditNotesTab } from "./credit-notes-tab";
 import { RefundsTab } from "./refunds-tab";
@@ -15,6 +14,7 @@ import { CustomersTab } from "./customers-tab";
 import { FeeStructuresTab } from "./fee-structures-tab";
 import { ReceiptsAllocationTab } from "./receipts-allocation-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const LABELS: Record<string, string> = {
   invoices: "Customer Invoices", "credit-notes": "Credit / Debit Notes", refunds: "Refunds & Write-offs",
@@ -53,7 +53,7 @@ export default function ReceivablesPage({ section = DEFAULT_RECEIVABLES_SECTION 
           </div>
         )}
         {!entity ? (
-          <EmptyState title="Select an entity" message="Choose a ledger entity to view receivables." />
+          <NoEntityState message="Choose a ledger entity to view receivables." />
         ) : section === "credit-notes" ? (
           <CreditNotesTab entity={entity} currency={currency} />
         ) : section === "refunds" ? (

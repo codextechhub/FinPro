@@ -36,6 +36,7 @@ import { StockLocationPicker } from "./pickers";
 import { useStockLocations } from "./use-stock-locations";
 import { DEFAULT_INVENTORY_SECTION, type InventorySection } from "./console-sections";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 // ── Shared small helpers ─────────────────────────────────────────────────────
 // Quantities arrive as 14,4 decimal strings ("10.0000"); show them trimmed.
@@ -95,7 +96,7 @@ export default function InventoryPage({ section = DEFAULT_INVENTORY_SECTION }: {
     return (
       <ProcurementShell>
         <PageShell>
-          <EmptyState title="Select an entity" message="Choose an entity to view its inventory." />
+          <NoEntityState message="Choose an entity to view its inventory." />
         </PageShell>
       </ProcurementShell>
     );

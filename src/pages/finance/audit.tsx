@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useGetAuditLogQuery, useGetAuditFacetsQuery } from "@/redux/services/finance/setup-api";
 import type { FinanceAuditLog } from "@/redux/services/finance/setup-types";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 // Action tone: rejections read red, reversals/cancellations amber, master-data
 // edits blue, everything else (posts/approvals/completions) green.
@@ -204,7 +205,7 @@ export default function FinanceAuditPage() {
     { header: "Status", cell: (l) => <StatusPill status={l.status} /> },
   ];
 
-  if (!entity) return <FinanceShell><PageShell><EmptyState title="Select an entity" /></PageShell></FinanceShell>;
+  if (!entity) return <FinanceShell><PageShell><NoEntityState /></PageShell></FinanceShell>;
   if (!canAudit) return <FinanceShell><PageShell><EmptyState title="No audit access" message="The finance audit trail needs finance.audit.view, which is a restricted grant." /></PageShell></FinanceShell>;
 
   return (

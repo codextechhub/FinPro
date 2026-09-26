@@ -53,6 +53,18 @@ node check-boundary.mjs   # nothing escapes src/, no orphaned or undiscovered te
 node check-exports.mjs    # every public subpath resolves to a file that exists
 ```
 
+A third script keeps the menus honest against the backend:
+
+```bash
+cd ../backend/apps && ../cx/bin/python manage.py show_access_registry --json \
+  | node ../../FinPro/sync-key-catalogue.mjs
+```
+
+It rewrites `src/backend-key-catalogue.ts`, the list `console-nav.test.ts`
+checks every menu gate and permission code against. Run it whenever the backend
+adds, renames or retires a finance, payments or procurement key; a new key that
+no screen claims then fails that test until a menu entry declares it.
+
 `check-exports.mjs` exists because a green build proved nothing: `v0.1.0`
 typechecked, built and tested clean in both applications, then blanked the
 console's finance area on open because its exports map pointed at files that do

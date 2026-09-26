@@ -18,6 +18,7 @@ import { downloadReportExport } from "@/utils/finance-export";
 import { useGetIncomeStatementQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { IncomeStatementLine, IncomeStatementTotals } from "@/redux/services/finance/reports-types";
+import { toArray } from "@/redux/services/finance/api-types";
 
 function Select({ value, onChange, children, className }: { value: string; onChange: (v: string) => void; children: ReactNode; className?: string }) {
   return (
@@ -53,7 +54,7 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
   const [wantPrior, setWantPrior] = useState(true);
 
   const { data: periodsData } = useGetPeriodsQuery({ entity });
-  const periods = useMemo(() => [...(periodsData?.data ?? [])]
+  const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 
   const { data, isLoading, isFetching, isError, refetch } = useGetIncomeStatementQuery({ entity, ...(period ? { period } : {}) });

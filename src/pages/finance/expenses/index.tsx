@@ -3,10 +3,10 @@
 import { DEFAULT_EXPENSES_SECTION, type ExpensesSection } from "../console-sections";
 import { FinanceShell } from "../finance-shell";
 import { useActiveEntity, InfoHint } from "@/components/finance-ui";
-import { EmptyState } from "@/components/finance-ui/states";
 import { ExpenseClaimsTab } from "./expense-claims-tab";
 import { PettyCashTab } from "./petty-cash-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 /** `section` comes from the route table; see console-sections.ts. */
 export default function ExpensesPage({ section = DEFAULT_EXPENSES_SECTION }: {
@@ -28,7 +28,7 @@ export default function ExpensesPage({ section = DEFAULT_EXPENSES_SECTION }: {
           <p className="mt-0.5 font-mont text-xs text-gray-05">{isPettyCash ? "Petty-cash floats and vouchers." : "Out-of-pocket spending by staff that needs reimbursement."}</p>
         </div>
         {!entity ? (
-          <EmptyState title="Select an entity" />
+          <NoEntityState />
         ) : isPettyCash ? (
           <PettyCashTab entity={entity} currency={currency} />
         ) : (

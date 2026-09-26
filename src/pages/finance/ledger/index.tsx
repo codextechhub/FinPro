@@ -10,7 +10,6 @@ import { useSearchParams } from "react-router";
 import { Plus, Search } from "lucide-react";
 import { FinanceShell } from "../finance-shell";
 import { DataTable, InfoHint, Money, StatusPill, TabStrip, useActiveEntity, type Column, type TabStripItem } from "@/components/finance-ui";
-import { EmptyState } from "@/components/finance-ui/states";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
@@ -26,6 +25,7 @@ import type { JournalListItem, JournalSource, JournalStatus } from "@/redux/serv
 import { DirectEntryDrawer } from "./direct-entry-drawer";
 import { JournalDetailDrawer } from "./journal-detail-drawer";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
 const SOURCES: JournalSource[] = ["MANUAL", "SALES", "PURCHASE", "BANK", "PAYROLL", "CLOSING", "OPENING", "FX", "SYSTEM"];
@@ -109,7 +109,7 @@ export default function GeneralLedgerPage() {
   if (!entity) {
     return (
       <FinanceShell>
-        <PageShell><EmptyState title="Select an entity" message="Choose a ledger entity to view its journals." /></PageShell>
+        <PageShell><NoEntityState message="Choose a ledger entity to view its journals." /></PageShell>
       </FinanceShell>
     );
   }

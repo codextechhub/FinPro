@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/finance-ui/states";
 import { CollectionsTab } from "./collections-tab";
 import { VirtualAccountsTab } from "./virtual-accounts-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 /** `section` comes from the route table; see console-sections.ts. */
 export default function CollectionsPage({ section = DEFAULT_COLLECTIONS_SECTION }: {
@@ -32,7 +33,7 @@ export default function CollectionsPage({ section = DEFAULT_COLLECTIONS_SECTION 
           <p className="mt-0.5 font-mont text-xs text-gray-05">{isVA ? "Dedicated funding accounts that auto-reconcile inbound transfers." : "Money in - gateway checkouts and their settlement."}</p>
         </div>
         {!entity ? (
-          <EmptyState title="Select an entity" message="Choose a ledger entity to view collections." />
+          <NoEntityState message="Choose a ledger entity to view collections." />
         ) : !canCollections ? (
           <EmptyState title="No collections access" message="Money in is read through the payments module, which needs payments.collection.view." />
         ) : isVA ? (

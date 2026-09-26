@@ -36,6 +36,7 @@ import { ActivityFeed, EmptyPanel, Field } from "./sourcing/shared";
 import { isForbidden, shortDate } from "./sourcing/helpers";
 import { ContractRenewButton } from "./procurement-action-gates";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const STATUS_TABS = [
   ["All", ""], ["Active", "ACTIVE"], ["Expiring", "EXPIRING"], ["Expired", "EXPIRED"],
@@ -102,7 +103,7 @@ export default function ContractsPage() {
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
   ];
 
-  if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view its contracts." /></PageShell></ProcurementShell>;
+  if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its contracts." /></PageShell></ProcurementShell>;
   if (!canPROC_VIEW_CONTRACTS) return <ProcurementShell><PageShell><EmptyState title="No contracts access" message="This screen needs procurement.contract.view." /></PageShell></ProcurementShell>;
 
   return <ProcurementShell>

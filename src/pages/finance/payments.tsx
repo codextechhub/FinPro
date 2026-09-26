@@ -9,8 +9,8 @@ import { SettlementTab } from "./settlement-tab";
 import { TransactionsTab } from "./transactions-tab";
 import { WebhooksTab } from "./webhooks-tab";
 import { useActiveEntity } from "@/components/finance-ui";
-import { EmptyState } from "@/components/finance-ui/states";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 /** `section` comes from the route table; see console-sections.ts. */
 export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
@@ -35,7 +35,7 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
           <p className="mt-0.5 font-mont text-xs text-gray-05">{subtitle}</p>
         </div>
         {!entity ? (
-          <EmptyState title="Select an entity" />
+          <NoEntityState />
         ) : section === "batches" ? (
           <BatchesTab entity={entity} currency={currency} />
         ) : section === "settlement" ? (

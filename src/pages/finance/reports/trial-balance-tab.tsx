@@ -20,6 +20,7 @@ import { downloadReportExport } from "@/utils/finance-export";
 import { useGetTrialBalanceQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { TrialBalanceRow } from "@/redux/services/finance/reports-types";
+import { toArray } from "@/redux/services/finance/api-types";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const TYPE_STYLE: Record<string, string> = {
@@ -52,7 +53,7 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
   const [compare, setCompare] = useState(false);
 
   const { data: periodsData } = useGetPeriodsQuery({ entity });
-  const periods = useMemo(() => [...(periodsData?.data ?? [])]
+  const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 
   // The prior fiscal period = the one immediately before the selected one.

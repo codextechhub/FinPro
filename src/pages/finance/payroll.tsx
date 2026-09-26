@@ -44,6 +44,7 @@ import {
 } from "@/redux/services/finance/ops-api";
 import type { PayrollLine, PayrollRun, EmployeeSalary, SalaryStructure, SalaryComponent, PayslipComponent } from "@/redux/services/finance/ops-types";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -138,7 +139,7 @@ export default function PayrollPage() {
   // on a pair of 403s and a red toast rather than saying what it needs.
   const { can } = useCan();
   const canPayroll = can(P.FIN_VIEW_PAYROLL);
-  if (!entity) return <FinanceShell><PageShell><EmptyState title="Select an entity" /></PageShell></FinanceShell>;
+  if (!entity) return <FinanceShell><PageShell><NoEntityState /></PageShell></FinanceShell>;
   if (!canPayroll) return <FinanceShell><PageShell><EmptyState title="No payroll access" message="Payroll needs finance.payrollrun.view. It is a restricted grant, because a run carries what each named person is paid." /></PageShell></FinanceShell>;
 
   return (

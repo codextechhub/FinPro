@@ -46,6 +46,7 @@ import { formatMoney } from "@/utils/money";
 import { formatQuantity } from "@/utils/quantity";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const STATUS_TABS = [
   { label: "All", value: "" },
@@ -169,7 +170,7 @@ export default function RequisitionsPage() {
     </span>
   );
 
-  if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view its requisitions." /></PageShell></ProcurementShell>;
+  if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its requisitions." /></PageShell></ProcurementShell>;
   if (!canPROC_VIEW_REQUISITIONS) return <ProcurementShell><PageShell><EmptyState title="No requisitions access" message="This screen needs procurement.requisition.view." /></PageShell></ProcurementShell>;
 
   return (

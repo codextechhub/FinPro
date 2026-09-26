@@ -44,6 +44,7 @@ import { ActivityFeed } from "./activity-feed";
 import { DocumentAttachments } from "./document-attachments";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["invoices", "Invoices", ListChecks],
@@ -83,7 +84,7 @@ export default function VendorPaymentsPage() {
   const { data, isLoading, isFetching, isError, error, refetch } = useGetVendorPaymentsQuery(
     { entity: entity!, page }, { skip: !entity },
   );
-  if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view vendor payments." /></PageShell></ProcurementShell>;
+  if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view vendor payments." /></PageShell></ProcurementShell>;
 
   const rows = toArray(data?.data);
   const pg = data?.pagination;

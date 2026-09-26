@@ -18,6 +18,7 @@ import { useGetProcurementDashboardQuery } from "@/redux/services/procurement/pr
 import { routesPath } from "@/routes/routes-path";
 import { currencySymbol, formatMoney, toNaira } from "@/utils/money";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const PROC = routesPath.PROTECTED.PROCUREMENT;
 const DONUT_COLORS = [
@@ -94,11 +95,11 @@ export default function ProcurementDashboard() {
   const navigate = useNavigate();
   const { code: entity, currency } = useActiveEntity();
   const { can } = useCan();
-  const canReports = can(P.PROC_VIEW_PROC_REPORTS);
+  const canAnalytics = can(P.PROC_VIEW_ANALYTICS);
   const canAudit = can(P.VIEW_AUDIT);
   const { data, isLoading, isError, refetch } = useGetProcurementDashboardQuery(
     { entity: entity! },
-    { skip: !entity || !canReports },
+    { skip: !entity || !canAnalytics },
   );
   const d = data?.data;
   const money = (kobo: number) => formatMoney(kobo, currency ?? d?.currency);
@@ -139,9 +140,9 @@ export default function ProcurementDashboard() {
         </header>
 
         {!entity ? (
-          <EmptyState title="Select an entity" message="Choose a ledger entity to see its procurement dashboard." />
-        ) : !canReports ? (
-          <EmptyState title="No procurement report access" message="You don’t hold procurement.report.view for this console." />
+          <NoEntityState message="Choose a ledger entity to see its procurement dashboard." />
+        ) : !canAnalytics ? (
+          <EmptyState title="No procurement analytics access" message="You don’t hold procurement.analytics.view, which the dashboard figures need." />
         ) : isLoading ? (
           <LoadingState rows={9} />
         ) : isError || !d ? (

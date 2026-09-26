@@ -12,7 +12,7 @@ import { ProcurementShell } from "../procurement-shell";
 import { RfqPicker, VendorPicker } from "../pickers";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
-  DataTable, DetailDrawer, EmptyState, ErrorState, FormDrawer, FormField, MoneyInput,
+  DataTable, DetailDrawer, ErrorState, FormDrawer, FormField, MoneyInput,
   LoadingState, StatusPill, ActionButton, TabStrip, TaxCodePicker, toArray,
   useActiveEntity, type Column, type TabStripItem,
 } from "@/components/finance-ui";
@@ -38,6 +38,7 @@ import { ActivityFeed, CompareModal, EmptyPanel, Field, ExpiredPill } from "./sh
 import { QUOTATION_TABS, isForbidden, shortDate } from "./helpers";
 import { useFetchAuthMediaQuery } from "@/redux/services/media-api";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["comparison", "Line comparison", Layers],
@@ -93,7 +94,7 @@ export default function QuotationsPage() {
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
   ];
 
-  if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view its quotations." /></PageShell></ProcurementShell>;
+  if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its quotations." /></PageShell></ProcurementShell>;
 
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">

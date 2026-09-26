@@ -17,6 +17,7 @@ import { formatMoney } from "@/utils/money";
 import { downloadReportExport } from "@/utils/finance-export";
 import { useGetCashFlowQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
+import { toArray } from "@/redux/services/finance/api-types";
 
 const BAND: Record<string, string> = {
   operating: "bg-green-01/10 text-green-01",
@@ -43,7 +44,7 @@ export function CashFlowReport({ entity, currency }: { entity: string; currency?
   const [period, setPeriod] = useState("");   // "" = year to date, else fiscal period id
 
   const { data: periodsData } = useGetPeriodsQuery({ entity });
-  const periods = useMemo(() => [...(periodsData?.data ?? [])]
+  const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 
   const { data, isLoading, isFetching, isError, refetch } = useGetCashFlowQuery({ entity, ...(period ? { period } : {}) });

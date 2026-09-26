@@ -12,7 +12,7 @@ import { PurchaseOrderPicker, VendorPicker } from "./pickers";
 import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
 import {
-  DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LineEditor,
+  DataTable, DetailDrawer, ErrorState, FormField, InfoHint, LineEditor,
   LoadingState, PostingRecap, StatCard, StatusPill, TabStrip, emptyLine, toApiLines, toArray,
   useActiveEntity, type Column, type DocLine, type TabStripItem,
   PostingDateField,} from "@/components/finance-ui";
@@ -56,6 +56,7 @@ import { ActivityFeed } from "./activity-feed";
 import { DocumentAttachments } from "./document-attachments";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const TABS = [
   ["All", ""], ["Draft", "DRAFT"], ["Under Review", "PENDING_APPROVAL"],
@@ -125,7 +126,7 @@ export default function VendorInvoicesPage() {
     { header: "Status", cell: (invoice) => <div className="flex flex-wrap gap-1"><StatusPill status={invoice.status} />{invoice.display_status !== invoice.status && <StatusPill status={invoice.display_status} />}</div> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
   ];
-  if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view its vendor invoices." /></PageShell></ProcurementShell>;
+  if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its vendor invoices." /></PageShell></ProcurementShell>;
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
       <header data-guide="procurement-vendor-invoices.heading" className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-1.5"><h1 className="font-mont text-lg font-semibold text-gray-01">Vendor Invoices</h1><InfoHint ariaLabel="About vendor invoices">Supplier bills remain drafts until matched, approved, and posted to Accounts Payable.</InfoHint></div><p className="mt-0.5 font-mont text-xs text-gray-05">Review three-way matches, approval, settlement, and overdue exposure.</p></div><div className="flex flex-wrap items-center gap-2"><QuickExportButton screen="procurement.vendor_invoices" params={{ status, search: debouncedSearch }} entity={entity} typeface="geist" defaultName="Vendor invoices" /><Can permission={P.PROC_CREATE_VENDOR_INVOICE}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> Record Invoice</Button></Can></div></header>

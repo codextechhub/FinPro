@@ -25,6 +25,7 @@ import { formatMoney } from "@/utils/money";
 import { formatQuantity } from "@/utils/quantity";
 import { canReceiveRemaining, completeReceiptSave } from "./goods-receipt-fulfilment";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const DETAIL_TABS = [
   { value: "overview", label: "Overview", icon: FileText },
@@ -74,7 +75,7 @@ export default function GoodsReceiptsPage() {
   ];
 
   if (!entity) {
-    return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view goods receipts." /></PageShell></ProcurementShell>;
+    return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view goods receipts." /></PageShell></ProcurementShell>;
   }
   if (!canPROC_VIEW_GOODS_RECEIPTS) {
     return <ProcurementShell><PageShell><EmptyState title="No goods receipts access" message="This screen needs procurement.goods_receipt.view." /></PageShell></ProcurementShell>;

@@ -31,6 +31,7 @@ import {
 } from "@/redux/services/finance/ops-api";
 import type { BankAccount, BankStatementLine } from "@/redux/services/finance/ops-types";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString() : "-");
 const signedCls = (kobo: number) => (kobo < 0 ? "text-destructive" : "text-green-01");
@@ -56,7 +57,7 @@ export default function BankReconciliationPage() {
   }, [accounts, accountId]);
 
   if (!entity) {
-    return <FinanceShell><PageShell><EmptyState title="Select an entity" /></PageShell></FinanceShell>;
+    return <FinanceShell><PageShell><NoEntityState /></PageShell></FinanceShell>;
   }
 
   return (

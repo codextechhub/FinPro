@@ -14,6 +14,7 @@ export { ConfirmActionModal } from "./confirm-action-modal";
 export { DocumentEmailAction, type DocumentEmailActionProps } from "./document-email-action";
 export { ActionButton } from "./action-button";
 export { EntitySelect } from "./entity-select";
+export { NoEntityState } from "./no-entity-state";
 export { FormModal, FormDrawer, FormField } from "./form-modal";
 export {
   useFieldAccess, resolveFieldAccess, fieldWriteErrors,

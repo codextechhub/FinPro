@@ -54,6 +54,7 @@ import { useAppDispatch } from "@/redux/store";
 import { routesPath } from "@/routes/routes-path";
 import { todayISO } from "@/utils/posting-window";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -123,7 +124,7 @@ export default function BankingPage() {
   ];
 
   if (!entity) {
-    return <FinanceShell><PageShell><EmptyState title="Select an entity" /></PageShell></FinanceShell>;
+    return <FinanceShell><PageShell><NoEntityState /></PageShell></FinanceShell>;
   }
 
   return (

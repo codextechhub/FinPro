@@ -42,7 +42,7 @@ export function AnalyticsSliceReport({ entity, currency }: { entity: string; cur
   const [acctType, setAcctType] = useState("");
 
   const { data: periodsData } = useGetPeriodsQuery({ entity });
-  const periods = useMemo(() => [...(periodsData?.data ?? [])]
+  const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 
   const { data: dimsData } = useGetDimensionsQuery({ entity });

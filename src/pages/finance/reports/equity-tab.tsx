@@ -18,6 +18,7 @@ import { downloadReportExport } from "@/utils/finance-export";
 import { useGetChangesInEquityQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { EquityColumn } from "@/redux/services/finance/reports-types";
+import { toArray } from "@/redux/services/finance/api-types";
 
 function Select({ value, onChange, children, className }: { value: string; onChange: (v: string) => void; children: ReactNode; className?: string }) {
   return (
@@ -36,7 +37,7 @@ export function EquityReport({ entity, currency }: { entity: string; currency?: 
   const [period, setPeriod] = useState("");   // "" = year to date, else fiscal period id
 
   const { data: periodsData } = useGetPeriodsQuery({ entity });
-  const periods = useMemo(() => [...(periodsData?.data ?? [])]
+  const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 
   const { data, isLoading, isFetching, isError, refetch } = useGetChangesInEquityQuery({ entity, ...(period ? { period } : {}) });

@@ -30,6 +30,7 @@ import { useGetFinanceDashboardQuery } from "@/redux/services/finance/reports-ap
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { DashboardKpi, FinanceDashboard, FiscalRunway, ReportMoney } from "@/redux/services/finance/reports-types";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 /** "2026-06-16" → "16 Jun 2026" (the design's as-of format). */
 function fmtDate(iso?: string) {
@@ -246,7 +247,7 @@ export default function FinanceDashboard() {
         </div>
 
         {!entity ? (
-          <EmptyState title="Select an entity" message="Choose a ledger entity to see its finances." />
+          <NoEntityState message="Choose a ledger entity to see its finances." />
         ) : !canReports ? (
           <EmptyState title="No report access" message="You don’t hold finance.report.view for this console." />
         ) : isLoading ? (

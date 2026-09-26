@@ -37,6 +37,7 @@ import { formatQuantity } from "@/utils/quantity";
 import { ActivityFeed, EmptyPanel, Field, ExpiredPill } from "./shared";
 import { RFQ_TABS, isForbidden, shortDate } from "./helpers";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["lines", "Lines", List],
@@ -107,7 +108,7 @@ export default function RfqsPage() {
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
   ];
 
-  if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view its RFQs." /></PageShell></ProcurementShell>;
+  if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its RFQs." /></PageShell></ProcurementShell>;
   if (!canPROC_VIEW_RFQS) return <ProcurementShell><PageShell><EmptyState title="No RFQs access" message="This screen needs procurement.rfq.view." /></PageShell></ProcurementShell>;
 
   return <ProcurementShell>

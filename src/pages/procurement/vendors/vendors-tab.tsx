@@ -196,11 +196,11 @@ function VendorDrawer({ id, entity, currency, onClose }: { id: number | null; en
   const vendor = data?.data;
   const access = useFieldAccess(VENDOR, vendor);
   const showContacts = access.anyVisible(...CONTACT_FIELDS);
-  const reportAllowed = can(P.PROC_VIEW_PROC_REPORTS);
+  const insightsAllowed = can(P.PROC_VIEW_ANALYTICS);
   const contractAllowed = can(P.PROC_VIEW_CONTRACTS);
   const poAllowed = can(P.PROC_VIEW_PURCHASE_ORDERS);
   const invoiceAllowed = can(P.PROC_VIEW_VENDOR_INVOICES);
-  const { data: insightData, isLoading: insightLoading, isError: insightError } = useGetVendorInsightsQuery({ id: id!, entity }, { skip: id == null || !reportAllowed });
+  const { data: insightData, isLoading: insightLoading, isError: insightError } = useGetVendorInsightsQuery({ id: id!, entity }, { skip: id == null || !insightsAllowed });
   const { data: contractData, isLoading: contractsLoading } = useGetContractsQuery({ entity, vendor: vendor?.code || "" }, { skip: !vendor || !contractAllowed });
   const { data: poData, isLoading: posLoading } = useGetPurchaseOrdersQuery({ entity, vendor: vendor?.code || "", page_size: 5 }, { skip: !vendor || !poAllowed });
   const { data: invoiceData, isLoading: invoicesLoading } = useGetVendorInvoicesQuery({ entity, vendor: vendor?.code || "", page_size: 5 }, { skip: !vendor || !invoiceAllowed });
@@ -227,19 +227,19 @@ function VendorDrawer({ id, entity, currency, onClose }: { id: number | null; en
           className="w-full gap-1"
           buttonClassName="flex items-center gap-1.5 px-3"
         />
-        {tab === "profile" && <ProfileTab vendor={vendor} access={access} insights={reportAllowed ? insights : undefined} currency={currency} reportRestricted={!reportAllowed} />}
+        {tab === "profile" && <ProfileTab vendor={vendor} access={access} insights={insightsAllowed ? insights : undefined} currency={currency} insightsRestricted={!insightsAllowed} />}
         {tab === "contacts" && showContacts && <ContactsTab vendor={vendor} access={access} />}
         {tab === "bank" && <BankTab vendor={vendor} access={access} />}
         {tab === "history" && <HistoryTab contracts={contracts} pos={pos} invoices={invoices} loading={contractsLoading || posLoading || invoicesLoading} contractAllowed={contractAllowed} poAllowed={poAllowed} invoiceAllowed={invoiceAllowed} currency={currency} />}
-        {tab === "performance" && <PerformanceTab insights={insights} loading={insightLoading} error={insightError} restricted={!reportAllowed} currency={currency} />}
+        {tab === "performance" && <PerformanceTab insights={insights} loading={insightLoading} error={insightError} restricted={!insightsAllowed} currency={currency} />}
       </div>}
     </DetailDrawer>
     {editing && vendor && <VendorForm key={vendor.id} entity={entity} initial={vendor} canManage={can(P.PROC_VERIFY_VENDOR)} onClose={() => setEditing(false)} />}
   </>;
 }
 
-function ProfileTab({ vendor, access, insights, currency, reportRestricted }: { vendor: Vendor; access: FieldAccess; insights?: VendorInsights; currency?: string | null; reportRestricted: boolean }) {
-  return <div className="space-y-5"><dl className="grid grid-cols-1 gap-4 sm:grid-cols-2"><Field label="Vendor code" value={vendor.code} /><Field label="Category" value={vendor.category_code || "Uncategorised"} /><Field label="Payment terms" value={titleCase(vendor.payment_terms)} /><Field label="Payable account" value={vendor.payable_code} /><Field label="Default expense" value={vendor.default_expense_code} /><Field label="Default WHT" value={vendor.default_wht_tax_code_value} /><Field label="YTD spend" value={reportRestricted ? "Restricted" : formatMoney(insights?.spend_ytd || 0, currency)} /><Field label="Active purchase orders" value={vendor.active_po_count ?? insights?.po_count ?? 0} /></dl>{access.isHidden("address") ? null : <div><p className="mb-2 font-mont text-xs font-semibold text-black-01">Registered address</p><div className="rounded-md border border-white-02 p-3"><Field label="Address" value={vendor.address} prose /></div></div>}</div>;
+function ProfileTab({ vendor, access, insights, currency, insightsRestricted }: { vendor: Vendor; access: FieldAccess; insights?: VendorInsights; currency?: string | null; insightsRestricted: boolean }) {
+  return <div className="space-y-5"><dl className="grid grid-cols-1 gap-4 sm:grid-cols-2"><Field label="Vendor code" value={vendor.code} /><Field label="Category" value={vendor.category_code || "Uncategorised"} /><Field label="Payment terms" value={titleCase(vendor.payment_terms)} /><Field label="Payable account" value={vendor.payable_code} /><Field label="Default expense" value={vendor.default_expense_code} /><Field label="Default WHT" value={vendor.default_wht_tax_code_value} /><Field label="YTD spend" value={insightsRestricted ? "Restricted" : formatMoney(insights?.spend_ytd || 0, currency)} /><Field label="Active purchase orders" value={vendor.active_po_count ?? insights?.po_count ?? 0} /></dl>{access.isHidden("address") ? null : <div><p className="mb-2 font-mont text-xs font-semibold text-black-01">Registered address</p><div className="rounded-md border border-white-02 p-3"><Field label="Address" value={vendor.address} prose /></div></div>}</div>;
 }
 /** A vendor's contact details. Each block appears only when its field is visible to this user. */
 function ContactsTab({ vendor, access }: { vendor: Vendor; access: FieldAccess }) {

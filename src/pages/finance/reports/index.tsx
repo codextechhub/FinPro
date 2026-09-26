@@ -5,7 +5,6 @@ import { useState, type ReactNode } from "react";
 import { DEFAULT_REPORTS_SECTION, type ReportsSection } from "../console-sections";
 import { FinanceShell } from "../finance-shell";
 import { useActiveEntity, InfoHint } from "@/components/finance-ui";
-import { EmptyState } from "@/components/finance-ui/states";
 import { IncomeStatementReport } from "./income-statement-tab";
 import { BalanceSheetReport } from "./balance-sheet-tab";
 import { CashFlowReport } from "./cash-flow-tab";
@@ -14,6 +13,7 @@ import { TrialBalanceReport } from "./trial-balance-tab";
 import { AnalyticsSliceReport } from "./analytics-slice-tab";
 import { PeriodsTab, PERIODS_DESCRIPTION } from "./periods-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const LABELS: Record<string, string> = {
   "trial-balance": "Trial Balance", "income-statement": "Income Statement (P&L)",
@@ -79,7 +79,7 @@ export default function ReportsPage({ section = DEFAULT_REPORTS_SECTION }: {
           {section === "periods" ? <div ref={setHeaderSlot} className="contents" /> : null}
         </div>
         {!entity ? (
-          <EmptyState title="Select an entity" />
+          <NoEntityState />
         ) : section === "income-statement" ? (
           <IncomeStatementReport entity={entity} currency={currency} />
         ) : section === "balance-sheet" ? (

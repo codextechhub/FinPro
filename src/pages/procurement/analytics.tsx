@@ -4,7 +4,7 @@
  * lives in its own file under ./analytics/; this picks one off the :section route.
  * Every screen gates on procurement.report.view (the backend view enforces it too).
  */
-import { EmptyState, ForbiddenState, useActiveEntity } from "@/components/finance-ui";
+import { ForbiddenState, useActiveEntity } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { P } from "../../permissions";
 import { ProcurementShell } from "./procurement-shell";
@@ -15,6 +15,7 @@ import GrirScreen from "./analytics/grir";
 import SpendScreen from "./analytics/spend";
 import PerformanceScreen from "./analytics/performance";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const SECTIONS: Record<AnalyticsSection, (props: SectionProps) => React.ReactElement> = {
   "ap-aging": ApAgingScreen,
@@ -37,18 +38,18 @@ export default function AnalyticsPage({ section = DEFAULT_ANALYTICS_SECTION }: {
 }) {
   const { code: entity, currency } = useActiveEntity();
   const { can } = useCan();
-  const canReports = can(P.PROC_VIEW_PROC_REPORTS);
+  const canAnalytics = can(P.PROC_VIEW_ANALYTICS);
   const Section = SECTIONS[section] ?? ApAgingScreen;
 
   return (
     <ProcurementShell>
       {!entity ? (
         <PageShell>
-          <EmptyState title="Select an entity" message="Choose a ledger entity to see its procurement reports." />
+          <NoEntityState message="Choose a ledger entity to see its procurement reports." />
         </PageShell>
-      ) : !canReports ? (
+      ) : !canAnalytics ? (
         <PageShell>
-          <ForbiddenState message="You don’t hold procurement.report.view for this console." />
+          <ForbiddenState message="You don’t hold procurement.analytics.view, which these reports need." />
         </PageShell>
       ) : (
         <Section entity={entity} currency={currency} />

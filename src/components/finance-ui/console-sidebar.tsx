@@ -25,7 +25,7 @@ import { AppLogo } from "../../host";
 import { NavMain } from "./nav-main";
 import { usePermissions } from "@/hooks/use-permissions";
 import { routesPath } from "@/routes/routes-path";
-import type { ConsoleNavGroup, ConsoleNavItem } from "./console-nav";
+import { visibleConsoleNav, type ConsoleNavGroup, type ConsoleNavItem } from "./console-nav";
 import { revealActiveSidebarItem } from "./sidebar-navigation";
 
 /**
@@ -38,7 +38,7 @@ const scrollByConsole = new Map<string, number>();
 
 export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavGroup[] }) {
   const location = useLocation().pathname;
-  const { hasModuleAccess } = usePermissions();
+  const { hasAnyPermission, hasModuleAccess } = usePermissions();
   const scrollRef = useRef<HTMLDivElement>(null);
   const isCollapsed = useSidebar().state === "collapsed";
 
@@ -52,7 +52,7 @@ export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavG
     revealActiveSidebarItem(el, remembered);
   }, [title, location]);
 
-  const childVisible = (prefixes?: string[]) => !prefixes?.length || hasModuleAccess(...prefixes);
+  const visibleNav = visibleConsoleNav(nav, { hasAnyPermission, hasModuleAccess });
 
   // Find the single best-matching leaf URL (longest URL whose path is a prefix
   // of the current location). This prevents a shorter sibling URL from also
@@ -61,7 +61,7 @@ export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavG
   const matches = (url: string) => location === url || location.startsWith(url + "/");
   const activeUrl = (() => {
     let best: string | null = null;
-    for (const g of nav) {
+    for (const g of visibleNav) {
       for (const item of g.items) {
         const leaves = item.children?.length ? item.children : [item];
         for (const leaf of leaves) {
@@ -72,16 +72,10 @@ export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavG
     return best;
   })();
 
-  const mapItems = (navItems: ConsoleNavItem[]) => navItems.flatMap((item) => {
-    const kids = (item.children ?? []).filter((c) => childVisible(c.prefixes));
-    // A parent shows if it has visible children, or (no children) its own keys pass.
-    const visible = item.children?.length
-      ? kids.length > 0
-      : !item.prefixes?.length || hasModuleAccess(...item.prefixes);
-    if (!visible) return [];
-
+  const mapItems = (navItems: ConsoleNavItem[]) => navItems.map((item) => {
+    const kids = item.children ?? [];
     if (kids.length) {
-      return [{
+      return {
         title: item.title,
         url: item.url,
         icon: item.icon,
@@ -92,21 +86,18 @@ export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavG
           url: c.url,
           isActive: c.url === activeUrl,
         })),
-      }];
+      };
     }
-    return [{
+    return {
       title: item.title,
       url: item.url,
       icon: item.icon,
       isActive: item.url === activeUrl,
       childActive: false,
-    }];
+    };
   });
 
-  // Build each visible group: its label + mapped items (drop empty groups).
-  const groups = nav
-    .map((g) => ({ label: g.label, items: mapItems(g.items) }))
-    .filter((g) => g.items.length > 0);
+  const groups = visibleNav.map((g) => ({ label: g.label, items: mapItems(g.items) }));
 
   const groupLabelCls = "px-4 pb-1 pt-3 font-mont text-[10px] font-semibold uppercase tracking-wide text-gray-05 group-data-[collapsible=icon]:hidden";
 

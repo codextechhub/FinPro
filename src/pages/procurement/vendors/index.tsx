@@ -2,12 +2,12 @@
 
 import { ProcurementShell } from "../procurement-shell";
 import { useActiveEntity } from "@/components/finance-ui";
-import { EmptyState } from "@/components/finance-ui/states";
 import { VendorsTab } from "./vendors-tab";
 import { CategoriesTab } from "./categories-tab";
 import { CatalogTab } from "./catalog-tab";
 import { DEFAULT_VENDOR_SECTION, type VendorSection } from "../console-sections";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 /** `section` comes from the route table; see console-sections.ts. */
 export default function VendorsPage({ section = DEFAULT_VENDOR_SECTION }: {
@@ -19,7 +19,7 @@ export default function VendorsPage({ section = DEFAULT_VENDOR_SECTION }: {
     <ProcurementShell>
       <PageShell className="space-y-5 text-black-01">
         {!entity ? (
-          <EmptyState title="Select an entity" />
+          <NoEntityState />
         ) : section === "categories" ? (
           <CategoriesTab entity={entity} currency={currency} />
         ) : section === "catalog" ? (

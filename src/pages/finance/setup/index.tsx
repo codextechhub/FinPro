@@ -5,7 +5,6 @@ import { useState } from "react";
 import { DEFAULT_SETUP_SECTION, type SetupSection } from "../console-sections";
 import { FinanceShell } from "../finance-shell";
 import { useActiveEntity, InfoHint } from "@/components/finance-ui";
-import { EmptyState } from "@/components/finance-ui/states";
 import { EntitiesTab } from "./entities-tab";
 import { AccountsTab } from "./accounts-tab";
 import { PeriodsTab, PERIODS_DESCRIPTION } from "../reports/periods-tab";
@@ -14,6 +13,7 @@ import { TaxCodesTab } from "./tax-codes-tab";
 import { CostCentersTab } from "./cost-centers-tab";
 import { DimensionsTab } from "./dimensions-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const LABELS: Record<string, string> = {
   entities: "Entities", accounts: "Chart of Accounts", periods: "Periods",
@@ -53,7 +53,7 @@ export default function SetupPage({ section = DEFAULT_SETUP_SECTION }: {
 }) {
   const { code: entity } = useActiveEntity();
   const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null);
-  const needsEntity = (node: React.ReactNode) => (entity ? node : <EmptyState title="Select an entity" />);
+  const needsEntity = (node: React.ReactNode) => (entity ? node : <NoEntityState />);
 
   return (
     <FinanceShell>

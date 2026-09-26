@@ -39,6 +39,7 @@ import { formatMoney } from "@/utils/money";
 import { formatQuantity } from "@/utils/quantity";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const STATUS_TABS = [
   { label: "All", value: "" },
@@ -143,7 +144,7 @@ export default function PurchaseOrdersPage() {
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-04" /> },
   ];
 
-  if (!entity) return <ProcurementShell><PageShell><EmptyState title="Select an entity" message="Choose an entity to view its purchase orders." /></PageShell></ProcurementShell>;
+  if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its purchase orders." /></PageShell></ProcurementShell>;
   if (!canPROC_VIEW_PURCHASE_ORDERS) return <ProcurementShell><PageShell><EmptyState title="No purchase orders access" message="This screen needs procurement.purchase_order.view." /></PageShell></ProcurementShell>;
 
   return (

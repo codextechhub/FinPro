@@ -3,11 +3,11 @@
 import { DEFAULT_BUDGETS_SECTION, type BudgetsSection } from "../console-sections";
 import { FinanceShell } from "../finance-shell";
 import { useActiveEntity } from "@/components/finance-ui";
-import { EmptyState } from "@/components/finance-ui/states";
 import { BudgetsTab } from "./budgets-tab";
 import { AssetsTab } from "./assets-tab";
 import { TaxTab } from "./tax-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const META: Record<string, { title: string; sub: string }> = {
   budgets: { title: "Budgets & Forecasts", sub: "Compare planned vs actual spending - find your overruns before close does." },
@@ -30,7 +30,7 @@ export default function BudgetsAssetsTaxPage({ section = DEFAULT_BUDGETS_SECTION
           {meta.sub ? <p className="mt-0.5 font-mont text-xs text-gray-05">{meta.sub}</p> : null}
         </div>
         {!entity ? (
-          <EmptyState title="Select an entity" />
+          <NoEntityState />
         ) : section === "assets" ? (
           <AssetsTab entity={entity} currency={currency} />
         ) : section === "tax" ? (

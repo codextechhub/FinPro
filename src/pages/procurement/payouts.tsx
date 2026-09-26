@@ -6,7 +6,7 @@ import { useParams } from "react-router";
 import { toast } from "sonner";
 import { ProcurementShell } from "./procurement-shell";
 import { DataTable, Money, StatusPill, ActionButton, toArray, useActiveEntity, useFieldAccess, type Column } from "@/components/finance-ui";
-import { EmptyState, LoadingState } from "@/components/finance-ui/states";
+import { LoadingState } from "@/components/finance-ui/states";
 import { P } from "../../permissions";
 import {
   useGetPayoutsQuery, useGetPayoutBatchesQuery, useSubmitPayoutBatchMutation, useGetSettlementReconciliationQuery,
@@ -16,6 +16,7 @@ import type { PayoutBatchSummary, PayoutInstruction, TransactionLogEntry } from 
 import { PageShell } from "@/components/layout/page-shell";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 function PayoutsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [page, setPage] = useState(1);
@@ -122,7 +123,7 @@ export default function PayoutsPage() {
           <p className="mt-0.5 font-mont text-xs text-gray-05">Single and bulk payouts, batches and settlement reconciliation.</p>
         </div>
         {!entity ? (
-          <EmptyState title="Select an entity" />
+          <NoEntityState />
         ) : section === "batches" ? (
           <BatchesTab entity={entity} currency={currency} />
         ) : section === "settlement" ? (

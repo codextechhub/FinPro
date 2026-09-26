@@ -28,6 +28,7 @@ import type {
 } from "@/redux/services/procurement/procurement-ext-types";
 import { formatMoney } from "@/utils/money";
 import { PageShell } from "@/components/layout/page-shell";
+import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const DOCUMENT_TYPES = [
   ["", "All document types"],
@@ -129,7 +130,7 @@ export default function ProcurementApprovalsPage() {
         <p className="mt-0.5 font-mont text-xs text-gray-05">Documents awaiting your decision, routed through the shared approval workflow.</p>
       </header>
 
-      {!entity ? <EmptyState title="Select an entity" message="Choose an entity to view its Procurement approval queue." /> : <>
+      {!entity ? <NoEntityState message="Choose an entity to view its Procurement approval queue." /> : <>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <label className="relative w-full sm:max-w-xs">
