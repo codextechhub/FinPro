@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRecordCustomerReceiptMutation } from "@/redux/services/finance/ar-api";
-import { useGetChartOfAccountsQuery } from "@/redux/services/finance/setup-api";
+import { useGetTaggedAccountsQuery } from "@/redux/services/finance/setup-api";
 import type { Account } from "@/redux/services/finance/setup-types";
 
 const selectCls = "h-9 w-full rounded-md border border-white-02 bg-white px-2 font-mont text-sm focus:border-primary focus:outline-none";
@@ -35,7 +35,7 @@ export function RecordReceiptDrawer({ open, onOpenChange, entity, currency, onCr
   const [record, { isLoading }] = useRecordCustomerReceiptMutation();
 
   // Resolve account names for the posting preview (Dr bank, Cr AR control).
-  const { data: coaData } = useGetChartOfAccountsQuery({ entity }, { skip: !open });
+  const { data: coaData } = useGetTaggedAccountsQuery({ entity }, { skip: !open });
   const accounts = toArray<Account>(coaData?.data);
   const depositAcc = useMemo(() => accounts.find((a) => a.code === account), [accounts, account]);
   const arAcc = useMemo(() => accounts.find((a) => a.account_type === "ASSET" && a.tag === "CONTROL"), [accounts]);

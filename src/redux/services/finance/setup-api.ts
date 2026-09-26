@@ -45,6 +45,16 @@ export const setupApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/accounts/${qs({ ...p, with_balance: "true" })}`, method: "GET" }),
       providesTags: ["FinanceAccounts"],
     }),
+    /**
+     * Full chart (un-paginated) with each account's `tag` (CONTROL / CASH) and
+     * no balances. Readable on any finance key, so a form that only needs to
+     * know which account is the receivable control does not need the chart of
+     * accounts permission that the balances sit behind.
+     */
+    getTaggedAccounts: b.query<ApiEnvelope<Account[]>, { entity: string }>({
+      query: (p) => ({ url: `/finance/accounts/${qs({ ...p, with_tags: "true" })}`, method: "GET" }),
+      providesTags: ["FinanceAccounts"],
+    }),
     createAccount: b.mutation<ApiEnvelope<Account>, { entity: string; code: string; name: string; subtype?: string; parent?: number; is_postable?: boolean; is_contra?: boolean }>({
       query: ({ entity, ...body }) => ({ url: `/finance/accounts/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceAccounts"],
@@ -196,6 +206,7 @@ export const setupApi = baseApi.injectEndpoints({
 export const {
   useGetAccountsQuery,
   useGetChartOfAccountsQuery,
+  useGetTaggedAccountsQuery,
   useCreateAccountMutation,
   useGetAccountDetailQuery,
   useGetAccountActivityQuery,

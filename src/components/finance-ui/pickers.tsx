@@ -6,7 +6,7 @@
  */
 
 import { SearchSelect } from "@/components/custom/search-select";
-import { useGetAccountsQuery, useGetChartOfAccountsQuery, useGetCurrenciesQuery, useGetTaxCodesQuery, useGetCostCentersQuery } from "@/redux/services/finance/setup-api";
+import { useGetAccountsQuery, useGetTaggedAccountsQuery, useGetCurrenciesQuery, useGetTaxCodesQuery, useGetCostCentersQuery } from "@/redux/services/finance/setup-api";
 import { selectableCostCenters } from "./cost-center-usage";
 import { useGetTaxObligationsQuery, useGetPettyCashFundsQuery, useGetBankAccountsQuery } from "@/redux/services/finance/ops-api";
 import { useGetCustomersQuery } from "@/redux/services/finance/ar-api";
@@ -38,9 +38,10 @@ export function AccountPicker({ entity, value, onChange, label, placeholder = "S
 
 /** Receivable control account picker - postable ASSET accounts tagged CONTROL
  *  (the AR control accounts a customer posts to), shown as a populated, searchable
- *  list. Sourced from the chart endpoint, which is what computes the CONTROL tag. */
+ *  list. Sourced from the tagged chart, which computes the CONTROL tag without
+ *  the balances, so anyone who may add a customer can read it. */
 export function ReceivableAccountPicker({ entity, value, onChange, label, placeholder = "Select receivable account", isRequired, disabled }: PickerProps) {
-  const { data, isLoading } = useGetChartOfAccountsQuery({ entity });
+  const { data, isLoading } = useGetTaggedAccountsQuery({ entity });
   const options = toArray(data?.data)
     .filter((a) => a.account_type === "ASSET" && a.tag === "CONTROL" && a.is_postable)
     .map((a) => ({ value: a.code, label: `${a.code} · ${a.name}` }));
