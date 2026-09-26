@@ -42,7 +42,7 @@ export const financeNav: ConsoleNavGroup[] = [
       { title: "AR Invoices", url: `${F.RECEIVABLES}/invoices`, icon: ReceiptText, permissions: [P.FIN_VIEW_INVOICES] },
       { title: "Receipts & Allocation", url: F.RECEIPTS_ALLOCATION, icon: CreditCard, permissions: [P.FIN_VIEW_PAYMENTS] },
       { title: "Credit / Debit Notes", url: `${F.RECEIVABLES}/credit-notes`, icon: FileMinus, permissions: [P.FIN_VIEW_CREDIT_NOTES] },
-      { title: "Refunds & Write-offs", url: `${F.RECEIVABLES}/refunds`, icon: Undo2, permissions: [P.FIN_VIEW_REFUNDS], resources: ["finance.writeoff"] },
+      { title: "Refunds & Write-offs", url: `${F.RECEIVABLES}/refunds`, icon: Undo2, permissions: [P.FIN_VIEW_REFUNDS, P.FIN_VIEW_WRITE_OFFS] },
       { title: "Payment Plans", url: `${F.RECEIVABLES}/payment-plans`, icon: CalendarClock, permissions: [P.FIN_VIEW_PAYMENT_PLANS] },
       { title: "Concessions", url: `${F.RECEIVABLES}/concessions`, icon: BadgePercent, permissions: [P.FIN_VIEW_CONCESSIONS] },
       { title: "Dunning", url: `${F.RECEIVABLES}/dunning`, icon: BellRing, permissions: [P.FIN_VIEW_DUNNING] },

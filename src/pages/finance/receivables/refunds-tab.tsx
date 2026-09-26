@@ -116,6 +116,10 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
 
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
+  // The kinds the server sends this reader; a filter for a kind they cannot read
+  // would always come back empty.
+  const kinds = data?.kinds ?? ["REFUND", "WRITEOFF"];
+  const bothKinds = kinds.length > 1;
   const resetPage = () => setPage(1);
   const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
 
@@ -131,9 +135,13 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
 
   return (
     <>
-      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Stat label="Refundable credit" hint="Total customer credit available to refund." value={formatMoney(data?.kpis.refundable_credit ?? 0, currency)} />
-        <Stat label="Written off (YTD)" value={formatMoney(data?.kpis.written_off_ytd ?? 0, currency)} />
+      <div className={cn("mb-5 grid grid-cols-1 gap-4", bothKinds ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+        {data?.kpis.refundable_credit !== null && (
+          <Stat label="Refundable credit" hint="Total customer credit available to refund." value={formatMoney(data?.kpis.refundable_credit ?? 0, currency)} />
+        )}
+        {data?.kpis.written_off_ytd !== null && (
+          <Stat label="Written off (YTD)" value={formatMoney(data?.kpis.written_off_ytd ?? 0, currency)} />
+        )}
         <Stat label="Pending approval" value={String(data?.kpis.pending ?? 0)} />
       </div>
 
@@ -144,11 +152,13 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
             <Input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); resetPage(); }}
               placeholder="Search ref, customer, reason" className="h-9 w-64 bg-white pl-8 font-mont" />
           </div>
-          <select value={filter} onChange={(e) => { setFilter(e.target.value as "" | Mode); resetPage(); }} className={selectCls}>
-            <option value="">All</option>
-            <option value="REFUND">Refunds</option>
-            <option value="WRITEOFF">Write-offs</option>
-          </select>
+          {bothKinds && (
+            <select value={filter} onChange={(e) => { setFilter(e.target.value as "" | Mode); resetPage(); }} className={selectCls}>
+              <option value="">All</option>
+              <option value="REFUND">Refunds</option>
+              <option value="WRITEOFF">Write-offs</option>
+            </select>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {can(P.FIN_CREATE_REFUND) || can(P.FIN_CREATE_WRITE_OFF) ? (

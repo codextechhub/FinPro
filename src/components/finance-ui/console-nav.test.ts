@@ -116,8 +116,9 @@ describe("what a reader is offered", () => {
     expect(consoleOffersScreens(financeNav, clerk)).toBe(false);
   });
 
-  it("opens Refunds & Write-offs on the refund key, not on the invoice write-off action", () => {
+  it("opens Refunds & Write-offs on either list key, not on the invoice write-off action", () => {
     expect(titles(visibleConsoleNav(financeNav, reader("finance.refund.view")))).toContain("Refunds & Write-offs");
+    expect(titles(visibleConsoleNav(financeNav, reader("finance.writeoff.view")))).toContain("Refunds & Write-offs");
     expect(titles(visibleConsoleNav(financeNav, reader("finance.invoice.writeoff")))).not.toContain("Refunds & Write-offs");
   });
 

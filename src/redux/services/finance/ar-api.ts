@@ -193,7 +193,14 @@ export const arApi = baseApi.injectEndpoints({
     }),
     // Unified refunds + write-offs, paginated, with KPI totals in the envelope.
     getArAdjustments: builder.query<
-      { pagination: Pagination; kpis: { written_off_ytd: number; pending: number; refundable_credit: number }; data: ArAdjustment[] },
+      {
+        pagination: Pagination;
+        /** A KPI drawn from a kind the reader may not see is `null`. */
+        kpis: { written_off_ytd: number | null; pending: number; refundable_credit: number | null };
+        /** The row kinds this reader receives: refunds need the refund key, write-offs theirs. */
+        kinds: ("REFUND" | "WRITEOFF")[];
+        data: ArAdjustment[];
+      },
       { entity: string; type?: string; search?: string; page?: number }
     >({
       query: (params) => ({ url: `/finance/ar-adjustments/${qs(params)}`, method: "GET" }),
