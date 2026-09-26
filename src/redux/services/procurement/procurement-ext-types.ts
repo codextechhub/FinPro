@@ -11,7 +11,7 @@
  * means "these figures are the whole story" - hence the optional field, not `| null`.
  */
 
-import type { ReportMoney } from "../finance/reports-types";
+import type { DashboardWindow, ReportMoney } from "../finance/reports-types";
 
 export type ProcurementApprovalAction = "APPROVED" | "REJECTED" | "RETURNED";
 
@@ -73,35 +73,70 @@ export interface ProcurementApprovalDetail extends ProcurementApprovalRow {
   }[];
 }
 
+/** One stage of the purchase-to-payment pipeline: how many, how much, and its flagged few. */
+export interface ProcurementPipelineStage {
+  count: number;
+  amount: ReportMoney;
+  /** Stage-specific: not yet approved, closing soon, part received, over 30 days, late, vendors paid. */
+  flag: number;
+  flag_days?: number;
+}
+
 /**
- * The Procurement dashboard as one reader may see it.
+ * The Procurement overview as one reader may see it.
  *
  * The endpoint opens to anyone working in procurement and computes each block
- * only for a reader who holds the key behind it, so a block may be `null`. The
- * approval queue is the reader's own and always present. `narrowed` says the
- * figures cover only the reader's branches.
+ * only for a reader who holds the key behind it, so a block may be `null` and a
+ * pipeline stage may be missing. The approval queue is the reader's own and
+ * always present. `narrowed` says the figures cover only the reader's branches.
+ * `window` is the span spend, categories, top vendors and paid read, by date.
  */
 export interface ProcurementDashboard {
   entity: string;
   currency: string;
+  books: "school" | "general";
+  reader_first_name: string | null;
   as_of: string;
   month_start: string;
   narrowed: boolean;
+  window: DashboardWindow;
+  windows: { key: string; label: string; name: string }[];
   kpis: {
-    total_spend_mtd: { value: ReportMoney; prior_value: ReportMoney; delta_pct: number | null } | null;
-    open_purchase_orders: { count: number; partial_count: number } | null;
-    pending_approvals: { count: number };
-    overdue_invoices: { count: number; amount: ReportMoney } | null;
-    active_vendors: { count: number; on_hold_count: number } | null;
+    spend: { value: ReportMoney; prior_value: ReportMoney | null; delta_pct: number | null } | null;
+    open_purchase_orders: { count: number; partial_count: number; amount: ReportMoney } | null;
+    pending_approvals: { count: number; amount: ReportMoney; slow_count: number; type_count: number };
+    overdue_invoices: { count: number; amount: ReportMoney; oldest_days: number | null } | null;
+    active_vendors: { count: number; on_hold_count: number; first_time_count: number } | null;
   };
+  pipeline: Partial<Record<
+    "requisitions" | "rfqs" | "orders" | "received_not_billed" | "bills" | "paid", ProcurementPipelineStage
+  >>;
+  /** Twelve months from the fiscal year's start, in kobo; `current` is today's month, if in the year. */
+  committed_vs_spent: { labels: string[]; current: number | null; committed: number[]; spent: number[] } | null;
   spend_by_category: {
     total: ReportMoney;
     items: { key: string; label: string; amount: ReportMoney }[];
   } | null;
-  purchase_order_status: {
-    items: { key: string; label: string; count: number }[];
-  } | null;
-  monthly_spend_trend: { labels: string[]; values: number[] } | null;
+  top_vendors: { key: string; name: string; amount: ReportMoney; bills: number }[] | null;
+  /** Only the controls with something in them. */
+  exceptions: {
+    key: "match_failed" | "price_variance" | "vendor_on_hold" | "unbilled_receipts";
+    count: number;
+    amount: ReportMoney;
+    detail?: string;
+    days?: number;
+  }[] | null;
+  bills_due: { items: { key: "current" | "1-30" | "31-60" | "over-60"; amount: ReportMoney }[] } | null;
+  /** `ordered` is null for a reader who sees only some branches. */
+  contracts_ending: {
+    id: number;
+    title: string;
+    vendor: string;
+    end_date: string;
+    days: number;
+    value: ReportMoney;
+    ordered: ReportMoney | null;
+  }[] | null;
   recent_activity: {
     id: number;
     action: string;

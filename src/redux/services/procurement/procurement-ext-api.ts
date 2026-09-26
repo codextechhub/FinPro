@@ -253,7 +253,7 @@ export const procurementExtApi = baseApi.injectEndpoints({
     // Both reports paginate `rows` while keeping the report object in `data`.
 
     // Analytics reports
-    getProcurementDashboard: b.query<ApiEnvelope<ProcurementDashboard>, { entity: string }>({
+    getProcurementDashboard: b.query<ApiEnvelope<ProcurementDashboard>, { entity: string; window?: string }>({
       query: (p) => ({ url: `/procurement/reports/dashboard/${qs(p)}`, method: "GET" }),
       providesTags: [
         "ProcVendors", "ProcContracts", "ProcRequisitions", "ProcPurchaseOrders",
