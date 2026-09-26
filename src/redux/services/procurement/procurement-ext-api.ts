@@ -31,6 +31,7 @@ import type {
   GrirPoLineDetail,
   GrirPoLines,
   ProcurementDashboard,
+  ProcurementSuppliersDashboard,
   ProcurementApprovalDetail,
   ProcurementApprovalRow,
   SpendAnalysis,
@@ -261,6 +262,14 @@ export const procurementExtApi = baseApi.injectEndpoints({
         "WorkflowPending",
       ],
     }),
+    getProcurementSuppliersDashboard: b.query<ApiEnvelope<ProcurementSuppliersDashboard>, { entity: string; window?: string }>({
+      query: (p) => ({ url: `/procurement/reports/dashboard/suppliers/${qs(p)}`, method: "GET" }),
+      providesTags: [
+        "ProcVendors", "ProcContracts", "ProcRequisitions", "ProcPurchaseOrders",
+        "ProcGoodsReceipts", "ProcVendorInvoices", "ProcVendorPayments", "ProcStock",
+        "WorkflowPending",
+      ],
+    }),
     getApAging: b.query<ApiEnvelope<ApAging>, { entity: string; as_of?: string }>({
       query: (p) => ({ url: `/procurement/reports/ap-aging/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcStock"],
@@ -356,6 +365,7 @@ export const {
   useAdjustStockMutation,
   useGetStockMovementsQuery,
   useGetProcurementDashboardQuery,
+  useGetProcurementSuppliersDashboardQuery,
   useGetApAgingQuery,
   useGetApReconciliationQuery,
   useGetApCashRequirementsQuery,

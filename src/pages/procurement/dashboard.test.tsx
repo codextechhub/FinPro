@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProcurementDashboard as Dashboard } from "@/redux/services/procurement/procurement-ext-types";
 import { FINANCE_PERMISSION_REGISTRY, type PermissionCode } from "../../permissions";
 
-const mocks = vi.hoisted(() => ({ held: new Set<string>(), dashboard: null as unknown }));
+const mocks = vi.hoisted(() => ({ held: new Set<string>(), dashboard: null as unknown, suppliers: null as unknown, search: "" }));
 const holds = (code: PermissionCode) => mocks.held.has(FINANCE_PERMISSION_REGISTRY[code]);
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -29,6 +29,7 @@ vi.mock("@/hooks/use-permissions", () => ({
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useNavigate: () => vi.fn(),
+  useSearchParams: () => [new URLSearchParams(mocks.search), vi.fn()],
 }));
 vi.mock("./procurement-shell", () => ({ ProcurementShell: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/components/layout/page-shell", () => ({
@@ -41,6 +42,9 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 vi.mock("@/redux/services/procurement/procurement-ext-api", () => ({
   useGetProcurementDashboardQuery: () => ({
     data: { data: mocks.dashboard }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
+  }),
+  useGetProcurementSuppliersDashboardQuery: () => ({
+    data: { data: mocks.suppliers }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
   }),
 }));
 
@@ -93,6 +97,7 @@ let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
   mocks.held = new Set();
+  mocks.search = "";
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -156,6 +161,22 @@ describe("Procurement overview for a requisition raiser", () => {
     const text = render({ ...FULL, contracts_ending: [{ ...FULL.contracts_ending![0], ordered: null }] });
     expect(text).toContain("Worth");
     expect(text).not.toContain("ordered of");
+  });
+});
+
+describe("Procurement dashboard views", () => {
+  it("offers Spend & suppliers to a reader of any card on it, and opens it from the address", () => {
+    expect(render(FULL, "procurement.requisition.view")).not.toContain("Spend & suppliers");
+    mocks.search = "view=suppliers";
+    mocks.suppliers = {
+      entity: "HOLYCROSS", currency: "NGN", books: "school", reader_first_name: "Ngozi", as_of: "2026-09-26",
+      narrowed: false, window: MONTH, windows: FULL.windows, spend: null, vendors_paid: 3, deliveries: null,
+      non_po: null, scorecard: null, open_rfqs: null, savings: null, by_branch: null, cycle_times: null, vendor_base: null,
+    };
+    const text = render(FULL, "procurement.vendor_payment.view");
+    expect(text).toContain("Spend & suppliers");
+    expect(text).toContain("Vendors paid");
+    expect(text).not.toContain("Purchase to payment");
   });
 });
 

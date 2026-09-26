@@ -160,6 +160,80 @@ export interface ProcurementDashboard {
   }[];
 }
 
+/**
+ * The Spend & suppliers tab of the Procurement dashboard.
+ *
+ * Same windows and rules as the overview: each block needs the key of the screen
+ * it summarises and answers under the reader's branches. `spend.plan` is the
+ * approved school budget on the accounts purchasing posts to, net and year to
+ * date, and is `null` without an approved plan or for a branch reader.
+ */
+export interface ProcurementSuppliersDashboard {
+  entity: string;
+  currency: string;
+  books: "school" | "general";
+  reader_first_name: string | null;
+  as_of: string;
+  narrowed: boolean;
+  window: DashboardWindow;
+  windows: { key: string; label: string; name: string }[];
+  spend: {
+    value: ReportMoney;
+    prior_value: ReportMoney | null;
+    delta_pct: number | null;
+    plan: {
+      budget_name: string;
+      planned: ReportMoney;
+      spent_ytd: ReportMoney;
+      pct: number | null;
+      year_elapsed_pct: number;
+    } | null;
+    vendors_with_spend: number;
+    vendors_for_80pct: number;
+  } | null;
+  vendors_paid: number | null;
+  deliveries: {
+    on_time_pct: number | null;
+    on_time_change_pts: number | null;
+    accepted_pct: number | null;
+    rejected_lines: number;
+  } | null;
+  non_po: { amount: ReportMoney; count: number; pct: number | null; limit_pct: number } | null;
+  scorecard: {
+    vendor_id: number;
+    name: string;
+    category: string | null;
+    spend: ReportMoney;
+    on_time_pct: number | null;
+    accepted_pct: number | null;
+    open_orders: number;
+    grade: string | null;
+    score: number | null;
+  }[] | null;
+  open_rfqs: {
+    count: number;
+    items: {
+      id: number;
+      title: string;
+      number: string;
+      invited: number;
+      quoted: number;
+      budget: ReportMoney;
+      closes: string | null;
+      ready: boolean;
+    }[];
+  } | null;
+  savings: { saved: ReportMoney; pct: number | null; rfqs: number; items: { name: string; saved: ReportMoney }[] } | null;
+  /** `branch` is null for school-wide bills. */
+  by_branch: { branch: string | null; amount: ReportMoney }[] | null;
+  cycle_times: {
+    steps: { key: "approval" | "ordering" | "delivery" | "payment"; median_days: number | null; samples: number }[];
+    total_days: number | null;
+    slowest: string | null;
+  } | null;
+  vendor_base: { active: number; on_hold: number; awaiting_kyc: number; ordered_once: number; added: number } | null;
+}
+
 export interface ApAgingRow {
   vendor_id: number;
   code: string;

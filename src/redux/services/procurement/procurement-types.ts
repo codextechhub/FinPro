@@ -800,6 +800,8 @@ export interface ProcurementSettingsValues {
   rfq_closing_soon_days: number;
   minimum_rfq_invited_vendors: number;
   minimum_submitted_quotations_before_award: number;
+  /** Share of spend (whole percent) the school accepts on bills without a purchase order. */
+  non_po_spend_limit_pct: number;
   updated_at: string | null;
   updated_by: string | null;
 }

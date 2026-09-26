@@ -10,22 +10,29 @@
  *
  * The window switch (this month, a school's term, the year to date) changes
  * spend, categories, top vendors and what was paid; everything else is where
- * things stand today. The cards are the finance dashboard's (see
+ * things stand today. Beside the overview sits Spend & suppliers (`?view=suppliers`),
+ * shown to a reader holding a key behind one of its cards; the window carries
+ * across both. The cards are the finance dashboard's (see
  * finance/dashboard-cards), so the two consoles read the same way.
  */
 
 import { useState } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Plus } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
 import { ProcurementShell } from "./procurement-shell";
 import { Donut, ErrorState, InfoHint, LoadingState, TabStrip, useActiveEntity, type TabStripItem } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { cn } from "@/lib/utils";
 import { P } from "../../permissions";
-import { useGetProcurementDashboardQuery } from "@/redux/services/procurement/procurement-ext-api";
-import type { ProcurementDashboard as Dashboard } from "@/redux/services/procurement/procurement-ext-types";
+import {
+  useGetProcurementDashboardQuery, useGetProcurementSuppliersDashboardQuery,
+} from "@/redux/services/procurement/procurement-ext-api";
+import type {
+  ProcurementDashboard as Dashboard, ProcurementSuppliersDashboard,
+} from "@/redux/services/procurement/procurement-ext-types";
+import { SuppliersTab } from "./dashboard-suppliers";
 import { routesPath } from "@/routes/routes-path";
 import { formatMoney } from "@/utils/money";
 import { PageShell } from "@/components/layout/page-shell";
@@ -37,6 +44,7 @@ import { greeting } from "../finance/dashboard-words";
 
 const R = routesPath.PROTECTED.PROCUREMENT;
 type D = Dashboard;
+type ProcurementView = "overview" | "suppliers";
 
 const DONUT_COLORS = [DASH_COLORS.primary, DASH_COLORS.mid, "#E0B25C", DASH_COLORS.soft, DASH_COLORS.orange, "#94A3B8"];
 
@@ -382,14 +390,29 @@ export default function ProcurementDashboard() {
   // The window is per-entity: a choice made on one set of books is ignored on another.
   const [picked, setPicked] = useState({ entity: "", window: "" });
   const windowKey = picked.entity === entity ? picked.window : "";
-  const { data, isLoading, isFetching, isError, refetch } = useGetProcurementDashboardQuery(
-    { entity: entity!, ...(windowKey ? { window: windowKey } : {}) },
-    { skip: !entity },
-  );
-  const d = data?.data;
-  const currency = entityCurrency ?? d?.currency;
+  const [params, setParams] = useSearchParams();
+  const canSuppliers = [P.PROC_VIEW_ANALYTICS, P.PROC_VIEW_VENDOR_PAYMENTS, P.PROC_VIEW_GOODS_RECEIPTS,
+    P.PROC_VIEW_VENDOR_INVOICES, P.PROC_VIEW_RFQS, P.PROC_VIEW_QUOTATIONS, P.PROC_VIEW_VENDORS].some((key) => can(key));
+  const tab: ProcurementView = params.get("view") === "suppliers" && canSuppliers ? "suppliers" : "overview";
+  const args = { entity: entity!, ...(windowKey ? { window: windowKey } : {}) };
+  const overviewQ = useGetProcurementDashboardQuery(args, { skip: !entity || tab !== "overview" });
+  const suppliersQ = useGetProcurementSuppliersDashboardQuery(args, { skip: !entity || tab !== "suppliers" });
+  const { isLoading, isFetching, isError, refetch } = tab === "overview" ? overviewQ : suppliersQ;
+  const d = tab === "overview" ? overviewQ.data?.data : undefined;
+  const sd = tab === "suppliers" ? suppliersQ.data?.data as ProcurementSuppliersDashboard | undefined : undefined;
+  const head = d ?? sd;
+  const currency = entityCurrency ?? head?.currency;
   const windowName = d ? d.window.label.toLowerCase() : "";
-  const windowTabs: TabStripItem<string>[] = (d?.windows ?? []).map((w) => ({ value: w.key, label: w.label }));
+  const windowTabs: TabStripItem<string>[] = (head?.windows ?? []).map((w) => ({ value: w.key, label: w.label }));
+  const viewTabs: TabStripItem<ProcurementView>[] = [
+    { value: "overview", label: "Overview" },
+    ...(canSuppliers ? [{ value: "suppliers" as const, label: "Spend & suppliers" }] : []),
+  ];
+  const showView = (view: ProcurementView) => setParams((prev) => {
+    const next = new URLSearchParams(prev);
+    if (view === "overview") next.delete("view"); else next.set("view", view);
+    return next;
+  }, { replace: true });
   const k = d?.kpis;
   const row2 = d ? [d.committed_vs_spent, true].filter(Boolean).length : 0;
   const row3 = d ? [d.spend_by_category, d.top_vendors, d.exceptions].filter(Boolean).length : 0;
@@ -400,7 +423,7 @@ export default function ProcurementDashboard() {
       <PageShell className="space-y-5 text-black-01" data-guide="procurement-overview.page">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            {d?.reader_first_name && <p className="font-mont text-xs text-gray-05">{greeting()}, {d.reader_first_name}</p>}
+            {head?.reader_first_name && <p className="font-mont text-xs text-gray-05">{greeting()}, {head.reader_first_name}</p>}
             <div className="mt-0.5 flex items-center gap-1.5">
               <h1 className="font-mont text-lg font-semibold text-gray-01">Procurement overview</h1>
               <InfoHint ariaLabel="About the procurement overview">
@@ -408,12 +431,12 @@ export default function ProcurementDashboard() {
               </InfoHint>
             </div>
             <p className="mt-0.5 font-mont text-xs text-gray-05">
-              {d ? [d.window.name, `as of ${fmtDate(d.as_of)}`, d.narrowed ? "your branches only" : null].filter(Boolean).join(" · ") : "-"}
+              {head ? [head.window.name, `as of ${fmtDate(head.as_of)}`, head.narrowed ? "your branches only" : null].filter(Boolean).join(" · ") : "-"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {windowTabs.length > 1 && (
-              <TabStrip items={windowTabs} value={d?.window.key ?? windowTabs[0].value}
+              <TabStrip items={windowTabs} value={head?.window.key ?? windowTabs[0].value}
                 onChange={(w) => setPicked({ entity: entity!, window: w })} variant="pill-compact" ariaLabel="Figures for" />
             )}
             {can(P.PROC_CREATE_REQUISITION) && (
@@ -431,13 +454,21 @@ export default function ProcurementDashboard() {
           </div>
         </div>
 
+        {viewTabs.length > 1 && (
+          <TabStrip items={viewTabs} value={tab} onChange={showView} variant="underline" ariaLabel="Dashboard views" />
+        )}
+
         {!entity ? (
           <NoEntityState message="Choose a ledger entity to see its procurement." />
         ) : isLoading ? (
           <LoadingState rows={9} />
-        ) : isError || !d || !k ? (
+        ) : isError || !head ? (
           <ErrorState onRetry={refetch} />
-        ) : (
+        ) : sd ? (
+          <div className={cn("transition-opacity", isFetching && "opacity-60")}>
+            <SuppliersTab d={sd} currency={currency} />
+          </div>
+        ) : !d || !k ? null : (
           <div className={cn("space-y-5 transition-opacity", isFetching && "opacity-60")}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
               {k.spend && (

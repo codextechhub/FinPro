@@ -367,14 +367,18 @@ function MatchingForm({ entityCode, values, history, consumers, canUpdate }: { e
   const [quantity, setQuantity] = useState(String(values.quantity_tolerance_bps / 100));
   const [price, setPrice] = useState(String(values.price_tolerance_bps / 100));
   const [allowNonPo, setAllowNonPo] = useState(values.allow_non_po_invoices);
+  const [nonPoLimit, setNonPoLimit] = useState(String(values.non_po_spend_limit_pct));
   const [update, state] = useUpdateProcurementSettingsMutation();
   const quantityBps = Math.round(Number(quantity) * 100);
   const priceBps = Math.round(Number(price) * 100);
-  const valid = Number.isFinite(quantityBps) && Number.isFinite(priceBps) && quantityBps >= 0 && quantityBps <= 10000 && priceBps >= 0 && priceBps <= 10000;
-  const dirty = valid && (quantityBps !== values.quantity_tolerance_bps || priceBps !== values.price_tolerance_bps || allowNonPo !== values.allow_non_po_invoices);
+  const nonPoLimitValue = Number(nonPoLimit);
+  const valid = Number.isFinite(quantityBps) && Number.isFinite(priceBps) && quantityBps >= 0 && quantityBps <= 10000 && priceBps >= 0 && priceBps <= 10000
+    && nonPoLimit.trim() !== "" && Number.isInteger(nonPoLimitValue) && nonPoLimitValue >= 0 && nonPoLimitValue <= 100;
+  const dirty = valid && (quantityBps !== values.quantity_tolerance_bps || priceBps !== values.price_tolerance_bps || allowNonPo !== values.allow_non_po_invoices
+    || nonPoLimitValue !== values.non_po_spend_limit_pct);
   const save = async () => {
     try {
-      const response = await update({ entity: entityCode, quantity_tolerance_bps: quantityBps, price_tolerance_bps: priceBps, allow_non_po_invoices: allowNonPo }).unwrap();
+      const response = await update({ entity: entityCode, quantity_tolerance_bps: quantityBps, price_tolerance_bps: priceBps, allow_non_po_invoices: allowNonPo, non_po_spend_limit_pct: nonPoLimitValue }).unwrap();
       toast.success(response.message || "Invoice matching policy saved.");
     } catch { /* Central API handling shows the actionable error. */ }
   };
@@ -385,8 +389,11 @@ function MatchingForm({ entityCode, values, history, consumers, canUpdate }: { e
         <label className="font-mont text-xs font-semibold text-gray-01">Price tolerance (%)<Input type="number" min="0" max="100" step="0.01" className="mt-2 bg-white" value={price} onChange={(event) => setPrice(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Allowed absolute unit-price difference from the PO.</span><SettingsConsumer consumer={consumers.price_tolerance_bps} /></label>
       </div>
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div className="min-w-0"><p className="font-mont text-sm font-medium text-gray-01">Allow non-PO invoices</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, invoices without purchase-order evidence receive a blocking match status.</p><SettingsConsumer consumer={consumers.allow_non_po_invoices} /></div><Switch checked={allowNonPo} onCheckedChange={setAllowNonPo} disabled={!canUpdate} aria-label="Allow non-PO invoices" /></div>
+      <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-2 sm:px-5">
+        <label className="font-mont text-xs font-semibold text-gray-01">Non-PO spend limit (%)<Input type="number" min="0" max="100" step="1" className="mt-2 bg-white" value={nonPoLimit} onChange={(event) => setNonPoLimit(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">The share of spend the school accepts on bills without a purchase order. The procurement dashboard marks spend above it.</span><SettingsConsumer consumer={consumers.non_po_spend_limit_pct} /></label>
+      </div>
       <SettingsRow icon={ShieldCheck} label="Variance override" description="Blocking outcomes still require the dedicated variance-override permission, and every override remains audited." badge={<PolicyBadge kind="enforced" />} />
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Enter values between 0 and 100%." : canUpdate ? "Saved tolerances affect the next match run." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save matching policy"}</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Enter values between 0 and 100%; the non-PO limit is a whole number." : canUpdate ? "Saved tolerances affect the next match run." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save matching policy"}</Button></div>
     </SettingsPanel>
     <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;
