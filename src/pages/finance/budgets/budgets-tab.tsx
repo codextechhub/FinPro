@@ -1,9 +1,17 @@
 /**
  * Budgets & Forecasts - built on the real backend model (account × cost-centre ×
- * period lines), in the house theme. A budget list (Code · Name · FY · Budgeted ·
- * Actual YTD · Consumed · Status), a per-account × per-month variance heatmap, and a
- * drawer that lets you build/edit a DRAFT's lines (auto-coded like an invoice) and,
- * once approved, read its variance. Budget lines are income/expense GLs only.
+ * period lines), in the house theme. A budget list (Code · Name · Branch · FY ·
+ * Budgeted · Actual YTD · Consumed · Status), a per-account × per-month variance
+ * heatmap, and a drawer that lets you build/edit a DRAFT's lines (auto-coded like
+ * an invoice) and, once approved, read its variance. Budget lines are
+ * income/expense GLs only.
+ *
+ * A budget is the school's plan or one branch's. A branch plan is measured
+ * against that branch's own postings, so its reader sees its actuals in full.
+ * The school's plan is measured against every branch, so a branch-bound reader
+ * sees it as a plan only, and cannot change it (`can_manage`). Who may file a
+ * plan for whom comes from the list response (`filing`), not the branch list,
+ * which is the school's rather than the reader's.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -22,7 +30,7 @@ import {
   useGetBudgetsQuery, useGetBudgetQuery, useGetBudgetVarianceQuery, useGetBudgetHeatmapQuery, useGetFiscalYearsQuery,
   useCreateBudgetMutation, useUpdateBudgetMutation, useSetBudgetLinesMutation, useApproveBudgetMutation, useDeleteBudgetMutation,
 } from "@/redux/services/finance/ops-api";
-import type { Budget, BudgetLineInput } from "@/redux/services/finance/ops-types";
+import type { Budget, BudgetFiling, BudgetLineInput } from "@/redux/services/finance/ops-types";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -85,18 +93,25 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
   const { data, isLoading, isFetching, isError, refetch } = useGetBudgetsQuery({ entity, page });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
-  const activeHeatmapId = heatmapId ?? rows[0]?.id ?? null;
-  // A branch-bound reader gets the plan without the school's actuals.
   const narrowed = data?.narrowed === true;
+  const filing = data?.filing;
+  // A branch-bound reader sees the school's plan without its actuals.
+  const planOnly = (b: Budget) => narrowed && b.branch_id == null;
+  const measured = rows.filter((b) => !planOnly(b));
+  const allPlanOnly = rows.length > 0 && measured.length === 0;
+  const activeHeatmapId = measured.some((b) => b.id === heatmapId) ? heatmapId : measured[0]?.id ?? null;
+  const showBranch = rows.some((b) => b.branch_id != null);
+  const mayFile = !filing || filing.school || filing.branches.length > 0;
 
   const columns: Column<Budget>[] = [
     { header: "Code", cell: (b) => <span className="font-semibold tabular-nums text-gray-01">{b.code || "-"}</span> },
     { header: "Name", cell: (b) => b.name },
+    ...(showBranch ? [{ header: "Branch", cell: (b: Budget) => <span className="text-gray-05">{b.branch_name ?? "School-wide"}</span> }] : []),
     { header: "Fiscal year", cell: (b) => <span className="tabular-nums text-gray-05">{b.fiscal_year}</span> },
     { header: "Budgeted", align: "right", cell: (b) => <Money kobo={b.budgeted_total ?? 0} currency={currency} align="right" /> },
-    ...(narrowed ? [] : [
-      { header: "Actual YTD", align: "right" as const, cell: (b: Budget) => <Money kobo={b.actual_ytd ?? 0} currency={currency} align="right" /> },
-      { header: "Consumed", align: "right" as const, cell: (b: Budget) => <ConsumedBar pct={b.consumed_pct ?? null} /> },
+    ...(allPlanOnly ? [] : [
+      { header: "Actual YTD", align: "right" as const, cell: (b: Budget) => planOnly(b) ? <span className="text-gray-05">-</span> : <Money kobo={b.actual_ytd ?? 0} currency={currency} align="right" /> },
+      { header: "Consumed", align: "right" as const, cell: (b: Budget) => planOnly(b) ? <span className="block text-right text-gray-05">-</span> : <ConsumedBar pct={b.consumed_pct ?? null} /> },
     ]),
     { header: "Status", cell: (b) => <StatusPill status={b.status} /> },
   ];
@@ -106,11 +121,13 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
       <div className="flex flex-wrap items-center justify-between gap-3" data-guide="finance-budgets.controls">
         <p className="max-w-2xl font-mont text-xs text-gray-05">
           A budget is a plan in the same shape as your chart of accounts - one line per income/expense GL × cost centre × period.
-          {narrowed ? null : " The system compares it to live postings; red cells in the heatmap are overruns."}
+          {allPlanOnly ? null : " The system compares it to live postings; red cells in the heatmap are overruns."}
         </p>
-        <Can permission={P.FIN_CREATE_BUDGET}>
-          <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New budget</Button>
-        </Can>
+        {mayFile ? (
+          <Can permission={P.FIN_CREATE_BUDGET}>
+            <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New budget</Button>
+          </Can>
+        ) : null}
       </div>
 
       <DataTable columns={columns} rows={rows} rowKey={(b) => b.id}
@@ -118,7 +135,7 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
         page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
         emptyTitle="No budgets" emptyMessage="Create a budget for a fiscal year and add its lines." />
 
-      {narrowed ? <PlanOnlyNote /> : activeHeatmapId != null ? (
+      {allPlanOnly ? <PlanOnlyNote /> : activeHeatmapId != null ? (
         <div className="rounded-md border border-white-02 bg-white p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
@@ -126,7 +143,7 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
               <InfoHint ariaLabel="About the budget variance heatmap">Each cell is a GL account's actual spend in that period, coloured by how much of the budgeted amount it consumed. Variance is per account - actuals aren't tracked per cost centre.</InfoHint>
             </div>
             <Select value={String(activeHeatmapId)} onChange={(v) => setHeatmapId(Number(v))} className="w-64">
-              {rows.map((b) => <option key={b.id} value={b.id}>{b.code ? `${b.code} · ${b.name}` : b.name}</option>)}
+              {measured.map((b) => <option key={b.id} value={b.id}>{b.code ? `${b.code} · ${b.name}` : b.name}</option>)}
             </Select>
           </div>
           <Heatmap budgetId={activeHeatmapId} entity={entity} />
@@ -135,28 +152,27 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
       ) : null}
 
       <BudgetDrawer budgetId={selectedId} entity={entity} currency={currency} onClose={() => setSelectedId(null)} />
-      <NewBudgetDrawer open={creating} onClose={() => setCreating(false)} entity={entity} currency={currency} />
+      <NewBudgetDrawer open={creating} onClose={() => setCreating(false)} entity={entity} currency={currency} filing={filing} />
     </div>
   );
 }
 
 /**
- * What a branch-bound reader sees in place of the variance heatmap.
+ * What a branch-bound reader sees where the school's plan would show actuals.
  *
- * The budget is the school's one plan. Setting the school's actuals against it
- * would show them other branches' money, and their own branch's actuals against
- * the whole plan would read as a shortfall; so they get the plan, and are
- * pointed at their branch's own income statement for what was actually earned
- * and spent.
+ * Setting the school's actuals against its plan would show them other branches'
+ * money, and their own branch's actuals against the whole plan would read as a
+ * shortfall; so they get the plan, and are pointed at their branch's own plan
+ * and income statement for what was actually earned and spent.
  */
 function PlanOnlyNote() {
   return (
     <div role="note" className="flex min-w-0 items-start gap-2.5 rounded-md bg-primary/5 px-4 py-3 ring-1 ring-primary/15">
       <Lock className="mt-0.5 size-4 shrink-0 text-primary" />
       <p className="min-w-0 font-mont text-xs text-gray-01 text-pretty">
-        <span className="font-semibold">The plan only.</span> Budgets are set for the whole school, so actuals and
-        variance against them are shown to school-wide readers. Your branches’ own income and spending are on the
-        Income Statement.
+        <span className="font-semibold">The school’s plan only.</span> It is measured against every branch, so its
+        actuals and variance are shown to school-wide readers. A budget for your branch is measured against your
+        branch’s own postings, and your branch’s income and spending are also on the Income Statement.
       </p>
     </div>
   );
@@ -257,9 +273,20 @@ function LinesEditor({ entity, currency, rows, setRows }: { entity: string; curr
   );
 }
 
-function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {
+/**
+ * Creates a draft budget for the school or for one branch.
+ *
+ * The owner choice comes from `filing`: a school-wide reader may pick
+ * School-wide or any branch; a reader bound to one branch files to it without a
+ * choice; a reader covering several must pick one of theirs.
+ */
+function NewBudgetDrawer({ open, onClose, entity, currency, filing }: { open: boolean; onClose: () => void; entity: string; currency?: string | null; filing?: BudgetFiling }) {
   const [name, setName] = useState("");
   const [year, setYear] = useState("");
+  const [branch, setBranch] = useState("");
+  const forSchool = filing?.school ?? true;
+  const branchChoices = filing?.branches ?? [];
+  const soleBranch = !forSchool && branchChoices.length === 1 ? branchChoices[0] : null;
   const [rows, setRows] = useState<EditLine[]>([newLine()]);
   const { data: fyData } = useGetFiscalYearsQuery({ entity, status: "OPEN" }, { skip: !open });
   const fys = useMemo(() => toArray(fyData?.data), [fyData]);
@@ -270,14 +297,15 @@ function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; o
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) { setName(""); setYear(""); setRows([newLine()]); }
+    if (open) { setName(""); setYear(""); setBranch(soleBranch ? String(soleBranch.id) : ""); setRows([newLine()]); }
   }
+  const ownerChosen = forSchool || !!branch;
   if (open && !year && fys.length) setYear(String(fys[0].year));
 
   const validRows = rows.filter(lineValid);
   const submit = async () => {
     try {
-      const r = await create({ entity, name: name.trim(), fiscal_year: Number(year), lines: validRows.map(toInput) }).unwrap();
+      const r = await create({ entity, name: name.trim(), fiscal_year: Number(year), ...(branch ? { branch: Number(branch) } : {}), lines: validRows.map(toInput) }).unwrap();
       toast.success(r.message || "Budget created.");
       onClose();
     } catch { /* central */ }
@@ -288,10 +316,10 @@ function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; o
       title="New budget" description="Plan income & expense by account, cost centre and period." widthClass="sm:max-w-4xl"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !name.trim() || !year} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create budget"}</Button>
+        <Button disabled={isLoading || !name.trim() || !year || !ownerChosen} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create budget"}</Button>
       </>}>
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Operating budget · 2026/27" className="h-9 bg-white" /></FormField>
           <div>
             <p className="mb-1 font-mont text-xs text-gray-05">Fiscal year *</p>
@@ -300,9 +328,20 @@ function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; o
               {fys.map((y) => <option key={y.id} value={y.year}>{y.year}{y.status !== "OPEN" ? ` (${y.status.toLowerCase()})` : ""}</option>)}
             </Select>
           </div>
+          <div>
+            <p className="mb-1 font-mont text-xs text-gray-05">Branch{forSchool ? "" : " *"}</p>
+            {soleBranch ? (
+              <p className="flex h-9 items-center rounded-md border border-white-02 bg-gray-03/40 px-2.5 font-mont text-xs text-black-01">{soleBranch.name}</p>
+            ) : (
+              <Select value={branch} onChange={setBranch} className="w-full">
+                {forSchool ? <option value="">School-wide</option> : <option value="" disabled>Select branch</option>}
+                {branchChoices.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </Select>
+            )}
+          </div>
         </div>
         <LinesEditor entity={entity} currency={currency} rows={rows} setRows={setRows} />
-        <p className="rounded-md border border-gray-03 bg-gray-03/40 px-3 py-2 font-mont text-[11px] text-gray-05">A reference code is allocated on save. The budget is a draft you can keep editing until you approve it - approval locks the lines.</p>
+        <p className="rounded-md border border-gray-03 bg-gray-03/40 px-3 py-2 font-mont text-[11px] text-gray-05">A reference code is allocated on save. The budget is a draft you can keep editing until you approve it - approval locks the lines. A branch budget is measured against that branch’s own postings; a school-wide one against the whole school.</p>
       </div>
     </DetailDrawer>
   );
@@ -313,9 +352,10 @@ function BudgetDrawer({ budgetId, entity, currency, onClose }: { budgetId: numbe
   const { data: bd } = useGetBudgetQuery(budgetId != null ? { id: budgetId, entity } : skipToken);
   const budget = bd?.data ?? null;
   const isDraft = !!budget && budget.status === "DRAFT" && !budget.is_locked;
+  const editable = isDraft && budget.can_manage !== false;
 
   if (budgetId == null || !budget) return null;
-  return isDraft
+  return editable
     ? <DraftEditor key={budget.id} budget={budget} entity={entity} currency={currency} onClose={onClose} />
     : <VarianceView budget={budget} entity={entity} currency={currency} onClose={onClose} />;
 }
@@ -373,6 +413,7 @@ function DraftEditor({ budget, entity, currency, onClose }: { budget: Budget; en
         <div className="grid grid-cols-2 gap-3 text-[11px] text-gray-05 sm:grid-cols-4">
           <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont">Code</p><p className="mt-1 font-mont text-xs font-semibold tabular-nums text-black-01">{budget.code}</p></div>
           <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont">Fiscal year</p><p className="mt-1 font-mont text-xs font-semibold tabular-nums text-black-01">{budget.fiscal_year}</p></div>
+          <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont">Branch</p><p className="mt-1 truncate font-mont text-xs font-semibold text-black-01">{budget.branch_name ?? "School-wide"}</p></div>
         </div>
         <LinesEditor entity={entity} currency={currency} rows={rows} setRows={setRows} />
       </div>
@@ -402,11 +443,12 @@ function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; e
 
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title={`${budget.code} · ${budget.name}`} description={`FY ${budget.fiscal_year} · ${budget.lines.length} lines`} widthClass="sm:max-w-3xl"
+      title={`${budget.code} · ${budget.name}`} description={`${budget.branch_name ?? "School-wide"} · FY ${budget.fiscal_year} · ${budget.lines.length} lines`} widthClass="sm:max-w-3xl"
       footer={<>
         <StatusPill status={budget.status} />
         <div className="flex-1" />
-        <span className="inline-flex items-center gap-1.5 font-mont text-[11px] text-gray-05"><Lock className="size-3.5" /> Locked - figures frozen against the actuals</span>
+        <span className="inline-flex items-center gap-1.5 font-mont text-[11px] text-gray-05"><Lock className="size-3.5" />
+          {budget.is_locked ? " Locked - figures frozen against the actuals" : " The school’s budget - read-only for your branch"}</span>
       </>}>
       <div className="space-y-5">
         {narrowed ? (

@@ -29,6 +29,7 @@ import type {
   PettyCashVoucher,
   TaxFiling,
   TaxObligation,
+  BudgetFiling,
 } from "./ops-types";
 import type { ImportBatch } from "@/redux/services/dashboard/import-types";
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
@@ -348,7 +349,7 @@ export const opsApi = baseApi.injectEndpoints({
     }),
 
     // Budgets
-    getBudgets: b.query<PaginatedEnvelope<Budget> & { narrowed?: boolean }, { entity: string; page?: number; page_size?: number; status?: string }>({
+    getBudgets: b.query<PaginatedEnvelope<Budget> & { narrowed?: boolean; filing?: BudgetFiling }, { entity: string; page?: number; page_size?: number; status?: string }>({
       query: (p) => ({ url: `/finance/budgets/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceBudgets"],
     }),
@@ -368,7 +369,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/fiscal-years/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),
-    createBudget: b.mutation<ApiEnvelope<Budget>, { entity: string; name: string; fiscal_year: number; lines?: BudgetLineInput[] }>({
+    createBudget: b.mutation<ApiEnvelope<Budget>, { entity: string; name: string; fiscal_year: number; branch?: number; lines?: BudgetLineInput[] }>({
       query: ({ entity, ...body }) => ({ url: `/finance/budgets/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceBudgets"],
     }),

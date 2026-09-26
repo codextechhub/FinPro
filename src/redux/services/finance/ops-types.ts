@@ -319,11 +319,24 @@ export interface Budget {
   is_locked: boolean;
   approved_at: string | null;
   lines: BudgetLine[];
-  // headline figures the list view enriches each budget with; the actual and
-  // consumed figures are null for a branch-bound reader (see BudgetVariance)
+  /** The branch whose plan this is; null for the school's own plan. */
+  branch_id: number | null;
+  branch_name: string | null;
+  /** Whether the reader may change it. A branch-bound reader may read the
+   *  school's plan but not change it. */
+  can_manage?: boolean;
+  /** Headline figures the list enriches each budget with. The actual and
+   *  consumed figures are null where the reader sees the plan only: the
+   *  school's plan, read by a branch-bound reader (see BudgetVariance). */
   budgeted_total?: number;
   actual_ytd?: number | null;
   consumed_pct?: number | null;
+}
+
+/** Whose plan the reader may create: the school's, and which branches'. */
+export interface BudgetFiling {
+  school: boolean;
+  branches: { id: number; name: string }[];
 }
 
 // Payload for creating/replacing budget cells (account × cost-centre × period).
@@ -348,11 +361,13 @@ export interface BudgetVarianceRow {
 /**
  * A budget set against the ledger.
  *
- * A budget is the school's one plan and has no branch, so a branch-bound reader
- * (`narrowed`) gets the plan with every actual and variance `null`: school-wide
- * actuals would show them other branches' money, and their own branch's actuals
- * against the whole plan would read as a shortfall that is only the other
- * branches' share. Rows for accounts the plan does not cover are left out too.
+ * A branch's plan is measured against that branch's own journals and comes with
+ * its actuals. The school's plan is measured against the whole ledger, so a
+ * branch-bound reader of it (`narrowed`) gets the plan with every actual and
+ * variance `null`: the school's actuals would show them other branches' money,
+ * and their own against the whole plan would read as a shortfall that is only
+ * the other branches' share. Rows for accounts the plan does not cover are left
+ * out too.
  */
 export interface BudgetVariance {
   budget_id: number;
