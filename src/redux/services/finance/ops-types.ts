@@ -319,9 +319,10 @@ export interface Budget {
   is_locked: boolean;
   approved_at: string | null;
   lines: BudgetLine[];
-  // headline figures the list view enriches each budget with
+  // headline figures the list view enriches each budget with; the actual and
+  // consumed figures are null for a branch-bound reader (see BudgetVariance)
   budgeted_total?: number;
-  actual_ytd?: number;
+  actual_ytd?: number | null;
   consumed_pct?: number | null;
 }
 
@@ -341,20 +342,30 @@ export interface BudgetVarianceRow {
   name: string;
   account_type: string;
   budget: KoboNaira;
-  actual: KoboNaira;
-  variance: KoboNaira;
+  actual: KoboNaira | null;
+  variance: KoboNaira | null;
 }
+/**
+ * A budget set against the ledger.
+ *
+ * A budget is the school's one plan and has no branch, so a branch-bound reader
+ * (`narrowed`) gets the plan with every actual and variance `null`: school-wide
+ * actuals would show them other branches' money, and their own branch's actuals
+ * against the whole plan would read as a shortfall that is only the other
+ * branches' share. Rows for accounts the plan does not cover are left out too.
+ */
 export interface BudgetVariance {
   budget_id: number;
   fiscal_year_id: number;
   period_no: number | null;
+  narrowed?: boolean;
   rows: BudgetVarianceRow[];
   total_budget: KoboNaira;
-  total_actual: KoboNaira;
-  total_variance: KoboNaira;
+  total_actual: KoboNaira | null;
+  total_variance: KoboNaira | null;
 }
 
-export interface BudgetHeatmapCell { period_no: number; budget: number; actual: number }
+export interface BudgetHeatmapCell { period_no: number; budget: number; actual: number | null }
 export interface BudgetHeatmapRow {
   account_id: number;
   code: string;
@@ -362,15 +373,17 @@ export interface BudgetHeatmapRow {
   account_type: string;
   cells: BudgetHeatmapCell[];
   budget_total: number;
-  actual_total: number;
+  actual_total: number | null;
 }
+/** The plan per account and period; actuals are `null` when `narrowed` (see BudgetVariance). */
 export interface BudgetHeatmap {
   budget_id: number;
   fiscal_year_id: number;
   periods: { period_no: number; label: string }[];
+  narrowed?: boolean;
   rows: BudgetHeatmapRow[];
   total_budget: number;
-  total_actual: number;
+  total_actual: number | null;
 }
 
 // ── Fixed assets ─────────────────────────────────────────────────────────────

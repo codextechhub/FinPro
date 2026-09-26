@@ -86,14 +86,18 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
   const activeHeatmapId = heatmapId ?? rows[0]?.id ?? null;
+  // A branch-bound reader gets the plan without the school's actuals.
+  const narrowed = data?.narrowed === true;
 
   const columns: Column<Budget>[] = [
     { header: "Code", cell: (b) => <span className="font-semibold tabular-nums text-gray-01">{b.code || "-"}</span> },
     { header: "Name", cell: (b) => b.name },
     { header: "Fiscal year", cell: (b) => <span className="tabular-nums text-gray-05">{b.fiscal_year}</span> },
     { header: "Budgeted", align: "right", cell: (b) => <Money kobo={b.budgeted_total ?? 0} currency={currency} align="right" /> },
-    { header: "Actual YTD", align: "right", cell: (b) => <Money kobo={b.actual_ytd ?? 0} currency={currency} align="right" /> },
-    { header: "Consumed", align: "right", cell: (b) => <ConsumedBar pct={b.consumed_pct ?? null} /> },
+    ...(narrowed ? [] : [
+      { header: "Actual YTD", align: "right" as const, cell: (b: Budget) => <Money kobo={b.actual_ytd ?? 0} currency={currency} align="right" /> },
+      { header: "Consumed", align: "right" as const, cell: (b: Budget) => <ConsumedBar pct={b.consumed_pct ?? null} /> },
+    ]),
     { header: "Status", cell: (b) => <StatusPill status={b.status} /> },
   ];
 
@@ -101,7 +105,8 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
     <div className="space-y-5" data-guide="finance-budgets.workbench">
       <div className="flex flex-wrap items-center justify-between gap-3" data-guide="finance-budgets.controls">
         <p className="max-w-2xl font-mont text-xs text-gray-05">
-          A budget is a plan in the same shape as your chart of accounts - one line per income/expense GL × cost centre × period. The system compares it to live postings; red cells in the heatmap are overruns.
+          A budget is a plan in the same shape as your chart of accounts - one line per income/expense GL × cost centre × period.
+          {narrowed ? null : " The system compares it to live postings; red cells in the heatmap are overruns."}
         </p>
         <Can permission={P.FIN_CREATE_BUDGET}>
           <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New budget</Button>
@@ -113,7 +118,7 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
         page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
         emptyTitle="No budgets" emptyMessage="Create a budget for a fiscal year and add its lines." />
 
-      {activeHeatmapId != null ? (
+      {narrowed ? <PlanOnlyNote /> : activeHeatmapId != null ? (
         <div className="rounded-md border border-white-02 bg-white p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
@@ -131,6 +136,28 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
 
       <BudgetDrawer budgetId={selectedId} entity={entity} currency={currency} onClose={() => setSelectedId(null)} />
       <NewBudgetDrawer open={creating} onClose={() => setCreating(false)} entity={entity} currency={currency} />
+    </div>
+  );
+}
+
+/**
+ * What a branch-bound reader sees in place of the variance heatmap.
+ *
+ * The budget is the school's one plan. Setting the school's actuals against it
+ * would show them other branches' money, and their own branch's actuals against
+ * the whole plan would read as a shortfall; so they get the plan, and are
+ * pointed at their branch's own income statement for what was actually earned
+ * and spent.
+ */
+function PlanOnlyNote() {
+  return (
+    <div role="note" className="flex min-w-0 items-start gap-2.5 rounded-md bg-primary/5 px-4 py-3 ring-1 ring-primary/15">
+      <Lock className="mt-0.5 size-4 shrink-0 text-primary" />
+      <p className="min-w-0 font-mont text-xs text-gray-01 text-pretty">
+        <span className="font-semibold">The plan only.</span> Budgets are set for the whole school, so actuals and
+        variance against them are shown to school-wide readers. Your branches’ own income and spending are on the
+        Income Statement.
+      </p>
     </div>
   );
 }
@@ -167,7 +194,7 @@ function Heatmap({ budgetId, entity }: { budgetId: number; entity: string }) {
         </thead>
         <tbody>
           {hm.rows.map((r) => {
-            const ytd = r.budget_total ? r.actual_total / r.budget_total : null;
+            const ytd = r.budget_total && r.actual_total != null ? r.actual_total / r.budget_total : null;
             return (
               <tr key={r.account_id}>
                 <td className={cn(tdCls, "sticky left-0 z-10 bg-white")}>
@@ -175,11 +202,12 @@ function Heatmap({ budgetId, entity }: { budgetId: number; entity: string }) {
                 </td>
                 {hm.periods.map((p) => {
                   const cell = r.cells.find((c) => c.period_no === p.period_no);
-                  const ratio = cell && cell.budget ? cell.actual / cell.budget : null;
-                  const hasActual = !!cell && cell.actual !== 0;
+                  const actual = cell?.actual ?? null;
+                  const ratio = cell && cell.budget && actual != null ? actual / cell.budget : null;
+                  const hasActual = actual != null && actual !== 0;
                   return (
                     <td key={p.period_no} className={cn("border-t border-white-02 px-2 py-1.5 text-right font-mont text-[11px] tabular-nums", heatClass(ratio))}>
-                      {hasActual ? compactNaira(cell!.actual) : <span className="text-gray-05">-</span>}
+                      {hasActual ? compactNaira(actual) : <span className="text-gray-05">-</span>}
                     </td>
                   );
                 })}
@@ -366,8 +394,9 @@ function DraftEditor({ budget, entity, currency, onClose }: { budget: Budget; en
 function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; entity: string; currency?: string | null; onClose: () => void }) {
   const { data: vd } = useGetBudgetVarianceQuery({ id: budget.id, entity });
   const v = vd?.data;
+  const narrowed = v?.narrowed === true;
   const budgeted = v?.total_budget.kobo ?? 0;
-  const actual = v?.total_actual.kobo ?? 0;
+  const actual = v?.total_actual?.kobo ?? 0;
   const remaining = budgeted - actual;
   const consumed = budgeted ? Math.round((actual * 100) / budgeted) : null;
 
@@ -380,40 +409,55 @@ function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; e
         <span className="inline-flex items-center gap-1.5 font-mont text-[11px] text-gray-05"><Lock className="size-3.5" /> Locked - figures frozen against the actuals</span>
       </>}>
       <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Metric label="Budgeted" kobo={budgeted} currency={currency} />
-          <Metric label="Actual YTD" kobo={actual} currency={currency} />
-          <Metric label="Variance (remaining)" kobo={remaining} currency={currency} tone={remaining < 0 ? "bad" : "good"} />
-          <div className="rounded-md border border-white-02 bg-white p-3">
-            <p className="font-mont text-[11px] text-gray-05">% Consumed</p>
-            <p className={cn("mt-1 font-mont text-sm font-semibold tabular-nums", consumed != null && consumed > 100 ? "text-destructive" : "text-black-01")}>{consumed == null ? "-" : `${consumed}%`}</p>
+        {narrowed ? (
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Metric label="Budgeted" kobo={budgeted} currency={currency} />
+            </div>
+            <PlanOnlyNote />
+          </>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Metric label="Budgeted" kobo={budgeted} currency={currency} />
+            <Metric label="Actual YTD" kobo={actual} currency={currency} />
+            <Metric label="Variance (remaining)" kobo={remaining} currency={currency} tone={remaining < 0 ? "bad" : "good"} />
+            <div className="rounded-md border border-white-02 bg-white p-3">
+              <p className="font-mont text-[11px] text-gray-05">% Consumed</p>
+              <p className={cn("mt-1 font-mont text-sm font-semibold tabular-nums", consumed != null && consumed > 100 ? "text-destructive" : "text-black-01")}>{consumed == null ? "-" : `${consumed}%`}</p>
+            </div>
           </div>
-        </div>
+        )}
 
         <div>
-          <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Lines · actual vs budget</p>
+          <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">{narrowed ? "Lines · budget" : "Lines · actual vs budget"}</p>
           <div className="overflow-hidden rounded-md border border-white-02">
             <table className="w-full border-collapse">
               <thead><tr>
                 <th className={thCls}>GL · Account</th>
-                <th className={cn(thCls, "text-right")}>Budget</th><th className={cn(thCls, "text-right")}>Actual YTD</th>
-                <th className={cn(thCls, "text-right")}>Variance</th><th className={cn(thCls, "text-right")}>Consumed</th>
+                <th className={cn(thCls, "text-right")}>Budget</th>
+                {narrowed ? null : <>
+                  <th className={cn(thCls, "text-right")}>Actual YTD</th>
+                  <th className={cn(thCls, "text-right")}>Variance</th><th className={cn(thCls, "text-right")}>Consumed</th>
+                </>}
               </tr></thead>
               <tbody>
                 {(v?.rows ?? []).map((r) => {
-                  const rem = r.budget.kobo - r.actual.kobo;
-                  const pct = r.budget.kobo ? (r.actual.kobo * 100) / r.budget.kobo : null;
+                  const rowActual = r.actual?.kobo ?? 0;
+                  const rem = r.budget.kobo - rowActual;
+                  const pct = r.budget.kobo ? (rowActual * 100) / r.budget.kobo : null;
                   return (
                     <tr key={r.account_id}>
                       <td className={tdCls}><span className="tabular-nums text-gray-05">{r.code}</span> {r.name}</td>
                       <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(r.budget.kobo, currency)}</td>
-                      <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(r.actual.kobo, currency)}</td>
-                      <td className={cn(tdCls, "text-right tabular-nums", rem < 0 ? "text-destructive" : "text-green-01")}>{formatMoney(rem, currency)}</td>
-                      <td className={cn(tdCls)}><ConsumedBar pct={pct} /></td>
+                      {narrowed ? null : <>
+                        <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(rowActual, currency)}</td>
+                        <td className={cn(tdCls, "text-right tabular-nums", rem < 0 ? "text-destructive" : "text-green-01")}>{formatMoney(rem, currency)}</td>
+                        <td className={cn(tdCls)}><ConsumedBar pct={pct} /></td>
+                      </>}
                     </tr>
                   );
                 })}
-                {(v?.rows ?? []).length === 0 ? <tr><td className={cn(tdCls, "text-center text-gray-05")} colSpan={5}>No activity yet.</td></tr> : null}
+                {(v?.rows ?? []).length === 0 ? <tr><td className={cn(tdCls, "text-center text-gray-05")} colSpan={narrowed ? 2 : 5}>No activity yet.</td></tr> : null}
               </tbody>
             </table>
           </div>
