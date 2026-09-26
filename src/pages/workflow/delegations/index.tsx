@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { CustomInput } from "@/components/custom/custom-input";
+import { CustomNativeSelect } from "@/components/custom/custom-native-select";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
   Sheet,
@@ -29,6 +30,7 @@ import { formatDate } from "@/utils/relative-date";
 import { useAppSelector } from "@/redux/store";
 import {
   useGetDelegationsQuery,
+  useGetDelegationDocumentTypesQuery,
   useCreateDelegationMutation,
   useRevokeDelegationMutation,
 } from "@/redux/services/dashboard/workflow-api";
@@ -238,6 +240,11 @@ function NewDelegationSheet({
   const [exclusive, setExclusive] = useState(false);
   const [reason, setReason] = useState("");
 
+  // Picked by name from what this school raises; blank means every type.
+  const documentTypes = useGetDelegationDocumentTypesQuery(undefined, { skip: !open });
+  const docTypeOptions = documentTypes.data ?? [];
+  const docTypeLabel = docTypeOptions.find((t) => t.value === docType)?.label;
+
   const userOptions = useMemo(
     () =>
       Array.from(byId.values())
@@ -274,7 +281,7 @@ function NewDelegationSheet({
       // Send ISO datetimes (start of day → end of day) for the date-only inputs.
       starts_at: new Date(`${startDate}T00:00:00`).toISOString(),
       ends_at: new Date(`${endDate}T23:59:59`).toISOString(),
-      document_type: docType.trim(),
+      document_type: docType,
       exclusive,
       reason: reason.trim(),
     })
@@ -329,10 +336,12 @@ function NewDelegationSheet({
             />
           </div>
 
-          <CustomInput
+          <CustomNativeSelect
             id="del-doc-type"
             label="Applies to"
-            placeholder="e.g. leave.request - leave blank for all types"
+            placeholder="All document types"
+            loading={documentTypes.isLoading}
+            options={docTypeOptions}
             value={docType}
             onChange={(e) => setDocType(e.target.value)}
           />
@@ -365,7 +374,7 @@ function NewDelegationSheet({
               <span className="font-medium text-primary">Summary:</span> From{" "}
               <strong>{formatDate(new Date(`${startDate}T00:00:00`))}</strong> to{" "}
               <strong>{formatDate(new Date(`${endDate}T00:00:00`))}</strong>,{" "}
-              {docType ? humanizeDocumentType(docType) : "all"} approvals route to{" "}
+              {docType ? humanizeDocumentType(docType, docTypeLabel) : "all"} approvals route to{" "}
               <strong>{name(delegate)}</strong>.
               {exclusive ? " You won't appear in queues during this period." : ""}
             </div>
