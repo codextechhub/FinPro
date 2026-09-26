@@ -39,7 +39,7 @@ export function DocumentPanel({
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-medium uppercase tracking-wide text-gray-01">
-              {humanizeDocumentType(instance.document_type)}
+              {humanizeDocumentType(instance.document_type, instance.document_type_label)}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold">

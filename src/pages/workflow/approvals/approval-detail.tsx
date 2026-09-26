@@ -61,7 +61,7 @@ export default function ApprovalDetail() {
       ? {
           kind: "approval",
           id,
-          label: `${humanizeDocumentType(instance.document_type)} #${String(instance.document_object_id).slice(0, 8)}`,
+          label: `${humanizeDocumentType(instance.document_type, instance.document_type_label)} #${String(instance.document_object_id).slice(0, 8)}`,
           to: routesPath.PROTECTED.WORKFLOW.APPROVAL_DETAIL(id),
         }
       : null,

@@ -117,13 +117,22 @@ export function approverScopeLabel(
   return String(scope);
 }
 
-/** Turn a dotted document_type (e.g. "leave.request") into "Leave Request". */
-export function humanizeDocumentType(docType: string): string {
+/**
+ * What people call a document type.
+ *
+ * The server's `label` wins: every workflow payload carries
+ * `document_type_label`, read from the handler's own noun ("Customer refund",
+ * "Restricted role grant"), so pass it whenever the row has one. Without it,
+ * the code's last segment is put into words the way the server's own fallback
+ * does ("finance.write_off" reads "Write off"), which is only ever reached for
+ * a server too old to send a label.
+ */
+export function humanizeDocumentType(docType: string, label?: string | null): string {
+  if (label) return label;
   if (!docType) return "Document";
-  return docType
-    .split(/[._]/)
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(" ");
+  const last = docType.split(".").pop() ?? docType;
+  const words = last.replace(/_/g, " ").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 export const AUDIT_EVENT_LABEL: Record<AuditEventType, string> = {

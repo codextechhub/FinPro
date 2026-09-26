@@ -29,11 +29,17 @@ export default function PendingApprovals() {
 
   const items = useMemo(() => data?.results ?? [], [data]);
 
-  // Doc-type counts for the filter rail (computed off the unfiltered set).
+  // Doc-type counts and labels for the filter rail, off the unfiltered set.
   const typeCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const it of items) m.set(it.document_type, (m.get(it.document_type) ?? 0) + 1);
-    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    const m = new Map<string, { count: number; label: string }>();
+    for (const it of items) {
+      const entry = m.get(it.document_type);
+      m.set(it.document_type, {
+        count: (entry?.count ?? 0) + 1,
+        label: humanizeDocumentType(it.document_type, it.document_type_label),
+      });
+    }
+    return Array.from(m.entries()).sort((a, b) => a[1].label.localeCompare(b[1].label));
   }, [items]);
 
   const delegatedCount = items.filter((i) => i.on_behalf_of).length;
@@ -47,7 +53,8 @@ export default function PendingApprovals() {
       out = out.filter(
         (i) =>
           i.document_object_id.toLowerCase().includes(q) ||
-          i.document_type.toLowerCase().includes(q) ||
+          humanizeDocumentType(i.document_type, i.document_type_label).toLowerCase().includes(q) ||
+          (i.document_title ?? "").toLowerCase().includes(q) ||
           name(i.requested_by).toLowerCase().includes(q),
       );
     }
@@ -71,12 +78,12 @@ export default function PendingApprovals() {
                 active={selectedType === "all"}
                 onClick={() => setSelectedType("all")}
               />
-              {typeCounts.map(([t, c]) => (
+              {typeCounts.map(([t, { count, label }]) => (
                 <RailItem
                   key={t}
                   icon={<FileText className="size-4" />}
-                  label={humanizeDocumentType(t)}
-                  count={c}
+                  label={label}
+                  count={count}
                   active={selectedType === t}
                   onClick={() => setSelectedType(t)}
                 />
@@ -223,8 +230,13 @@ function ApprovalRow({
         <FileText className="size-5" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate">
-          <DocumentRef documentType={item.document_type} objectId={item.document_object_id} />
+        <div className="min-w-0">
+          <DocumentRef
+            documentType={item.document_type}
+            objectId={item.document_object_id}
+            label={item.document_type_label}
+            title={item.document_title}
+          />
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-gray-01 min-w-0">
           <InitialsAvatar initials={requesterInitials} seed={item.requested_by} size={18} />

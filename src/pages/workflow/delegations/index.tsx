@@ -175,7 +175,7 @@ export default function Delegations() {
                       <span>
                         Scope:{" "}
                         <span className="text-black-01">
-                          {d.document_type ? humanizeDocumentType(d.document_type) : "All document types"}
+                          {d.document_type ? humanizeDocumentType(d.document_type, d.document_type_label) : "All document types"}
                         </span>
                       </span>
                       {d.exclusive && <span className="text-orange-600">Exclusive</span>}

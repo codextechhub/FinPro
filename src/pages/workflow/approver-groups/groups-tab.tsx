@@ -130,7 +130,7 @@ export default function GroupsTab() {
     for (const t of templates.data) {
       for (const s of t.stages ?? []) {
         if (s.approver_group_code && s.approver_group_code === selected.code) {
-          out.push(`${s.label} (${humanizeDocumentType(t.document_type)})`);
+          out.push(`${s.label} (${humanizeDocumentType(t.document_type, t.document_type_label)})`);
         }
       }
     }

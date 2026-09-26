@@ -393,11 +393,11 @@ export default function TemplateBuilder() {
       loading: docFieldsLoading,
     };
   }, [docFields, docFieldsLoading]);
-  // The server names each document type. Humanising the code is only the
-  // fallback, and it reads "Rbac Role Change" where the server says "Role change".
-  const documentLabel =
-    docFields?.document_types.find((t) => t.value === docType)?.label
-    ?? humanizeDocumentType(documentType);
+  // The server names each document type; the code in words is the fallback.
+  const documentLabel = humanizeDocumentType(
+    documentType,
+    docFields?.document_types.find((t) => t.value === docType)?.label,
+  );
   // Who a Dynamic Role is tried for: its rules can test the person's role and branch.
   const { data: people } = useDirectory();
   const directoryOptions = useMemo(

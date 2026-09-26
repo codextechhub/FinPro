@@ -22,22 +22,36 @@ export function StageStatusBadge({ status }: { status: WorkflowStageStatus }) {
 }
 
 /**
- * Compact reference for a business document. The workflow engine does not own
- * document content, so we render the humanized type + a short object id.
+ * Compact reference for a business document in a queue row.
+ *
+ * The engine does not own document content, but it keeps the title the
+ * document's handler gave it at submission ("JV-0042", "Finance Admin for
+ * Emeka Obi"). Where there is one it leads, with the type beside it; where
+ * there is none the type leads, with a short object id so two rows of the
+ * same type can be told apart.
  */
 export function DocumentRef({
   documentType,
   objectId,
+  label,
+  title,
   className,
 }: {
   documentType: string;
   objectId: string;
+  /** The server's `document_type_label`. */
+  label?: string | null;
+  /** The server's `document_title`. */
+  title?: string | null;
   className?: string;
 }) {
+  const type = humanizeDocumentType(documentType, label);
   return (
-    <span className={cn("inline-flex items-baseline gap-1.5", className)}>
-      <span className="font-medium text-black-01">{humanizeDocumentType(documentType)}</span>
-      <span className="font-mono text-xs text-gray-01">#{String(objectId).slice(0, 8)}</span>
+    <span className={cn("inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5", className)}>
+      <span className="break-words font-medium text-black-01">{title || type}</span>
+      <span className="shrink-0 text-xs text-gray-01">
+        {title ? type : <span className="font-mono">#{String(objectId).slice(0, 8)}</span>}
+      </span>
     </span>
   );
 }

@@ -15,12 +15,16 @@ export default function TeamLoad() {
 
   const grouped = useMemo(() => {
     const m = new Map<string, { stage_label: string | null; stage_code: string; active_count: number }[]>();
+    const labels = new Map<string, string>();
     for (const r of rows) {
       const list = m.get(r.document_type) ?? [];
       list.push({ stage_label: r.stage_label, stage_code: r.stage_code, active_count: r.active_count });
       m.set(r.document_type, list);
+      labels.set(r.document_type, humanizeDocumentType(r.document_type, r.document_type_label));
     }
-    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    return Array.from(m.entries())
+      .map(([docType, stages]) => [labels.get(docType) ?? docType, stages] as const)
+      .sort((a, b) => a[0].localeCompare(b[0]));
   }, [rows]);
 
   const total = rows.reduce((s, r) => s + r.active_count, 0);
@@ -58,12 +62,12 @@ export default function TeamLoad() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            {grouped.map(([docType, stages]) => {
+            {grouped.map(([label, stages]) => {
               const subtotal = stages.reduce((s, x) => s + x.active_count, 0);
               return (
-                <div key={docType} className="rounded-lg border border-white-02 bg-white p-5">
+                <div key={label} className="rounded-lg border border-white-02 bg-white p-5">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">{humanizeDocumentType(docType)}</h3>
+                    <h3 className="text-sm font-semibold">{label}</h3>
                     <span className="rounded-full bg-pry-01 px-2 py-0.5 text-xs font-medium text-primary">
                       {subtotal} active
                     </span>

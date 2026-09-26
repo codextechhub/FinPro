@@ -408,7 +408,7 @@ function DynamicRoleDetail({
               <li key={`${use.template_id}:${use.stage_code}`} className="text-black-01">
                 {use.stage_label}{" "}
                 <span className="text-gray-01">
-                  on {use.template_name} · {humanizeDocumentType(use.document_type)}
+                  on {use.template_name} · {humanizeDocumentType(use.document_type, use.document_type_label)}
                 </span>
               </li>
             ))}

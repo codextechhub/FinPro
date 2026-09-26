@@ -45,7 +45,7 @@ export default function WorkflowTemplates() {
       versions.map((v) => ({
         _key: v.key,
         name: <span className="text-sm font-medium text-black-01">{v.running.name}</span>,
-        documentType: <span className="text-sm">{humanizeDocumentType(v.document_type)}</span>,
+        documentType: <span className="text-sm">{humanizeDocumentType(v.document_type, v.running.document_type_label)}</span>,
         code: <span className="font-mono text-xs text-gray-01">{v.code}</span>,
         stages: <Badge variant="inactive">{v.running.stages.length} stages</Badge>,
         running: (

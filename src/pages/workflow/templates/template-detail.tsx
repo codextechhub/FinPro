@@ -108,7 +108,7 @@ export default function TemplateDetail() {
               <div>
                 <h1 className="text-lg font-semibold">{template.name}</h1>
                 <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-01">
-                  <span>{humanizeDocumentType(template.document_type)}</span>
+                  <span>{humanizeDocumentType(template.document_type, template.document_type_label)}</span>
                   <span aria-hidden>·</span>
                   <span className="font-mono">{template.code}</span>
                   <span aria-hidden>·</span>

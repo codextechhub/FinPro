@@ -56,7 +56,14 @@ export default function AllInstances() {
   const tableData = useMemo(
     () =>
       items.map((r: WorkflowInstance) => ({
-        document: <DocumentRef documentType={r.document_type} objectId={r.document_object_id} />,
+        document: (
+          <DocumentRef
+            documentType={r.document_type}
+            objectId={r.document_object_id}
+            label={r.document_type_label}
+            title={r.document_title}
+          />
+        ),
         template: <span className="text-sm">{r.template_code}</span>,
         status: <InstanceStatusBadge status={r.status} />,
         stage: <span className="text-xs text-gray-01">{r.current_stage_label ?? "-"}</span>,
