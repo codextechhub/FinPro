@@ -234,6 +234,76 @@ export interface ProcurementSuppliersDashboard {
   vendor_base: { active: number; on_hold: number; awaiting_kyc: number; ordered_once: number; added: number } | null;
 }
 
+/**
+ * The Stock & receiving tab of the Procurement dashboard.
+ *
+ * Stock blocks answer for the reader's stores (their branches' and the
+ * school-wide ones) and need stock view; `receipts` and `unbilled` need goods
+ * receipts; `expected` needs purchase orders. A block the reader may not see is
+ * `null`.
+ */
+export interface ProcurementStockDashboard {
+  entity: string;
+  currency: string;
+  books: "school" | "general";
+  reader_first_name: string | null;
+  as_of: string;
+  narrowed: boolean;
+  window: DashboardWindow;
+  windows: { key: string; label: string; name: string }[];
+  position: {
+    value: ReportMoney;
+    items: number;
+    stores: number;
+    below_reorder: number;
+    out_within_week: number;
+    out_of_stock: number;
+    out_names: string[];
+    idle: number;
+    idle_value: ReportMoney;
+  } | null;
+  /** Most urgent first; `days_left` is null for an item never issued. */
+  running_low: {
+    id: number;
+    name: string;
+    unit: string;
+    store: string | null;
+    stores: number;
+    on_hand: number;
+    reorder_level: number;
+    days_left: number | null;
+    suggested: number;
+  }[] | null;
+  by_store: { store: string; value: ReportMoney }[] | null;
+  /** `name` is null for issues that named no cost centre. */
+  issued: { total: ReportMoney; items: { name: string | null; value: ReportMoney }[] } | null;
+  movements: {
+    id: number;
+    type: "RECEIPT" | "ISSUE" | "ADJUSTMENT";
+    item: string;
+    unit: string;
+    store: string | null;
+    reference: string;
+    cost_center: string | null;
+    quantity: number;
+    occurred_at: string;
+  }[] | null;
+  turns: { times: number | null; fastest_store: string | null; fastest_times: number | null } | null;
+  adjustments: { count: number; value: ReportMoney } | null;
+  receipts: { this_week: number; this_week_short: number; short_lines: number; lines: number; short_pct: number | null } | null;
+  unbilled: { amount: ReportMoney; count: number; older: number; days: number } | null;
+  expected: {
+    id: number;
+    number: string;
+    vendor: string;
+    title: string;
+    expected_date: string;
+    days: number;
+    state: "due" | "late" | "awaiting_approval";
+    partial: boolean;
+  }[] | null;
+}
+
 export interface ApAgingRow {
   vendor_id: number;
   code: string;

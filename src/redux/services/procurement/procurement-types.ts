@@ -761,6 +761,9 @@ export interface StockMovement {
   balance_value_naira: string;
   reference: string;
   narration: string;
+  /** Who the stock was issued to, when the issue named a cost centre. */
+  cost_center_id: number | null;
+  cost_center_name: string | null;
   created_by_name: string | null;
   created_at: string;
 }

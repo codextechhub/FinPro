@@ -31,6 +31,7 @@ import type {
   GrirPoLineDetail,
   GrirPoLines,
   ProcurementDashboard,
+  ProcurementStockDashboard,
   ProcurementSuppliersDashboard,
   ProcurementApprovalDetail,
   ProcurementApprovalRow,
@@ -237,7 +238,7 @@ export const procurementExtApi = baseApi.injectEndpoints({
     // `location` (id or code) is optional with one active location and REQUIRED with
     // more than one: the server refuses a movement that names none rather than
     // silently drawing from the default store.
-    issueStock: b.mutation<ApiEnvelope<{ movement: StockMovement; stock_item: StockItemDetail }>, { id: number; entity: string; quantity: number; location?: string | number; movement_date?: string; expense_account?: string; reference?: string; narration?: string }>({
+    issueStock: b.mutation<ApiEnvelope<{ movement: StockMovement; stock_item: StockItemDetail }>, { id: number; entity: string; quantity: number; location?: string | number; movement_date?: string; expense_account?: string; reference?: string; narration?: string; cost_center?: string }>({
       query: ({ id, entity, ...body }) => ({ url: `/procurement/stock-items/${id}/issue/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcStock", "FinanceJournals"],
     }),
@@ -269,6 +270,18 @@ export const procurementExtApi = baseApi.injectEndpoints({
         "ProcGoodsReceipts", "ProcVendorInvoices", "ProcVendorPayments", "ProcStock",
         "WorkflowPending",
       ],
+    }),
+    getProcurementStockDashboard: b.query<ApiEnvelope<ProcurementStockDashboard>, { entity: string; window?: string }>({
+      query: (p) => ({ url: `/procurement/reports/dashboard/stock/${qs(p)}`, method: "GET" }),
+      providesTags: [
+        "ProcVendors", "ProcContracts", "ProcRequisitions", "ProcPurchaseOrders",
+        "ProcGoodsReceipts", "ProcVendorInvoices", "ProcVendorPayments", "ProcStock",
+        "WorkflowPending",
+      ],
+    }),
+    draftRestockRequisition: b.mutation<ApiEnvelope<{ id: number; document_number: string }>, { entity: string; item_ids?: number[] }>({
+      query: ({ entity, ...body }) => ({ url: `/procurement/stock-items/restock-requisition/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["ProcRequisitions"],
     }),
     getApAging: b.query<ApiEnvelope<ApAging>, { entity: string; as_of?: string }>({
       query: (p) => ({ url: `/procurement/reports/ap-aging/${qs(p)}`, method: "GET" }),
@@ -366,6 +379,8 @@ export const {
   useGetStockMovementsQuery,
   useGetProcurementDashboardQuery,
   useGetProcurementSuppliersDashboardQuery,
+  useGetProcurementStockDashboardQuery,
+  useDraftRestockRequisitionMutation,
   useGetApAgingQuery,
   useGetApReconciliationQuery,
   useGetApCashRequirementsQuery,

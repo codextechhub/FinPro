@@ -11,7 +11,7 @@ import {
 
 import { ProcurementShell } from "./procurement-shell";
 import {
-  AccountPicker, DataTable, DetailDrawer, EmptyState, ErrorState, FormDrawer, FormField,
+  AccountPicker, CostCenterPicker, DataTable, DetailDrawer, EmptyState, ErrorState, FormDrawer, FormField,
   LoadingState, Money, MoneyInput, PostingRecap, Segmented, StatCard, StatusPill, TabStrip, toArray,
   useActiveEntity, type Column, type RecapRow, type TabStripItem,
   PostingDateField,} from "@/components/finance-ui";
@@ -451,6 +451,7 @@ function IssueDrawer({ entity, currency, item, onClose }: { entity: string; curr
   const [qty, setQty] = useState("");
   const [movementDate, setMovementDate] = useState("");
   const [expense, setExpense] = useState(item.expense_code || "");
+  const [costCenter, setCostCenter] = useState("");
   const [reference, setReference] = useState("");
   const [narration, setNarration] = useState("");
   const [issue, { isLoading }] = useIssueStockMutation();
@@ -475,7 +476,7 @@ function IssueDrawer({ entity, currency, item, onClose }: { entity: string; curr
       const r = await issue({
         id: item.id, entity, quantity: q, movement_date: movementDate,
         ...(loc.multi ? { location: Number(loc.locationId) } : {}),
-        expense_account: expense || undefined,
+        expense_account: expense || undefined, cost_center: costCenter || undefined,
         reference: reference.trim() || undefined, narration: narration.trim() || undefined,
       }).unwrap();
       toast.success(r.message || "Stock issued.");
@@ -504,6 +505,10 @@ function IssueDrawer({ entity, currency, item, onClose }: { entity: string; curr
         <PostingDateField label="Movement date" entity={entity} value={movementDate} onChange={setMovementDate} />
       </div>
       <FormField label="Expense account" required={!item.expense_code}><AccountPicker entity={entity} value={expense} onChange={setExpense} accountType="EXPENSE" postableOnly activeOnly /></FormField>
+      <FormField label="Issued to">
+        <CostCenterPicker entity={entity} value={costCenter} onChange={setCostCenter} placeholder="Optional - the department using it" />
+        <span className="mt-1 block font-mont text-[11px] text-gray-05">The cost centre the stock went to, such as the kitchen or a department. It appears on the dashboard and on spending by cost centre.</span>
+      </FormField>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Reference"><Input value={reference} onChange={(e) => setReference(e.target.value)} className="bg-white" /></FormField>
         <FormField label="Narration"><Input value={narration} onChange={(e) => setNarration(e.target.value)} className="bg-white" /></FormField>

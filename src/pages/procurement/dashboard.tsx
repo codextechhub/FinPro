@@ -10,9 +10,9 @@
  *
  * The window switch (this month, a school's term, the year to date) changes
  * spend, categories, top vendors and what was paid; everything else is where
- * things stand today. Beside the overview sits Spend & suppliers (`?view=suppliers`),
- * shown to a reader holding a key behind one of its cards; the window carries
- * across both. The cards are the finance dashboard's (see
+ * things stand today. Beside the overview sit Spend & suppliers (`?view=suppliers`)
+ * and Stock & receiving (`?view=stock`), each shown to a reader holding a key
+ * behind one of its cards; the window carries across all three. The cards are the finance dashboard's (see
  * finance/dashboard-cards), so the two consoles read the same way.
  */
 
@@ -27,11 +27,12 @@ import { useCan } from "@/components/finance-ui/can";
 import { cn } from "@/lib/utils";
 import { P } from "../../permissions";
 import {
-  useGetProcurementDashboardQuery, useGetProcurementSuppliersDashboardQuery,
+  useGetProcurementDashboardQuery, useGetProcurementStockDashboardQuery, useGetProcurementSuppliersDashboardQuery,
 } from "@/redux/services/procurement/procurement-ext-api";
 import type {
-  ProcurementDashboard as Dashboard, ProcurementSuppliersDashboard,
+  ProcurementDashboard as Dashboard, ProcurementStockDashboard, ProcurementSuppliersDashboard,
 } from "@/redux/services/procurement/procurement-ext-types";
+import { StockTab } from "./dashboard-stock";
 import { SuppliersTab } from "./dashboard-suppliers";
 import { routesPath } from "@/routes/routes-path";
 import { formatMoney } from "@/utils/money";
@@ -44,7 +45,7 @@ import { greeting } from "../finance/dashboard-words";
 
 const R = routesPath.PROTECTED.PROCUREMENT;
 type D = Dashboard;
-type ProcurementView = "overview" | "suppliers";
+type ProcurementView = "overview" | "suppliers" | "stock";
 
 const DONUT_COLORS = [DASH_COLORS.primary, DASH_COLORS.mid, "#E0B25C", DASH_COLORS.soft, DASH_COLORS.orange, "#94A3B8"];
 
@@ -393,20 +394,26 @@ export default function ProcurementDashboard() {
   const [params, setParams] = useSearchParams();
   const canSuppliers = [P.PROC_VIEW_ANALYTICS, P.PROC_VIEW_VENDOR_PAYMENTS, P.PROC_VIEW_GOODS_RECEIPTS,
     P.PROC_VIEW_VENDOR_INVOICES, P.PROC_VIEW_RFQS, P.PROC_VIEW_QUOTATIONS, P.PROC_VIEW_VENDORS].some((key) => can(key));
-  const tab: ProcurementView = params.get("view") === "suppliers" && canSuppliers ? "suppliers" : "overview";
+  const canStock = [P.PROC_VIEW_STOCK, P.PROC_VIEW_GOODS_RECEIPTS, P.PROC_VIEW_PURCHASE_ORDERS].some((key) => can(key));
+  const asked = params.get("view");
+  const tab: ProcurementView = asked === "suppliers" && canSuppliers ? "suppliers"
+    : asked === "stock" && canStock ? "stock" : "overview";
   const args = { entity: entity!, ...(windowKey ? { window: windowKey } : {}) };
   const overviewQ = useGetProcurementDashboardQuery(args, { skip: !entity || tab !== "overview" });
   const suppliersQ = useGetProcurementSuppliersDashboardQuery(args, { skip: !entity || tab !== "suppliers" });
-  const { isLoading, isFetching, isError, refetch } = tab === "overview" ? overviewQ : suppliersQ;
+  const stockQ = useGetProcurementStockDashboardQuery(args, { skip: !entity || tab !== "stock" });
+  const { isLoading, isFetching, isError, refetch } = tab === "overview" ? overviewQ : tab === "suppliers" ? suppliersQ : stockQ;
   const d = tab === "overview" ? overviewQ.data?.data : undefined;
   const sd = tab === "suppliers" ? suppliersQ.data?.data as ProcurementSuppliersDashboard | undefined : undefined;
-  const head = d ?? sd;
+  const st = tab === "stock" ? stockQ.data?.data as ProcurementStockDashboard | undefined : undefined;
+  const head = d ?? sd ?? st;
   const currency = entityCurrency ?? head?.currency;
   const windowName = d ? d.window.label.toLowerCase() : "";
   const windowTabs: TabStripItem<string>[] = (head?.windows ?? []).map((w) => ({ value: w.key, label: w.label }));
   const viewTabs: TabStripItem<ProcurementView>[] = [
     { value: "overview", label: "Overview" },
     ...(canSuppliers ? [{ value: "suppliers" as const, label: "Spend & suppliers" }] : []),
+    ...(canStock ? [{ value: "stock" as const, label: "Stock & receiving" }] : []),
   ];
   const showView = (view: ProcurementView) => setParams((prev) => {
     const next = new URLSearchParams(prev);
@@ -467,6 +474,10 @@ export default function ProcurementDashboard() {
         ) : sd ? (
           <div className={cn("transition-opacity", isFetching && "opacity-60")}>
             <SuppliersTab d={sd} currency={currency} />
+          </div>
+        ) : st ? (
+          <div className={cn("transition-opacity", isFetching && "opacity-60")}>
+            <StockTab d={st} currency={currency} />
           </div>
         ) : !d || !k ? null : (
           <div className={cn("space-y-5 transition-opacity", isFetching && "opacity-60")}>

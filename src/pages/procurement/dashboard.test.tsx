@@ -46,6 +46,10 @@ vi.mock("@/redux/services/procurement/procurement-ext-api", () => ({
   useGetProcurementSuppliersDashboardQuery: () => ({
     data: { data: mocks.suppliers }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
   }),
+  useGetProcurementStockDashboardQuery: () => ({
+    data: { data: null }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
+  }),
+  useDraftRestockRequisitionMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
 import ProcurementDashboard, { waitingFor } from "./dashboard";
@@ -167,6 +171,8 @@ describe("Procurement overview for a requisition raiser", () => {
 describe("Procurement dashboard views", () => {
   it("offers Spend & suppliers to a reader of any card on it, and opens it from the address", () => {
     expect(render(FULL, "procurement.requisition.view")).not.toContain("Spend & suppliers");
+    expect(render(FULL, "procurement.requisition.view")).not.toContain("Stock & receiving");
+    expect(render(FULL, "procurement.stock.view")).toContain("Stock & receiving");
     mocks.search = "view=suppliers";
     mocks.suppliers = {
       entity: "HOLYCROSS", currency: "NGN", books: "school", reader_first_name: "Ngozi", as_of: "2026-09-26",
