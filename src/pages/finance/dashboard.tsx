@@ -15,6 +15,11 @@
  * what has been paid against them whenever it arrived; a calendar window counts
  * by date. Everything else is a snapshot as of today (or the period pinned).
  *
+ * Beside the overview sit two more views of the same books, chosen by `?view=`:
+ * Receivables & collections and Cash, spend & compliance. Each view's tab shows
+ * only to a reader holding a key behind one of its cards, and the window switch
+ * carries across all three.
+ *
  * A school's books read in school words ("How parents paid", "This term"); any
  * other books read in neutral words. See dashboard-words.
  */
@@ -31,10 +36,15 @@ import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { useGetFinanceDashboardQuery, useGetReceivablesDashboardQuery } from "@/redux/services/finance/reports-api";
+import {
+  useGetFinanceDashboardQuery, useGetReceivablesDashboardQuery, useGetSpendDashboardQuery,
+} from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
-import type { DashboardKpi, FinanceDashboard, FiscalRunway, ReceivablesDashboard } from "@/redux/services/finance/reports-types";
+import type {
+  DashboardKpi, FinanceDashboard, FiscalRunway, ReceivablesDashboard, SpendDashboard,
+} from "@/redux/services/finance/reports-types";
 import { ReceivablesTab } from "./dashboard-receivables";
+import { SpendTab } from "./dashboard-spend";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { toArray } from "@/redux/services/finance/api-types";
@@ -52,6 +62,8 @@ function fmtDate(iso?: string) {
 }
 
 const F = routesPath.PROTECTED.FINANCE;
+
+type DashboardView = "overview" | "receivables" | "spend";
 
 /** Columns for a row of `n` cards, so a row with two cards has no empty third. */
 function rowCols(n: number) {
@@ -113,27 +125,34 @@ export default function FinanceDashboard() {
   const period = mine ? picked.period : "";
   const periodValid = period !== "" && periods.some((p) => String(p.period_no) === period);
   const windowKey = mine ? picked.window : "";
-  // Receivables & collections is a second view of the same books, for anyone who
-  // may read invoices or receipts; the chosen view lives in the URL (?view=).
+  // The other views of the same books each open to anyone holding a key behind
+  // one of their cards; the chosen view lives in the URL (?view=).
   const [params, setParams] = useSearchParams();
   const canReceivables = can(P.FIN_VIEW_INVOICES) || can(P.FIN_VIEW_PAYMENTS);
-  const tab: "overview" | "receivables" = params.get("view") === "receivables" && canReceivables ? "receivables" : "overview";
+  const canSpend = [P.FIN_VIEW_REPORTS, P.FIN_VIEW_BANK_ACCOUNTS, P.FIN_VIEW_BUDGETS, P.FIN_VIEW_EXPENSE_CLAIMS,
+    P.FIN_VIEW_PETTY_CASH, P.FIN_VIEW_PAYROLL, P.FIN_VIEW_TAX, P.FIN_VIEW_FIXED_ASSETS].some((key) => can(key));
+  const asked = params.get("view");
+  const tab: DashboardView = asked === "receivables" && canReceivables ? "receivables"
+    : asked === "spend" && canSpend ? "spend" : "overview";
   const args = { entity: entity!, ...(periodValid ? { period } : {}), ...(windowKey ? { window: windowKey } : {}) };
   const overviewQ = useGetFinanceDashboardQuery(args, { skip: !entity || tab !== "overview" });
   const receivablesQ = useGetReceivablesDashboardQuery(args, { skip: !entity || tab !== "receivables" });
-  const { isLoading, isFetching, isError, refetch } = tab === "overview" ? overviewQ : receivablesQ;
+  const spendQ = useGetSpendDashboardQuery(args, { skip: !entity || tab !== "spend" });
+  const { isLoading, isFetching, isError, refetch } = tab === "overview" ? overviewQ : tab === "receivables" ? receivablesQ : spendQ;
   const d = tab === "overview" ? overviewQ.data?.data as FinanceDashboard | undefined : undefined;
   const r = tab === "receivables" ? receivablesQ.data?.data as ReceivablesDashboard | undefined : undefined;
-  const head = d ?? r;
+  const s = tab === "spend" ? spendQ.data?.data as SpendDashboard | undefined : undefined;
+  const head = d ?? r ?? s;
   const words = dashboardWords(head?.books);
   const money = (kobo: number) => formatMoney(kobo, currency);
 
   const windowTabs: TabStripItem<string>[] = (head?.windows ?? []).map((w) => ({ value: w.key, label: w.label }));
-  const viewTabs: TabStripItem<"overview" | "receivables">[] = [
+  const viewTabs: TabStripItem<DashboardView>[] = [
     { value: "overview", label: "Overview" },
-    { value: "receivables", label: "Receivables & collections" },
+    ...(canReceivables ? [{ value: "receivables" as const, label: "Receivables & collections" }] : []),
+    ...(canSpend ? [{ value: "spend" as const, label: "Cash, spend & compliance" }] : []),
   ];
-  const showView = (view: "overview" | "receivables") => setParams((prev) => {
+  const showView = (view: DashboardView) => setParams((prev) => {
     const next = new URLSearchParams(prev);
     if (view === "overview") next.delete("view"); else next.set("view", view);
     return next;
@@ -208,7 +227,7 @@ export default function FinanceDashboard() {
           </div>
         </div>
 
-        {canReceivables && (
+        {viewTabs.length > 1 && (
           <TabStrip items={viewTabs} value={tab} onChange={showView} variant="underline" ariaLabel="Dashboard views" />
         )}
 
@@ -221,6 +240,10 @@ export default function FinanceDashboard() {
         ) : r ? (
           <div className={cn("transition-opacity", isFetching && "opacity-60")}>
             <ReceivablesTab d={r} words={words} currency={currency} />
+          </div>
+        ) : s ? (
+          <div className={cn("transition-opacity", isFetching && "opacity-60")}>
+            <SpendTab d={s} words={words} currency={currency} />
           </div>
         ) : !d ? null : nothingToShow ? (
           <EmptyState title="Nothing to show here yet"

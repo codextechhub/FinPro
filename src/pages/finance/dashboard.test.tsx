@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   held: new Set<string>(),
   dashboard: null as unknown,
   receivables: null as unknown,
+  spend: null as unknown,
   lastArgs: null as unknown,
   search: "",
 }));
@@ -60,6 +61,9 @@ vi.mock("@/redux/services/finance/reports-api", () => ({
   },
   useGetReceivablesDashboardQuery: () => ({
     data: { data: mocks.receivables }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
+  }),
+  useGetSpendDashboardQuery: () => ({
+    data: { data: mocks.spend }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
   }),
 }));
 
@@ -213,6 +217,24 @@ describe("Finance dashboard views", () => {
     const text = render({ ...EMPTY, ar_aging: AGING }, "finance.invoice.view");
     expect(text).toContain("Days to pay");
     expect(text).not.toContain("Receivables aging");
+  });
+
+  it("offers the Cash, spend & compliance view to a reader of any card on it", () => {
+    expect(render({ ...EMPTY, bank_accounts: [] }, "finance.bankaccount.view")).toContain("Cash, spend & compliance");
+    expect(render({ ...EMPTY, ar_aging: AGING }, "finance.invoice.view")).not.toContain("Cash, spend & compliance");
+  });
+
+  it("opens the Cash, spend & compliance view named in the address", () => {
+    mocks.search = "view=spend";
+    mocks.spend = {
+      entity: "HOLYCROSS", books: "school", reader_first_name: null, as_of: "2026-09-26", narrowed: false,
+      window: TERM, windows: EMPTY.windows, runway: null, cash_movement: null, spend: null, spending: null,
+      reconciliation: null, unmatched: { lines: 8, amount: money(67_000_000) }, budgets: null, payroll: null,
+      claims: null, petty_cash: null, tax_owed: null, tax_calendar: null, assets: null,
+    };
+    const text = render({ ...EMPTY, bank_accounts: [] }, "finance.bankaccount.view");
+    expect(text).toContain("Unmatched bank lines");
+    expect(text).not.toContain("Cash & bank");
   });
 });
 

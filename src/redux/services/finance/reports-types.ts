@@ -472,3 +472,130 @@ export interface ReceivablesDashboard {
     last_action: string;
   }[] | null;
 }
+
+/** A kind of cash movement on the Cash, spend & compliance tab, in the order they are drawn. */
+export type CashFlowKey =
+  | "receipts" | "other_income" | "equity" | "other_in"
+  | "payroll" | "vendors" | "tax" | "claims" | "petty_cash" | "refunds" | "spending" | "other_out";
+
+/**
+ * GET /finance/reports/dashboard/spend/ - the Cash, spend & compliance tab.
+ *
+ * Every figure reads by date, a term window included. The cash, bank, payroll and
+ * tax blocks are the school's money as a whole and are `null` for a reader who
+ * sees only some branches; the rest answer under the reader's branches. A block
+ * the reader may not see is `null`.
+ */
+export interface SpendDashboard {
+  entity: string;
+  books: "school" | "general";
+  reader_first_name: string | null;
+  as_of: string;
+  narrowed: boolean;
+  window: DashboardWindow;
+  windows: { key: string; label: string; name: string }[];
+  /** Months of cash at the recent monthly outflow; `months` is null without enough history. */
+  runway: { months: number | null; monthly_outflow: ReportMoney | null; cash: ReportMoney; based_on_days: number } | null;
+  cash_movement: {
+    start: string;
+    end: string;
+    opening: ReportMoney;
+    closing: ReportMoney;
+    /** Signed: money in is positive, money out negative. */
+    steps: { key: CashFlowKey; amount: ReportMoney }[];
+  } | null;
+  /** Posted expense in the window, against the same point of the window before. */
+  spend: {
+    amount: ReportMoney;
+    previous: ReportMoney | null;
+    delta_pct: number | null;
+    payroll: ReportMoney;
+    payroll_share_pct: number | null;
+  } | null;
+  spending: {
+    basis: "cost_centre" | "account";
+    total: ReportMoney;
+    items: { name: string; amount: ReportMoney; share_pct: number | null }[];
+  } | null;
+  reconciliation: {
+    id: number;
+    name: string;
+    bank_name: string;
+    lines: number;
+    matched: number;
+    unmatched: number;
+    unmatched_amount: ReportMoney;
+    last_reconciled: string | null;
+  }[] | null;
+  unmatched: { lines: number; amount: ReportMoney } | null;
+  budgets: {
+    year_elapsed_pct: number;
+    /** `plan`, `used` and `pct` are null on the school's plan for a branch-bound reader. */
+    items: {
+      id: number;
+      name: string;
+      branch: string | null;
+      approved: boolean;
+      plan: ReportMoney | null;
+      used: ReportMoney | null;
+      pct: number | null;
+    }[];
+  } | null;
+  payroll: {
+    label: string;
+    pay_date: string;
+    status: "DRAFT" | "POSTED" | "PAID" | "CANCELLED";
+    heads: number;
+    gross: ReportMoney;
+    net: ReportMoney;
+    paye: ReportMoney;
+    pension: ReportMoney;
+    other: ReportMoney;
+  } | null;
+  claims: {
+    submitted: { count: number; amount: ReportMoney };
+    approved: { count: number; amount: ReportMoney };
+    paid: { count: number; amount: ReportMoney };
+    oldest: { id: number; claimant: string; title: string; days: number; amount: ReportMoney }[];
+  } | null;
+  petty_cash: {
+    threshold_pct: number;
+    funds: {
+      id: number;
+      name: string;
+      branch: string | null;
+      balance: ReportMoney;
+      float: ReportMoney;
+      low: boolean;
+      last_topped_up: string | null;
+    }[];
+  } | null;
+  tax_owed: {
+    amount: ReportMoney;
+    next: { name: string; due_date: string; days: number; amount: ReportMoney } | null;
+  } | null;
+  tax_calendar: {
+    id: number;
+    name: string;
+    code: string;
+    period: string;
+    due_date: string;
+    days: number;
+    amount: ReportMoney;
+    /** `nil`: nothing owed, but the return must still be filed. */
+    state: "paid" | "filed" | "prepared" | "nil";
+  }[] | null;
+  assets: {
+    net_book_value: ReportMoney;
+    depreciation: ReportMoney;
+    categories: {
+      key: string;
+      label: string;
+      count: number;
+      cost: ReportMoney;
+      net_book_value: ReportMoney;
+      depreciated_pct: number | null;
+    }[];
+    fully_depreciated_in_use: number;
+  } | null;
+}

@@ -18,6 +18,10 @@ export interface DashboardWords {
   trendSubtitle: string;
   budgetTitle: string;
   branchesTitle: (windowLabel: string) => string;
+  /** Money received against invoices, on the cash movement chart. */
+  receiptsLabel: string;
+  /** Money paid back to payers, on the cash movement chart. */
+  refundsLabel: string;
 }
 
 const SCHOOL: DashboardWords = {
@@ -27,6 +31,8 @@ const SCHOOL: DashboardWords = {
   trendSubtitle: "Fee invoices raised and money received, by month",
   budgetTitle: "Against the school's budget",
   branchesTitle: (w) => `Branches ${w.toLowerCase()}`,
+  receiptsLabel: "Fee receipts",
+  refundsLabel: "Refunds to parents",
 };
 
 const GENERAL: DashboardWords = {
@@ -36,6 +42,8 @@ const GENERAL: DashboardWords = {
   trendSubtitle: "Invoices raised and money received, by month",
   budgetTitle: "Against the budget",
   branchesTitle: (w) => `Branches ${w.toLowerCase()}`,
+  receiptsLabel: "Customer receipts",
+  refundsLabel: "Refunds",
 };
 
 export function dashboardWords(books: FinanceDashboard["books"] | undefined): DashboardWords {

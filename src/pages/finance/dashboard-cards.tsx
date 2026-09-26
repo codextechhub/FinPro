@@ -42,7 +42,7 @@ export function compactMoney(kobo: number, currency?: string | null): string {
   return `${sign}${symbol}${Math.round(a)}`;
 }
 
-function fmtShortDate(iso: string) {
+export function fmtShortDate(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
   return isNaN(d.getTime()) ? { mon: "", day: iso } : {
     mon: d.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
