@@ -1,8 +1,12 @@
 /**
  * Batch generate - raise a posted invoice per customer from a fee structure.
- * Backed by POST /finance/fee-structures/<id>/generate/ (gated on
- * finance.feestructure.generate). Pick a structure, choose all active customers
- * (the common case) and set the dates.
+ *
+ * Where the host supplies a `FeeGenerationPanel`, this only picks the
+ * structure and hands it to that panel, which names the payers and bills them
+ * its own way; see host.ts for why a school needs that. Otherwise it is the
+ * all-active run: POST /finance/fee-structures/<id>/generate/ (gated on
+ * finance.feestructure.generate) for every active customer, with the dates set
+ * here.
  */
 import { useState } from "react";
 import { toast } from "sonner";
@@ -12,11 +16,12 @@ import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { apiErrorMessage } from "@/utils/api-errors";
 import { useGetFeeStructuresQuery, useGenerateFromFeeStructureMutation } from "@/redux/services/finance/ar-api";
 import type { FeeStructure } from "@/redux/services/finance/ar-types";
+import { FeeGenerationPanel } from "../../../host";
 
 const selectCls = "h-9 w-full rounded-md border border-white-02 bg-white px-2 font-mont text-sm focus:border-primary focus:outline-none";
 
-export function BatchGenerateModal({ open, onOpenChange, entity }: {
-  open: boolean; onOpenChange: (o: boolean) => void; entity: string;
+export function BatchGenerateModal({ open, onOpenChange, entity, currency }: {
+  open: boolean; onOpenChange: (o: boolean) => void; entity: string; currency?: string | null;
 }) {
   const { data } = useGetFeeStructuresQuery({ entity, is_active: "true" }, { skip: !open });
   const structures = toArray<FeeStructure>(data?.data);
@@ -24,6 +29,7 @@ export function BatchGenerateModal({ open, onOpenChange, entity }: {
   const [invoiceDate, setInvoiceDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [failure, setFailure] = useState("");
+  const [handedOver, setHandedOver] = useState<FeeStructure | null>(null);
   const [generate, { isLoading }] = useGenerateFromFeeStructureMutation();
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) setFailure("");
@@ -32,6 +38,11 @@ export function BatchGenerateModal({ open, onOpenChange, entity }: {
 
   const submit = async () => {
     setFailure("");
+    if (FeeGenerationPanel) {
+      setHandedOver(structures.find((f) => String(f.id) === structure) ?? null);
+      onOpenChange(false); setStructure("");
+      return;
+    }
     try {
       const res = await generate({
         id: structure, entity, all_active: true,
@@ -43,6 +54,36 @@ export function BatchGenerateModal({ open, onOpenChange, entity }: {
       setFailure(apiErrorMessage(error, "The invoices could not be generated. Check the billing setup and try again."));
     }
   };
+
+  if (FeeGenerationPanel) {
+    // Only a Customer structure bills anyone, as on the structure's own Generate.
+    const billable = structures.filter((f) => f.applies_to === "CUSTOMER");
+    return (
+      <>
+        <FormModal
+          open={open}
+          onOpenChange={handleOpenChange}
+          title="Batch generate invoices"
+          description="Choose the fee structure, then choose who it bills."
+          submitText="Continue"
+          canSubmit={!!structure}
+          onSubmit={submit}
+        >
+          <FormField label="Fee structure" required>
+            <select value={structure} onChange={(e) => setStructure(e.target.value)} className={selectCls} aria-label="Fee structure">
+              <option value="">Select a fee structure…</option>
+              {billable.map((f) => (
+                <option key={f.id} value={f.id}>{f.code} - {f.name} ({f.total_naira})</option>
+              ))}
+            </select>
+          </FormField>
+        </FormModal>
+        {handedOver ? (
+          <FeeGenerationPanel structure={handedOver} entity={entity} currency={currency} onClose={() => setHandedOver(null)} />
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <FormModal

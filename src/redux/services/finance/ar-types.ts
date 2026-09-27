@@ -471,6 +471,8 @@ export interface FeeStructure {
   name: string;
   applies_to: FeeAppliesTo;
   applies_to_display: string;
+  /** The branch whose price list this is; null for one shared across the tenant. */
+  branch_id?: number | null;
   description: string;
   is_active: boolean;
   items: FeeItem[];

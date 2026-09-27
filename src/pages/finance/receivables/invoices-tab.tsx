@@ -212,7 +212,7 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
         onWriteOff={() => setWriteOff(true)}
       />
 
-      <BatchGenerateModal open={batchOpen} onOpenChange={setBatchOpen} entity={entity} />
+      <BatchGenerateModal open={batchOpen} onOpenChange={setBatchOpen} entity={entity} currency={currency} />
       <NewInvoiceDrawer open={newOpen} onOpenChange={setNewOpen} entity={entity} currency={currency} />
 
       <ConfirmActionModal

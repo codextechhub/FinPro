@@ -134,6 +134,28 @@ export interface HostAvatarProps {
   fallbackClassName?: string;
 }
 
+/** The fee structure a host's generation panel bills from. */
+export interface HostFeeStructure {
+  id: number;
+  code: string;
+  name: string;
+  /** Per payer, tax included, in kobo. */
+  total_with_tax: number;
+  /** The branch whose price list this is. Null for one shared across the
+   *  tenant; absent where the server does not send it. */
+  branch_id?: number | null;
+}
+
+/** What a host's generation panel is given. It renders its own drawer and
+ *  calls `onClose` when the reader leaves it, whether or not anything was
+ *  billed. */
+export interface HostFeeGenerationProps {
+  structure: HostFeeStructure;
+  entity: string;
+  currency?: string | null;
+  onClose: () => void;
+}
+
 export interface HostContract {
   /** The application's own export affordance.
    *
@@ -200,6 +222,21 @@ export interface HostContract {
    *  school fees. An app that omits "fees" from `financeSettingsSections`
    *  supplies a component that renders nothing and it is never reached. */
   FeeDuePolicyPanel: ComponentType;
+  /** Who a fee structure bills, and the run that bills them.
+   *
+   *  Optional, and the only member that is. Without it, Generate invoices on a
+   *  fee structure and Batch generate on the invoice list raise one invoice for
+   *  every active customer in the entity, which is right for a business with a
+   *  customer list and wrong for a school, where the customers are pupils and a
+   *  structure has no class. A "JSS 1 First Term" structure billed that way
+   *  bills every child in the school.
+   *
+   *  A host that knows who a structure is for supplies a panel that names the
+   *  payers itself, and both entry points render it in place of the all-active
+   *  run. The school app's panel picks classes, previews the run and bills
+   *  through the school's own route, which also applies the school's due-date
+   *  rule. A host that omits it keeps the all-active run unchanged. */
+  FeeGenerationPanel?: ComponentType<HostFeeGenerationProps>;
   /** Whether this app creates approval templates from nothing.
    *
    *  CodeX does: the shared paths every tenant starts on are authored in the
@@ -252,3 +289,7 @@ export const {
   financeSettingsSections, setupSections, FeeDuePolicyPanel, createsWorkflowTemplates,
   platformName,
 } = host;
+
+// Read through the contract type, not the module: an optional member a host
+// leaves out is not an export of its module at all.
+export const FeeGenerationPanel = _satisfies.FeeGenerationPanel;

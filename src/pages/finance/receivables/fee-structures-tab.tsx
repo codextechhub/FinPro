@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { apiErrorMessage } from "@/utils/api-errors";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
+import { FeeGenerationPanel } from "../../../host";
 import {
   useGetFeeStructuresQuery, useGetFeeStructureQuery, useCreateFeeStructureMutation,
   useUpdateFeeStructureMutation, useDuplicateFeeStructureMutation,
@@ -241,11 +242,20 @@ function FeeStructureDetailDrawer({ structure, entity, currency, onClose, onEdit
         </div>
       </DetailDrawer>
 
-      {generating ? <GenerateDrawer structure={full} entity={entity} onClose={() => setGenerating(false)} /> : null}
+      {generating && FeeGenerationPanel ? (
+        <FeeGenerationPanel structure={full} entity={entity} currency={currency} onClose={() => setGenerating(false)} />
+      ) : generating ? (
+        <GenerateDrawer structure={full} entity={entity} onClose={() => setGenerating(false)} />
+      ) : null}
     </>
   );
 }
 
+/**
+ * The all-active run: one posted invoice for every active customer in the
+ * entity. Used only where the host supplies no `FeeGenerationPanel`; a host
+ * that does names the payers itself (see host.ts).
+ */
 function GenerateDrawer({ structure, entity, onClose }: { structure: FeeStructure; entity: string; onClose: () => void }) {
   const [invoiceDate, setInvoiceDate] = useState("");
   const [dueDate, setDueDate] = useState("");
