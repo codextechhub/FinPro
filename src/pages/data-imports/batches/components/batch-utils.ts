@@ -1,4 +1,7 @@
 // Small helpers shared by the batch-detail page and its tabs.
+import { toast } from "sonner";
+
+import { getAccessToken } from "@/utils/access-token";
 
 // RTK responses are sometimes wrapped in a { data } envelope; this normalises.
 export const unwrap = <T,>(res: { data: T } | T | undefined): T | undefined => {
@@ -6,19 +9,19 @@ export const unwrap = <T,>(res: { data: T } | T | undefined): T | undefined => {
   return (res as { data: T }).data ?? (res as T);
 };
 
-export function triggerDownload(url: string, filename: string) {
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.target = "_blank";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
-
+/**
+ * Download a file from a bearer-authenticated import endpoint and save it.
+ *
+ * The access token lives in the host's memory, never in a cookie or storage,
+ * so a plain link or a new tab reaches the endpoint with no credentials and is
+ * refused. The file is fetched with the token instead, the same way the
+ * finance report exports and printable documents are, and handed to the
+ * browser as a blob. A failed download says so rather than opening a tab onto
+ * the refusal.
+ */
 export async function triggerBlobDownload(url: string, filename: string) {
   try {
-    const token = document.cookie.match(/(?:^|;\s*)token=([^;]*)/)?.[1];
+    const token = getAccessToken();
     const res = await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
@@ -33,6 +36,6 @@ export async function triggerBlobDownload(url: string, filename: string) {
     document.body.removeChild(a);
     URL.revokeObjectURL(blobUrl);
   } catch {
-    window.open(url, "_blank", "noopener,noreferrer");
+    toast.error("Download failed. Please try again.");
   }
 }

@@ -190,7 +190,7 @@ function BuilderForm({
     const out: { step: number; message: string }[] = [];
     if (!state.datasetKey) out.push({ step: 1, message: "Choose a dataset." });
     if (dataset?.requires_entity && !state.entity)
-      out.push({ step: 1, message: "Choose the entity this export reads." });
+      out.push({ step: 1, message: "Choose the set of books this export reads." });
     if (!state.columns.length) out.push({ step: 2, message: "Choose at least one column." });
     if (dataset) {
       const withdrawn = state.columns.filter((c) => !dataset.fields.some((f) => f.id === c));
@@ -222,7 +222,7 @@ function BuilderForm({
     step === 1 && !state.datasetKey
       ? "Choose a dataset first."
       : step === 1 && dataset?.requires_entity && !state.entity
-        ? "Choose the entity this export reads."
+        ? "Choose the set of books this export reads."
         : step === 2 && !state.columns.length
           ? "Choose at least one column."
           : "";
@@ -541,20 +541,20 @@ function StepData({
       {requiresEntity && (
         <div>
           <p className="mb-2 font-mont text-[11px] uppercase tracking-widest text-gray-05">
-            Entity scope
+            Books
           </p>
           <CustomNativeSelect
             id="builder-entity"
-            aria-label="Entity"
-            placeholder="Choose an entity…"
+            aria-label="Set of books"
+            placeholder="Choose a set of books…"
             containerClass="w-full sm:w-72"
             options={entities.map((e) => ({ value: e.code, label: `${e.code} - ${e.name}` }))}
             value={entity}
             onChange={(e) => onEntity(e.target.value)}
           />
           <p className="mt-2 font-mont text-[11px] text-gray-05">
-            {entities.length} {entities.length === 1 ? "entity is" : "entities are"} available to you.
-            Data never crosses an entity boundary.
+            {entities.length} {entities.length === 1 ? "set of books is" : "sets of books are"} available to you.
+            An export reads one set of books and nothing outside it.
           </p>
         </div>
       )}

@@ -7,6 +7,7 @@ import { useActiveEntity } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { P } from "../../../permissions";
 import { EmptyState } from "@/components/finance-ui/states";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { CollectionsTab } from "./collections-tab";
 import { VirtualAccountsTab } from "./virtual-accounts-tab";
 import { PageShell } from "@/components/layout/page-shell";
@@ -35,7 +36,7 @@ export default function CollectionsPage({ section = DEFAULT_COLLECTIONS_SECTION 
         {!entity ? (
           <NoEntityState message="Choose a ledger entity to view collections." />
         ) : !canCollections ? (
-          <EmptyState title="No collections access" message="Money in is read through the payments module, which needs payments.collection.view." />
+          <EmptyState title="No collections access" message={noAccessMessage("view collections")} />
         ) : isVA ? (
           <VirtualAccountsTab entity={entity} currency={currency} />
         ) : (

@@ -55,6 +55,7 @@ A host must provide:
 | `@/hooks/use-permissions` | `usePermissions`, returning `fieldAccess` beside the permission checks: the `field_access` map from the login response and `/user/auth/me/`, stored as received (an empty object when the user has no restrictions) |
 | `@/components/custom/*` | `PermissionGate`, skeletons |
 | `@/routes/routes-path` | the route table, for nav URLs |
+| `@/utils/access-token` | `getAccessToken`, the in-memory access token that raw-fetch downloads send as a bearer |
 
 A host must also register this package's API slices and reducers in its own
 store.

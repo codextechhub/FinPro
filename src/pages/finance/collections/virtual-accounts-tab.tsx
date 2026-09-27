@@ -27,12 +27,9 @@ import {
   useUpdateVirtualAccountMutation, useGetCollectionsQuery,
 } from "@/redux/services/payments/payments-api";
 import type { VirtualAccount } from "@/redux/services/payments/payments-types";
+import { PROVIDER_CHOICES, providerInfo } from "../payment-providers";
 
-const PROVIDERS: { value: string; label: string }[] = [
-  { value: "PAYSTACK", label: "Paystack" },
-  { value: "FAKE", label: "Fake (testing)" },
-];
-const providerLabel = (p: string) => PROVIDERS.find((x) => x.value === p)?.label ?? p;
+const providerLabel = (p: string) => providerInfo(p).label;
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -104,7 +101,7 @@ export function VirtualAccountsTab({ entity, currency }: { entity: string; curre
           </div>
           <select value={provider} onChange={(e) => { setProvider(e.target.value); setPage(1); }} className={selectCls}>
             <option value="">All providers</option>
-            {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            {PROVIDER_CHOICES.map(([value, p]) => <option key={value} value={value}>{p.label}</option>)}
           </select>
           <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectCls}>
             <option value="">All statuses</option>
@@ -263,14 +260,14 @@ function ProvisionDrawer({ open, onClose, entity }: { open: boolean; onClose: ()
     >
       <div className="space-y-4">
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
-          The gateway mints a unique account number for this customer. Transfers to it arrive as collections that reconcile to the customer's invoices. In dev, the Fake provider issues test numbers.
+          The gateway mints a unique account number for this customer. Transfers to it arrive as collections that reconcile to the customer's invoices.
         </p>
         <FormField label="Customer" required>
           <CustomerPicker entity={entity} value={customer} onChange={setCustomer} placeholder="Select customer" />
         </FormField>
         <FormField label="Provider" required>
           <select value={provider} onChange={(e) => setProvider(e.target.value)} className="h-9 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01">
-            {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            {PROVIDER_CHOICES.map(([value, p]) => <option key={value} value={value}>{p.label}</option>)}
           </select>
         </FormField>
         <FormField label="Deposit (GL) account - optional">

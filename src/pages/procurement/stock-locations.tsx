@@ -31,6 +31,7 @@ import {
 } from "@/redux/services/procurement/procurement-ext-api";
 import type { StockBalance, StockLocation } from "@/redux/services/procurement/procurement-types";
 import { useBranches } from "../../host";
+import { useIsSchool, wholeBooksLabel } from "../../lib/reader-words";
 import { apiFieldError } from "@/utils/api-errors";
 import { ProcurementShell } from "./procurement-shell";
 import { EmptyPanel, Field } from "./sourcing/shared";
@@ -45,6 +46,7 @@ const fmtQty = (value?: string | null) => {
 };
 
 export function LocationsSection({ entity, currency }: { entity: string; currency?: string | null }) {
+  const wholeBooks = wholeBooksLabel(useIsSchool());
   const { can } = useCan();
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
@@ -82,7 +84,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
       header: "Location",
       cell: (l) => <div className="min-w-40"><p className="font-semibold">{l.name}</p><p className="mt-0.5 font-mont text-xs text-gray-05">{l.code}</p></div>,
     },
-    { header: "Branch", cell: (l) => l.branch_name || <span className="text-gray-05">Entity-wide</span> },
+    { header: "Branch", cell: (l) => l.branch_name || <span className="text-gray-05">{wholeBooks}</span> },
     { header: "Default", cell: (l) => (l.is_default ? <StatusPill status="DEFAULT" /> : <span className="text-gray-05">-</span>) },
     { header: "Status", cell: (l) => <StatusPill status={l.is_active ? "ACTIVE" : "INACTIVE"} /> },
     { header: "Created", cell: (l) => shortDate(l.created_at) },
@@ -152,6 +154,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
 function LocationForm({ entity, initial, isFirst, onClose }: {
   entity: string; initial?: StockLocation; isFirst: boolean; onClose: () => void;
 }) {
+  const wholeBooks = wholeBooksLabel(useIsSchool());
   const [code, setCode] = useState(initial?.code || "");
   const [name, setName] = useState(initial?.name || "");
   const [description, setDescription] = useState(initial?.description || "");
@@ -210,7 +213,7 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
     <FormDrawer
       open onOpenChange={(o) => !saving && !o && onClose()}
       title={initial ? "Edit stock location" : "New stock location"}
-      description={initial ? "Update this store. Its code cannot be changed." : "A store stock is held in. Leave the branch blank for an entity-wide store."}
+      description={initial ? "Update this store. Its code cannot be changed." : `A store stock is held in. Leave the branch blank and the store is ${wholeBooks.toLowerCase()}.`}
       widthClass="sm:max-w-lg" onSubmit={save} submitText={initial ? "Save changes" : "Create"}
       loading={saving} canSubmit={canSubmit}
     >
@@ -232,7 +235,7 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
       {branchesReadable && (
         <FormField label="Branch">
           <NativeSelect value={branch} disabled={branchQ.isLoading} onChange={(e) => setBranch(e.target.value)}>
-            <option value="">Entity-wide</option>
+            <option value="">{wholeBooks}</option>
             {branches.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
           </NativeSelect>
           <span className="mt-1 block font-mont text-[11px] leading-5 text-gray-05">Goods received at this branch land in this store by default.</span>
@@ -242,7 +245,7 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
         <Input value={description} maxLength={255} onChange={(e) => setDescription(e.target.value)} className="bg-white" />
       </FormField>
       {isFirst ? (
-        <p className="font-mont text-[11px] leading-5 text-gray-05">The first store an entity has is always its default.</p>
+        <p className="font-mont text-[11px] leading-5 text-gray-05">The first store set up is always the default.</p>
       ) : (
         <label className="flex cursor-pointer items-start gap-2 font-mont text-xs text-gray-01">
           <input type="checkbox" className="mt-0.5" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />
@@ -257,6 +260,7 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
 function LocationBalancesDrawer({ location, entity, currency, onClose }: {
   location: StockLocation | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const wholeBooks = wholeBooksLabel(useIsSchool());
   // skipToken rather than `skip`: the argument expression is evaluated whether or
   // not the query runs, so reading `location.id` off a closed drawer threw before
   // the skip could matter.
@@ -272,14 +276,14 @@ function LocationBalancesDrawer({ location, entity, currency, onClose }: {
     <DetailDrawer
       open={!!location} onOpenChange={(o) => !o && onClose()}
       title={location ? location.name : "Stock location"}
-      description={location ? `${location.code}${location.branch_name ? ` · ${location.branch_name}` : " · Entity-wide"}` : ""}
+      description={location ? `${location.code}${location.branch_name ? ` · ${location.branch_name}` : ` · ${wholeBooks}`}` : ""}
       widthClass="sm:max-w-2xl"
     >
       {!location ? null : (
         <div className="space-y-5">
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">
             <Field label="Code" value={location.code} />
-            <Field label="Branch" value={location.branch_name || "Entity-wide"} />
+            <Field label="Branch" value={location.branch_name || wholeBooks} />
             <Field label="Default" value={location.is_default ? "Yes" : "No"} />
             <Field label="Status" value={location.is_active ? "Active" : "Inactive"} />
             <Field label="Description" value={location.description || "-"} />

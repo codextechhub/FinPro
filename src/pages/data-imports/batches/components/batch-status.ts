@@ -76,3 +76,33 @@ export const JOB_STATUS_BADGE: Record<string, "active" | "pending" | "suspended"
   cancelled: "inactive",
   rolled_back: "suspended",
 };
+
+const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+
+/**
+ * The line under the banner on a batch whose import failed or only partly
+ * completed.
+ *
+ * Validation runs before the import, so the banner says what it found, from the
+ * batch's own counts: an import that fails after a validation that flagged
+ * errors is a different story from one that fails on clean data, and telling
+ * both readers validation "passed with no issues" sends the first one looking
+ * in the wrong place. The import's own failure is always in the Jobs tab.
+ */
+export function importFailureNote(batch: {
+  error_count: number;
+  warning_count: number;
+  validation_summary: Record<string, unknown> | null;
+}): string {
+  const jobs = "The Jobs tab has the details of what went wrong during the import.";
+  if (batch.validation_summary == null) return jobs;
+  const summary = batch.validation_summary as Record<string, number | undefined>;
+  const errors = summary.error_count ?? batch.error_count;
+  const warnings = summary.warning_count ?? batch.warning_count;
+  if (errors > 0) {
+    const also = warnings > 0 ? ` and ${count(warnings, "warning")}` : "";
+    return `Validation found ${count(errors, "error")}${also}. ${jobs}`;
+  }
+  if (warnings > 0) return `Validation passed with ${count(warnings, "warning")}. ${jobs}`;
+  return `Validation passed with no issues, so the failure happened during the import itself. ${jobs}`;
+}

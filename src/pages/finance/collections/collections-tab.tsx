@@ -5,8 +5,9 @@
  * posting (Dr bank/collections, Cr AR), a New-checkout drawer, and a server-side export.
  *
  * Backed by the real model: initiate returns a hosted checkout_url; verify polls the PSP
- * and books a vs_finance receipt when settled. Honest: providers are Paystack (+
- * Fake for testing); no email is sent (Copy link copies the real URL); the receipt
+ * and books a vs_finance receipt when settled. Honest: the provider is Paystack
+ * (plus the Fake test gateway in a development build); no email is sent (Copy
+ * link copies the real URL); the receipt
  * journal posts automatically on confirmation - the recap mirrors it, never a 2nd post.
  *
  * Not every row here is a checkout. A transfer into a customer's dedicated virtual
@@ -26,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchSelect } from "@/components/custom/search-select";
 import { cn } from "@/lib/utils";
+import { PROVIDER_CHOICES, providerInfo } from "../payment-providers";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
 import { useGetCollectionsQuery, useGetCollectionsSummaryQuery, useInitiateCollectionMutation, useVerifyCollectionMutation } from "@/redux/services/payments/payments-api";
@@ -50,12 +52,8 @@ function StatusPill({ status }: { status: string }) {
   return <span className={cn(PILL, g.cls)}>{g.label}</span>;
 }
 
-const PROVIDERS: Record<string, { label: string; dot: string }> = {
-  PAYSTACK: { label: "Paystack", dot: "bg-blue-500" },
-  FAKE: { label: "Fake (test)", dot: "bg-gray-400" },
-};
 function ProviderTag({ provider }: { provider: string }) {
-  const p = PROVIDERS[provider] ?? { label: provider, dot: "bg-gray-400" };
+  const p = providerInfo(provider);
   return <span className="inline-flex items-center gap-1.5 font-mont text-xs text-black-01"><span className={cn("size-2 rounded-sm", p.dot)} /> {p.label}</span>;
 }
 
@@ -118,7 +116,7 @@ export function CollectionsTab({ entity, currency }: { entity: string; currency?
           </Select>
           <Select value={provider} onChange={(value) => { setProvider(value); setPage(1); }} className="w-40">
             <option value="">All providers</option>
-            {Object.entries(PROVIDERS).map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}
+            {PROVIDER_CHOICES.map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}
           </Select>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -213,7 +211,7 @@ function CollectionDrawer({ collectionId, collections, entity, currency, onClose
             {deposit ? (
               // A deposit has no checkout and no link: the first we hear of it is the
               // provider telling us the customer's dedicated account was credited.
-              <TimelineStep done title="Transfer received" sub={`${PROVIDERS[c.provider]?.label ?? c.provider} reported a transfer into this customer's account · ${fmtDateTime(c.created_at)}`} />
+              <TimelineStep done title="Transfer received" sub={`${providerInfo(c.provider).label} reported a transfer into this customer's account · ${fmtDateTime(c.created_at)}`} />
             ) : (
               <>
                 <TimelineStep done title="Checkout created" sub={fmtDateTime(c.created_at)} />
@@ -303,7 +301,7 @@ function NewCheckoutDrawer({ open, onClose, entity, currency }: { open: boolean;
         <p className="-mt-2 font-mont text-[11px] text-gray-05">Select an invoice to settle Accounts Receivable; leave blank to hold the payment as customer credit.</p>
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></FormField>
-          <div><p className="mb-1 font-mont text-xs text-gray-05">Provider</p><Select value={provider} onChange={setProvider} className="w-full">{Object.entries(PROVIDERS).map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}</Select></div>
+          <div><p className="mb-1 font-mont text-xs text-gray-05">Provider</p><Select value={provider} onChange={setProvider} className="w-full">{PROVIDER_CHOICES.map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}</Select></div>
         </div>
         <FormField label="Customer email"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" className="h-9 bg-white" /></FormField>
         <FormField label="Narration"><Input value={narration} onChange={(e) => setNarration(e.target.value)} placeholder="e.g. Term 3 tuition - A. Williams" className="h-9 bg-white" /></FormField>

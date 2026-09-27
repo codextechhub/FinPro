@@ -17,6 +17,7 @@ import { ArrowDownLeft, ArrowUpRight, Receipt, Banknote } from "lucide-react";
 import { DataTable, Money, KpiCard, DetailDrawer, toArray, useFieldAccess, type Column } from "@/components/finance-ui";
 import { QuickExportButton } from "../../host";
 import { cn } from "@/lib/utils";
+import { PROVIDER_CHOICES, providerInfo } from "./payment-providers";
 import { formatMoney } from "@/utils/money";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { useGetMovementsQuery, useGetMovementsSummaryQuery } from "@/redux/services/payments/payments-api";
@@ -25,12 +26,8 @@ import type { Movement } from "@/redux/services/payments/payments-types";
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const fmtDateTime = (s?: string | null) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "-");
 
-const PROVIDERS: Record<string, { label: string; dot: string }> = {
-  PAYSTACK: { label: "Paystack", dot: "bg-blue-500" },
-  FAKE: { label: "Fake (test)", dot: "bg-gray-400" },
-};
 function ProviderTag({ provider }: { provider: string }) {
-  const p = PROVIDERS[provider] ?? { label: provider || "-", dot: "bg-gray-400" };
+  const p = providerInfo(provider);
   return <span className="inline-flex items-center gap-1.5 font-mont text-sm text-black-01"><span className={cn("size-2 rounded-sm", p.dot)} /> {p.label}</span>;
 }
 
@@ -119,7 +116,7 @@ export function TransactionsTab({ entity, currency }: { entity: string; currency
         <div className="flex flex-wrap items-center gap-2">
           <Select value={direction} onChange={setDirection} className="w-36"><option value="">All directions</option><option value="in">In</option><option value="out">Out</option></Select>
           <Select value={group} onChange={setGroup} className="w-36"><option value="">All status</option>{STATUS_GROUPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select>
-          <Select value={provider} onChange={setProvider} className="w-40"><option value="">All providers</option>{Object.entries(PROVIDERS).map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}</Select>
+          <Select value={provider} onChange={setProvider} className="w-40"><option value="">All providers</option>{PROVIDER_CHOICES.map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}</Select>
         </div>
         {/* This screen is a MERGE of two datasets, and one file cannot hold
             both: a collection has a payer and a provider reference, a payout has
@@ -181,7 +178,7 @@ function MovementDrawer({ move, currency, onClose }: { move: Movement | null; cu
 
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title={move.reference} description={`${inbound ? "Collection in" : "Payout out"} · ${PROVIDERS[move.provider]?.label ?? move.provider} · ${formatMoney(move.amount, currency)}`}
+      title={move.reference} description={`${inbound ? "Collection in" : "Payout out"} · ${providerInfo(move.provider).label} · ${formatMoney(move.amount, currency)}`}
       widthClass="sm:max-w-md"
       footer={<><DirectionTag dir={move.direction} /><div className="flex-1" /><StatusPill status={move.status} /></>}>
       <div className="space-y-4">

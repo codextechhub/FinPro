@@ -26,6 +26,7 @@ import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { PROVIDER_CHOICES, providerInfo } from "./payment-providers";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
 import { useGetPayoutBatchesQuery, useGetPayoutBatchesSummaryQuery, useCreatePayoutBatchMutation, useGetPayoutBatchQuery, useSubmitPayoutBatchMutation, useSubmitPayoutBatchForApprovalMutation } from "@/redux/services/payments/payments-api";
@@ -64,12 +65,8 @@ function ItemStatusPill({ status }: { status: string }) {
   return <span className={cn(PILL, g.cls)}>{g.label}</span>;
 }
 
-const PROVIDERS: Record<string, { label: string; dot: string }> = {
-  PAYSTACK: { label: "Paystack", dot: "bg-blue-500" },
-  FAKE: { label: "Fake (test)", dot: "bg-gray-400" },
-};
 function ProviderTag({ provider }: { provider: string }) {
-  const p = PROVIDERS[provider] ?? { label: provider, dot: "bg-gray-400" };
+  const p = providerInfo(provider);
   return <span className="inline-flex items-center gap-1.5 font-mont text-xs text-black-01"><span className={cn("size-2 rounded-sm", p.dot)} /> {p.label}</span>;
 }
 
@@ -208,7 +205,7 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
 
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Purpose"><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. May vendor run" className="h-9 bg-white" /></FormField>
-          <div><p className="mb-1 font-mont text-xs text-gray-05">Provider</p><Select value={provider} onChange={setProvider} className="w-full">{Object.entries(PROVIDERS).map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}</Select></div>
+          <div><p className="mb-1 font-mont text-xs text-gray-05">Provider</p><Select value={provider} onChange={setProvider} className="w-full">{PROVIDER_CHOICES.map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}</Select></div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <FormField label="From bank account"><AccountPicker entity={entity} value={sourceAccount} onChange={setSourceAccount} accountType="ASSET" postableOnly placeholder="Defaults to cash & bank" /></FormField>

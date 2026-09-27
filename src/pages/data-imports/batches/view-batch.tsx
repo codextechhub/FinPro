@@ -24,7 +24,7 @@ import {
   importDownloadUrls,
 } from "@/redux/services/dashboard/import-api";
 import type { ImportBatch } from "@/redux/services/dashboard/import-types";
-import { IN_FLIGHT, STATUS_BADGE, STATUS_LABEL } from "./components/batch-status";
+import { IN_FLIGHT, STATUS_BADGE, STATUS_LABEL, importFailureNote } from "./components/batch-status";
 import { formatBytes } from "@/utils/format-bytes";
 import { unwrap, triggerBlobDownload } from "./components/batch-utils";
 import { PipelineTimeline } from "./components/pipeline-timeline";
@@ -282,7 +282,7 @@ export default function ViewBatch() {
                 {batch.status === "import_failed" ? "Import failed" : "Import partially completed"}
               </p>
               <p className="text-[11px] text-destructive/80 mt-0.5">
-                Validation passed with no issues. The failure occurred during the import execution - check the <strong>Jobs</strong> tab for the error details.
+                {importFailureNote(batch)}
               </p>
             </div>
           </div>

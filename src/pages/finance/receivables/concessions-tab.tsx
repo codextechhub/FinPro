@@ -17,6 +17,7 @@ import {
   DataTable, Money, MoneyInput, ConfirmActionModal, DetailDrawer, FormField, Segmented,
   CustomerPicker, AccountPicker, InfoHint, PostingRecap, toArray, type Column, type RecapRow,
   PostingDateField, StatusPill,} from "@/components/finance-ui";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -231,7 +232,7 @@ function ConcessionDetailDrawer({ concession, entity, currency, onClose }: {
                   offers nothing at all and the draft looks abandoned. Posting is
                   refused server-side, so the submit right is the only way out. */}
               {!can(P.FIN_SUBMIT_CONCESSION)
-                ? " You do not have permission to submit it - ask somebody who holds finance.concession.submit."
+                ? ` ${noAccessMessage("submit concessions")}`
                 : ""}
             </p>
           ) : null}

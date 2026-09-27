@@ -5,6 +5,7 @@
  * Every screen gates on procurement.report.view (the backend view enforces it too).
  */
 import { ForbiddenState, useActiveEntity } from "@/components/finance-ui";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { useCan } from "@/components/finance-ui/can";
 import { P } from "../../permissions";
 import { ProcurementShell } from "./procurement-shell";
@@ -49,7 +50,7 @@ export default function AnalyticsPage({ section = DEFAULT_ANALYTICS_SECTION }: {
         </PageShell>
       ) : !canAnalytics ? (
         <PageShell>
-          <ForbiddenState message="You don’t hold procurement.analytics.view, which these reports need." />
+          <ForbiddenState message={noAccessMessage("view procurement reports")} />
         </PageShell>
       ) : (
         <Section entity={entity} currency={currency} />

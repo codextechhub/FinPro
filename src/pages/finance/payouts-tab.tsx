@@ -26,6 +26,7 @@ import { QuickExportButton } from "../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { PROVIDER_CHOICES, providerInfo } from "./payment-providers";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
@@ -53,12 +54,8 @@ function StatusPill({ status }: { status: string }) {
   return <span className={cn(PILL, g.cls)}>{g.label}</span>;
 }
 
-const PROVIDERS: Record<string, { label: string; dot: string }> = {
-  PAYSTACK: { label: "Paystack", dot: "bg-blue-500" },
-  FAKE: { label: "Fake (test)", dot: "bg-gray-400" },
-};
 function ProviderTag({ provider }: { provider: string }) {
-  const p = PROVIDERS[provider] ?? { label: provider, dot: "bg-gray-400" };
+  const p = providerInfo(provider);
   return <span className="inline-flex items-center gap-1.5 font-mont text-xs text-black-01"><span className={cn("size-2 rounded-sm", p.dot)} /> {p.label}</span>;
 }
 
@@ -123,7 +120,7 @@ export function PayoutsTab({ entity, currency }: { entity: string; currency?: st
           </Select>
           <Select value={provider} onChange={setProvider} className="w-40">
             <option value="">All providers</option>
-            {Object.entries(PROVIDERS).map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}
+            {PROVIDER_CHOICES.map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}
           </Select>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -202,7 +199,7 @@ function PayoutDrawer({ payoutId, payouts, currency, onClose }: { payoutId: numb
           <div className="space-y-3">
             <TimelineStep done title="Payout created" sub={fmtDateTime(p.created_at)} />
             <TimelineStep done={dispatched && !failed} current={!dispatched && !failed} title={failed && !p.provider_reference ? "Provider rejected" : "Sent to provider"}
-              sub={failed && !p.provider_reference ? (p.failure_reason || "The provider declined the transfer") : `${PROVIDERS[p.provider]?.label ?? p.provider}${p.provider_reference ? ` · ${p.provider_reference}` : ""}`} />
+              sub={failed && !p.provider_reference ? (p.failure_reason || "The provider declined the transfer") : `${providerInfo(p.provider).label}${p.provider_reference ? ` · ${p.provider_reference}` : ""}`} />
             <TimelineStep done={paid} current={dispatched && !paid && !failed} title={failed ? "Settlement failed" : "Settled"}
               sub={paid ? `Confirmed - journal booked (Dr payable / Cr bank)${p.confirmed_at ? ` · ${fmtDateTime(p.confirmed_at)}` : ""}` : failed ? (p.failure_reason || "The provider reported a failed/reversed transfer") : "Awaiting the provider's settlement"} />
           </div>
@@ -304,7 +301,7 @@ export function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boo
         ) : null}
 
         <div className="grid grid-cols-2 gap-3">
-          <div><p className="mb-1 font-mont text-xs text-gray-05">Provider</p><Select value={provider} onChange={setProvider} className="w-full">{Object.entries(PROVIDERS).map(([v, pr]) => <option key={v} value={v}>{pr.label}</option>)}</Select></div>
+          <div><p className="mb-1 font-mont text-xs text-gray-05">Provider</p><Select value={provider} onChange={setProvider} className="w-full">{PROVIDER_CHOICES.map(([v, pr]) => <option key={v} value={v}>{pr.label}</option>)}</Select></div>
           <FormField label="From bank account"><AccountPicker entity={entity} value={sourceAccount} onChange={setSourceAccount} accountType="ASSET" postableOnly placeholder="Defaults to cash & bank" /></FormField>
         </div>
         <FormField label="Narration"><Input value={narration} onChange={(e) => setNarration(e.target.value)} placeholder="Reason for payout" className="h-9 bg-white" /></FormField>

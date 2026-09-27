@@ -5,6 +5,7 @@ import { humanizeDocumentType } from "./workflow-format";
 import { InstanceStatusBadge, UserChip } from "./workflow-ui";
 import { sourceDocumentLink, sourceDocumentPrompt } from "./source-document-link";
 import { DocumentDetailsPanel } from "./document-details";
+import { useServesPath } from "../../lib/host-routes";
 
 type Resolver = (id?: string | number | null) => string;
 
@@ -26,7 +27,10 @@ export function DocumentPanel({
   role: Resolver;
 }) {
   const summary = instance.document_summary;
-  const documentLink = sourceDocumentLink(instance);
+  // A source screen this app does not mount (the console's Payments area, say) gets no link.
+  const servesPath = useServesPath();
+  const sourceLink = sourceDocumentLink(instance);
+  const documentLink = sourceLink && servesPath(sourceLink) ? sourceLink : null;
   const documentPrompt = sourceDocumentPrompt(instance.status);
 
   return (

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Cookies from "js-cookie";
+import { clearAccessToken, setAccessToken } from "@/utils/access-token";
 import { openInvoiceDocument, openPaymentReceipt } from "./finance-documents";
 
 // A stand-in for the tab returned by window.open - records the load handler so a
@@ -19,12 +19,12 @@ const makeWin = () => {
 const htmlResponse = () => new Response("<html>doc</html>", { status: 200, headers: { "Content-Type": "text/html" } });
 
 beforeEach(() => {
-  Cookies.set("token", "test-token");
+  setAccessToken("test-token");
   URL.createObjectURL = vi.fn(() => "blob:mock-url");
   URL.revokeObjectURL = vi.fn();
 });
 afterEach(() => {
-  Cookies.remove("token");
+  clearAccessToken();
   vi.restoreAllMocks();
 });
 

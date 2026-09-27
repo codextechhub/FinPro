@@ -47,6 +47,9 @@ import { useGetProcurementSettingsQuery, useUpdateProcurementSettingsMutation } 
 import type { ProcurementSettingsValues } from "@/redux/services/procurement/procurement-types";
 import type { FinanceAuditLog, SettingConsumer } from "@/redux/services/finance/setup-types";
 import { ProcurementShell } from "./procurement-shell";
+import { financeSettingsSections, platformName } from "../../host";
+import { useIsSchool, wholeBooksLabel } from "../../lib/reader-words";
+import { PAYMENT_TERMS } from "./payment-terms";
 import {
   DEFAULT_PROCUREMENT_SETTINGS_SECTION, type ProcurementSettingsSection,
 } from "./console-sections";
@@ -75,10 +78,6 @@ const PROCUREMENT_ACCOUNTS = [
   ["PURCHASE_PRICE_VARIANCE", "Purchase price variance", "Difference between receipt basis and vendor invoice price."],
 ] as const;
 
-const PAYMENT_TERMS = [
-  ["NET_0", "Due on receipt"], ["NET_7", "Net 7 days"], ["NET_14", "Net 14 days"],
-  ["NET_30", "Net 30 days"], ["NET_60", "Net 60 days"], ["NET_90", "Net 90 days"],
-] as const;
 
 /** `section` comes from the route table; see console-sections.ts. */
 export default function ProcurementSettings({ section = DEFAULT_PROCUREMENT_SETTINGS_SECTION }: {
@@ -135,7 +134,8 @@ function Overview({ entity }: { entity: ReturnType<typeof useActiveEntity>["enti
 
 function General({ entity, entityCode }: { entity: ReturnType<typeof useActiveEntity>["entity"]; entityCode: string | null }) {
   const { hasPermission } = usePermissions();
-  const canManageEntities = hasPermission(P.FIN_VIEW_ENTITIES);
+  // The same two gates Finance Settings puts on its entities section.
+  const canManageEntities = financeSettingsSections.includes("entities") && hasPermission(P.FIN_CREATE_ENTITY);
   const canView = hasPermission(P.PROC_VIEW_SETTINGS);
   const canUpdate = hasPermission(P.PROC_UPDATE_SETTINGS);
   const query = useGetProcurementSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
@@ -176,6 +176,7 @@ function GeneralForm({ entityCode, values, history, consumers, canUpdate }: { en
 }
 
 function PurchasingPolicy({ entityCode }: { entityCode: string | null }) {
+  const wholeBooks = wholeBooksLabel(useIsSchool());
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.PROC_VIEW_SETTINGS);
   const canUpdate = hasPermission(P.PROC_UPDATE_SETTINGS);
@@ -183,7 +184,7 @@ function PurchasingPolicy({ entityCode }: { entityCode: string | null }) {
   const payload = query.data?.data;
   return (
     <div className="space-y-5">
-      <div data-guide="procurement-settings.purchasing"><SettingsSectionHeader title="Purchasing policy" description="Set entity-wide vendor, requisition and receipt defaults. The backend applies each saved rule to new purchasing activity." /></div>
+      <div data-guide="procurement-settings.purchasing"><SettingsSectionHeader title="Purchasing policy" description={`Set ${wholeBooks.toLowerCase()} vendor, requisition and receipt defaults. The backend applies each saved rule to new purchasing activity.`} /></div>
       {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading purchasing policy" description="Reading the selected entity's procurement controls." /></SettingsPanel> : <PurchasingForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} />}
       <SettingsPanel title="Always-enforced controls">
         <SettingsRow icon={ClipboardCheck} label="Approved requisition required" description="A purchase order can only be created from an approved requisition in the same entity." badge={<PolicyBadge kind="enforced" />} />
@@ -419,11 +420,12 @@ function ProtectedSettings() {
 }
 
 function Approvals() {
+  const isSchool = useIsSchool();
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.VIEW_WORKFLOW_TEMPLATES);
   return (
     <div className="space-y-5">
-      <div data-guide="procurement-settings.approvals"><SettingsSectionHeader title="Procurement approvals" description="Each document type can resolve its own branch, tenant or platform workflow template." action={canView ? <Button asChild><Link to={routesPath.PROTECTED.WORKFLOW.TEMPLATES}>Manage workflows</Link></Button> : undefined} /></div>
+      <div data-guide="procurement-settings.approvals"><SettingsSectionHeader title="Procurement approvals" description={isSchool ? `Each document type follows its own approval path: one for a branch, one for the whole school, or the ${platformName} version.` : "Each document type can resolve its own branch, tenant or platform workflow template."} action={canView ? <Button asChild><Link to={routesPath.PROTECTED.WORKFLOW.TEMPLATES}>Manage workflows</Link></Button> : undefined} /></div>
       <SettingsPanel title="Approval-capable documents">
         <SettingsRow icon={ClipboardCheck} label="Purchase requisitions" description="Route the initial request and estimated commitment." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
         <SettingsRow icon={ShoppingCart} label="Purchase orders" description="Approve the legal commitment before receipt." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />

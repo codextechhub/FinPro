@@ -14,6 +14,7 @@ import { DataTable, StatusPill, DetailDrawer, InfoHint, useActiveEntity, type Co
 import { useCan } from "@/components/finance-ui/can";
 import { P } from "../../permissions";
 import { EmptyState } from "@/components/finance-ui/states";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { SearchSelect } from "@/components/custom/search-select";
 import { cn } from "@/lib/utils";
 import { useGetAuditLogQuery, useGetAuditFacetsQuery } from "@/redux/services/finance/setup-api";
@@ -206,7 +207,7 @@ export default function FinanceAuditPage() {
   ];
 
   if (!entity) return <FinanceShell><PageShell><NoEntityState /></PageShell></FinanceShell>;
-  if (!canAudit) return <FinanceShell><PageShell><EmptyState title="No audit access" message="The finance audit trail needs finance.audit.view, which is a restricted grant." /></PageShell></FinanceShell>;
+  if (!canAudit) return <FinanceShell><PageShell><EmptyState title="No audit access" message={noAccessMessage("view the finance audit trail")} /></PageShell></FinanceShell>;
 
   return (
     <FinanceShell>

@@ -9,6 +9,7 @@ import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LoadingState,
   PostingRecap, StatusPill, TabStrip, toArray, useActiveEntity, type Column,
   type TabStripItem, PostingDateField,} from "@/components/finance-ui";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,7 +79,7 @@ export default function GoodsReceiptsPage() {
     return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view goods receipts." /></PageShell></ProcurementShell>;
   }
   if (!canPROC_VIEW_GOODS_RECEIPTS) {
-    return <ProcurementShell><PageShell><EmptyState title="No goods receipts access" message="This screen needs procurement.goods_receipt.view." /></PageShell></ProcurementShell>;
+    return <ProcurementShell><PageShell><EmptyState title="No goods receipts access" message={noAccessMessage("view goods receipts")} /></PageShell></ProcurementShell>;
   }
 
   return (

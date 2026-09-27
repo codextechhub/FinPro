@@ -11,12 +11,15 @@ import { toast } from "sonner";
 import { ProcurementShell } from "./procurement-shell";
 import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
+import { useServesPath } from "../../lib/host-routes";
+import { approvalWorkflowLink } from "./approval-workflow-link";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LoadingState,
   MoneyInput, StatCard, StatusPill, TabStrip, toArray, useActiveEntity, type Column,
   type TabStripItem,
 } from "@/components/finance-ui";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../host";
 import { Button } from "@/components/ui/button";
@@ -41,7 +44,6 @@ import {
 } from "@/redux/services/dashboard/workflow-api";
 import type { VoteAction } from "@/redux/services/dashboard/workflow-types";
 import { useGetCostCentersQuery } from "@/redux/services/finance/setup-api";
-import { routesPath } from "@/routes/routes-path";
 import { formatMoney } from "@/utils/money";
 import { formatQuantity } from "@/utils/quantity";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
@@ -171,7 +173,7 @@ export default function RequisitionsPage() {
   );
 
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its requisitions." /></PageShell></ProcurementShell>;
-  if (!canPROC_VIEW_REQUISITIONS) return <ProcurementShell><PageShell><EmptyState title="No requisitions access" message="This screen needs procurement.requisition.view." /></PageShell></ProcurementShell>;
+  if (!canPROC_VIEW_REQUISITIONS) return <ProcurementShell><PageShell><EmptyState title="No requisitions access" message={noAccessMessage("view requisitions")} /></PageShell></ProcurementShell>;
 
   return (
     <ProcurementShell>
@@ -244,6 +246,7 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
   id: number | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const navigate = useNavigate();
+  const servesPath = useServesPath();
   const user = useAppSelector((state) => state.auth.user);
   const uid = user?.id == null ? "" : String(user.id);
   const { name } = useUserDirectory();
@@ -264,6 +267,7 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
     const stages = (workflow?.stage_instances ?? []).filter((stage) => stage.status === "ACTIVE");
     return stages.length ? stages.reduce((latest, stage) => stage.attempt > latest.attempt ? stage : latest) : undefined;
   }, [workflow]);
+  const workflowLink = approvalWorkflowLink(workflowId, workflow?.requested_by, uid, servesPath);
   const canVote = !!activeStage && workflow?.status === "IN_PROGRESS"
     && activeStage.eligible_approvers.some((approver) => sameId(approver.user, uid) && approver.attempt === activeStage.attempt)
     && !activeStage.actions.some((action) => sameId(action.actor, uid) && !action.reversed_at && !action.is_reversal_of && action.attempt === activeStage.attempt);
@@ -321,7 +325,7 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
               {req.status === "PENDING_APPROVAL" && (
                 <section className="rounded-md border border-amber-200 bg-amber-50 p-4">
                   <p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>
-                  <p className="mt-1 font-mont text-xs text-amber-800">{canVote ? "Review the request and record your decision below." : "Open the approval workflow to see who owns the current step."}</p>
+                  <p className="mt-1 font-mont text-xs text-amber-800">{canVote ? "Review the request and record your decision below." : workflowLink ? "Open the approval workflow to see who owns the current step." : "The Approval tab shows each step and the decisions recorded so far."}</p>
                   {canVote ? <>
                     <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" />
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -329,7 +333,8 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
                       <Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button>
                       <Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button>
                     </div>
-                  </> : workflowId && <Button size="sm" variant="outline" className="mt-3" onClick={() => navigate(routesPath.PROTECTED.WORKFLOW.INSTANCE_DETAIL(workflowId))}>Open approval workflow <ChevronRight className="size-4" /></Button>}
+                  </> : workflowLink ? <Button size="sm" variant="outline" className="mt-3" onClick={() => navigate(workflowLink)}>Open approval workflow <ChevronRight className="size-4" /></Button>
+                    : workflowId && <Button size="sm" variant="outline" className="mt-3" onClick={() => setTab("approval")}>View approval steps <ChevronRight className="size-4" /></Button>}
                 </section>
               )}
               <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">

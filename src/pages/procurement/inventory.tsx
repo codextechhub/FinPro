@@ -15,6 +15,7 @@ import {
   LoadingState, Money, MoneyInput, PostingRecap, Segmented, StatCard, StatusPill, TabStrip, toArray,
   useActiveEntity, type Column, type RecapRow, type TabStripItem,
   PostingDateField,} from "@/components/finance-ui";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,7 +103,7 @@ export default function InventoryPage({ section = DEFAULT_INVENTORY_SECTION }: {
     );
   }
   if (!canPROC_VIEW_STOCK) {
-    return <ProcurementShell><PageShell><EmptyState title="No inventory access" message="This screen needs procurement.stock.view." /></PageShell></ProcurementShell>;
+    return <ProcurementShell><PageShell><EmptyState title="No inventory access" message={noAccessMessage("view inventory")} /></PageShell></ProcurementShell>;
   }
   if (section === "movements") return <MovementsSection entity={entity} currency={currency} />;
   if (section === "locations") return <LocationsSection entity={entity} currency={currency} />;

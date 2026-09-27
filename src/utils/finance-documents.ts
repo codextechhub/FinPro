@@ -1,5 +1,4 @@
-import Cookies from "js-cookie";
-
+import { getAccessToken } from "@/utils/access-token";
 import { getTenantSlug } from "@/utils/tenant-context";
 
 const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
@@ -25,7 +24,8 @@ function buildUrl(path: string, params: Record<string, string | number | undefin
 /**
  * The backend serves print-ready HTML documents (@media print / @page A4); there
  * is no server-side PDF. We fetch the HTML (the endpoint needs the Bearer token,
- * so a plain navigation won't authenticate), open it in a new tab, and trigger
+ * which lives only in the host's memory, so a plain navigation won't
+ * authenticate), open it in a new tab, and trigger
  * the browser's print dialog - from which the user saves as PDF.
  */
 async function openPrintableDocument(path: string, params: Record<string, string | number | undefined>) {
@@ -35,11 +35,9 @@ async function openPrintableDocument(path: string, params: Record<string, string
   const win = window.open("", "_blank");
   if (!win) throw new Error("Allow pop-ups for this site to open the document.");
   try {
-    const token = Cookies.get("token");
+    const token = getAccessToken();
     const res = await fetch(buildUrl(path, params), {
-      headers: {
-        ...(token && token !== "undefined" ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) {
       let message = "Could not open the document.";

@@ -15,6 +15,7 @@ import {
   FormField, InfoHint, LoadingState, StatCard, StatusPill, TabStrip, toArray, useActiveEntity,
   useCan, type Column, type TabStripItem,
 } from "@/components/finance-ui";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Button } from "@/components/ui/button";
 import { QuickExportButton } from "../../host";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -145,7 +146,7 @@ export default function PurchaseOrdersPage() {
   ];
 
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its purchase orders." /></PageShell></ProcurementShell>;
-  if (!canPROC_VIEW_PURCHASE_ORDERS) return <ProcurementShell><PageShell><EmptyState title="No purchase orders access" message="This screen needs procurement.purchase_order.view." /></PageShell></ProcurementShell>;
+  if (!canPROC_VIEW_PURCHASE_ORDERS) return <ProcurementShell><PageShell><EmptyState title="No purchase orders access" message={noAccessMessage("view purchase orders")} /></PageShell></ProcurementShell>;
 
   return (
     <ProcurementShell>

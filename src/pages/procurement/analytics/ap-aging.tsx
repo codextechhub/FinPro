@@ -17,6 +17,7 @@ import { formatMoney } from "@/utils/money";
 import { isForbidden, shortDate } from "../sourcing/helpers";
 import { Field, EmptyPanel } from "../sourcing/shared";
 import { Card, ChartEmpty, DateFilter, Pill, ScopeNote, StatusDotPill, SectionHeader, type PillTone } from "./shared";
+import { paymentTermsLabel } from "../payment-terms";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   BUCKET_LABEL, TD, TDR, TFOOT, TFOOTR, TH, THR, ageColor, excludedScopeNote, kobo, todayISO,
@@ -31,13 +32,6 @@ function apStatus(buckets: Record<string, ReportMoney>): { label: string; tone: 
   return { label: "Current", tone: "green" };
 }
 
-// Short net-terms label for the vendor subtitle (e.g. "NET_30" → "Net 30"); "" when unset.
-function termsLabel(v: string): string {
-  if (!v) return "";
-  if (v === "NET_0") return "Due on receipt";
-  const m = /^NET_(\d+)$/.exec(v);
-  return m ? `Net ${m[1]}` : v;
-}
 
 // Pill tone for a single aging bucket (green current, amber 1–30, red beyond).
 function bucketTone(bucket: string): PillTone {
@@ -139,8 +133,8 @@ function ApAgingBody({ d, cash, currency, entity, asOf }: {
                     <tr key={r.vendor_id} onClick={() => setSel({ code: r.code, name: r.name })} className="cursor-pointer transition-colors hover:bg-primary/5">
                       <td className={TD}>
                         <span className="font-semibold text-gray-01">{r.name}</span>
-                        {termsLabel(r.payment_terms) && (
-                          <span className="mt-0.5 block font-mont text-[11px] text-gray-05">{termsLabel(r.payment_terms)}</span>
+                        {paymentTermsLabel(r.payment_terms) && (
+                          <span className="mt-0.5 block font-mont text-[11px] text-gray-05">{paymentTermsLabel(r.payment_terms)}</span>
                         )}
                       </td>
                       {buckets.map((b) => (

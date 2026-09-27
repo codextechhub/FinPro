@@ -15,6 +15,7 @@ import { Download, RefreshCw, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { DataTable, Money, KpiCard, DetailDrawer, TabStrip, type Column } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { PROVIDER_CHOICES, providerInfo } from "./payment-providers";
 import { formatMoney } from "@/utils/money";
 import { useGetSettlementReconciliationQuery } from "@/redux/services/payments/payments-api";
 import { downloadReportExport } from "@/utils/finance-export";
@@ -25,12 +26,8 @@ const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium"
 const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : "-");
 const signed = (kobo: number, currency?: string | null) => `${kobo < 0 ? "−" : ""}${formatMoney(Math.abs(kobo), currency)}`;
 
-const PROVIDERS: Record<string, { label: string; dot: string }> = {
-  PAYSTACK: { label: "Paystack", dot: "bg-blue-500" },
-  FAKE: { label: "Fake (test)", dot: "bg-gray-400" },
-};
 function ProviderTag({ provider }: { provider: string }) {
-  const p = PROVIDERS[provider] ?? { label: provider || "-", dot: "bg-gray-400" };
+  const p = providerInfo(provider);
   return <span className="inline-flex items-center gap-1.5 font-mont text-sm text-black-01"><span className={cn("size-2 rounded-sm", p.dot)} /> {p.label}</span>;
 }
 function TypeTag({ kind }: { kind: string }) {
@@ -131,7 +128,7 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
         <div className="flex flex-wrap items-center gap-2">
           <Select value={provider} onChange={setProvider} className="w-40">
             <option value="">All providers</option>
-            {Object.entries(PROVIDERS).map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}
+            {PROVIDER_CHOICES.map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}
           </Select>
           {/* Server-rendered, matching every other finance report - the same
               three views the tabs show, in csv / xlsx / pdf rather than the
@@ -262,5 +259,5 @@ function SettlementDrawer({ picked, currency, onClose }: { picked: Picked | null
 }
 
 function ProvidersLabel(p: string) {
-  return PROVIDERS[p]?.label ?? p ?? "-";
+  return providerInfo(p).label;
 }

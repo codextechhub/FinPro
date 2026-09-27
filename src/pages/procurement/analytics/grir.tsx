@@ -42,7 +42,7 @@ const qty = (v: string) => formatQuantity(Number(v));
 const CONTROL_WITHHELD_NOTE =
   "You are viewing one branch. The clearing balance and the difference come from the "
   + "general ledger, which is not kept per branch, so they are withheld rather than "
-  + "checked against a branch-only receipt total. The entity-wide GR/IR balance still "
+  + "checked against a branch-only receipt total. The GR/IR balance for the whole set of books still "
   + "carries them.";
 
 export default function GrirScreen({ entity, currency }: SectionProps) {

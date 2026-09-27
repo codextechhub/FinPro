@@ -1,7 +1,8 @@
 /**
  * Authenticated file download for the finance report ?export= endpoints. The
- * API is bearer-authenticated, so a plain <a href> can't carry the token - we
- * fetch the attachment with the Authorization header and save the blob.
+ * API is bearer-authenticated and the access token lives only in the host's
+ * memory, so a plain <a href> can't carry it - the attachment is fetched with
+ * the Authorization header and saved as a blob.
  *
  * This is a raw fetch, so it sits OUTSIDE RTK Query and gets none of what
  * `baseQuery` adds for free. That is the whole reason for the tenant handling
@@ -9,9 +10,9 @@
  * it makes, and a hand-rolled fetch that forgets it gets a 400 every time.
  */
 
-import Cookies from "js-cookie";
 import { toast } from "sonner";
 
+import { getAccessToken } from "@/utils/access-token";
 import { getTenantSlug } from "@/utils/tenant-context";
 
 const baseUrl = import.meta.env.VITE_BACKEND_URL;
@@ -25,7 +26,6 @@ export async function downloadReportExport(
   params: Record<string, string | number | undefined>,
   format: "csv" | "xlsx" | "pdf",
 ): Promise<void> {
-  const token = Cookies.get("token");
   const search = new URLSearchParams({ export: format });
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== "") search.set(k, String(v));
@@ -38,6 +38,7 @@ export async function downloadReportExport(
     if (slug) search.set("tenant", slug);
   }
   try {
+    const token = getAccessToken();
     const res = await fetch(`${baseUrl}${path}?${search.toString()}`, {
       headers: { Authorization: token ? `Bearer ${token}` : "", accept: "*/*" },
     });

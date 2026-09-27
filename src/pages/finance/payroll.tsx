@@ -28,6 +28,7 @@ import { useGetBranchOptionsQuery, type BranchOption } from "@/redux/services/te
 import { FinanceShell } from "./finance-shell";
 import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, useFieldAccess, fieldWriteErrors, toArray, type Column, type FieldAccess, type FieldErrors, type TabStripItem, PostingDateField,} from "@/components/finance-ui";
 import { EmptyState } from "@/components/finance-ui/states";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -140,7 +141,7 @@ export default function PayrollPage() {
   const { can } = useCan();
   const canPayroll = can(P.FIN_VIEW_PAYROLL);
   if (!entity) return <FinanceShell><PageShell><NoEntityState /></PageShell></FinanceShell>;
-  if (!canPayroll) return <FinanceShell><PageShell><EmptyState title="No payroll access" message="Payroll needs finance.payrollrun.view. It is a restricted grant, because a run carries what each named person is paid." /></PageShell></FinanceShell>;
+  if (!canPayroll) return <FinanceShell><PageShell><EmptyState title="No payroll access" message={`${noAccessMessage("view payroll")} Payroll is granted on its own because a run shows what each person is paid.`} /></PageShell></FinanceShell>;
 
   return (
     <FinanceShell>

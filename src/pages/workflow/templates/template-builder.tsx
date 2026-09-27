@@ -68,7 +68,7 @@ const SOURCE_OPTIONS = [
 // the picker because the choice decides who can approve, and the difference
 // between a role and a group is not guessable from the name alone.
 const SOURCE_HINT: Record<string, string> = {
-  ROLE: "Whoever currently holds this role in the tenant that raised the request.",
+  ROLE: "Whoever currently holds this role in the organisation that raised the request.",
   WORKFLOW_GROUP:
     "A named pool built on the Approvers screen - people, roles and org seats mixed.",
   DYNAMIC_ROLE:
@@ -86,10 +86,17 @@ const KIND_OPTIONS = [
   { value: "APPROVAL", label: "Waits for approval" },
   { value: "BRANCH", label: "Routing only, nobody approves" },
 ];
-const SCOPE_OPTIONS = (isPlatformTenant: boolean) => [
+/**
+ * Where a stage may look for approvers. A tenant is not offered `PLATFORM`,
+ * which reaches no further than `SCHOOL` for it, unless the stage already
+ * carries it; then it stays listed so the picker shows the stored value.
+ */
+const SCOPE_OPTIONS = (isPlatformTenant: boolean, current: string) => [
   { value: "SCHOOL", label: approverScopeLabel("SCHOOL", isPlatformTenant) },
   { value: "BRANCH", label: approverScopeLabel("BRANCH", isPlatformTenant) },
-  { value: "PLATFORM", label: approverScopeLabel("PLATFORM", isPlatformTenant) },
+  ...(isPlatformTenant || current === "PLATFORM"
+    ? [{ value: "PLATFORM", label: approverScopeLabel("PLATFORM", isPlatformTenant) }]
+    : []),
 ];
 const RULE_OPTIONS = [
   { value: "ANY", label: "Any one of them" },
@@ -151,7 +158,9 @@ function formSignature(form: {
 /** What a folded stage is still carrying, so nothing hides behind the fold. */
 function advancedSummary(s: StageForm, isPlatformTenant: boolean): string | null {
   const carried: string[] = [];
-  if (s.kind === "APPROVAL" && s.approver_source !== "ORGANOGRAM" && s.approver_scope !== "SCHOOL") {
+  // Outside the platform tenant PLATFORM reaches as far as SCHOOL, so neither is worth carrying.
+  const wholeTenant = s.approver_scope === "SCHOOL" || (!isPlatformTenant && s.approver_scope === "PLATFORM");
+  if (s.kind === "APPROVAL" && s.approver_source !== "ORGANOGRAM" && !wholeTenant) {
     carried.push(approverScopeLabel(s.approver_scope, isPlatformTenant));
   }
   if (s.kind === "APPROVAL" && !s.skip_if_no_approvers) carried.push("never skipped");
@@ -1031,7 +1040,7 @@ export default function TemplateBuilder() {
                         <SearchSelect
                           id={`stage-scope-${i}`}
                           label="Approvers looked for in"
-                          options={SCOPE_OPTIONS(isPlatformTenant)}
+                          options={SCOPE_OPTIONS(isPlatformTenant, s.approver_scope)}
                           value={s.approver_scope}
                           onChange={(e) =>
                             updateStage(i, { approver_scope: e.target.value as ApproverScope })

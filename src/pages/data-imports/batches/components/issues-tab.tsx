@@ -12,7 +12,7 @@ import {
 } from "@/redux/services/dashboard/import-api";
 import type { ValidationIssueListItem, ValidationSeverity } from "@/redux/services/dashboard/import-types";
 import { SEVERITY_BADGE } from "./batch-status";
-import { triggerDownload } from "./batch-utils";
+import { triggerBlobDownload } from "./batch-utils";
 
 export function IssuesTab({ batchId }: { batchId: number }) {
   const [sev, setSev] = useState<"all" | ValidationSeverity>("all");
@@ -94,7 +94,7 @@ export function IssuesTab({ batchId }: { batchId: number }) {
         </div>
         <Button
           variant="white" size="sm"
-          onClick={() => triggerDownload(importDownloadUrls.validationIssuesExport(batchId), `batch_${batchId}_issues.csv`)}
+          onClick={() => triggerBlobDownload(importDownloadUrls.validationIssuesExport(batchId), `batch_${batchId}_issues.csv`)}
         >
           <Download className="size-3.5" /> Export CSV
         </Button>

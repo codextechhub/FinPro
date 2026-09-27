@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { humanizeDocumentType } from "./workflow-format";
+import { approverScopeLabel, humanizeDocumentType } from "./workflow-format";
 
 describe("humanizeDocumentType", () => {
   it("uses the server's label when the row carries one", () => {
@@ -19,5 +19,18 @@ describe("humanizeDocumentType", () => {
 
   it("calls a missing type a document", () => {
     expect(humanizeDocumentType("")).toBe("Document");
+  });
+});
+
+describe("approverScopeLabel", () => {
+  it("names the platform scope in the platform operator's words", () => {
+    expect(approverScopeLabel("PLATFORM", true)).toBe("Everyone, platform-wide");
+    expect(approverScopeLabel("SCHOOL", true)).toBe("Whole organisation");
+  });
+
+  it("never tells a school a step reaches the whole platform", () => {
+    expect(approverScopeLabel("PLATFORM", false)).toBe("Whole school (as published)");
+    expect(approverScopeLabel("SCHOOL", false)).toBe("Whole school");
+    expect(approverScopeLabel("BRANCH", false)).toBe("This branch only");
   });
 });

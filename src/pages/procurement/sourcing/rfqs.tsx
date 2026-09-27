@@ -16,6 +16,7 @@ import {
   LoadingState, Money, MoneyInput, StatCard, StatusPill, ActionButton, TabStrip, emptyLine, toArray,
   useActiveEntity, useFieldAccess, type Column, type DocLine, type TabStripItem,
 } from "@/components/finance-ui";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,7 +110,7 @@ export default function RfqsPage() {
   ];
 
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its RFQs." /></PageShell></ProcurementShell>;
-  if (!canPROC_VIEW_RFQS) return <ProcurementShell><PageShell><EmptyState title="No RFQs access" message="This screen needs procurement.rfq.view." /></PageShell></ProcurementShell>;
+  if (!canPROC_VIEW_RFQS) return <ProcurementShell><PageShell><EmptyState title="No RFQs access" message={noAccessMessage("view requests for quotation")} /></PageShell></ProcurementShell>;
 
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">

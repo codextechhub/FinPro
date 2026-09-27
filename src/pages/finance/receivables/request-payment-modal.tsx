@@ -89,7 +89,7 @@ export function RequestPaymentModal({ open, onOpenChange, entity, invoiceId, doc
               </div>
             </label>
             <p className="font-mont text-[11px] text-gray-05">
-              Share this link with the customer. On payment, the receipt posts (Dr bank, Cr AR) and allocates to {docNumber} automatically - it’ll appear in the Payments tab.
+              Share this link with the customer. On payment, the receipt posts (Dr bank, Cr AR) and allocates to {docNumber} automatically - it’ll appear in the Settlements tab.
             </p>
             <div className="flex items-center justify-end pt-1">
               <Button onClick={close}>Done</Button>

@@ -42,6 +42,7 @@ import {
   AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, plural,
 } from "../finance/dashboard-cards";
 import { greeting } from "../finance/dashboard-words";
+import { useServesPath } from "../../lib/host-routes";
 
 const R = routesPath.PROTECTED.PROCUREMENT;
 type D = Dashboard;
@@ -387,7 +388,9 @@ export default function ProcurementDashboard() {
   const navigate = useNavigate();
   const { code: entity, currency: entityCurrency } = useActiveEntity();
   const { can } = useCan();
-  const canAudit = can(P.VIEW_AUDIT);
+  const servesPath = useServesPath();
+  // The platform audit log is a console screen; a host that does not mount it gets no link.
+  const canAudit = can(P.VIEW_AUDIT) && servesPath(routesPath.PROTECTED.AUDIT.EVENTS);
   // The window is per-entity: a choice made on one set of books is ignored on another.
   const [picked, setPicked] = useState({ entity: "", window: "" });
   const windowKey = picked.entity === entity ? picked.window : "";

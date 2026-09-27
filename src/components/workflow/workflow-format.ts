@@ -106,13 +106,20 @@ export function approverSummary(
  * platform operator that their approval step is "scoped to school" describes
  * their own organisation as a customer, so the label follows the viewer while
  * the value stays exactly what the engine stores.
+ *
+ * `PLATFORM` is a platform operator's word. The engine narrows approvers only
+ * for `BRANCH`, so outside the platform tenant a `PLATFORM` step looks across
+ * the whole school exactly as a `SCHOOL` one does, and is labelled that way,
+ * marked as the published setting so the two stay distinguishable in a picker.
  */
 export function approverScopeLabel(
   scope: ApproverScope | string,
   isPlatformTenant = false,
 ): string {
   if (scope === "BRANCH") return "This branch only";
-  if (scope === "PLATFORM") return "Everyone, platform-wide";
+  if (scope === "PLATFORM") {
+    return isPlatformTenant ? "Everyone, platform-wide" : "Whole school (as published)";
+  }
   if (scope === "SCHOOL") return isPlatformTenant ? "Whole organisation" : "Whole school";
   return String(scope);
 }

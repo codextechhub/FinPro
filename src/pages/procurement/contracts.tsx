@@ -15,6 +15,7 @@ import {
   Money, MoneyInput, StatCard, StatusPill, ActionButton, TabStrip, toArray, useActiveEntity,
   type Column, type TabStripItem,
 } from "@/components/finance-ui";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ import { isForbidden, shortDate } from "./sourcing/helpers";
 import { ContractRenewButton } from "./procurement-action-gates";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { PAYMENT_TERMS, paymentTermsLabel } from "./payment-terms";
 
 const STATUS_TABS = [
   ["All", ""], ["Active", "ACTIVE"], ["Expiring", "EXPIRING"], ["Expired", "EXPIRED"],
@@ -54,9 +56,6 @@ const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label,
   value,
   label: <><Icon className="size-3.5" />{label}</>,
 }));
-
-const PAYMENT_TERMS = ["IMMEDIATE", "NET_7", "NET_14", "NET_30", "NET_60", "NET_90"];
-const termLabel = (t: string) => (t === "IMMEDIATE" ? "Immediate" : t.replace("NET_", "Net "));
 
 // The amber "Expired" overlay pill - an ACTIVE contract past its end_date; shown
 // alongside, never replacing, the persisted status.
@@ -104,7 +103,7 @@ export default function ContractsPage() {
   ];
 
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its contracts." /></PageShell></ProcurementShell>;
-  if (!canPROC_VIEW_CONTRACTS) return <ProcurementShell><PageShell><EmptyState title="No contracts access" message="This screen needs procurement.contract.view." /></PageShell></ProcurementShell>;
+  if (!canPROC_VIEW_CONTRACTS) return <ProcurementShell><PageShell><EmptyState title="No contracts access" message={noAccessMessage("view contracts")} /></PageShell></ProcurementShell>;
 
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
@@ -158,8 +157,13 @@ function ContractDrawer({ id, entity, currency, onClose }: { id: number | null; 
   const [activate] = useActivateContractMutation();
   const [terminate] = useTerminateContractMutation();
 
+  // What the backend accepts from each status: a draft or live contract may be
+  // edited, only a live one terminated, and a live or expired one renewed.
+  // Expired, terminated and renewed contracts are settled records.
   const isDraft = c?.status === "DRAFT";
-  const canRenewTerminate = c?.status === "ACTIVE" || c?.status === "EXPIRED";
+  const canEdit = isDraft || c?.status === "ACTIVE";
+  const canTerminate = c?.status === "ACTIVE";
+  const canRenew = c?.status === "ACTIVE" || c?.status === "EXPIRED";
 
   return <>
     <DetailDrawer
@@ -168,10 +172,10 @@ function ContractDrawer({ id, entity, currency, onClose }: { id: number | null; 
       description={c ? `${c.title} · ${c.vendor_name || c.vendor_code}` : "Loading contract"}
       widthClass="sm:max-w-2xl"
       footer={c && <>
-        {(isDraft || canRenewTerminate) && <Can permission={P.PROC_UPDATE_CONTRACT}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
+        {canEdit && <Can permission={P.PROC_UPDATE_CONTRACT}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
         {isDraft && <ActionButton label="Activate" permission={P.PROC_ACTIVATE_CONTRACT} title="Activate this contract?" description={`Brings ${c.reference} into force. Requires a start and end date and an eligible vendor.`} onConfirm={async () => { const r = await activate({ id: c.id, entity }).unwrap(); toast.success(r.message || "Contract activated."); }} />}
-        {canRenewTerminate && <ContractRenewButton onClick={() => setRenewing(true)} />}
-        {canRenewTerminate && <ActionButton label="Terminate" permission={P.PROC_TERMINATE_CONTRACT} destructive title="Terminate this contract?" description={`Ends ${c.reference} early. This cannot be undone.`} confirmText="Terminate" onConfirm={async () => { const r = await terminate({ id: c.id, entity, reason: reason.trim() || undefined }).unwrap(); toast.success(r.message || "Contract terminated."); setReason(""); }}><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (optional)" className="bg-white" /></ActionButton>}
+        {canRenew && <ContractRenewButton onClick={() => setRenewing(true)} />}
+        {canTerminate && <ActionButton label="Terminate" permission={P.PROC_TERMINATE_CONTRACT} destructive title="Terminate this contract?" description={`Ends ${c.reference} early. This cannot be undone.`} confirmText="Terminate" onConfirm={async () => { const r = await terminate({ id: c.id, entity, reason: reason.trim() || undefined }).unwrap(); toast.success(r.message || "Contract terminated."); setReason(""); }}><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (optional)" className="bg-white" /></ActionButton>}
       </>}
     >
       {isLoading ? <LoadingState rows={8} /> : isError || !c ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
@@ -206,7 +210,7 @@ function ContractDrawer({ id, entity, currency, onClose }: { id: number | null; 
 
         {tab === "terms" && (
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">
-            <Field label="Payment terms" value={termLabel(c.payment_terms)} />
+            <Field label="Payment terms" value={paymentTermsLabel(c.payment_terms) || "-"} />
             <Field label="Renewal notice" value={`${c.renewal_notice_days} days`} />
             <Field label="Auto-renew" value={c.auto_renew ? "Yes" : "No"} />
             <div className="sm:col-span-2"><dt className="font-mont text-[11px] text-gray-05">Notes</dt><dd className="mt-1 font-mont text-sm text-black-01">{c.notes || "-"}</dd></div>
@@ -394,7 +398,7 @@ function ContractForm({ entity, currency, initial, onClose }: { entity: string; 
         <FormField label="Contract value"><MoneyInput valueKobo={value} onChangeKobo={setValue} currency={currency} /></FormField>
         <FormField label="Payment terms">
           <select value={terms} onChange={(e) => setTerms(e.target.value)} className="h-9 w-full rounded-md border bg-white px-2 font-mont text-sm">
-            {PAYMENT_TERMS.map((t) => <option key={t} value={t}>{termLabel(t)}</option>)}
+            {PAYMENT_TERMS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </FormField>
         <FormField label="Renewal notice (days)"><Input type="number" min="0" max="365" value={noticeDays} onChange={(e) => setNoticeDays(e.target.value)} className="bg-white tabular-nums" /></FormField>
