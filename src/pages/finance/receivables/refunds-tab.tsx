@@ -552,7 +552,8 @@ function NewActionDrawer({ open, onClose, entity, currency }: {
           </FormField>
         ) : (
           <FormField label="Refund to bank account" required>
-            <BankAccountPicker entity={entity} value={bankAccount} onChange={setBankAccount} />
+            <BankAccountPicker entity={entity} value={bankAccount} onChange={setBankAccount}
+              documentBranchId={(liveRefundCustomer ?? selectedRefundCustomer)?.branch_id} />
           </FormField>
         )}
 

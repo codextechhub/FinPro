@@ -6,6 +6,10 @@
  * empty. The tagged chart names the control accounts without any balance and
  * is readable on any finance key; the picker must use it and offer only the
  * postable asset accounts tagged CONTROL.
+ *
+ * The bank account picker offers, for a document of a branch, only that
+ * branch's accounts and the school-wide ones: Mrs Okafor covers Ikeja and Lekki,
+ * and paying an Ikeja claim from Lekki's account is refused by the server.
  */
 
 import { act } from "react";
@@ -53,7 +57,19 @@ vi.mock("@/redux/services/finance/setup-api", () => ({
   },
 }));
 
-import { ReceivableAccountPicker } from "./pickers";
+const bank = (id: number, name: string, branch_id: number | null) =>
+  ({ id, name, bank_name: "", branch_id, is_active: true });
+
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetTaxObligationsQuery: () => ({ data: undefined, isLoading: false }),
+  useGetPettyCashFundsQuery: () => ({ data: undefined, isLoading: false }),
+  useGetBankAccountsQuery: () => ({
+    isLoading: false,
+    data: { data: [bank(1, "Ikeja Collections", 10), bank(2, "Lekki Collections", 20), bank(3, "GTBank Operations", null)] },
+  }),
+}));
+
+import { BankAccountPicker, ReceivableAccountPicker } from "./pickers";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -85,5 +101,21 @@ describe("ReceivableAccountPicker", () => {
     act(() => root.render(<ReceivableAccountPicker entity="HOLYCROSS" value="" onChange={() => undefined} />));
 
     expect(mocks.options).toEqual([{ value: "1200", label: "1200 · Accounts Receivable" }]);
+  });
+});
+
+describe("BankAccountPicker", () => {
+  const offered = () => mocks.options.map((o) => o.label);
+
+  it("offers a branch's document its own branch's accounts and the school-wide ones", () => {
+    act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={10} />));
+
+    expect(offered()).toEqual(["Ikeja Collections", "GTBank Operations"]);
+  });
+
+  it("offers a school-wide document every account", () => {
+    act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={null} />));
+
+    expect(offered()).toEqual(["Ikeja Collections", "Lekki Collections", "GTBank Operations"]);
   });
 });

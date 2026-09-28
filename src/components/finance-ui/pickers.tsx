@@ -100,11 +100,19 @@ export function PettyCashFundPicker({ entity, value, onChange, label, placeholde
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} />;
 }
 
-/** Bank account picker - entity's named bank accounts; reports the account id. */
-export function BankAccountPicker({ entity, value, onChange, label, placeholder = "Select bank account", isRequired, disabled }: PickerProps) {
+/**
+ * Bank account picker - entity's named bank accounts; reports the account id.
+ *
+ * `documentBranchId` is the branch of the document being paid. A branch's
+ * document is paid from that branch's account or a school-wide one, and the
+ * server refuses any other, so with a branch given only those are offered.
+ * Null (a school-wide document) or absent offers every account in the list.
+ */
+export function BankAccountPicker({ entity, value, onChange, label, placeholder = "Select bank account", isRequired, disabled, documentBranchId }: PickerProps & { documentBranchId?: number | null }) {
   const { data, isLoading } = useGetBankAccountsQuery({ entity, page: 1 });
   const options = toArray(data?.data)
     .filter((a) => a.is_active)
+    .filter((a) => documentBranchId == null || a.branch_id == null || a.branch_id === documentBranchId)
     .map((a) => ({ value: String(a.id), label: a.bank_name ? `${a.name} · ${a.bank_name}` : a.name }));
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} />;
 }

@@ -246,7 +246,7 @@ function AcquireDrawer({ asset, entity, currency, onClose }: { asset: FixedAsset
         <p className="rounded-md border border-gray-03 bg-gray-03/40 px-3 py-2 font-mont text-[11px] text-gray-05">
           Capitalises the cost - Dr PP&E, Cr the funding account - and lays down the straight-line depreciation schedule.
         </p>
-        <FormField label="Funded from (bank account)" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} /></FormField>
+        <FormField label="Funded from (bank account)" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={asset.branch_id} /></FormField>
       </div>
     </DetailDrawer>
   );
@@ -289,7 +289,7 @@ function DisposeDrawer({ asset, entity, currency, onClose }: { asset: FixedAsset
           <PostingDateField label="Disposal date" entity={entity} value={date} onChange={setDate} />
           <FormField label="Proceeds"><MoneyInput valueKobo={proceeds} onChangeKobo={setProceeds} currency={currency} className="[&_input]:h-9" /></FormField>
         </div>
-        {proceeds > 0 ? <FormField label="Proceeds into (bank)" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} /></FormField> : null}
+        {proceeds > 0 ? <FormField label="Proceeds into (bank)" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={asset.branch_id} /></FormField> : null}
         {needsGl ? <FormField label={gainLoss >= 0 ? "Gain account (income)" : "Loss account (expense)"} required><AccountPicker entity={entity} value={glAccount} onChange={setGlAccount} accountType="INCOME,EXPENSE" postableOnly /></FormField> : null}
         <div className="flex items-center justify-between rounded-md border border-gray-03 bg-gray-03/40 px-3 py-2">
           <span className="font-mont text-[11px] text-gray-05">{gainLoss >= 0 ? "Gain on disposal" : "Loss on disposal"}</span>

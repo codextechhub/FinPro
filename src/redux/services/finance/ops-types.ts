@@ -7,6 +7,8 @@
 // ── Banking ──────────────────────────────────────────────────────────────────
 export interface BankAccount {
   id: number;
+  // The branch it belongs to; null is school-wide.
+  branch_id?: number | null;
   name: string;
   bank_name: string;
   account_number?: string; // Field Access: finance.bankaccount
@@ -131,6 +133,8 @@ export interface ExpenseClaimLine {
 
 export interface ExpenseClaim {
   id: number;
+  // The branch it belongs to; null is school-wide.
+  branch_id?: number | null;
   document_number: string;
   claimant_id: number | null;
   claimant_name: string;
@@ -153,6 +157,8 @@ export interface ExpenseClaim {
 // ── Petty cash ───────────────────────────────────────────────────────────────
 export interface PettyCashFund {
   id: number;
+  // The branch it belongs to; null is school-wide.
+  branch_id?: number | null;
   name: string;
   gl_account: string;
   gl_account_id: number;
@@ -420,6 +426,8 @@ export interface DepreciationScheduleRow {
 
 export interface FixedAsset {
   id: number;
+  // The branch it belongs to; null is school-wide.
+  branch_id?: number | null;
   document_number: string;
   name: string;
   asset_code: string;

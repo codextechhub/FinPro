@@ -335,7 +335,7 @@ function ReplenishDrawer({ fund, entity, currency, onClose }: { fund: PettyCashF
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
           Tops the tin back up to its {formatMoney(fund.float_amount, currency)} ceiling (Dr petty cash, Cr bank).
         </p>
-        <FormField label="Bank account"><BankAccountPicker entity={entity} value={bank} onChange={setBank} placeholder="Default cash/bank" /></FormField>
+        <FormField label="Bank account"><BankAccountPicker entity={entity} value={bank} onChange={setBank} placeholder="Default cash/bank" documentBranchId={fund.branch_id} /></FormField>
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></FormField>
           <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />

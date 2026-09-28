@@ -93,6 +93,8 @@ export interface RefundAvailabilityCustomer {
   customer_id: number;
   customer_code: string;
   customer_name: string;
+  // The customer's branch, which the refund inherits; null is school-wide.
+  branch_id?: number | null;
   refundable_credit: number;
   refundable_credit_naira: string;
 }
