@@ -311,7 +311,10 @@ export function BatchAdjustmentDrawer({
             </FormField>
           ) : (
             <FormField label="Refund bank account" required>
-              <BankAccountPicker entity={entity} value={bankAccount} onChange={setBankAccount} />
+              <BankAccountPicker
+                entity={entity} value={bankAccount} onChange={setBankAccount}
+                documentBranchIds={lines.map((line) => refundTargets.find((c) => c.customer_code === line.target)?.branch_id)}
+              />
             </FormField>
           )}
         </div>

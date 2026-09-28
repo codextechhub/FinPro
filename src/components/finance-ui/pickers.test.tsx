@@ -119,3 +119,19 @@ describe("BankAccountPicker", () => {
     expect(offered()).toEqual(["Ikeja Collections", "Lekki Collections", "GTBank Operations"]);
   });
 });
+
+describe("BankAccountPicker for a batch", () => {
+  const offered = () => mocks.options.map((o) => o.label);
+
+  it("offers lines of one branch that branch's accounts and the school-wide ones", () => {
+    act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchIds={[10, null, 10]} />));
+
+    expect(offered()).toEqual(["Ikeja Collections", "GTBank Operations"]);
+  });
+
+  it("offers lines of two branches only the school-wide accounts", () => {
+    act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchIds={[10, 20]} />));
+
+    expect(offered()).toEqual(["GTBank Operations"]);
+  });
+});

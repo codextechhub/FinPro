@@ -107,12 +107,17 @@ export function PettyCashFundPicker({ entity, value, onChange, label, placeholde
  * document is paid from that branch's account or a school-wide one, and the
  * server refuses any other, so with a branch given only those are offered.
  * Null (a school-wide document) or absent offers every account in the list.
+ *
+ * `documentBranchIds` is the same rule for one account shared by several
+ * documents, as a batch of refunds is: an account is offered only when every
+ * document may use it, so lines from two branches leave the school-wide ones.
  */
-export function BankAccountPicker({ entity, value, onChange, label, placeholder = "Select bank account", isRequired, disabled, documentBranchId }: PickerProps & { documentBranchId?: number | null }) {
+export function BankAccountPicker({ entity, value, onChange, label, placeholder = "Select bank account", isRequired, disabled, documentBranchId, documentBranchIds }: PickerProps & { documentBranchId?: number | null; documentBranchIds?: (number | null | undefined)[] }) {
   const { data, isLoading } = useGetBankAccountsQuery({ entity, page: 1 });
+  const branches = [documentBranchId, ...(documentBranchIds ?? [])].filter((b): b is number => b != null);
   const options = toArray(data?.data)
     .filter((a) => a.is_active)
-    .filter((a) => documentBranchId == null || a.branch_id == null || a.branch_id === documentBranchId)
+    .filter((a) => a.branch_id == null || branches.every((b) => b === a.branch_id))
     .map((a) => ({ value: String(a.id), label: a.bank_name ? `${a.name} · ${a.bank_name}` : a.name }));
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} />;
 }
