@@ -416,7 +416,7 @@ export default function ViewBatch() {
           </div>
 
           {tab === "issues" && <IssuesTab batchId={batchId} />}
-          {tab === "jobs" && <JobsTab batchId={batchId} batchStatus={batch.status} />}
+          {tab === "jobs" && <JobsTab batchId={batchId} batchStatus={batch.status} datasetType={batch.dataset_type} />}
           {tab === "rows" && <RowResultsTab batchId={batchId} latestJobId={latestJob?.id ?? null} />}
           {tab === "audit" && <AuditLogsTab batchId={batchId} />}
           {tab === "notifications" && <NotificationsTab batchId={batchId} />}

@@ -1,10 +1,16 @@
 /**
- * A bank account's number follows Field Access on `finance.bankaccount`.
+ * The bank account drawer.
+ *
+ * A bank account's number follows Field Access on `finance.bankaccount`:
  *
  *   1. hidden: the settings form has no Account number field at all;
  *   2. read-only: the field is shown greyed and a save does not send it;
  *   3. a refused save shows the backend's message under the field it names,
  *      not as a generic toast.
+ *
+ * A bulk-imported statement is corrected from its own row: it offers a
+ * rollback while the server names the import that published it, and the
+ * rollback goes to that batch and job.
  */
 
 import { act } from "react";
@@ -14,6 +20,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   fieldAccess: {} as Record<string, unknown>,
   update: vi.fn(),
+  rollback: vi.fn(),
+  dispatch: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -36,10 +44,16 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   AccountPicker: () => null,
 }));
 
+vi.mock("@/redux/services/dashboard/import-api", () => ({
+  useCancelImportBatchMutation: () => [vi.fn(), { isLoading: false }],
+  useRollbackImportJobMutation: () => [mocks.rollback, { isLoading: false }],
+}));
+vi.mock("@/redux/store", () => ({ useAppDispatch: () => mocks.dispatch }));
+
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { SettingsTab } from "./banking";
-import type { BankAccount } from "@/redux/services/finance/ops-types";
+import { SettingsTab, StatementsTab } from "./banking";
+import type { BankAccount, BankStatement } from "@/redux/services/finance/ops-types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -56,6 +70,8 @@ let root: Root;
 beforeEach(() => {
   mocks.fieldAccess = {};
   mocks.update.mockReset();
+  mocks.rollback.mockReset();
+  mocks.dispatch.mockReset();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -64,6 +80,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  document.body.innerHTML = "";
 });
 
 const accountNumberField = () => container.querySelector("fieldset[data-field=account_number]");
@@ -117,5 +134,54 @@ describe("Bank account settings under Field Access", () => {
     await act(async () => { saveButton().click(); });
     const alert = accountNumberField()!.querySelector("[role=alert]");
     expect(alert?.textContent).toBe("You do not have permission to change this field.");
+  });
+});
+
+const statement = (over: Partial<BankStatement>): BankStatement => ({
+  id: 1, statement_date: "2026-03-31", period_label: "March 2026",
+  opening_balance: 0, opening_balance_naira: "0.00",
+  closing_balance: 0, closing_balance_naira: "0.00",
+  line_count: 2, status: "UPLOADED", status_display: "Uploaded",
+  can_edit: false, edit_block_reason: "Bulk-imported statements must be rolled back and re-imported.",
+  import_rollback: null,
+  ...over,
+});
+
+const render = (statements: BankStatement[]) =>
+  act(() =>
+    root.render(<StatementsTab detail={{ statements }} canEdit onEdit={() => {}} />),
+  );
+
+const rollBackButton = (label: string) =>
+  container.querySelector<HTMLButtonElement>(`button[aria-label="Roll back statement ${label}"]`);
+
+describe("StatementsTab rollback", () => {
+  it("offers a rollback only on a statement the server names an import for", () => {
+    render([
+      statement({ id: 1, period_label: "March 2026", import_rollback: { batch_id: 40, job_id: 41 } }),
+      statement({ id: 2, period_label: "February 2026", can_edit: true, edit_block_reason: null }),
+    ]);
+    expect(rollBackButton("March 2026")).not.toBeNull();
+    expect(rollBackButton("February 2026")).toBeNull();
+  });
+
+  it("rolls back the named batch and job with the reason given", async () => {
+    mocks.rollback.mockReturnValue({ unwrap: () => Promise.resolve({}) });
+    render([statement({ import_rollback: { batch_id: 40, job_id: 41 } })]);
+
+    await act(async () => rollBackButton("March 2026")!.click());
+    const reason = document.querySelector<HTMLTextAreaElement>("textarea")!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+      setter.call(reason, "  Imported into the wrong account ");
+      reason.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const confirm = [...document.querySelectorAll("button")].find((b) => b.textContent === "Roll back statement")!;
+    await act(async () => confirm.click());
+
+    expect(mocks.rollback).toHaveBeenCalledWith({
+      batchId: 40, jobId: 41, reason: "Imported into the wrong account",
+    });
+    expect(mocks.dispatch).toHaveBeenCalled();
   });
 });

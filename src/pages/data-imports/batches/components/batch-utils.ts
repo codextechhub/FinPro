@@ -1,6 +1,7 @@
 // Small helpers shared by the batch-detail page and its tabs.
 import { toast } from "sonner";
 
+import { P, type PermissionCode } from "@/permissions";
 import { getAccessToken } from "@/utils/access-token";
 
 // RTK responses are sometimes wrapped in a { data } envelope; this normalises.
@@ -38,4 +39,21 @@ export async function triggerBlobDownload(url: string, filename: string) {
   } catch {
     toast.error("Download failed. Please try again.");
   }
+}
+
+/**
+ * Whether this reader may roll back a job of a batch of `dataset`.
+ *
+ * The engine's rollback key covers every batch. The bank-statement import key
+ * also covers a bank-statement batch and no other, because a bulk-imported
+ * statement is corrected by rolling it back and importing it again. The server
+ * applies the same rule (`_DATASET_EXTRA_ENGINE_KEYS`), and the school app's
+ * import wizard spells it as `canRollBackImport`.
+ */
+export function canRollBackBatch(
+  dataset: string | undefined,
+  hasPermission: (code: PermissionCode) => boolean,
+): boolean {
+  if (hasPermission(P.RUN_IMPORT_ROLLBACK)) return true;
+  return dataset === "bank_statements" && hasPermission(P.FIN_IMPORT_BANK);
 }

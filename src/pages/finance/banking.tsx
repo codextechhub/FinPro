@@ -16,13 +16,14 @@ import { useNavigate } from "react-router";
 import { useActionParam } from "@/hooks/use-action-param";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, Upload, RefreshCw, ListChecks, FileText, History, Settings as SettingsIcon, ArrowLeftRight, ChevronDown, Rows3, FileSpreadsheet, Download, Pencil } from "lucide-react";
+import { Plus, Search, Trash2, Upload, RefreshCw, ListChecks, FileText, History, Settings as SettingsIcon, ArrowLeftRight, ChevronDown, Rows3, FileSpreadsheet, Download, Pencil, Undo2 } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
 import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, AccessField, useFieldAccess, fieldWriteErrors, type Column, type TabStripItem, type FieldErrors } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   DropdownMenu,
@@ -48,7 +49,7 @@ import {
   useUpdateBankStatementMutation, useDeleteBankStatementLineMutation,
 } from "@/redux/services/finance/ops-api";
 import type { BankAccount, BankStatementDetail } from "@/redux/services/finance/ops-types";
-import { useCancelImportBatchMutation } from "@/redux/services/dashboard/import-api";
+import { useCancelImportBatchMutation, useRollbackImportJobMutation } from "@/redux/services/dashboard/import-api";
 import { baseApi } from "@/redux/services/base-api";
 import { useAppDispatch } from "@/redux/store";
 import { routesPath } from "@/routes/routes-path";
@@ -251,7 +252,7 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
         }
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MetricCard label="Book balance" kobo={m?.book_balance ?? account.book_balance} currency={currency} />
             <MetricCard label="Statement balance" kobo={m?.statement_balance ?? 0} currency={currency} />
             <MetricCard label="Unreconciled diff" kobo={m?.unreconciled_diff ?? 0} currency={currency} danger />
@@ -401,7 +402,17 @@ function StatementLinesTab({ id, entity, currency }: { id: number; entity: strin
   );
 }
 
-function StatementsTab({
+/**
+ * The statements imported into one bank account.
+ *
+ * A statement keyed in by hand is corrected in place. A bulk-imported one is
+ * not, so its lines stay the ones the file carried: it is rolled back from its
+ * own row and the file imported again. The row offers that rollback only while
+ * the server says it would succeed (`import_rollback`), and to the holders of
+ * the bank-statement import key, whom the rollback endpoint accepts for a
+ * statement batch.
+ */
+export function StatementsTab({
   detail,
   currency,
   canEdit,
@@ -412,9 +423,30 @@ function StatementsTab({
   canEdit: boolean;
   onEdit: (statementId: number) => void;
 }) {
+  const dispatch = useAppDispatch();
+  const [rollingBack, setRollingBack] = useState<import("@/redux/services/finance/ops-types").BankStatement | null>(null);
+  const [reason, setReason] = useState("");
+  const [rollback, { isLoading: isRollingBack }] = useRollbackImportJobMutation();
   const sts = detail?.statements ?? [];
+
+  const close = () => {
+    setRollingBack(null);
+    setReason("");
+  };
+  const confirmRollback = async () => {
+    const target = rollingBack?.import_rollback;
+    if (!target) return;
+    try {
+      await rollback({ batchId: target.batch_id, jobId: target.job_id, reason: reason.trim() }).unwrap();
+      toast.success("Statement rolled back. Import the corrected file to replace it.");
+      dispatch(baseApi.util.invalidateTags(["FinanceBankAccounts", "FinanceStatementLines"]));
+      close();
+    } catch { /* central */ }
+  };
+
   if (sts.length === 0) return <EmptyState title="No statements" message="Imported statement batches appear here." />;
   return (
+    <>
     <div className="overflow-hidden rounded-md border border-white-02">
       <table className="w-full border-collapse">
         <thead><tr>
@@ -433,7 +465,18 @@ function StatementsTab({
               <td className={cn(tdCls, "text-right tabular-nums text-gray-05")}>{s.line_count}</td>
               <td className={tdCls}><span className={cn(PILL, s.status === "RECONCILED" ? "bg-green-01/10 text-green-01" : "bg-amber-50 text-amber-700")}>{s.status_display}</span></td>
               {canEdit ? (
-                <td className={cn(tdCls, "text-right")}>
+                <td className={cn(tdCls, "text-right whitespace-nowrap")}>
+                  {s.import_rollback ? (
+                    <button
+                      type="button"
+                      onClick={() => setRollingBack(s)}
+                      title="Roll back this import"
+                      aria-label={`Roll back statement ${s.period_label || s.statement_date}`}
+                      className="rounded p-1.5 text-gray-05 hover:bg-destructive/5 hover:text-destructive"
+                    >
+                      <Undo2 className="size-3.5" />
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => onEdit(s.id)}
@@ -451,6 +494,27 @@ function StatementsTab({
         </tbody>
       </table>
     </div>
+    <ConfirmActionModal
+      open={rollingBack !== null}
+      onOpenChange={(open) => !open && close()}
+      title="Roll back this statement?"
+      description={`This removes the ${rollingBack?.period_label || "imported"} statement and its ${rollingBack?.line_count ?? 0} lines, so you can import the corrected file. The rollback is kept in the import's history.`}
+      confirmText="Roll back statement"
+      destructive
+      loading={isRollingBack}
+      onConfirm={confirmRollback}
+    >
+      <label className="block space-y-1.5">
+        <span className="font-mont text-xs font-medium text-black-01">Reason</span>
+        <Textarea
+          rows={3}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          placeholder="For example: imported into the wrong account"
+        />
+      </label>
+    </ConfirmActionModal>
+    </>
   );
 }
 

@@ -56,6 +56,12 @@ export interface BankStatement {
   status_display: string;
   can_edit: boolean;
   edit_block_reason: string | null;
+  /**
+   * The import job to roll back to correct a bulk-imported statement. Null
+   * for a statement keyed in by hand, and for one the rollback would refuse
+   * (reconciled, or with a line already acted on).
+   */
+  import_rollback: { batch_id: number; job_id: number } | null;
 }
 
 export interface BankReconciliationRun {

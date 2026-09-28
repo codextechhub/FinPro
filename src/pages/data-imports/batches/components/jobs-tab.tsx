@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import PermissionGate from "@/components/custom/permission-gate";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { P } from "@/permissions";
+import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatRelativeDate } from "@/utils/helpers";
@@ -21,8 +20,18 @@ import {
 } from "@/redux/services/dashboard/import-api";
 import type { BatchStatus, ImportJobListItem } from "@/redux/services/dashboard/import-types";
 import { IN_FLIGHT, JOB_STATUS_BADGE } from "./batch-status";
+import { canRollBackBatch } from "./batch-utils";
 
-export function JobsTab({ batchId, batchStatus }: { batchId: number; batchStatus: BatchStatus }) {
+export function JobsTab({
+  batchId,
+  batchStatus,
+  datasetType,
+}: {
+  batchId: number;
+  batchStatus: BatchStatus;
+  datasetType: string;
+}) {
+  const mayRollBack = canRollBackBatch(datasetType, usePermissions().hasPermission);
   const [rollbackJob, setRollbackJob] = useState<ImportJobListItem | null>(null);
   const [rollbackReason, setRollbackReason] = useState("");
   const [rollback, { isLoading: rollingBack }] = useRollbackImportJobMutation();
@@ -72,7 +81,7 @@ export function JobsTab({ batchId, batchStatus }: { batchId: number; batchStatus
           <JobRow
             key={job.id}
             job={job}
-            onRollback={() => setRollbackJob(job)}
+            onRollback={mayRollBack ? () => setRollbackJob(job) : undefined}
           />
         ))}
       </div>
@@ -116,7 +125,7 @@ export function JobsTab({ batchId, batchStatus }: { batchId: number; batchStatus
   );
 }
 
-function JobRow({ job, onRollback }: { job: ImportJobListItem; onRollback: () => void }) {
+function JobRow({ job, onRollback }: { job: ImportJobListItem; onRollback?: () => void }) {
   const isLive = job.status === "running" || job.status === "queued";
   const canRollback = ["succeeded", "failed", "cancelled"].includes(job.status);
 
@@ -133,13 +142,11 @@ function JobRow({ job, onRollback }: { job: ImportJobListItem; onRollback: () =>
             <span className="text-[10px] text-amber-600">Retry x{job.retry_count}</span>
           )}
         </div>
-        <PermissionGate permission={P.RUN_IMPORT_ROLLBACK}>
-          {canRollback && (
-            <Button variant="white" size="sm" onClick={onRollback}>
-              <Undo2 className="size-3.5" /> Rollback
-            </Button>
-          )}
-        </PermissionGate>
+        {onRollback && canRollback && (
+          <Button variant="white" size="sm" onClick={onRollback}>
+            <Undo2 className="size-3.5" /> Rollback
+          </Button>
+        )}
       </div>
 
       {/* Progress bar */}
