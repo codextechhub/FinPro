@@ -7,10 +7,12 @@
  *   POST /finance/journals/{id}/submit/     finance.journal.submit
  *   POST /finance/journals/{id}/reverse/    finance.journal.reverse
  *   POST /finance/direct-entries/           finance.directentry.post
+ *        (posts, or waits for approval where the school's journal route has steps)
  */
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
+import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
 import type { ApiEnvelope, PaginatedEnvelope } from "./api-types";
 import type {
   DirectEntryPayload,
@@ -60,13 +62,15 @@ export const glApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["FinanceJournals", "FinanceReports"],
     }),
-    postDirectEntry: builder.mutation<ApiEnvelope<JournalDetail>, DirectEntryPayload>({
+    // A school whose journal route has steps gets the entry back waiting for
+    // approval rather than posted; `approval` then says whether anyone can decide it.
+    postDirectEntry: builder.mutation<ApiEnvelope<JournalDetail & { approval?: ApprovalParkState }>, DirectEntryPayload>({
       query: ({ entity, ...body }) => ({
         url: `/finance/direct-entries/${generateQueryString({ entity })}`,
         method: "POST",
         body,
       }),
-      invalidatesTags: ["FinanceJournals", "FinanceReports"],
+      invalidatesTags: ["FinanceJournals", "FinanceReports", "WorkflowPending", "WorkflowSubmissions"],
     }),
   }),
 });
