@@ -30,7 +30,8 @@ import {
 } from "@/redux/services/dashboard/exports-api";
 import type { ExportRun, ExportRunStatus, RunListParams } from "@/redux/services/dashboard/exports-types";
 import { formatBytes } from "@/utils/format-bytes";
-import { daysUntil, formatDay } from "./format";
+import { useDates, type DateFormatter } from "../../lib/display-prefs";
+import { daysUntil } from "./format";
 import { errorStatus } from "@/utils/api-errors";
 import { useFileDownload } from "./use-file-download";
 import { PageShell } from "@/components/layout/page-shell";
@@ -58,23 +59,17 @@ const TRIGGER_LABEL: Record<string, string> = {
   API: "API",
 };
 
-function fmtStarted(run: ExportRun): string {
-  const iso = run.started_at ?? run.queued_at;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-}
 
 // The second line under the file name: what this run left behind. Reads
 // differently for each outcome because "no file produced" is information, not
 // an empty cell.
-function subtitle(run: ExportRun): string {
+function subtitle(run: ExportRun, dates: DateFormatter): string {
   const parts = [run.reference];
   if (run.file) {
     parts.push(formatBytes(run.file.size_bytes));
     if (run.file.is_purged) parts.push("deleted from storage");
-    else if (run.file.is_expired) parts.push(`expired ${formatDay(run.file.available_until)}`);
-    else parts.push(`expires ${formatDay(run.file.available_until)}`);
+    else if (run.file.is_expired) parts.push(`expired ${dates.day(run.file.available_until)}`);
+    else parts.push(`expires ${dates.day(run.file.available_until)}`);
   } else if (run.status === "FAILED") {
     parts.push("no file produced");
   } else if (run.status === "CANCELLED") {
@@ -94,6 +89,7 @@ export default function ExportFilesPage() {
   // Filters in the URL so a view is linkable - a failure notification points
   // straight at the run that explains itself.
   const [searchParams, setSearchParams] = useSearchParams();
+  const dates = useDates();
   const status = (searchParams.get("status") ?? "") as ExportRunStatus | "";
   const trigger = searchParams.get("trigger") ?? "";
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
@@ -154,13 +150,13 @@ export default function ExportFilesPage() {
       cell: (run) => (
         <div className="min-w-0">
           <p className="truncate font-semibold text-black-01">{run.file?.name ?? run.export_name}</p>
-          <p className={cn(NUM, "mt-0.5 truncate text-xs font-normal text-gray-06-text")}>{subtitle(run)}</p>
+          <p className={cn(NUM, "mt-0.5 truncate text-xs font-normal text-gray-06-text")}>{subtitle(run, dates)}</p>
         </div>
       ),
     },
     { header: "Requested by", cell: (run) => run.requested_by_name || "-" },
     { header: "Trigger", cell: (run) => TRIGGER_LABEL[run.trigger] ?? run.trigger },
-    { header: "Started", cell: (run) => <span className={NUM}>{fmtStarted(run)}</span> },
+    { header: "Started", cell: (run) => <span className={NUM}>{dates.dateTime(run.started_at ?? run.queued_at)}</span> },
     {
       header: "Rows",
       align: "right",

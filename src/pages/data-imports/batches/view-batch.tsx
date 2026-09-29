@@ -34,12 +34,14 @@ import { RowResultsTab } from "./components/row-results-tab";
 import { AuditLogsTab } from "./components/audit-logs-tab";
 import { NotificationsTab } from "./components/notifications-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { useDates } from "../../../lib/display-prefs";
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
 type TabKey = "issues" | "jobs" | "rows" | "audit" | "notifications";
 
 export default function ViewBatch() {
+  const dates = useDates();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const batchId = Number(id);
@@ -331,10 +333,10 @@ export default function ViewBatch() {
                 {(batch.validation_started_at || batch.validation_completed_at) && (
                   <div className="text-[10px] text-gray-400 flex gap-4 pt-2">
                     {batch.validation_started_at && (
-                      <span>Started: {new Date(batch.validation_started_at).toLocaleString()}</span>
+                      <span>Started: {dates.dateTime(batch.validation_started_at)}</span>
                     )}
                     {batch.validation_completed_at && (
-                      <span>Completed: {new Date(batch.validation_completed_at).toLocaleString()}</span>
+                      <span>Completed: {dates.dateTime(batch.validation_completed_at)}</span>
                     )}
                   </div>
                 )}
@@ -368,7 +370,7 @@ export default function ViewBatch() {
             </MetaRow>
             {batch.imported_at && (
               <MetaRow label="Imported">
-                <span className="text-xs">{new Date(batch.imported_at).toLocaleString()}</span>
+                <span className="text-xs">{dates.dateTime(batch.imported_at)}</span>
               </MetaRow>
             )}
             {batch.sheet_name && (

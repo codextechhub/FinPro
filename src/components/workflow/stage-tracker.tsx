@@ -6,6 +6,7 @@ import type {
   WorkflowStageStatus,
 } from "@/redux/services/dashboard/workflow-types";
 import { InitialsAvatar, StageStatusBadge } from "./workflow-ui";
+import { useDates } from "../../lib/display-prefs";
 
 type Resolver = (id?: string | null) => string;
 
@@ -38,6 +39,7 @@ export function StageTracker({
   name: Resolver;
   initials: Resolver;
 }) {
+  const dates = useDates();
   // Skipped stages (branch nodes, unmet conditions, no-approver / retired
   // skips) are recorded for audit but never shown in the workflow tracker.
   const visible = stages.filter((s) => s.status !== "SKIPPED");
@@ -106,7 +108,7 @@ export function StageTracker({
                               {vm.icon} {vm.label}
                               {a.acted_at && (
                                 <span className="font-normal text-gray-01">
-                                  · {formatRelativeDate(a.acted_at)}
+                                  · {formatRelativeDate(a.acted_at, dates.prefs)}
                                 </span>
                               )}
                             </span>

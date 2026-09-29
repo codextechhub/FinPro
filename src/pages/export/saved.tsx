@@ -42,13 +42,14 @@ import type {
   DefinitionListParams,
   ExportDefinitionListItem,
 } from "@/redux/services/dashboard/exports-types";
-import { formatDay } from "./format";
+import { useDates } from "../../lib/display-prefs";
 import { PageShell } from "@/components/layout/page-shell";
 
 const NUM = "font-geist-mono tabular-nums";
 
 export default function SavedExportsPage() {
   const navigate = useNavigate();
+  const dates = useDates();
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.VIEW_SAVED_EXPORTS);
   const canCreate = hasPermission(P.CREATE_EXPORT);
@@ -184,7 +185,7 @@ export default function SavedExportsPage() {
         row.last_run ? (
           <div className="flex flex-wrap items-center gap-2">
             <RunStatusPill status={row.last_run.status} />
-            <span className={cn(NUM, "text-xs text-gray-06-text")}>{formatDay(row.last_run.at)}</span>
+            <span className={cn(NUM, "text-xs text-gray-06-text")}>{dates.day(row.last_run.at)}</span>
           </div>
         ) : (
           <span className="text-gray-05">Never run</span>

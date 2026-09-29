@@ -43,7 +43,8 @@ import type {
 import { FileCard } from "./file-card";
 import { OMISSION_HEADING, omissionIsFixableInBuilder, remedyFor } from "./failure-actions";
 import { formatBytes } from "@/utils/format-bytes";
-import { formatDay, formatDuration, formatStamp } from "./format";
+import { useDates } from "../../lib/display-prefs";
+import { formatDuration } from "./format";
 import { useFileDownload } from "./use-file-download";
 import { useState } from "react";
 import { PageShell } from "@/components/layout/page-shell";
@@ -110,6 +111,7 @@ function Banner({
 
 export default function ExportRunDetailPage() {
   const { id } = useParams();
+  const dates = useDates();
   const runId = Number(id);
   const navigate = useNavigate();
   const { hasPermission } = usePermissions();
@@ -187,7 +189,7 @@ export default function ExportRunDetailPage() {
               </div>
               <p className={cn(NUM, "mt-1 text-xs text-gray-06-text")}>
                 {run.reference} · {TRIGGER_LABEL[run.trigger] ?? run.trigger} ·{" "}
-                {formatStamp(run.started_at ?? run.queued_at)}
+                {dates.dateTime(run.started_at ?? run.queued_at)}
               </p>
             </div>
 
@@ -234,9 +236,9 @@ export default function ExportRunDetailPage() {
                 <Field label="Run" value={run.reference} mono />
                 <Field label="Trigger" value={TRIGGER_LABEL[run.trigger] ?? run.trigger} />
                 <Field label="Requested by" value={run.requested_by_name || "-"} />
-                <Field label="Queued" value={formatStamp(run.queued_at)} mono />
-                <Field label="Started" value={formatStamp(run.started_at)} mono />
-                <Field label="Ended" value={formatStamp(run.ended_at)} mono />
+                <Field label="Queued" value={dates.dateTime(run.queued_at, null, { seconds: true })} mono />
+                <Field label="Started" value={dates.dateTime(run.started_at, null, { seconds: true })} mono />
+                <Field label="Ended" value={dates.dateTime(run.ended_at, null, { seconds: true })} mono />
                 <Field label="Duration" value={formatDuration(run.started_at, run.ended_at)} mono />
                 <Field
                   label="Rows"
@@ -244,7 +246,7 @@ export default function ExportRunDetailPage() {
                   mono
                 />
                 {run.file && <Field label="File size" value={formatBytes(run.file.size_bytes)} mono />}
-                {run.file && <Field label="Expires" value={formatDay(run.file.available_until)} mono />}
+                {run.file && <Field label="Expires" value={dates.day(run.file.available_until)} mono />}
                 {run.attempt > 1 && <Field label="Attempt" value={String(run.attempt)} mono />}
               </div>
             </Section>
@@ -362,6 +364,7 @@ function RunBody({
   onDownload: () => void;
   onEditExport: () => void;
 }) {
+  const dates = useDates();
   // Still going: a determinate bar when the total is known, the phase name when
   // it is not. Never a bar that creeps to 90% and parks.
   if (run.progress) {
@@ -516,8 +519,8 @@ function RunBody({
             {run.file.is_purged
               ? "The bytes have been deleted from storage. The run record and its audit trail stay."
               : run.file.is_expired
-                ? `This file passed its availability date on ${formatDay(run.file.available_until)}. Running the export again produces a new one.`
-                : `This file is a snapshot taken at ${formatStamp(run.started_at)}. Running the export again produces a new file; this one is not updated.`}
+                ? `This file passed its availability date on ${dates.day(run.file.available_until)}. Running the export again produces a new one.`
+                : `This file is a snapshot taken at ${dates.dateTime(run.started_at)}. Running the export again produces a new file; this one is not updated.`}
           </p>
         </>
       ) : (
@@ -536,12 +539,13 @@ function RunBody({
 // Allowed AND refused. "Who tried and was told no" is the question a compliance
 // review actually asks, and a refusal that leaves no trace cannot be answered.
 function DownloadLog({ fileId }: { fileId: number }) {
+  const dates = useDates();
   const { data, isLoading, isError, refetch } = useGetExportDownloadLogQuery({ fileId });
   const rows = useMemo(() => data?.data ?? [], [data]);
 
   const columns: Column<ExportDownloadEntry>[] = [
     { header: "Who", cell: (d) => d.user_name || "-" },
-    { header: "When", cell: (d) => <span className={NUM}>{formatStamp(d.at)}</span> },
+    { header: "When", cell: (d) => <span className={NUM}>{dates.dateTime(d.at)}</span> },
     { header: "IP", cell: (d) => <span className={NUM}>{d.ip_address || "-"}</span> },
     {
       header: "Outcome",

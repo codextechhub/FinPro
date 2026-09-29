@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ExportFile } from "@/redux/services/dashboard/exports-types";
 import { formatBytes } from "@/utils/format-bytes";
-import { daysUntil, formatDay } from "./format";
+import { useDates, type DateFormatter } from "../../lib/display-prefs";
+import { daysUntil } from "./format";
 
 /** Monospace tabular figures for anything a person compares by eye. */
 const NUM = "font-geist-mono tabular-nums";
@@ -22,12 +23,12 @@ const NUM = "font-geist-mono tabular-nums";
 // What the metadata line says about how long this file is around for. Expiry is
 // a fact about the file, so it is stated plainly rather than hidden once it has
 // passed - the run still succeeded, and the history is intact.
-function availability(file: ExportFile): string {
+function availability(file: ExportFile, dates: DateFormatter): string {
   if (file.is_purged) return "deleted from storage";
-  if (file.is_expired) return `expired ${formatDay(file.available_until)}`;
+  if (file.is_expired) return `expired ${dates.day(file.available_until)}`;
   const days = daysUntil(file.available_until);
   if (days <= 7) return `available for ${days} more day${days === 1 ? "" : "s"}`;
-  return `available until ${formatDay(file.available_until)}`;
+  return `available until ${dates.day(file.available_until)}`;
 }
 
 export function FileCard({
@@ -53,6 +54,7 @@ export function FileCard({
   lastDownload?: string;
   className?: string;
 }) {
+  const dates = useDates();
   const produced = file.columns_produced?.length ?? 0;
   const columns =
     columnsRequested && columnsRequested !== produced
@@ -81,7 +83,7 @@ export function FileCard({
         <p className="truncate font-mont text-sm font-semibold text-black-01">{file.name}</p>
         <p className={cn(NUM, "mt-1 text-xs text-gray-06-text")}>
           {file.row_count.toLocaleString("en-GB")} rows · {columns} · {formatBytes(file.size_bytes)} ·{" "}
-          {availability(file)}
+          {availability(file, dates)}
         </p>
         {file.download_count > 0 && (
           <p className="mt-1.5 font-mont text-xs text-gray-05">

@@ -30,6 +30,7 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { PermissionCode } from "../../permissions";
 import type { DocumentDelivery } from "@/redux/services/finance/ar-types";
+import { useDates } from "../../lib/display-prefs";
 
 const MAX_NOTE = 1000;
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
@@ -39,14 +40,6 @@ const STATUS_META: Record<DocumentDelivery["status"], { label: string; cls: stri
   PENDING: { label: "Sending", cls: "bg-amber-50 text-amber-700" },
   FAILED: { label: "Failed", cls: "bg-destructive/10 text-destructive" },
 };
-
-function shortDateTime(value: string | null) {
-  if (!value) return "-";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString(undefined, {
-    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-  });
-}
 
 export interface DocumentEmailActionProps {
   /** Which endpoint family to talk to. `customers` sends a statement of account. */
@@ -68,6 +61,7 @@ export interface DocumentEmailActionProps {
 export function DocumentEmailAction({
   kind, id, entity, permission, label, title, period, buttonVariant = "outline", className,
 }: DocumentEmailActionProps) {
+  const dates = useDates();
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const [retrying, setRetrying] = useState<DocumentDelivery | null>(null);
@@ -171,7 +165,7 @@ export function DocumentEmailAction({
                         <div className="min-w-0">
                           <p className="font-mont text-xs font-semibold text-black-01">{delivery.source_display}</p>
                           <p className="mt-0.5 font-mont text-[11px] text-gray-05">
-                            {delivery.requested_by_name} · {shortDateTime(delivery.sent_at ?? delivery.created_at)}
+                            {delivery.requested_by_name} · {dates.dateTime(delivery.sent_at ?? delivery.created_at)}
                           </p>
                         </div>
                         <span className={cn(PILL, meta.cls)}>{meta.label}</span>
@@ -205,7 +199,7 @@ export function DocumentEmailAction({
 
           {retrying ? (
             <p className="flex items-center gap-1.5 font-mont text-[11px] text-gray-05">
-              <Send className="size-3" /> Retrying the attempt from {shortDateTime(retrying.created_at)}.
+              <Send className="size-3" /> Retrying the attempt from {dates.dateTime(retrying.created_at)}.
             </p>
           ) : null}
         </div>

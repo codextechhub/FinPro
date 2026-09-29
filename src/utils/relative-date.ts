@@ -1,51 +1,31 @@
 /**
- * "Today", "Yesterday", or "3rd September 2026".
+ * "Today", "Yesterday", or the day in the school's own format.
  *
- * Lifted out of the console so the workflow screens can be shared. It has no
- * finance in it and no console in it; it belongs to whichever app is rendering
- * a date somebody has to read rather than parse, and both of them are.
+ * Shared by the workflow screens here and by the school app's own screens
+ * (notifications, support), which import it through their `@/utils/relative-date`
+ * alias. The preferences are optional so a caller with none to hand still gets
+ * the default reading, Lagos time and "29 Sep 2026"; a screen inside this
+ * package passes `useDates().prefs`. "Today" is the school's today, not the
+ * reader's: at 00:30 in Lagos a payment made at 23:50 reads "Yesterday".
  */
-export const formatRelativeDate = (dateStr: string): string => {
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return "-";
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
+import {
+  DEFAULT_DISPLAY_PREFS,
+  addDays,
+  calendarDayOf,
+  formatDay,
+  todayIn,
+  type DisplayPrefs,
+} from "./dates";
 
-  const isSameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
-
-  if (isSameDay(date, today)) return "Today";
-  if (isSameDay(date, yesterday)) return "Yesterday";
-
-  const day = date.getDate();
-  const suffix =
-    day % 10 === 1 && day !== 11
-      ? "st"
-      : day % 10 === 2 && day !== 12
-        ? "nd"
-        : day % 10 === 3 && day !== 13
-          ? "rd"
-          : "th";
-
-  return `${day}${suffix} ${date.toLocaleString("en-GB", { month: "long" })} ${date.getFullYear()}`;
-};
-
-/**
- * An ISO calendar date: ``2026-09-04``.
- *
- * Deliberately not localised. This is the form a date takes in an input, in a
- * filter and in a payload, where a reader is matching it against something
- * rather than reading it as prose - and where "04/09/2026" means two different
- * days depending on who is looking.
- */
-export const formatDate = (timestamp: string | number | Date): string => {
-  const date = new Date(timestamp);
-  if (isNaN(date.getTime())) return "-";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+export const formatRelativeDate = (
+  dateStr: string | null | undefined,
+  prefs: DisplayPrefs = DEFAULT_DISPLAY_PREFS,
+  now: Date = new Date(),
+): string => {
+  const day = calendarDayOf(dateStr, prefs.timeZone);
+  if (!day) return "-";
+  const today = todayIn(prefs.timeZone, now);
+  if (day === today) return "Today";
+  if (day === addDays(today, -1)) return "Yesterday";
+  return formatDay(day, prefs);
 };

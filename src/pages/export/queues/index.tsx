@@ -36,6 +36,7 @@ import type { BackgroundJob, JobStatus, QueueParams } from "@/redux/services/das
 import { useGetMyTasksQuery, useGetMyTasksSummaryQuery } from "@/redux/services/dashboard/queue-api";
 import { errorStatus } from "@/utils/api-errors";
 import { displayStatus, exportOutcome } from "./job-outcome";
+import { useDates, type DateFormatter } from "../../../lib/display-prefs";
 import { PageShell } from "@/components/layout/page-shell";
 
 const POLL_MS = 10_000;
@@ -81,7 +82,7 @@ function KindChip({ kind }: { kind: string }) {
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────────
-function timeAgo(iso: string | null, now: number): string {
+function timeAgo(iso: string | null, now: number, dates: DateFormatter): string {
   if (!iso) return "-";
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "-";
@@ -90,7 +91,7 @@ function timeAgo(iso: string | null, now: number): string {
   if (s < 3600) return `${Math.floor(s / 60)} min ago`;
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   if (s < 7 * 86400) return `${Math.floor(s / 86400)} d ago`;
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return dates.day(iso);
 }
 
 function fmtDuration(seconds: number | null): string {
@@ -101,17 +102,13 @@ function fmtDuration(seconds: number | null): string {
   return `${m}m ${s}s`;
 }
 
-function fmtTimestamp(iso: string | null): string {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString("en-GB");
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function QueuesPage() {
   // Scope, filters and page live in the URL so a view is linkable - a failure
   // notification can point straight at the filtered queue that explains it.
   const [searchParams, setSearchParams] = useSearchParams();
+  const dates = useDates();
   // Defensive: a 403 on scope=all drops the page back to "mine" and hides the
   // toggle, even if can_view_all lied. Derived rather than written back to the
   // URL - a navigation during render is not safe, and the query below only ever
@@ -219,7 +216,7 @@ export default function QueuesPage() {
         cell: (job) =>
           job.status === "RUNNING" && job.progress != null ? <ProgressBar value={job.progress} /> : null,
       },
-      { header: "Started", cell: (job) => <span className={NUM}>{timeAgo(job.started_at, now)}</span> },
+      { header: "Started", cell: (job) => <span className={NUM}>{timeAgo(job.started_at, now, dates)}</span> },
       {
         header: "Duration",
         align: "right",
@@ -230,7 +227,7 @@ export default function QueuesPage() {
     ];
     if (scope === "all") base.push({ header: "Owner", cell: (job) => job.owner_name ?? "System" });
     return base;
-  }, [now, scope]);
+  }, [now, scope, dates]);
 
   return (
     <PageShell className="space-y-5 text-black-01">
@@ -370,6 +367,7 @@ function resultFields(result: unknown): { label: string; value: string }[] {
 }
 
 function JobDrawer({ job, onClose }: { job: BackgroundJob | null; onClose: () => void }) {
+  const dates = useDates();
   const outcome = job ? exportOutcome(job) : null;
   return (
     <DetailDrawer
@@ -408,9 +406,9 @@ function JobDrawer({ job, onClose }: { job: BackgroundJob | null; onClose: () =>
           )}
 
           <div className="grid gap-x-8 gap-y-4 sm:grid-cols-3">
-            <Field label="Created" value={fmtTimestamp(job.created_at)} mono />
-            <Field label="Started" value={fmtTimestamp(job.started_at)} mono />
-            <Field label="Finished" value={fmtTimestamp(job.finished_at)} mono />
+            <Field label="Created" value={dates.dateTime(job.created_at, null, { seconds: true })} mono />
+            <Field label="Started" value={dates.dateTime(job.started_at, null, { seconds: true })} mono />
+            <Field label="Finished" value={dates.dateTime(job.finished_at, null, { seconds: true })} mono />
             <Field
               label="Duration"
               value={job.status === "RUNNING" ? "Still running" : fmtDuration(job.runtime_seconds)}

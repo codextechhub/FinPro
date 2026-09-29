@@ -26,7 +26,7 @@ import {
 import { toast } from "sonner";
 import { TabStrip, type TabStripItem } from "@/components/finance-ui/tab-strip";
 import { cn } from "@/lib/utils";
-import { formatDate } from "@/utils/relative-date";
+import { zonedInstant } from "../../../utils/dates";
 import { useAppSelector } from "@/redux/store";
 import {
   useGetDelegationsQuery,
@@ -39,6 +39,7 @@ import { useUserDirectory } from "@/pages/protected/workflow/components/use-user
 import { InitialsAvatar } from "@/pages/protected/workflow/components/workflow-ui";
 import { humanizeDocumentType, sameId } from "@/pages/protected/workflow/components/workflow-format";
 import { PageShell } from "@/components/layout/page-shell";
+import { useDates } from "../../../lib/display-prefs";
 
 type DelegationState = "Active" | "Scheduled" | "Expired" | "Revoked";
 
@@ -58,6 +59,7 @@ const STATE_VARIANT: Record<DelegationState, React.ComponentProps<typeof Badge>[
 };
 
 export default function Delegations() {
+  const dates = useDates();
   const user = useAppSelector((s) => s.auth.user);
   const uid = user?.id != null ? String(user.id) : "";
   const { name, initials, role } = useUserDirectory();
@@ -172,7 +174,7 @@ export default function Delegations() {
                     </div>
                     <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-01">
                       <span>
-                        {formatDate(new Date(d.starts_at))} → {formatDate(new Date(d.ends_at))}
+                        {dates.day(d.starts_at)} → {dates.day(d.ends_at)}
                       </span>
                       <span>
                         Scope:{" "}
@@ -230,6 +232,7 @@ function NewDelegationSheet({
   onClose: () => void;
   selfId: string;
 }) {
+  const dates = useDates();
   const { byId, name } = useUserDirectory();
   const [createDelegation, { isLoading }] = useCreateDelegationMutation();
 
@@ -278,9 +281,9 @@ function NewDelegationSheet({
     }
     createDelegation({
       delegate,
-      // Send ISO datetimes (start of day → end of day) for the date-only inputs.
-      starts_at: new Date(`${startDate}T00:00:00`).toISOString(),
-      ends_at: new Date(`${endDate}T23:59:59`).toISOString(),
+      // the picked days run from the school's midnight to its last second
+      starts_at: zonedInstant(startDate, "00:00:00", dates.prefs.timeZone) ?? "",
+      ends_at: zonedInstant(endDate, "23:59:59", dates.prefs.timeZone) ?? "",
       document_type: docType,
       exclusive,
       reason: reason.trim(),
@@ -372,8 +375,8 @@ function NewDelegationSheet({
           {delegate && startDate && endDate && (
             <div className="rounded-md bg-pry-01/50 border border-primary/10 px-4 py-3 text-xs text-gray-01">
               <span className="font-medium text-primary">Summary:</span> From{" "}
-              <strong>{formatDate(new Date(`${startDate}T00:00:00`))}</strong> to{" "}
-              <strong>{formatDate(new Date(`${endDate}T00:00:00`))}</strong>,{" "}
+              <strong>{dates.day(startDate)}</strong> to{" "}
+              <strong>{dates.day(endDate)}</strong>,{" "}
               {docType ? humanizeDocumentType(docType, docTypeLabel) : "all"} approvals route to{" "}
               <strong>{name(delegate)}</strong>.
               {exclusive ? " You won't appear in queues during this period." : ""}

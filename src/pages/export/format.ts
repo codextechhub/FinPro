@@ -1,26 +1,13 @@
 /**
- * Date and duration formatting shared by the Export Centre screens. Kept out of
- * the component files so fast refresh keeps working (a module that exports both
- * components and helpers loses it).
+ * Duration and countdown helpers shared by the Export Centre screens. Kept out
+ * of the component files so fast refresh keeps working (a module that exports
+ * both components and helpers loses it). Days and times are written with
+ * `useDates` from `lib/display-prefs`, in the school's own format and zone.
  *
  * formatBytes used to live here and is now `@/utils/format-bytes` - it is not
  * re-exported, deliberately: leaving a second import path for the same function
  * is what let four copies of it drift apart in the first place.
  */
-
-export function formatDay(iso: string | null | undefined): string {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? "-"
-    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
-
-export function formatStamp(iso: string | null | undefined): string {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString("en-GB");
-}
 
 /** Whole days from now until `iso`, floored at 0. */
 export function daysUntil(iso: string): number {

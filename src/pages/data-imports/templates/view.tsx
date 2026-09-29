@@ -19,6 +19,7 @@ import type {
 } from "@/redux/services/dashboard/import-types";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
+import { useDates } from "../../../lib/display-prefs";
 
 const STATUS_BADGE: Record<TemplateStatus, "active" | "pending" | "inactive"> = {
   active: "active",
@@ -54,6 +55,7 @@ async function triggerDownload(
 }
 
 export default function ViewTemplate() {
+  const dates = useDates();
   const navigate = useNavigate();
   const { hasPermission } = usePermissions();
   const { id } = useParams<{ id: string }>();
@@ -198,11 +200,11 @@ export default function ViewTemplate() {
             <MetaRow label="Sample row"><span className="text-sm">{template.allow_sample_row ? "Enabled" : "Disabled"}</span></MetaRow>
             <MetaRow label="Download"><span className="text-sm">{template.is_download_enabled ? "Enabled" : "Disabled"}</span></MetaRow>
             <MetaRow label="Published">
-              <span className="text-sm">{template.published_at ? new Date(template.published_at).toLocaleDateString() : "-"}</span>
+              <span className="text-sm">{dates.day(template.published_at)}</span>
             </MetaRow>
             {template.retired_at && (
               <MetaRow label="Retired">
-                <span className="text-sm">{new Date(template.retired_at).toLocaleDateString()}</span>
+                <span className="text-sm">{dates.day(template.retired_at)}</span>
               </MetaRow>
             )}
           </div>

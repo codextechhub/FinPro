@@ -1,11 +1,12 @@
 import { FileText, Info } from "lucide-react";
-import { formatDate, formatRelativeDate } from "@/utils/relative-date";
+import { formatRelativeDate } from "@/utils/relative-date";
 import type { WorkflowInstanceDetail } from "@/redux/services/dashboard/workflow-types";
 import { humanizeDocumentType } from "./workflow-format";
 import { InstanceStatusBadge, UserChip } from "./workflow-ui";
 import { sourceDocumentLink, sourceDocumentPrompt } from "./source-document-link";
 import { DocumentDetailsPanel } from "./document-details";
 import { useServesPath } from "../../lib/host-routes";
+import { useDates } from "../../lib/display-prefs";
 
 type Resolver = (id?: string | number | null) => string;
 
@@ -26,6 +27,7 @@ export function DocumentPanel({
   initials: Resolver;
   role: Resolver;
 }) {
+  const dates = useDates();
   const summary = instance.document_summary;
   // A source screen this app does not mount (the console's Payments area, say) gets no link.
   const servesPath = useServesPath();
@@ -58,7 +60,7 @@ export function DocumentPanel({
               {instance.submitted_at && (
                 <>
                   <span className="size-1 rounded-full bg-gray-300" />
-                  <span>Submitted {formatRelativeDate(instance.submitted_at)}</span>
+                  <span>Submitted {formatRelativeDate(instance.submitted_at, dates.prefs)}</span>
                 </>
               )}
             </div>
@@ -93,12 +95,12 @@ export function DocumentPanel({
             </Field>
             <Field label="Submitted">
               <span className="text-black-01">
-                {instance.submitted_at ? formatDate(new Date(instance.submitted_at)) : "-"}
+                {dates.dateTime(instance.submitted_at)}
               </span>
             </Field>
             {instance.completed_at && (
               <Field label="Completed">
-                <span className="text-black-01">{formatDate(new Date(instance.completed_at))}</span>
+                <span className="text-black-01">{dates.dateTime(instance.completed_at)}</span>
               </Field>
             )}
           </div>

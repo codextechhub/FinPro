@@ -1,6 +1,7 @@
 import { formatRelativeDate } from "@/utils/relative-date";
 import type { AuditEventType, WorkflowAuditLog } from "@/redux/services/dashboard/workflow-types";
 import { AUDIT_EVENT_LABEL } from "./workflow-format";
+import { useDates } from "../../lib/display-prefs";
 
 type Resolver = (id?: string | null) => string;
 
@@ -20,6 +21,7 @@ export function AuditTimeline({
   logs: WorkflowAuditLog[];
   name: Resolver;
 }) {
+  const dates = useDates();
   const visible = logs.filter((log) => !HIDDEN_EVENTS.has(log.event_type));
 
   if (!visible.length) {
@@ -43,7 +45,7 @@ export function AuditTimeline({
             </p>
             {log.message && <p className="text-xs text-gray-01 mt-0.5">{log.message}</p>}
             <p className="text-[11px] text-gray-06 mt-0.5">
-              {formatRelativeDate(log.occurred_at)}
+              {formatRelativeDate(log.occurred_at, dates.prefs)}
             </p>
           </div>
         </li>
