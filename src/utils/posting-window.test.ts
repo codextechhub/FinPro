@@ -178,14 +178,15 @@ describe("openWindowLabel", () => {
 });
 
 describe("todayISO", () => {
-  it("returns the browser-local day, not the UTC one", () => {
-    const now = new Date();
-    const expected = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0"),
-    ].join("-");
-    expect(todayISO()).toBe(expected);
+  it("is the school's day, not the browser's and not UTC's", () => {
+    // 21:30 UTC: 22:30 in Lagos, already 00:30 the next morning in Nairobi.
+    const now = new Date("2026-09-28T21:30:00Z");
+    expect(todayISO("Africa/Lagos", now)).toBe("2026-09-28");
+    expect(todayISO("Africa/Nairobi", now)).toBe("2026-09-29");
+  });
+
+  it("turns over at Lagos midnight, an hour before UTC does", () => {
+    expect(todayISO("Africa/Lagos", new Date("2026-09-28T23:30:00Z"))).toBe("2026-09-29");
   });
 
   it("matches YYYY-MM-DD", () => {

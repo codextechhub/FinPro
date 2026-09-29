@@ -23,7 +23,7 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { Customer, CustomerDetail } from "@/redux/services/finance/ar-types";
 import { CustomerReceiptModal } from "./customer-receipt-modal";
-import { todayISO } from "@/utils/posting-window";
+import { useDates } from "../../../lib/display-prefs";
 
 const TABS = [
   { key: "open", label: "Open items", icon: Receipt },
@@ -229,9 +229,10 @@ function OpenItemsTab({ d, currency }: { d: CustomerDetail; currency?: string | 
 
 /** A printable statement-of-account document for the active date range. */
 function StatementTab({ d, entity, entityName, currency }: { d: CustomerDetail; entity: string; entityName: string; currency?: string | null }) {
+  const dates = useDates();
   const c = d.customer;
   const [from, setFrom] = useState("");
-  const [to, setTo] = useState(todayISO());
+  const [to, setTo] = useState(() => dates.today());
 
   const { opening, rows, closing } = useMemo(() => {
     const inRange = (e: CustomerDetail["statement"][number]) =>

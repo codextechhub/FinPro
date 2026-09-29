@@ -24,6 +24,7 @@ import {
   type OpenRange,
 } from "@/utils/posting-window";
 import { useEntityCode } from "./use-entity";
+import { useDisplayPrefs } from "../../lib/display-prefs";
 
 export interface PostingWindowState {
   /** Selectable spans, oldest first. Empty means unconstrained - see `constrained`. */
@@ -54,6 +55,7 @@ export interface PostingWindowState {
 export function usePostingWindow(entity?: string | null): PostingWindowState {
   const activeCode = useEntityCode();
   const code = entity ?? activeCode;
+  const { timeZone } = useDisplayPrefs();
 
   const { data, isLoading, isError } = useGetPostingWindowQuery(
     { entity: code! },
@@ -67,7 +69,7 @@ export function usePostingWindow(entity?: string | null): PostingWindowState {
     if (!window || isError) {
       return {
         ranges: [],
-        defaultDate: todayISO(),
+        defaultDate: todayISO(timeZone),
         constrained: false,
         noOpenPeriod: false,
         label: null,
@@ -87,7 +89,7 @@ export function usePostingWindow(entity?: string | null): PostingWindowState {
       // `default_date` is null only when nothing is open at all. Today is then as
       // good a placeholder as any - the field surfaces `noOpenPeriod` instead of
       // pretending some date would work.
-      defaultDate: window.default_date ?? todayISO(),
+      defaultDate: window.default_date ?? todayISO(timeZone),
       constrained: ranges.length > 0,
       noOpenPeriod: open.length === 0,
       label: openWindowLabel(open),
@@ -96,5 +98,5 @@ export function usePostingWindow(entity?: string | null): PostingWindowState {
       reasonFor: (date: string) => blockedReason(date, ranges, blocked),
       isLoading,
     };
-  }, [data, isError, isLoading]);
+  }, [data, isError, isLoading, timeZone]);
 }

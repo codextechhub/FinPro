@@ -23,7 +23,7 @@ import type { Invoice } from "@/redux/services/finance/ar-types";
 import { InvoiceDetailDrawer } from "./invoice-detail-drawer";
 import { BatchGenerateModal } from "./batch-generate-modal";
 import { NewInvoiceDrawer } from "./new-invoice-drawer";
-import { todayISO } from "@/utils/posting-window";
+import { useDates } from "../../../lib/display-prefs";
 
 const TABS = [
   { key: "", label: "All" }, { key: "draft", label: "Draft" }, { key: "issued", label: "Issued" },
@@ -38,11 +38,11 @@ const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Draft", ISSUED: "Issued", PARTIAL: "Partially Paid", PAID: "Paid", OVERDUE: "Overdue",
 };
 
-function derivedStatus(i: Invoice): string {
+function derivedStatus(i: Invoice, today: string): string {
   if (i.status === "DRAFT") return "DRAFT";
   if (i.status !== "POSTED") return i.status;
   if (i.payment_status === "PAID") return "PAID";
-  if (i.due_date && i.due_date < todayISO()) return "OVERDUE";
+  if (i.due_date && i.due_date < today) return "OVERDUE";
   if (i.payment_status === "PARTIAL") return "PARTIAL";
   return "ISSUED";
 }
@@ -78,6 +78,7 @@ function Kpi({ label, value, delta, deltaIsPoints }: {
 }
 
 export function InvoicesTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [bucket, setBucket] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput.trim(), 350);
@@ -131,7 +132,7 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
     { header: "Total", align: "right", cell: (r) => <Money kobo={r.total} currency={currency} align="right" /> },
     { header: "Paid", align: "right", cell: (r) => r.amount_paid ? <Money kobo={r.amount_paid} currency={currency} align="right" /> : <span className="text-gray-05">-</span> },
     { header: "Balance", align: "right", cell: (r) => <Money kobo={r.balance_due} currency={currency} align="right" /> },
-    { header: "Status", cell: (r) => { const s = derivedStatus(r); return <span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[s] ?? "bg-gray-03/60 text-gray-05")}>{STATUS_LABEL[s] ?? s}</span>; } },
+    { header: "Status", cell: (r) => { const s = derivedStatus(r, dates.today()); return <span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[s] ?? "bg-gray-03/60 text-gray-05")}>{STATUS_LABEL[s] ?? s}</span>; } },
   ];
 
   return (

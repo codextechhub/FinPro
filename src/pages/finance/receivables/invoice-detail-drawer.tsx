@@ -19,7 +19,7 @@ import { openInvoiceDocument } from "@/utils/finance-documents";
 import { RecordPaymentModal } from "./record-payment-modal";
 import { RequestPaymentModal } from "./request-payment-modal";
 import { DocumentVoidAction } from "./document-void-action";
-import { todayISO } from "@/utils/posting-window";
+import { useDates } from "../../../lib/display-prefs";
 
 const TABS = [
   { key: "lines", label: "Lines", icon: List },
@@ -57,6 +57,7 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
 export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff }: {
   id: number | null; entity: string; currency?: string | null; onClose: () => void; onWriteOff: () => void;
 }) {
+  const dates = useDates();
   const { data, isLoading, isError, refetch } = useGetInvoiceDetailQuery(id ? { entity, id } : skipToken);
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("lines");
   const [payOpen, setPayOpen] = useState(false);
@@ -66,7 +67,7 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
   const d = data?.data;
   const inv = d?.invoice;
   const s = d?.summary;
-  const overdue = !!(s?.due_date && s.due_date < todayISO() && (s?.balance.kobo ?? 0) > 0);
+  const overdue = !!(s?.due_date && s.due_date < dates.today() && (s?.balance.kobo ?? 0) > 0);
   const canAct = !!inv && inv.status === "POSTED" && inv.balance_due > 0;
 
   const openPdf = async () => {

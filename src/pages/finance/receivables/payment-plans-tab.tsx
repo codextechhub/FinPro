@@ -31,7 +31,7 @@ import {
   useGetInvoicesQuery,
 } from "@/redux/services/finance/ar-api";
 import type { PaymentPlan, PaymentPlanInstallment } from "@/redux/services/finance/ar-types";
-import { todayISO } from "@/utils/posting-window";
+import { useDates } from "../../../lib/display-prefs";
 
 const METHODS = ["BANK_TRANSFER", "CASH", "CARD", "CHEQUE", "ONLINE", "OTHER"];
 const FREQS: [string, string][] = [["WEEKLY", "Weekly"], ["FORTNIGHTLY", "Fortnightly"], ["MONTHLY", "Monthly"], ["QUARTERLY", "Quarterly"]];
@@ -42,12 +42,12 @@ const paidCount = (p: PaymentPlan) => p.installments.filter((i) => i.balance <= 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const GREEN = "bg-green-01/10 text-green-01", AMBER = "bg-amber-50 text-amber-700", GRAY = "bg-gray-03/60 text-gray-05", BLUE = "bg-blue-50 text-blue-700";
 
-function planHealth(p: PaymentPlan): { label: string; cls: string } {
+function planHealth(p: PaymentPlan, today: string): { label: string; cls: string } {
   if (p.plan_status === "COMPLETED") return { label: "Completed", cls: GREEN };
   if (p.plan_status === "CANCELLED") return { label: "Cancelled", cls: GRAY };
   if (p.plan_status === "DRAFT") return { label: "Draft", cls: GRAY };
   const n = nextUnpaid(p);
-  return n && n.due_date < todayISO() ? { label: "At risk", cls: AMBER } : { label: "On track", cls: GREEN };
+  return n && n.due_date < today ? { label: "At risk", cls: AMBER } : { label: "On track", cls: GREEN };
 }
 function instLabel(inst: PaymentPlanInstallment, isNext: boolean): { label: string; cls: string } {
   if (inst.balance <= 0) return { label: "Paid", cls: GREEN };
@@ -91,6 +91,7 @@ function previewSchedule(total: number, count: number, start: string, freq: stri
 }
 
 export function PaymentPlansTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput.trim(), 350);
   const [page, setPage] = useState(1);
@@ -120,7 +121,7 @@ export function PaymentPlansTab({ entity, currency }: { entity: string; currency
       const n = nextUnpaid(p);
       return n ? <span className="font-mont text-sm text-gray-01">{n.due_date} · <span className="tabular-nums">{formatMoney(n.balance, currency)}</span></span> : <span className="text-gray-05">-</span>;
     } },
-    { header: "Status", cell: (p) => { const h = planHealth(p); return <span className={cn(PILL, h.cls)}>{h.label}</span>; } },
+    { header: "Status", cell: (p) => { const h = planHealth(p, dates.today()); return <span className={cn(PILL, h.cls)}>{h.label}</span>; } },
   ];
 
   return (
@@ -165,6 +166,7 @@ const tdCls = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-0
 function PlanDetailDrawer({ plan, entity, currency, onClose }: {
   plan: PaymentPlan | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const dates = useDates();
   const { can } = useCan();
   const [recording, setRecording] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -175,7 +177,7 @@ function PlanDetailDrawer({ plan, entity, currency, onClose }: {
   const active = plan.plan_status === "ACTIVE";
   const canRecord = active && !!plan.invoice_id && !!next && can(P.FIN_RECORD_PAYMENT);
   const canCancel = (active || plan.plan_status === "DRAFT") && can(P.FIN_CANCEL_PAYMENT_PLAN);
-  const health = planHealth(plan);
+  const health = planHealth(plan, dates.today());
 
   const doCancel = async () => {
     try {
@@ -317,10 +319,11 @@ function RecordInstallmentDrawer({ plan, installment, entity, currency, onClose 
 function NewPlanDrawer({ open, onClose, entity, currency }: {
   open: boolean; onClose: () => void; entity: string; currency?: string | null;
 }) {
+  const dates = useDates();
   const [customer, setCustomer] = useState("");
   const [invoice, setInvoice] = useState("");
   const [total, setTotal] = useState(0);
-  const [startDate, setStartDate] = useState(todayISO());
+  const [startDate, setStartDate] = useState(() => dates.today());
   const [frequency, setFrequency] = useState("MONTHLY");
   const [count, setCount] = useState(3);
   const [create, { isLoading: creating }] = useCreatePaymentPlanMutation();
@@ -337,7 +340,7 @@ function NewPlanDrawer({ open, onClose, entity, currency }: {
   const schedule = useMemo(() => previewSchedule(total, count, startDate, frequency), [total, count, startDate, frequency]);
   const canSubmit = !!customer && !!invoice && total > 0 && count >= 1 && !!startDate;
 
-  const reset = () => { setCustomer(""); setInvoice(""); setTotal(0); setStartDate(todayISO()); setFrequency("MONTHLY"); setCount(3); };
+  const reset = () => { setCustomer(""); setInvoice(""); setTotal(0); setStartDate(dates.today()); setFrequency("MONTHLY"); setCount(3); };
   const close = () => { reset(); onClose(); };
   const pickInvoice = (id: string) => {
     setInvoice(id);

@@ -12,6 +12,7 @@
  */
 
 import type { PeriodBrief } from "@/redux/services/finance/setup-types";
+import { DEFAULT_TIME_ZONE, todayIn } from "./dates";
 
 /** An inclusive span of selectable days, taken from one OPEN fiscal period. */
 export interface OpenRange {
@@ -20,20 +21,18 @@ export interface OpenRange {
 }
 
 /**
- * Today in the browser's own timezone as `YYYY-MM-DD`.
+ * Today in the school's zone as `YYYY-MM-DD`.
  *
- * Call this - never hoist it to a module constant. `const todayISO = new
- * Date().toISOString().slice(0, 10)` at module scope freezes at page load, so a
- * tab left open overnight defaults to yesterday, and being UTC it is already
- * the wrong day for anyone west of Greenwich after 00:00 UTC.
+ * A posting date is a day on the school's calendar, so it is read in the
+ * school's zone rather than the browser's or UTC: at 00:30 in Lagos it is
+ * already the new day, even on a laptop whose clock is set to London, and the
+ * server's own "today" for the same tenant agrees.
+ *
+ * Call this - never hoist it to a module constant. A module-scope value
+ * freezes at page load, so a tab left open overnight defaults to yesterday.
  */
-export function todayISO(): string {
-  const now = new Date();
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
+export function todayISO(timeZone: string = DEFAULT_TIME_ZONE, now: Date = new Date()): string {
+  return todayIn(timeZone, now);
 }
 
 /** The OPEN periods as selectable ranges, oldest first. */
