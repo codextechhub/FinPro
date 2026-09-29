@@ -89,12 +89,21 @@ export interface Refund {
   approval_required?: boolean;
 }
 
+/**
+ * One customer's refundable credit **at one branch**.
+ *
+ * A refund pays out only the credit of its own branch, so a customer holding credit
+ * at two branches is two rows, and a refund raised from a row sends its `branch_id`
+ * as the refund's `branch`. Rows are limited to the branches the reader may raise a
+ * refund for; `null` is unbranched credit, offered to a whole-school user only.
+ */
 export interface RefundAvailabilityCustomer {
   customer_id: number;
   customer_code: string;
   customer_name: string;
-  // The customer's branch, which the refund inherits; null is school-wide.
-  branch_id?: number | null;
+  /** The branch holding this credit, and so the branch a refund of it belongs to. */
+  branch_id: number | null;
+  branch_name: string | null;
   refundable_credit: number;
   refundable_credit_naira: string;
 }
@@ -133,7 +142,7 @@ export interface ArAdjustmentBatchInput {
   narration?: string;
   reason?: string;
   items: (
-    | { customer: string | number; amount: number; reference?: string; narration?: string }
+    | { customer: string | number; branch?: number; amount: number; reference?: string; narration?: string }
     | { invoice: string | number; amount: number; reason?: string; narration?: string }
   )[];
 }

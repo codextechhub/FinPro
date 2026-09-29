@@ -34,7 +34,13 @@ import { P } from "../../../permissions";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { gateExplanation, predictsApproval } from "./adjustment-approval";
 import { useAdjustmentGate } from "./use-adjustment-gate";
-import { refundAmountIsWithinAvailableCredit } from "./refund-validation";
+import {
+  refundAmountIsWithinAvailableCredit,
+  refundCreditBranchLabel,
+  refundCreditKey,
+  refundCreditSpansBranches,
+  refundRequestBranch,
+} from "./refund-validation";
 import { BatchAdjustmentDrawer } from "./batch-adjustment-drawer";
 import {
   useGetArAdjustmentsQuery, useCreateRefundMutation, usePostRefundMutation,
@@ -313,6 +319,8 @@ function NewActionDrawer({ open, onClose, entity, currency }: {
   const [expenseAccount, setExpenseAccount] = useState("");
   const [nextAction, setNextAction] = useState<"post" | "submit" | "draft">("post");
   const [refundCustomerSearch, setRefundCustomerSearch] = useState("");
+  // The picked row: one customer's credit at one branch (see refundCreditKey).
+  const [refundKey, setRefundKey] = useState("");
   const [selectedRefundCustomer, setSelectedRefundCustomer] = useState<RefundAvailabilityCustomer | null>(null);
 
   const [createRefund, { isLoading: creatingR }] = useCreateRefundMutation();
@@ -357,12 +365,13 @@ function NewActionDrawer({ open, onClose, entity, currency }: {
   );
   const refundCustomerOptions = useMemo(() => {
     const rows = selectedRefundCustomer
-      && !refundCustomers.some((item) => item.customer_code === selectedRefundCustomer.customer_code)
+      && !refundCustomers.some((item) => refundCreditKey(item) === refundCreditKey(selectedRefundCustomer))
       ? [selectedRefundCustomer, ...refundCustomers]
       : refundCustomers;
+    const named = refundCreditSpansBranches(rows);
     return rows.map((item) => ({
-      value: item.customer_code,
-      label: `${item.customer_code} - ${item.customer_name} · ${formatMoney(item.refundable_credit, currency)} available`,
+      value: refundCreditKey(item),
+      label: `${item.customer_code} - ${item.customer_name}${named ? ` · ${refundCreditBranchLabel(item)}` : ""} · ${formatMoney(item.refundable_credit, currency)} available`,
     }));
   }, [refundCustomers, selectedRefundCustomer, currency]);
   // Changing the date changes the answer, so the figure on screen is always read off
@@ -374,8 +383,8 @@ function NewActionDrawer({ open, onClose, entity, currency }: {
   // full, settled list comes back without them, they genuinely have no credit on
   // this date and the amount must drop to zero.
   const liveRefundCustomer = useMemo(
-    () => refundCustomers.find((item) => item.customer_code === customer) ?? null,
-    [refundCustomers, customer],
+    () => refundCustomers.find((item) => refundCreditKey(item) === refundKey) ?? null,
+    [refundCustomers, refundKey],
   );
   const activeRefundCustomer = liveRefundCustomer
     ?? ((refundAvailabilityQ.isFetching || refundSearch) ? selectedRefundCustomer : null);
@@ -416,17 +425,19 @@ function NewActionDrawer({ open, onClose, entity, currency }: {
   const reset = () => {
     setMode("REFUND"); setDate(""); setCustomer(""); setAmount(0); setReason("");
     setBankAccount(""); setInvoice(""); setExpenseAccount(""); setNextAction("post");
-    setRefundCustomerSearch(""); setSelectedRefundCustomer(null);
+    setRefundCustomerSearch(""); setRefundKey(""); setSelectedRefundCustomer(null);
   };
   const close = () => { reset(); onClose(); };
   const changeMode = (m: Mode) => {
     setMode(m); setCustomer(""); setInvoice(""); setAmount(0); setNextAction("post");
-    setRefundCustomerSearch(""); setSelectedRefundCustomer(null);
+    setRefundCustomerSearch(""); setRefundKey(""); setSelectedRefundCustomer(null);
   };
-  const pickRefundCustomer = (code: string) => {
-    const selected = refundCustomers.find((item) => item.customer_code === code)
-      ?? (selectedRefundCustomer?.customer_code === code ? selectedRefundCustomer : null);
-    setCustomer(code);
+  const pickRefundCustomer = (key: string) => {
+    const selected = refundCustomers.find((item) => refundCreditKey(item) === key)
+      ?? (selectedRefundCustomer && refundCreditKey(selectedRefundCustomer) === key
+        ? selectedRefundCustomer : null);
+    setRefundKey(key);
+    setCustomer(selected?.customer_code ?? "");
     setInvoice("");
     setSelectedRefundCustomer(selected);
     setAmount(selected?.refundable_credit ?? 0);
@@ -460,7 +471,9 @@ function NewActionDrawer({ open, onClose, entity, currency }: {
         }
       } else {
         const res = await createRefund({
-          entity, customer: customer.trim().toUpperCase(), refund_date: date, method: "BANK_TRANSFER",
+          entity, customer: customer.trim().toUpperCase(),
+          branch: refundRequestBranch(activeRefundCustomer),
+          refund_date: date, method: "BANK_TRANSFER",
           amount, bank_account: bankAccount ? Number(bankAccount) : undefined, narration: reason.trim() || undefined,
         }).unwrap();
         if (nextAction === "submit" || (nextAction === "post" && res.data.approval_required)) {
@@ -517,7 +530,7 @@ function NewActionDrawer({ open, onClose, entity, currency }: {
             ) : (
               <SearchSelect
                 options={refundCustomerOptions}
-                value={customer}
+                value={refundKey}
                 onChange={(e) => pickRefundCustomer(e.target.value)}
                 onSearchChange={setRefundCustomerSearch}
                 loading={refundAvailabilityQ.isFetching}

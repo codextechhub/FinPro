@@ -33,8 +33,18 @@ import type {
 } from "@/redux/services/finance/ar-types";
 import { formatMoney } from "@/utils/money";
 import { batchAdjustmentLinesAreValid } from "./batch-adjustment-validation";
+import {
+  refundCreditBranchLabel,
+  refundCreditKey,
+  refundCreditSpansBranches,
+  refundRequestBranch,
+} from "./refund-validation";
 
 /**
+ * A line's `target` is an invoice id for a write-off, and for a refund the key of one
+ * customer's credit at one branch (`refundCreditKey`), since a refund pays out only
+ * its own branch's credit.
+ *
  * `available` is deliberately NOT held in state. Every line's headroom depends on the
  * batch's posting date - refundable credit is measured as at that date - so a stored
  * snapshot goes stale the moment the date changes, and the user submits against a
@@ -111,8 +121,8 @@ export function BatchAdjustmentDrawer({
           label: `${invoice.document_number} - ${invoice.customer_name} · ${formatMoney(invoice.balance_due, currency)} due`,
         }))
       : refundTargets.map((customer) => ({
-          value: customer.customer_code,
-          label: `${customer.customer_code} - ${customer.customer_name} · ${formatMoney(customer.refundable_credit, currency)} available`,
+          value: refundCreditKey(customer),
+          label: `${customer.customer_code} - ${customer.customer_name}${refundCreditSpansBranches(refundTargets) ? ` · ${refundCreditBranchLabel(customer)}` : ""} · ${formatMoney(customer.refundable_credit, currency)} available`,
         })),
     [writeOff, invoiceTargets, refundTargets, currency],
   );
@@ -130,10 +140,12 @@ export function BatchAdjustmentDrawer({
     return values;
   }, [can, writeOff]);
 
+  const refundTargetFor = (target: string) => (
+    refundTargets.find((customer) => refundCreditKey(customer) === target) ?? null);
   // Headroom for a target, read from the *current* (date-scoped) eligibility lists.
   const availableFor = (target: string) => (writeOff
     ? invoiceTargets.find((invoice) => String(invoice.id) === target)?.balance_due ?? 0
-    : refundTargets.find((customer) => customer.customer_code === target)?.refundable_credit ?? 0);
+    : refundTargetFor(target)?.refundable_credit ?? 0);
   const resolved = useMemo(
     () => lines.map((line) => ({ ...line, available: availableFor(line.target) })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,7 +223,14 @@ export function BatchAdjustmentDrawer({
         : { bank_account: bankAccount }),
       items: writeOff
         ? lines.map((line) => ({ invoice: Number(line.target), amount: line.amount }))
-        : lines.map((line) => ({ customer: line.target, amount: line.amount })),
+        : lines.map((line) => {
+            const row = refundTargetFor(line.target);
+            return {
+              customer: row?.customer_code ?? line.target,
+              branch: refundRequestBranch(row),
+              amount: line.amount,
+            };
+          }),
     };
     setGateRefusal(null);
     try {
@@ -313,7 +332,7 @@ export function BatchAdjustmentDrawer({
             <FormField label="Refund bank account" required>
               <BankAccountPicker
                 entity={entity} value={bankAccount} onChange={setBankAccount}
-                documentBranchIds={lines.map((line) => refundTargets.find((c) => c.customer_code === line.target)?.branch_id)}
+                documentBranchIds={lines.map((line) => refundTargetFor(line.target)?.branch_id)}
               />
             </FormField>
           )}

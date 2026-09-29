@@ -149,7 +149,7 @@ export const arApi = baseApi.injectEndpoints({
       query: (params) => ({ url: `/finance/refunds/availability/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceRefunds", "FinanceCustomers"],
     }),
-    createRefund: builder.mutation<ApiEnvelope<Refund>, { entity: string; customer: string; refund_date: string; method?: string; amount: number; bank_account?: string | number; reference?: string; narration?: string }>({
+    createRefund: builder.mutation<ApiEnvelope<Refund>, { entity: string; customer: string; branch?: number; refund_date: string; method?: string; amount: number; bank_account?: string | number; reference?: string; narration?: string }>({
       query: ({ entity, ...body }) => ({ url: `/finance/refunds/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceRefunds"],
     }),
