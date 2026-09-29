@@ -21,6 +21,8 @@ import { useGetAuditLogQuery, useGetAuditFacetsQuery } from "@/redux/services/fi
 import type { FinanceAuditLog } from "@/redux/services/finance/setup-types";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates, type DateFormatter } from "../../lib/display-prefs";
+import { sinceDate } from "../../utils/date-presets";
 
 // Action tone: rejections read red, reversals/cancellations amber, master-data
 // edits blue, everything else (posts/approvals/completions) green.
@@ -46,14 +48,17 @@ function diffRows(before: Record<string, unknown>, after: Record<string, unknown
     .filter((k) => JSON.stringify(b[k]) !== JSON.stringify(a[k]))
     .map((k) => ({ key: k, before: b[k], after: a[k] }));
 }
-function fmt(v: unknown): string {
+/**
+ * One side of a field diff as a reader wants it. A timestamp is written like
+ * the "When" column, in the school's format and zone, rather than as the raw
+ * "2026-06-30T09:51:10.585498+00:00" the ledger stores.
+ */
+function fmt(v: unknown, dates: DateFormatter): string {
   if (v === null || v === undefined) return "-";
   if (typeof v === "string") {
-    // Render ISO timestamps the human way (matches the "When" column) rather
-    // than the raw "2026-06-30T09:51:10.585498+00:00" the ledger stores.
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) {
-      const d = new Date(v);
-      if (!Number.isNaN(d.getTime())) return d.toLocaleString("en-GB");
+      const when = dates.dateTime(v, null, { seconds: true });
+      if (when !== "-") return when;
     }
     return v;
   }
@@ -66,14 +71,6 @@ const DATE_PRESETS = [
   { value: "7", label: "Last 7 days" },
   { value: "30", label: "Last 30 days" },
 ];
-
-function presetToDateFrom(preset: string): string | undefined {
-  if (!preset) return undefined;
-  const d = new Date();
-  if (preset === "7") d.setDate(d.getDate() - 7);
-  else if (preset === "30") d.setDate(d.getDate() - 30);
-  return d.toISOString().slice(0, 10);
-}
 
 // A plain styled dropdown for the small fixed-option filters (status, date).
 function FilterSelect({ value, onChange, className, children }: { value: string; onChange: (v: string) => void; className?: string; children: React.ReactNode }) {
@@ -98,11 +95,12 @@ const thd = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibol
 const tdd = "border-t border-white-02 px-3 py-2 align-top font-mont text-xs";
 
 function AuditDetail({ log }: { log: FinanceAuditLog }) {
+  const dates = useDates();
   const rows = diffRows(log.before, log.after);
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
-        <Stat label="When">{new Date(log.created_at).toLocaleString("en-GB")}</Stat>
+        <Stat label="When">{dates.dateTime(log.created_at, null, { seconds: true })}</Stat>
         <Stat label="Actor">{log.actor ?? "System"}</Stat>
         <Stat label="Action">
           <span className={cn("inline-flex rounded px-2 py-0.5 font-mont text-xs font-medium", actionTone(log.action, log.status))}>
@@ -131,8 +129,8 @@ function AuditDetail({ log }: { log: FinanceAuditLog }) {
                 {rows.map((r) => (
                   <tr key={r.key}>
                     <td className={cn(tdd, "font-mono text-gray-01")}>{r.key}</td>
-                    <td className={cn(tdd, "bg-destructive/5 break-words text-gray-05")}>{fmt(r.before)}</td>
-                    <td className={cn(tdd, "bg-green-01/5 break-words font-medium text-black-01")}>{fmt(r.after)}</td>
+                    <td className={cn(tdd, "bg-destructive/5 break-words text-gray-05")}>{fmt(r.before, dates)}</td>
+                    <td className={cn(tdd, "bg-green-01/5 break-words font-medium text-black-01")}>{fmt(r.after, dates)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -145,6 +143,7 @@ function AuditDetail({ log }: { log: FinanceAuditLog }) {
 }
 
 export default function FinanceAuditPage() {
+  const dates = useDates();
   const { code: entity } = useActiveEntity();
   const [page, setPage] = useState(1);
   const [action, setAction] = useState("");
@@ -158,14 +157,15 @@ export default function FinanceAuditPage() {
   const bind = (setter: (v: string) => void) => (v: string) => { setter(v); setPage(1); };
   const onSelect = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLSelectElement>) => bind(setter)(e.target.value);
 
+  const dateFrom = sinceDate(datePreset, dates.today());
   const params = useMemo(() => ({
     entity: entity!, page,
     ...(action ? { action } : {}),
     ...(targetType ? { target_type: targetType } : {}),
     ...(status ? { status } : {}),
     ...(actor ? { actor } : {}),
-    ...(presetToDateFrom(datePreset) ? { date_from: presetToDateFrom(datePreset) } : {}),
-  }), [entity, page, action, targetType, status, actor, datePreset]);
+    ...(dateFrom ? { date_from: dateFrom } : {}),
+  }), [entity, page, action, targetType, status, actor, dateFrom]);
 
   // finance.audit.view is a restricted key, so plenty of legitimate finance
   // users do not hold it. Asking anyway spent two 403s and a red toast on every
@@ -186,7 +186,7 @@ export default function FinanceAuditPage() {
   const actorOptions = useMemo(() => [{ value: "", label: "All actors" }, ...(facets?.actors ?? []).map((a) => ({ value: String(a.id), label: a.email }))], [facets]);
 
   const columns: Column<FinanceAuditLog>[] = [
-    { header: "When", cell: (l) => <span className="whitespace-nowrap tabular-nums text-gray-01">{new Date(l.created_at).toLocaleString("en-GB")}</span> },
+    { header: "When", cell: (l) => <span className="whitespace-nowrap tabular-nums text-gray-01">{dates.dateTime(l.created_at, null, { seconds: true })}</span> },
     { header: "Actor", cell: (l) => (
       <span className="flex items-center gap-2">
         <span className={cn("grid size-6 shrink-0 place-content-center rounded-full text-[10px] font-semibold",
