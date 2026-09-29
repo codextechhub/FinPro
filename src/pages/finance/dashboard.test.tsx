@@ -268,7 +268,7 @@ describe("Finance overview short cards", () => {
     }, "finance.invoice.view");
 
     expect(text).toContain("Total across 1 account");
-    expect(text).toContain("8 lines to match · last reconciled 25 Sept");
+    expect(text).toContain("8 lines to match · last reconciled 25 Sep");
   });
 });
 
