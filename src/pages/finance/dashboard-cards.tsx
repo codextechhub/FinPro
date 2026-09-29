@@ -204,7 +204,7 @@ export function BilledCollectedCard({ trend, collections, windowName, basis, cur
         ))}
       </div>
       {basis === "billed_for" && (
-        <p className="font-mont text-[11px] text-gray-05">The monthly bars count by date. The figures above count this term&rsquo;s fees and what has been paid against them, whenever it arrived.</p>
+        <p className="font-mont text-[11px] text-gray-05">The monthly bars count by date. The figures above count {windowName}&rsquo;s fees and what has been paid against them, whenever it arrived.</p>
       )}
     </Panel>
   );

@@ -99,6 +99,14 @@ describe("Receivables & collections for the proprietor", () => {
     expect(text).toContain("closes near 91%, above your 85% target");
   });
 
+  it("says semester where the school's term window is a semester", () => {
+    const text = render({ ...FULL, window: { ...FULL.window, label: "This semester", name: "First Semester 2026/2027" } });
+
+    expect(text).toContain("Semester collection curve");
+    expect(text).toContain("the semester closes near 91%");
+    expect(text).not.toContain("Term collection curve");
+  });
+
   it("draws every card it was sent, in school words", () => {
     const text = render(FULL);
 

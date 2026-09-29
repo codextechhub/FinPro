@@ -21,7 +21,7 @@ import { formatMoney } from "@/utils/money";
 import type { ReceivablesDashboard } from "@/redux/services/finance/reports-types";
 import { routesPath } from "@/routes/routes-path";
 import { AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, plural } from "./dashboard-cards";
-import type { DashboardWords } from "./dashboard-words";
+import { termWordOf, type DashboardWords } from "./dashboard-words";
 
 type R = ReceivablesDashboard;
 const F = routesPath.PROTECTED.FINANCE;
@@ -64,7 +64,12 @@ export function curveTicks(weeks: number): { week: number; wide: boolean }[] {
  * the left and right arrow keys step the marker week by week. Leaving the chart
  * returns the marker to today.
  */
-function CurveCard({ curve, windowName, isTerm }: { curve: NonNullable<R["curve"]>; windowName: string; isTerm: boolean }) {
+function CurveCard({ curve, windowName, unit }: {
+  curve: NonNullable<R["curve"]>;
+  windowName: string;
+  /** "term" or "semester" for a school's term window, else null. */
+  unit: string | null;
+}) {
   const xPct = (week: number) => (curve.weeks <= 1 ? 0 : (week * 100) / (curve.weeks - 1));
   const yPct = (pct: number) => 100 - Math.min(Math.max(pct, 0), 100);
   const line = (pts: number[]) => pts.map((p, i) => `${xPct(i).toFixed(2)},${yPct(p).toFixed(2)}`).join(" ");
@@ -86,13 +91,13 @@ function CurveCard({ curve, windowName, isTerm }: { curve: NonNullable<R["curve"
   };
   const pace = curve.projection_pct == null ? null
     : curve.projection_pct >= curve.target_pct
-      ? `At this pace the ${isTerm ? "term" : "period"} closes near ${curve.projection_pct}%, above your ${curve.target_pct}% target.`
-      : `At this pace the ${isTerm ? "term" : "period"} closes near ${curve.projection_pct}%, short of your ${curve.target_pct}% target.`;
+      ? `At this pace the ${unit ?? "period"} closes near ${curve.projection_pct}%, above your ${curve.target_pct}% target.`
+      : `At this pace the ${unit ?? "period"} closes near ${curve.projection_pct}%, short of your ${curve.target_pct}% target.`;
   const vs = curve.vs_previous_pts == null ? null
     : `${Math.abs(curve.vs_previous_pts)} points ${curve.vs_previous_pts >= 0 ? "ahead of" : "behind"} ${curve.previous_name ?? "last time"} at the same week.`;
   const ticks = curveTicks(curve.weeks);
   return (
-    <Panel title={isTerm ? "Term collection curve" : "Collection curve"}
+    <Panel title={unit ? `${unit.charAt(0).toUpperCase()}${unit.slice(1)} collection curve` : "Collection curve"}
       subtitle={`Share of ${windowName} fees collected, week by week`}
       footer={[`Week ${curve.week_now} of ${curve.weeks}: ${now}% collected.`, vs, pace].filter(Boolean).join(" ")}>
       <div className="flex flex-wrap gap-x-4 gap-y-1 font-mont text-[11px] text-gray-05">
@@ -414,7 +419,13 @@ export function ReceivablesTab({ d, words, currency }: { d: R; words: DashboardW
 
       {(d.curve || d.plans) && (
         <div className={cn("grid grid-cols-1 gap-5", d.curve && d.plans && "xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]")}>
-          {d.curve && <CurveCard curve={d.curve} windowName={windowName} isTerm={d.window.basis === "billed_for"} />}
+          {d.curve && (
+            <CurveCard
+              curve={d.curve}
+              windowName={windowName}
+              unit={d.window.basis === "billed_for" ? termWordOf(d.window.label) : null}
+            />
+          )}
           {d.plans && <PlansCard plans={d.plans} currency={currency} />}
         </div>
       )}

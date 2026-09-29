@@ -55,6 +55,20 @@ export function collectedLabel(windowLabel: string): string {
   return `Collected ${windowLabel.charAt(0).toLowerCase()}${windowLabel.slice(1)}`;
 }
 
+/**
+ * The school's word for a term, read from the window the server labelled.
+ *
+ * A school calls a part of its year a term or a semester, and the server
+ * words the term window in the school's own word ("This term", "This
+ * semester"), so the screen takes the word from that label rather than
+ * holding its own. Anything else reads "term", the word every school had
+ * before it could choose.
+ */
+export function termWordOf(windowLabel: string): string {
+  const word = windowLabel.replace(/^this\s+/i, "").trim().toLowerCase();
+  return /^[a-z]+$/.test(word) ? word : "term";
+}
+
 /** "Good morning", "Good afternoon" or "Good evening" for the reader's local hour. */
 export function greeting(now: Date = new Date()): string {
   const hour = now.getHours();
