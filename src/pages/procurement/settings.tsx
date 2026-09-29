@@ -39,6 +39,7 @@ import {
   SettingsPanel,
   SettingsRow,
   SettingsSectionHeader,
+  type ConsoleSettingsGroup,
   type ConsoleSettingsSection,
 } from "@/components/settings/settings-layout";
 import { useActiveEntity } from "@/components/finance-ui";
@@ -60,13 +61,19 @@ const F = routesPath.PROTECTED.FINANCE;
 const SECTIONS: ConsoleSettingsSection[] = [
   { key: "overview", title: "Overview", description: "Configuration health", icon: Settings2 },
   { key: "general", title: "General defaults", description: "Entity and document defaults", icon: Building2 },
-  { key: "purchasing", title: "Purchasing policy", description: "Requisitions and vendors", icon: ShoppingCart },
-  { key: "sourcing-lifecycle", title: "Sourcing and lifecycle", description: "RFQs and renewals", icon: Clock3 },
-  { key: "competitive-governance", title: "Competitive governance", description: "Bid minimums and exceptions", icon: Gavel },
-  { key: "matching", title: "Invoice matching", description: "PO, receipt and invoice", icon: Scale },
-  { key: "accounting", title: "Accounting integration", description: "Control account map", icon: BookOpenCheck },
+  { key: "purchasing", title: "Purchasing policy", description: "Requisitions and vendors", icon: ShoppingCart, group: "purchasing" },
+  { key: "sourcing-lifecycle", title: "Sourcing and lifecycle", description: "RFQs and renewals", icon: Clock3, group: "purchasing" },
+  { key: "competitive-governance", title: "Competitive governance", description: "Bid minimums and exceptions", icon: Gavel, group: "purchasing" },
+  { key: "matching", title: "Invoice matching", description: "PO, receipt and invoice", icon: Scale, group: "payables" },
+  { key: "accounting", title: "Accounting integration", description: "Control account map", icon: BookOpenCheck, group: "payables" },
   { key: "approvals", title: "Approvals", description: "Purchasing workflows", icon: Workflow },
   { key: "reference-data", title: "Reference data", description: "Vendors, catalog and stock", icon: Tags },
+];
+
+/** Rail headings; a section's `group` puts it under one (see ConsoleSettingsLayout). */
+const GROUPS: ConsoleSettingsGroup[] = [
+  { key: "purchasing", title: "Purchasing", icon: ShoppingCart },
+  { key: "payables", title: "Payables", icon: Scale },
 ];
 
 const PROCUREMENT_ACCOUNTS = [
@@ -95,6 +102,8 @@ export default function ProcurementSettings({ section = DEFAULT_PROCUREMENT_SETT
         basePath={PR.SETTINGS}
         activeSection={activeSection}
         sections={SECTIONS}
+        groups={GROUPS}
+        fitScreen
         scopeLabel={active.entity ? `${active.entity.code} · ${active.entity.name}` : "Select an entity"}
       >
         {activeSection === "overview" ? <Overview entity={active.entity} /> : null}

@@ -48,6 +48,7 @@ import {
   SettingsPanel,
   SettingsRow,
   SettingsSectionHeader,
+  type ConsoleSettingsGroup,
   type ConsoleSettingsSection,
 } from "@/components/settings/settings-layout";
 import { useActiveEntity } from "@/components/finance-ui";
@@ -61,16 +62,24 @@ const F = routesPath.PROTECTED.FINANCE;
 // Keys typed to the section union rather than to `string`, so the host's
 // mounted-sections list can be checked against them at compile time and a
 // section renamed in one place cannot silently stop matching in the other.
+//
+// The rail order is this list's order; a section's `group` puts it under that
+// heading, which opens like a sub-menu (see ConsoleSettingsLayout).
 const SECTIONS: (ConsoleSettingsSection & { key: FinanceSettingsSection })[] = [
   { key: "overview", title: "Overview", description: "Configuration health", icon: Settings2 },
-  { key: "entities", title: "Entities", description: "Sets of books", icon: Building2 },
-  { key: "fiscal-calendar", title: "Fiscal calendar", description: "Years and periods", icon: CalendarRange },
-  { key: "accounting", title: "Accounting defaults", description: "Posting account map", icon: BookOpenCheck },
-  { key: "documents", title: "Documents", description: "Collections and policies", icon: FileCog },
-  { key: "banking-cash", title: "Banking and cash", description: "Matching and allocation", icon: Banknote },
-  { key: "reference-data", title: "Reference data", description: "Codes and dimensions", icon: ListTree },
+  { key: "entities", title: "Entities", description: "Sets of books", icon: Building2, group: "books" },
+  { key: "fiscal-calendar", title: "Fiscal calendar", description: "Years and periods", icon: CalendarRange, group: "books" },
+  { key: "accounting", title: "Accounting defaults", description: "Posting account map", icon: BookOpenCheck, group: "books" },
+  { key: "reference-data", title: "Reference data", description: "Codes and dimensions", icon: ListTree, group: "books" },
+  { key: "documents", title: "Documents", description: "Collections and policies", icon: FileCog, group: "billing" },
+  { key: "fees", title: "Fee due dates", description: "When fee bills fall due", icon: CalendarClock, group: "billing" },
+  { key: "banking-cash", title: "Banking and cash", description: "Matching and allocation", icon: Banknote, group: "billing" },
   { key: "approvals", title: "Approvals", description: "Finance workflows", icon: Workflow },
-  { key: "fees", title: "Fee due dates", description: "When fee bills fall due", icon: CalendarClock },
+];
+
+const GROUPS: ConsoleSettingsGroup[] = [
+  { key: "books", title: "Books", icon: BookOpenCheck },
+  { key: "billing", title: "Billing and cash", icon: Banknote },
 ];
 
 const ACCOUNT_DESCRIPTIONS: Record<string, string> = {
@@ -117,6 +126,8 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
         basePath={F.SETTINGS}
         activeSection={activeSection}
         sections={sections}
+        groups={GROUPS}
+        fitScreen
         scopeLabel={active.entity ? `${active.entity.code} · ${active.entity.name}` : "Select an entity"}
       >
         {activeSection === "overview" ? <Overview entity={active.entity} sections={sections} /> : null}
