@@ -6,6 +6,7 @@ import {
   refundCreditKey,
   refundCreditSpansBranches,
   refundRequestBranch,
+  type RefundCreditRow,
 } from "./refund-validation";
 
 describe("refundAmountIsWithinAvailableCredit", () => {
@@ -38,5 +39,13 @@ describe("refund credit rows", () => {
     expect(refundRequestBranch(lekki)).toBe(2);
     expect(refundRequestBranch(unbranched)).toBeUndefined();
     expect(refundRequestBranch(null)).toBeUndefined();
+  });
+
+  it("names no branch when the server reports rows per customer", () => {
+    const rows = [
+      { customer_code: "OKAFOR", branch_id: 1 },
+      { customer_code: "BELLO", branch_id: 2 },
+    ] as unknown as RefundCreditRow[];
+    expect(refundCreditSpansBranches(rows)).toBe(false);
   });
 });

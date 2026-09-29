@@ -24,12 +24,16 @@ export function refundCreditKey(row: RefundCreditRow): string {
 }
 
 /**
- * Whether the rows hold credit at more than one branch.
+ * Whether the rows hold credit at more than one branch, and say which.
  *
  * The branch is named on a row only then: a school with one branch, or a reader
- * whose rows all sit at one, would otherwise see the same name on every line.
+ * whose rows all sit at one, would otherwise see the same name on every line. A
+ * server that reports rows per customer rather than per branch sends no
+ * `branch_name`, and its rows are not named at all, so a branched customer is
+ * never labelled by the unbranched fallback.
  */
 export function refundCreditSpansBranches(rows: RefundCreditRow[]): boolean {
+  if (rows.some((row) => row.branch_name === undefined)) return false;
   return new Set(rows.map((row) => row.branch_id ?? null)).size > 1;
 }
 
