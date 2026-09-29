@@ -26,6 +26,8 @@ import { DirectEntryDrawer } from "./direct-entry-drawer";
 import { JournalDetailDrawer } from "./journal-detail-drawer";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../../lib/display-prefs";
+import { presetRange } from "../../../utils/date-presets";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
 const SOURCES: JournalSource[] = ["MANUAL", "SALES", "PURCHASE", "BANK", "PAYROLL", "CLOSING", "OPENING", "FX", "SYSTEM"];
@@ -39,16 +41,8 @@ const STATUS_TABS: { key: JournalStatus; label: string }[] = [
 ];
 const cap = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 
-function presetRange(preset: string): { from: string; to: string } {
-  const now = new Date();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  if (preset === "this-month") return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(new Date(now.getFullYear(), now.getMonth() + 1, 0)) };
-  if (preset === "last-month") return { from: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: iso(new Date(now.getFullYear(), now.getMonth(), 0)) };
-  if (preset === "ytd") return { from: iso(new Date(now.getFullYear(), 0, 1)), to: iso(now) };
-  return { from: "", to: "" };
-}
-
 export default function GeneralLedgerPage() {
+  const dates = useDates();
   const [searchParams] = useSearchParams();
   const { code: entity, currency } = useActiveEntity();
   const [status, setStatus] = useState<JournalStatus | "">("");
@@ -63,7 +57,7 @@ export default function GeneralLedgerPage() {
   const { can } = useCan();
   useActionParam("new", can(P.FIN_POST_DIRECT_ENTRY), () => setDirectOpen(true));
 
-  const range = preset === "custom" ? custom : presetRange(preset);
+  const range = preset === "custom" ? custom : presetRange(preset, dates.today());
   const filters = useMemo(() => ({
     entity: entity!,
     ...(source ? { source } : {}),
