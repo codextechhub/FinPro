@@ -33,6 +33,7 @@ import { P } from "../../../permissions";
 import { useGetCollectionsQuery, useGetCollectionsSummaryQuery, useInitiateCollectionMutation, useVerifyCollectionMutation } from "@/redux/services/payments/payments-api";
 import { useGetInvoicesQuery } from "@/redux/services/finance/ar-api";
 import type { Collection } from "@/redux/services/payments/payments-types";
+import type { Invoice } from "@/redux/services/finance/ar-types";
 import { useDates } from "../../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
@@ -239,36 +240,52 @@ function CollectionDrawer({ collectionId, collections, entity, currency, onClose
   );
 }
 
+/**
+ * Start a hosted checkout, from a family or from one of the reader's open invoices.
+ *
+ * Money paid against an invoice belongs to the invoice's branch, and the family
+ * picker lists only families filed in the reader's branches. A Lekki bursar
+ * collecting a Lekki invoice owed by a family filed under Ikeja therefore starts
+ * from the invoice: with no family picked, the invoice list offers every open
+ * invoice she can see, and the checkout is sent with the invoice alone, which
+ * the backend bills to the invoice's own family.
+ */
 function NewCheckoutDrawer({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {
   const [customer, setCustomer] = useState("");
   const [invoice, setInvoice] = useState("");
+  const [picked, setPicked] = useState<Invoice | null>(null);
+  const [invoiceSearch, setInvoiceSearch] = useState("");
   const [amount, setAmount] = useState(0);
   const [provider, setProvider] = useState("PAYSTACK");
   const [email, setEmail] = useState("");
   const [narration, setNarration] = useState("");
   const [initiate, { isLoading }] = useInitiateCollectionMutation();
   const invoicesQ = useGetInvoicesQuery(
-    { entity, search: customer, status: "POSTED" },
-    { skip: !open || !customer },
+    { entity, status: "POSTED", bucket: "open", page_size: 100, search: customer || invoiceSearch.trim() || undefined },
+    { skip: !open || (!customer && invoiceSearch.trim().length < 2) },
   );
-  const openInvoices = useMemo(
-    () => toArray(invoicesQ.data?.data).filter((i) => i.customer_code === customer && i.balance_due > 0),
-    [invoicesQ.data, customer],
-  );
+  // The picked invoice stays listed after the search that found it is cleared.
+  const openInvoices = useMemo(() => {
+    const found = toArray(invoicesQ.data?.data).filter((i) => (!customer || i.customer_code === customer) && i.balance_due > 0);
+    return picked && !found.some((i) => i.id === picked.id) ? [picked, ...found] : found;
+  }, [invoicesQ.data, customer, picked]);
   const invoiceOptions = openInvoices.map((i) => ({
     value: String(i.id),
-    label: `${i.document_number} · ${formatMoney(i.balance_due, currency)} due`,
+    label: customer
+      ? `${i.document_number} · ${formatMoney(i.balance_due, currency)} due`
+      : `${i.document_number} · ${i.customer_name} · ${formatMoney(i.balance_due, currency)} due`,
   }));
   const selectedInvoice = openInvoices.find((i) => String(i.id) === invoice);
-  const close = () => { setCustomer(""); setInvoice(""); setAmount(0); setProvider("PAYSTACK"); setEmail(""); setNarration(""); onClose(); };
+  const close = () => { setCustomer(""); setInvoice(""); setPicked(null); setInvoiceSearch(""); setAmount(0); setProvider("PAYSTACK"); setEmail(""); setNarration(""); onClose(); };
   const pickInvoice = (id: string) => {
     setInvoice(id);
-    const selected = openInvoices.find((i) => String(i.id) === id);
+    const selected = openInvoices.find((i) => String(i.id) === id) ?? null;
+    setPicked(selected);
     if (selected) setAmount(selected.balance_due);
   };
   const submit = async () => {
     try {
-      const r = await initiate({ entity, amount, customer, invoice: invoice ? Number(invoice) : undefined, provider, payer_email: email.trim() || undefined, narration: narration.trim() || undefined }).unwrap();
+      const r = await initiate({ entity, amount, customer: customer || undefined, invoice: invoice ? Number(invoice) : undefined, provider, payer_email: email.trim() || undefined, narration: narration.trim() || undefined }).unwrap();
       const url = r.data?.checkout_url;
       if (url) { try { await navigator.clipboard.writeText(url); } catch { /* ignore */ } }
       toast.success(url ? "Checkout link created and copied." : r.message || "Checkout created.");
@@ -287,20 +304,27 @@ function NewCheckoutDrawer({ open, onClose, entity, currency }: { open: boolean;
       title="New checkout" description="Create a hosted payment link to hand off to the customer." widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
-        <Button disabled={isLoading || amount <= 0 || !customer} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create checkout link"}</Button>
+        <Button disabled={isLoading || amount <= 0 || (!customer && !invoice)} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create checkout link"}</Button>
       </>}>
       <div className="space-y-4">
-        <FormField label="Customer" required><CustomerPicker entity={entity} value={customer} onChange={(value) => { setCustomer(value); setInvoice(""); setAmount(0); }} /></FormField>
-        <FormField label="Invoice (optional)">
+        <FormField label="Customer"><CustomerPicker entity={entity} value={customer} onChange={(value) => { setCustomer(value); setInvoice(""); setPicked(null); setAmount(0); }} placeholder="Select customer, or pick an invoice below" /></FormField>
+        <FormField label={customer ? "Invoice (optional)" : "Invoice"}>
           <SearchSelect
             options={invoiceOptions}
             value={invoice}
             onChange={(e) => pickInvoice(e.target.value)}
-            placeholder={customer ? (invoicesQ.isFetching ? "Loading invoices…" : "No invoice - customer credit") : "Select a customer first"}
-            disabled={!customer || invoicesQ.isFetching}
+            placeholder={customer ? (invoicesQ.isFetching ? "Loading invoices…" : "No invoice - customer credit") : "Search open invoices by number or family"}
+            disabled={!!customer && invoicesQ.isFetching}
+            loading={invoicesQ.isFetching}
+            revealOnSearch={!customer}
+            onSearchChange={customer ? undefined : setInvoiceSearch}
           />
         </FormField>
-        <p className="-mt-2 font-mont text-[11px] text-gray-05">Select an invoice to settle Accounts Receivable; leave blank to hold the payment as customer credit.</p>
+        <p className="-mt-2 font-mont text-[11px] text-gray-05">
+          {!customer && selectedInvoice
+            ? `Bills ${selectedInvoice.customer_name}, the family on invoice ${selectedInvoice.document_number}.`
+            : "Select an invoice to settle Accounts Receivable. With a customer picked, leave it blank to hold the payment as customer credit."}
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></FormField>
           <div><p className="mb-1 font-mont text-xs text-gray-05">Provider</p><Select value={provider} onChange={setProvider} className="w-full">{PROVIDER_CHOICES.map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}</Select></div>
