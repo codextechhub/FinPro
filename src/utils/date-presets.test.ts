@@ -9,8 +9,7 @@ const today = todayIn("Africa/Lagos", JUST_PAST_LAGOS_MIDNIGHT);
 
 describe("presetRange", () => {
   it("runs this month from its first day to its last, just past Lagos midnight", () => {
-    // The ledger built these from local-midnight Dates and toISOString(), and
-    // in Lagos offered 31 Aug to 29 Sep for "this month", every time.
+    // Local-midnight Dates written with toISOString() give 31 Aug to 29 Sep here.
     expect(today).toBe("2026-09-01");
     expect(presetRange("this-month", today)).toEqual({ from: "2026-09-01", to: "2026-09-30" });
   });
@@ -31,8 +30,7 @@ describe("presetRange", () => {
 
 describe("sinceDate", () => {
   it("starts 'today' on the school's day, not the UTC one", () => {
-    // The audit log's "Today" filter read the date from UTC after setting a
-    // local day, and asked for 31 Aug here.
+    // The UTC date is still 31 Aug here.
     expect(sinceDate("today", today)).toBe("2026-09-01");
   });
 

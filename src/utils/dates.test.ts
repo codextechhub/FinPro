@@ -39,8 +39,7 @@ describe("formatDay", () => {
   });
 
   it("never moves a calendar date, whatever the zone", () => {
-    // `new Date("2026-01-01").toLocaleDateString()` read this as UTC midnight,
-    // which is 31 Dec anywhere west of Greenwich.
+    // `new Date("2026-01-01")` is UTC midnight: 31 Dec west of Greenwich.
     for (const timeZone of ["Africa/Lagos", "Africa/Nairobi", "America/Los_Angeles", "Pacific/Kiritimati"]) {
       expect(formatDay("2026-01-01", { ...LAGOS, timeZone })).toBe("1 Jan 2026");
       expect(formatDay("2026-12-31", { ...LAGOS, timeZone })).toBe("31 Dec 2026");
@@ -125,8 +124,7 @@ describe("todayIn and nowIn", () => {
   });
 
   it("is the Lagos date just past Lagos midnight, not the UTC one", () => {
-    // A form defaulted with `new Date().toISOString().slice(0, 10)` offered
-    // the 28th here, for the whole first hour of the 29th.
+    // `new Date().toISOString().slice(0, 10)` is still the 28th here.
     expect(todayIn("Africa/Lagos", new Date(PAST_LAGOS_MIDNIGHT))).toBe("2026-09-29");
   });
 
@@ -163,9 +161,7 @@ describe("calendar arithmetic", () => {
   });
 
   it("ends a month on its last day, not the day before", () => {
-    // Fixed-asset depreciation defaulted to
-    // `new Date(y, m + 1, 0).toISOString()`, local midnight on the 30th read
-    // back as 23:00 UTC on the 29th in Lagos: a day short every month.
+    // `new Date(y, m + 1, 0).toISOString()` is the 29th in Lagos.
     expect(monthBounds("2026-09-29")).toEqual({ from: "2026-09-01", to: "2026-09-30" });
     expect(monthBounds(todayIn("Africa/Lagos", new Date("2026-09-30T23:30:00Z"))).to).toBe("2026-10-31");
   });

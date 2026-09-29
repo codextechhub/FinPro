@@ -227,7 +227,7 @@ describe("finance print dates", () => {
   const plainRun = { ...payrollRun(plainLine), document_number: "PAY-0009", period_label: "September 2026", pay_date: "2026-09-01" };
 
   it("prints a pay date on its own day in the school's format, whatever the zone", () => {
-    // `new Date("2026-09-01").toLocaleDateString()` printed 31 Aug west of UTC.
+    // `new Date("2026-09-01")` is UTC midnight: 31 Aug west of Greenwich.
     const slashed: DisplayPrefs = { ...PREFS, dateFormat: "DD_MM_YYYY", timeZone: "America/Los_Angeles" };
     expect(textOf(renderFinancePrintHtml(buildPayslipPrintDocument(plainRun, plainLine, "NGN", PREFS)))).toContain("paid 1 Sep 2026");
     expect(textOf(renderFinancePrintHtml(buildPayslipPrintDocument(plainRun, plainLine, "NGN", slashed)))).toContain("paid 01/09/2026");
