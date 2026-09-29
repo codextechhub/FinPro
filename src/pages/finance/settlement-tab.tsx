@@ -21,9 +21,9 @@ import { useGetSettlementReconciliationQuery } from "@/redux/services/payments/p
 import { downloadReportExport } from "@/utils/finance-export";
 import type { SettlementRow, UnmatchedBankLine } from "@/redux/services/payments/payments-types";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
+import { useDates } from "../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
-const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : "-");
 const signed = (kobo: number, currency?: string | null) => `${kobo < 0 ? "−" : ""}${formatMoney(Math.abs(kobo), currency)}`;
 
 function ProviderTag({ provider }: { provider: string }) {
@@ -56,6 +56,7 @@ type Tab = "matched" | "unsettled" | "unmatched";
 type Picked = { kind: "gw"; row: SettlementRow } | { kind: "bank"; line: UnmatchedBankLine };
 
 export function SettlementTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [provider, setProvider] = useState("");
   const [tab, setTab] = useState<Tab>("matched");
   const [picked, setPicked] = useState<Picked | null>(null);
@@ -78,7 +79,7 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
   ];
 
   const gwBase: Column<SettlementRow>[] = [
-    { header: "Date", cell: (r) => <span className="tabular-nums text-gray-05">{fmtDate(r.confirmed_at)}</span> },
+    { header: "Date", cell: (r) => <span className="tabular-nums text-gray-05">{dates.day(r.confirmed_at)}</span> },
     { header: "Type", cell: (r) => <TypeTag kind={r.kind} /> },
     { header: "Provider", cell: (r) => <ProviderTag provider={r.provider} /> },
     { header: "Reference", cell: (r) => <span className="tabular-nums text-gray-01">{r.reference}</span> },
@@ -96,7 +97,7 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
     { header: "Status", cell: () => <span className={cn(PILL, "bg-amber-50 text-amber-700")}>Awaiting bank</span> },
   ];
   const unmatchedCols: Column<UnmatchedBankLine>[] = [
-    { header: "Date", cell: (b) => <span className="tabular-nums text-gray-05">{fmtDate(b.txn_date)}</span> },
+    { header: "Date", cell: (b) => <span className="tabular-nums text-gray-05">{dates.day(b.txn_date)}</span> },
     { header: "Description", cell: (b) => b.description || "-" },
     { header: "Reference", cell: (b) => <span className="tabular-nums text-gray-05">{b.reference || "-"}</span> },
     { header: "Amount", align: "right", cell: (b) => <span className={cn("tabular-nums font-medium", b.amount < 0 ? "text-destructive" : "text-black-01")}>{signed(b.amount, currency)}</span> },
@@ -192,6 +193,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function SettlementDrawer({ picked, currency, onClose }: { picked: Picked | null; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   if (!picked) return null;
 
   if (picked.kind === "bank") {
@@ -202,7 +204,7 @@ function SettlementDrawer({ picked, currency, onClose }: { picked: Picked | null
         footer={<span className={cn(PILL, "bg-amber-50 text-amber-700")}>No gateway record</span>}>
     <div className="space-y-4" data-guide="finance-settlement.workbench">
           <Section title="Bank statement line">
-            <Field label="Date" mono>{fmtDate(b.txn_date)}</Field>
+            <Field label="Date" mono>{dates.day(b.txn_date)}</Field>
             <Field label="Description">{b.description || "-"}</Field>
             <Field label="Reference" mono>{b.reference || "-"}</Field>
             <Field label="Amount" mono><span className={b.amount < 0 ? "text-destructive" : ""}>{signed(b.amount, currency)}</span></Field>
@@ -229,14 +231,14 @@ function SettlementDrawer({ picked, currency, onClose }: { picked: Picked | null
           <Field label="Provider"><ProviderTag provider={r.provider} /></Field>
           <Field label="Reference" mono>{r.reference}</Field>
           {r.provider_reference ? <Field label="Provider ref" mono>{r.provider_reference}</Field> : null}
-          <Field label="Confirmed" mono>{fmtDate(r.confirmed_at)}</Field>
+          <Field label="Confirmed" mono>{dates.day(r.confirmed_at)}</Field>
           <Field label="Gross" mono>{formatMoney(Math.abs(r.amount), currency)}</Field>
         </Section>
 
         {r.settled ? (
           <Section title="Bank settlement">
             <Field label="Settlement ref" mono>{r.settlement_reference || "-"}</Field>
-            <Field label="Bank date" mono>{fmtDate(r.settlement_date)}</Field>
+            <Field label="Bank date" mono>{dates.day(r.settlement_date)}</Field>
             {r.settlement_description ? <Field label="Description">{r.settlement_description}</Field> : null}
             <Field label="Net settled" mono>{formatMoney(Math.abs(r.settled_amount ?? r.amount), currency)}</Field>
             <Field label="PSP fee" mono><span className={r.fee_amount ? "text-destructive" : ""}>{r.fee_amount ? formatMoney(r.fee_amount, currency) : "-"}</span></Field>

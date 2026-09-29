@@ -7,6 +7,7 @@ import type {
   TaxFiling,
 } from "../redux/services/finance/ops-types";
 import { formatMoney } from "./money";
+import { formatDateTime, formatDay, formatMonthSpan, todayIn, type DisplayPrefs } from "./dates";
 
 type PrintCell = {
   text: string;
@@ -151,7 +152,6 @@ export function openFinancePrintDocument(spec: FinancePrintDocument) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-const date = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString() : "-";
 const cell = (text: unknown, className?: string, colSpan?: number): PrintCell => ({
   text: text == null || text === "" ? "-" : String(text),
   className,
@@ -161,7 +161,8 @@ const cell = (text: unknown, className?: string, colSpan?: number): PrintCell =>
 export function buildPayrollSchedulePrintDocument(
   run: PayrollRun,
   kind: "PAYE" | "PENSION",
-  currency?: string | null,
+  currency: string | null | undefined,
+  prefs: DisplayPrefs,
 ): FinancePrintDocument {
   const field = kind === "PAYE" ? "paye_amount" : "pension_amount";
   const title = kind === "PAYE" ? "PAYE remittance schedule" : "Pension remittance schedule";
@@ -179,7 +180,7 @@ export function buildPayrollSchedulePrintDocument(
     windowFeatures: "width=600,height=760",
     blocks: [
       { kind: "heading", level: 1, text: title },
-      { kind: "text", className: "sub", text: `${run.period_label || ""} · ${run.document_number} · pay date ${date(run.pay_date)}` },
+      { kind: "text", className: "sub", text: `${run.period_label || ""} · ${run.document_number} · pay date ${formatDay(run.pay_date, prefs)}` },
       { kind: "table", headings: [cell("Employee"), cell(`${kind} withheld`, "r")], rows },
     ],
   };
@@ -188,7 +189,8 @@ export function buildPayrollSchedulePrintDocument(
 export function buildPayslipPrintDocument(
   run: PayrollRun,
   line: PayrollLine,
-  currency?: string | null,
+  currency: string | null | undefined,
+  prefs: DisplayPrefs,
 ): FinancePrintDocument {
   const money = (amount?: number) => formatMoney(amount ?? 0, currency);
   const components = line.components ?? [];
@@ -213,7 +215,7 @@ export function buildPayslipPrintDocument(
     windowFeatures: "width=560,height=720",
     blocks: [
       { kind: "heading", level: 1, text: "Payslip" },
-      { kind: "text", className: "sub", text: `${line.employee_name || "-"} · ${run.period_label || ""} · ${run.document_number} · paid ${date(run.pay_date)}` },
+      { kind: "text", className: "sub", text: `${line.employee_name || "-"} · ${run.period_label || ""} · ${run.document_number} · paid ${formatDay(run.pay_date, prefs)}` },
       { kind: "table", rows },
     ],
   };
@@ -227,11 +229,14 @@ export function buildBankReconciliationPrintDocument(input: {
   difference: number;
   matched: BankStatementLine[];
   unmatched: BankStatementLine[];
+  prefs: DisplayPrefs;
+  /** The moment the report is dated; now unless a test pins it. */
+  now?: Date;
 }): FinancePrintDocument {
-  const { account, currency, book, statement, difference, matched, unmatched } = input;
+  const { account, currency, book, statement, difference, matched, unmatched, prefs } = input;
   const money = (amount: number) => formatMoney(amount, currency);
   const lineRows = (lines: BankStatementLine[]) => lines.length
-    ? lines.map((line) => ({ cells: [cell(line.txn_date), cell(line.description), cell(money(line.amount), "r")] }))
+    ? lines.map((line) => ({ cells: [cell(formatDay(line.txn_date, prefs)), cell(line.description), cell(money(line.amount), "r")] }))
     : [{ cells: [cell("None", undefined, 3)] }];
   return {
     title: `Bank reconciliation - ${account.name}`,
@@ -239,7 +244,7 @@ export function buildBankReconciliationPrintDocument(input: {
     windowFeatures: "width=820,height=900",
     blocks: [
       { kind: "heading", level: 1, text: "Bank reconciliation" },
-      { kind: "text", className: "sub", text: `${account.name} · ${account.bank_name || ""} · GL ${account.gl_account} · ${new Date().toLocaleDateString()}` },
+      { kind: "text", className: "sub", text: `${account.name} · ${account.bank_name || ""} · GL ${account.gl_account} · ${formatDay(todayIn(prefs.timeZone, input.now), prefs)}` },
       { kind: "cards", cards: [
         { label: "Statement balance", value: money(statement) },
         { label: "Book balance", value: money(book) },
@@ -256,7 +261,8 @@ export function buildBankReconciliationPrintDocument(input: {
 export function buildExpenseClaimPrintDocument(
   claim: ExpenseClaim,
   statusLabel: string,
-  currency?: string | null,
+  currency: string | null | undefined,
+  prefs: DisplayPrefs,
 ): FinancePrintDocument {
   const money = (amount: number) => formatMoney(amount, currency);
   const rows: PrintRow[] = claim.lines.map((line) => ({ cells: [
@@ -272,40 +278,44 @@ export function buildExpenseClaimPrintDocument(
     windowFeatures: "width=780,height=900",
     blocks: [
       { kind: "heading", level: 1, text: `Expense claim ${claim.document_number}` },
-      { kind: "text", className: "sub", text: `${claim.claimant_name || "-"} · ${date(claim.claim_date)} · ${claim.title || ""} · ${statusLabel}` },
+      { kind: "text", className: "sub", text: `${claim.claimant_name || "-"} · ${formatDay(claim.claim_date, prefs)} · ${claim.title || ""} · ${statusLabel}` },
       { kind: "table", headings: [cell("Category"), cell("Description"), cell("Cost center"), cell("Amount", "r")], rows },
     ],
   };
 }
 
-function taxPeriodLabel(start: string, end: string) {
-  const first = new Date(start);
-  const last = new Date(end);
-  if (first.getFullYear() === last.getFullYear() && first.getMonth() === last.getMonth()) {
-    return last.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+/**
+ * A tax filing's period as a short label: "Sep 2026" for a month, "FY2026"
+ * for a calendar year, "Jan–Mar 2026" for anything between.
+ *
+ * Read from the calendar dates themselves, so no zone can move a period that
+ * starts on the 1st into the month before.
+ */
+export function taxPeriodLabel(start: string, end: string, prefs: DisplayPrefs): string {
+  if (start.slice(0, 4) === end.slice(0, 4) && start.slice(5, 7) === "01" && end.slice(5, 7) === "12") {
+    return `FY${end.slice(0, 4)}`;
   }
-  if (first.getMonth() === 0 && last.getMonth() === 11 && first.getFullYear() === last.getFullYear()) {
-    return `FY${last.getFullYear()}`;
-  }
-  return `${first.toLocaleDateString(undefined, { month: "short" })}–${last.toLocaleDateString(undefined, { month: "short", year: "numeric" })}`;
+  return formatMonthSpan(start, end, prefs);
 }
 
 const TAX_STATUS: Record<string, string> = { DRAFT: "Open", FILED: "Filed", PAID: "Paid", CANCELLED: "Cancelled" };
 
 export function buildTaxFilingPackPrintDocument(
   filings: TaxFiling[],
-  currency?: string | null,
+  currency: string | null | undefined,
+  prefs: DisplayPrefs,
+  now: Date = new Date(),
 ): FinancePrintDocument {
   const money = (amount: number) => formatMoney(amount, currency);
   const totalAccrued = filings.reduce((sum, filing) => sum + filing.gross_liability, 0);
   const totalOutstanding = filings.reduce((sum, filing) => sum + filing.balance_due, 0);
   const rows: PrintRow[] = filings.map((filing) => ({ cells: [
     cell(filing.obligation_code),
-    cell(taxPeriodLabel(filing.period_start, filing.period_end)),
+    cell(taxPeriodLabel(filing.period_start, filing.period_end, prefs)),
     cell(filing.authority_name),
     cell(money(filing.gross_liability), "r"),
     cell(money(filing.balance_due), "r"),
-    cell(date(filing.due_date)),
+    cell(formatDay(filing.due_date, prefs)),
     cell(filing.filing_reference),
     cell(TAX_STATUS[filing.filing_status] ?? TAX_STATUS.DRAFT),
   ] }));
@@ -321,7 +331,7 @@ export function buildTaxFilingPackPrintDocument(
     windowFeatures: "width=960,height=720",
     blocks: [
       { kind: "heading", level: 1, text: "Tax filing pack" },
-      { kind: "text", className: "sub", text: `Statutory obligations · generated ${new Date().toLocaleString()}` },
+      { kind: "text", className: "sub", text: `Statutory obligations · generated ${formatDateTime(now, prefs)}` },
       { kind: "table", headings: [
         cell("Tax"), cell("Period"), cell("Authority"), cell("Accrued", "r"),
         cell("Outstanding", "r"), cell("Due date"), cell("Filing ref"), cell("Status"),
@@ -330,17 +340,17 @@ export function buildTaxFilingPackPrintDocument(
   };
 }
 
-export const printPayrollSchedule = (run: PayrollRun, kind: "PAYE" | "PENSION", currency?: string | null) =>
-  openFinancePrintDocument(buildPayrollSchedulePrintDocument(run, kind, currency));
+export const printPayrollSchedule = (run: PayrollRun, kind: "PAYE" | "PENSION", currency: string | null | undefined, prefs: DisplayPrefs) =>
+  openFinancePrintDocument(buildPayrollSchedulePrintDocument(run, kind, currency, prefs));
 
-export const printPayslip = (run: PayrollRun, line: PayrollLine, currency?: string | null) =>
-  openFinancePrintDocument(buildPayslipPrintDocument(run, line, currency));
+export const printPayslip = (run: PayrollRun, line: PayrollLine, currency: string | null | undefined, prefs: DisplayPrefs) =>
+  openFinancePrintDocument(buildPayslipPrintDocument(run, line, currency, prefs));
 
 export const printBankReconciliation = (input: Parameters<typeof buildBankReconciliationPrintDocument>[0]) =>
   openFinancePrintDocument(buildBankReconciliationPrintDocument(input));
 
-export const printExpenseClaim = (claim: ExpenseClaim, statusLabel: string, currency?: string | null) =>
-  openFinancePrintDocument(buildExpenseClaimPrintDocument(claim, statusLabel, currency));
+export const printExpenseClaim = (claim: ExpenseClaim, statusLabel: string, currency: string | null | undefined, prefs: DisplayPrefs) =>
+  openFinancePrintDocument(buildExpenseClaimPrintDocument(claim, statusLabel, currency, prefs));
 
-export const printTaxFilingPack = (filings: TaxFiling[], currency?: string | null) =>
-  openFinancePrintDocument(buildTaxFilingPackPrintDocument(filings, currency));
+export const printTaxFilingPack = (filings: TaxFiling[], currency: string | null | undefined, prefs: DisplayPrefs) =>
+  openFinancePrintDocument(buildTaxFilingPackPrintDocument(filings, currency, prefs));

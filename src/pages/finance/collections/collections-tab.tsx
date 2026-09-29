@@ -33,9 +33,9 @@ import { P } from "../../../permissions";
 import { useGetCollectionsQuery, useGetCollectionsSummaryQuery, useInitiateCollectionMutation, useVerifyCollectionMutation } from "@/redux/services/payments/payments-api";
 import { useGetInvoicesQuery } from "@/redux/services/finance/ar-api";
 import type { Collection } from "@/redux/services/payments/payments-types";
+import { useDates } from "../../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
-const fmtDateTime = (s?: string | null) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "-");
 
 // filing-style status → prototype group (Pending / Paid / Failed / Refunded)
 const STATUS_GROUP: Record<string, "PENDING" | "PAID" | "FAILED" | "REFUNDED"> = {
@@ -71,6 +71,7 @@ const customerLabel = (c: Collection) => c.customer_name || c.payer_name || c.cu
 const isDeposit = (c: Collection) => c.channel === "VIRTUAL_ACCOUNT";
 
 export function CollectionsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
@@ -92,7 +93,7 @@ export function CollectionsTab({ entity, currency }: { entity: string; currency?
         {isDeposit(c) ? <span className={cn(PILL, "mt-0.5 bg-gray-03 text-gray-05")}>Virtual account transfer</span> : null}
       </span>
     ) },
-    { header: "Created", cell: (c) => <span className="tabular-nums text-gray-05">{fmtDateTime(c.created_at)}</span> },
+    { header: "Created", cell: (c) => <span className="tabular-nums text-gray-05">{dates.dateTime(c.created_at)}</span> },
     { header: "Customer", cell: (c) => <span><span className="font-medium text-gray-01">{customerLabel(c)}</span>{c.narration ? <span className="block font-mont text-[11px] text-gray-05">{c.narration}</span> : null}</span> },
     { header: "Provider", cell: (c) => <ProviderTag provider={c.provider} /> },
     { header: "Amount", align: "right", cell: (c) => <Money kobo={c.amount} currency={currency} align="right" /> },
@@ -167,6 +168,7 @@ function TimelineStep({ done, current, title, sub }: { done: boolean; current?: 
 }
 
 function CollectionDrawer({ collectionId, collections, entity, currency, onClose }: { collectionId: number | null; collections: Collection[]; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const c = useMemo(() => collections.find((x) => x.id === collectionId) ?? null, [collections, collectionId]);
   const [verify, { isLoading: verifying }] = useVerifyCollectionMutation();
   if (collectionId == null || !c) return null;
@@ -211,15 +213,15 @@ function CollectionDrawer({ collectionId, collections, entity, currency, onClose
             {deposit ? (
               // A deposit has no checkout and no link: the first we hear of it is the
               // provider telling us the customer's dedicated account was credited.
-              <TimelineStep done title="Transfer received" sub={`${providerInfo(c.provider).label} reported a transfer into this customer's account · ${fmtDateTime(c.created_at)}`} />
+              <TimelineStep done title="Transfer received" sub={`${providerInfo(c.provider).label} reported a transfer into this customer's account · ${dates.dateTime(c.created_at)}`} />
             ) : (
               <>
-                <TimelineStep done title="Checkout created" sub={fmtDateTime(c.created_at)} />
+                <TimelineStep done title="Checkout created" sub={dates.dateTime(c.created_at)} />
                 <TimelineStep done={paid || failed} current={!paid && !failed} title="Checkout link ready" sub={c.checkout_url ? (c.payer_email ? `Hand off to ${c.payer_email}` : "Link ready to share") : "No hosted link"} />
               </>
             )}
             <TimelineStep done={paid} current={!paid && !failed} title={failed ? "Payment failed" : deposit ? "Deposit confirmed" : "Payment confirmed"}
-              sub={paid ? `Verified with the provider - receipt booked (Dr bank / Cr ${linked ? "AR" : "customer credit"})${c.confirmed_at ? ` · ${fmtDateTime(c.confirmed_at)}` : ""}` : failed ? "The provider reported a failed/abandoned payment" : "Awaiting the provider's confirmation"} />
+              sub={paid ? `Verified with the provider - receipt booked (Dr bank / Cr ${linked ? "AR" : "customer credit"})${c.confirmed_at ? ` · ${dates.dateTime(c.confirmed_at)}` : ""}` : failed ? "The provider reported a failed/abandoned payment" : "Awaiting the provider's confirmation"} />
           </div>
         </div>
 

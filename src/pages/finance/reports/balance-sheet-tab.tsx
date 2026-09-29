@@ -19,6 +19,7 @@ import { downloadReportExport } from "@/utils/finance-export";
 import { useGetBalanceSheetQuery } from "@/redux/services/finance/reports-api";
 import type { BalanceSheetSection } from "@/redux/services/finance/reports-types";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
+import { useDates } from "../../../lib/display-prefs";
 
 const BAND: Record<string, string> = {
   asset: "bg-blue-50 text-blue-700",
@@ -37,13 +38,8 @@ function Column({ title, children }: { title: string; children: React.ReactNode 
 }
 
 export function BalanceSheetReport({ entity, currency }: { entity: string; currency?: string | null }) {
-  const [asOf, setAsOf] = useState(() => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  });
+  const dates = useDates();
+  const [asOf, setAsOf] = useState(() => dates.today());
   const { data, isLoading, isFetching, isError, refetch } = useGetBalanceSheetQuery({ entity, as_of: asOf });
   const d = data?.data;
   const byKey = useMemo(() => Object.fromEntries((d?.sections ?? []).map((s) => [s.key, s])), [d]);

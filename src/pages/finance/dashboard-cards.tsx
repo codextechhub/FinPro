@@ -16,6 +16,8 @@ import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import type { FinanceDashboard } from "@/redux/services/finance/reports-types";
+import { useDates } from "../../lib/display-prefs";
+import { DEFAULT_DISPLAY_PREFS, DEFAULT_TIME_ZONE, calendarDayOf, formatMonthName } from "../../utils/dates";
 
 type D = FinanceDashboard;
 
@@ -42,12 +44,16 @@ export function compactMoney(kobo: number, currency?: string | null): string {
   return `${sign}${symbol}${Math.round(a)}`;
 }
 
+/**
+ * A calendar-tile reading of a date, `{ mon: "SEP", day: "29" }`. A tile is
+ * drawn the same way in every date format, so it takes no preferences; the
+ * date is split as written and never shifted by a zone.
+ */
 export function fmtShortDate(iso: string) {
-  const d = new Date(`${iso}T00:00:00`);
-  return isNaN(d.getTime()) ? { mon: "", day: iso } : {
-    mon: d.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
-    day: String(d.getDate()).padStart(2, "0"),
-  };
+  const day = calendarDayOf(iso, DEFAULT_TIME_ZONE);
+  return day
+    ? { mon: formatMonthName(day, DEFAULT_DISPLAY_PREFS).toUpperCase(), day: day.slice(8, 10) }
+    : { mon: "", day: iso };
 }
 
 // ── shells ───────────────────────────────────────────────────────────────────
@@ -89,7 +95,6 @@ export function AllClear({ children }: { children: React.ReactNode }) {
 }
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const dayMonth = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 export function LinkAction({ label, to }: { label: string; to: string }) {
   const navigate = useNavigate();
@@ -322,6 +327,7 @@ export function AgingCard({ aging, summary, payers, currency, to }: {
  * the footer says what is left to reconcile.
  */
 export function BankAccountsCard({ banks, currency, to }: { banks: NonNullable<D["bank_accounts"]>; currency?: string | null; to: string }) {
+  const dates = useDates();
   const total = banks.reduce((sum, b) => sum + b.balance.kobo, 0);
   const points = Math.max(0, ...banks.map((b) => b.spark.length));
   const series = Array.from({ length: points }, (_, i) =>
@@ -330,7 +336,7 @@ export function BankAccountsCard({ banks, currency, to }: { banks: NonNullable<D
   const lastReconciled = banks.map((b) => b.last_reconciled).filter((d): d is string => !!d).sort().pop();
   const footer = banks.length === 0 ? undefined : [
     lines ? `${plural(lines, "line")} to match` : "Nothing to match",
-    lastReconciled ? `last reconciled ${dayMonth(lastReconciled)}` : "not reconciled yet",
+    lastReconciled ? `last reconciled ${dates.dayMonth(lastReconciled)}` : "not reconciled yet",
   ].join(" · ");
   return (
     <Panel title="Cash by account" action={<LinkAction label="Reconcile" to={to} />} footer={footer}>
@@ -354,7 +360,7 @@ export function BankAccountsCard({ banks, currency, to }: { banks: NonNullable<D
                   <p className={cn("font-mont text-[11px]", b.unmatched_lines ? "text-amber-700" : "text-green-01")}>
                     {b.unmatched_lines
                       ? `${b.unmatched_lines} line${b.unmatched_lines === 1 ? "" : "s"} to match`
-                      : b.last_reconciled ? `Reconciled ${new Date(`${b.last_reconciled}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : "Nothing to match"}
+                      : b.last_reconciled ? `Reconciled ${dates.dayMonth(b.last_reconciled)}` : "Nothing to match"}
                   </p>
                 </div>
                 <span className="shrink-0 font-mont text-[13px] font-semibold tabular-nums text-black-01">{compactMoney(b.balance.kobo, currency)}</span>
@@ -613,6 +619,7 @@ export function PostingsCard({ journals, currency, to }: { journals: NonNullable
 export function YearCloseStrip({ runway, close, fiscalYear }: {
   runway: D["fiscal_runway"]; close: D["close_progress"]; fiscalYear: string | null;
 }) {
+  const dates = useDates();
   const days = runway?.days_remaining;
   return (
     <section className={cn(INFORMATION_CARD_SURFACE, "grid min-w-0 grid-cols-1 gap-6 rounded-md p-5", close && "lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]")}>
@@ -620,7 +627,7 @@ export function YearCloseStrip({ runway, close, fiscalYear }: {
         <h2 className="font-mont text-sm font-semibold text-gray-01">Fiscal year runway</h2>
         <p className="font-mont text-xs text-gray-05">
           {runway?.calendar_end
-            ? `FY ${fiscalYear ?? ""} periods run to ${new Date(`${runway.calendar_end}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}${days != null ? `, ${days} day${days === 1 ? "" : "s"} away` : ""}.`
+            ? `FY ${fiscalYear ?? ""} periods run to ${dates.day(runway.calendar_end)}${days != null ? `, ${days} day${days === 1 ? "" : "s"} away` : ""}.`
             : "No fiscal periods are set up yet."}
         </p>
       </div>

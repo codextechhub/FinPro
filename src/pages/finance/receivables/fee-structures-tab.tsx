@@ -36,6 +36,7 @@ import {
   useGenerateFromFeeStructureMutation,
 } from "@/redux/services/finance/ar-api";
 import type { FeeStructure, FeeAppliesTo } from "@/redux/services/finance/ar-types";
+import { useDates } from "../../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -139,6 +140,7 @@ function FeeStructureDetailDrawer({ structure, entity, currency, onClose, onEdit
   structure: FeeStructure | null; entity: string; currency?: string | null;
   onClose: () => void; onEdit: (s: FeeStructure) => void; onDuplicate: (s: FeeStructure) => void;
 }) {
+  const dates = useDates();
   const { can } = useCan();
   const [generating, setGenerating] = useState(false);
   // Fetch the full record (carries usage/activity) once the drawer is open.
@@ -223,7 +225,7 @@ function FeeStructureDetailDrawer({ structure, entity, currency, onClose, onEdit
                 <CircleCheck className="mt-0.5 size-4 shrink-0 text-green-01" />
                 <p className="font-mont text-xs text-black-01">
                   Created{full.created_by_name ? <> by <span className="font-medium">{full.created_by_name}</span></> : null}
-                  {full.created_at ? <span className="text-gray-05"> · {new Date(full.created_at).toLocaleDateString()}</span> : null}
+                  {full.created_at ? <span className="text-gray-05"> · {dates.day(full.created_at, full.branch_id)}</span> : null}
                 </p>
               </div>
               <div className="flex items-start gap-2">
@@ -231,7 +233,7 @@ function FeeStructureDetailDrawer({ structure, entity, currency, onClose, onEdit
                 <p className="font-mont text-xs text-black-01">
                   {full.usage && full.usage.invoices_generated > 0 ? (
                     <>Used to generate <span className="font-medium tabular-nums">{full.usage.invoices_generated}</span> invoice{full.usage.invoices_generated === 1 ? "" : "s"}
-                      {full.usage.last_generated_at ? <span className="text-gray-05"> · last {new Date(full.usage.last_generated_at).toLocaleDateString()}</span> : null}</>
+                      {full.usage.last_generated_at ? <span className="text-gray-05"> · last {dates.day(full.usage.last_generated_at, full.branch_id)}</span> : null}</>
                   ) : (
                     <span className="text-gray-05">Not used to generate invoices yet.</span>
                   )}

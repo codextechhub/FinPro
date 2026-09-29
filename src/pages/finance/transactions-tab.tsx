@@ -22,9 +22,9 @@ import { formatMoney } from "@/utils/money";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { useGetMovementsQuery, useGetMovementsSummaryQuery } from "@/redux/services/payments/payments-api";
 import type { Movement } from "@/redux/services/payments/payments-types";
+import { useDates } from "../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
-const fmtDateTime = (s?: string | null) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "-");
 
 function ProviderTag({ provider }: { provider: string }) {
   const p = providerInfo(provider);
@@ -66,6 +66,7 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 }
 
 export function TransactionsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [direction, setDirection] = useState("");
   const [group, setGroup] = useState("");
   const [provider, setProvider] = useState("");
@@ -95,7 +96,7 @@ export function TransactionsTab({ entity, currency }: { entity: string; currency
 
   const columns: Column<Movement>[] = [
     { header: "Reference", cell: (m) => <span className="font-semibold tabular-nums text-gray-01">{m.reference}</span> },
-    { header: "Date", cell: (m) => <span className="tabular-nums text-gray-05">{fmtDateTime(m.created_at)}</span> },
+    { header: "Date", cell: (m) => <span className="tabular-nums text-gray-05">{dates.dateTime(m.created_at)}</span> },
     { header: "Direction", cell: (m) => <DirectionTag dir={m.direction} /> },
     { header: "Party", cell: (m) => (showsParty(m) ? m.party || "-" : null) },
     { header: "Provider", cell: (m) => <ProviderTag provider={m.provider} /> },
@@ -169,6 +170,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function MovementDrawer({ move, currency, onClose }: { move: Movement | null; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const payoutAccess = useFieldAccess("payments.payout");
   if (!move) return null;
   const inbound = move.direction === "in";
@@ -195,7 +197,7 @@ function MovementDrawer({ move, currency, onClose }: { move: Movement | null; cu
             </>
           ) : null}
           <Field label="Status"><StatusPill status={move.status} /></Field>
-          <Field label="Created" mono>{fmtDateTime(move.created_at)}</Field>
+          <Field label="Created" mono>{dates.dateTime(move.created_at)}</Field>
         </Section>
 
         {showName || showAccount || showEmail || move.narration ? (
@@ -208,7 +210,7 @@ function MovementDrawer({ move, currency, onClose }: { move: Movement | null; cu
         ) : null}
 
         <Section title="Settlement">
-          <Field label="Confirmed" mono>{fmtDateTime(move.confirmed_at)}</Field>
+          <Field label="Confirmed" mono>{dates.dateTime(move.confirmed_at)}</Field>
           <Field label={inbound ? "Deposit account" : "Source account"} mono>{move.account_code ? `${move.account_code}${move.account_name ? ` · ${move.account_name}` : ""}` : (inbound ? "Bank / collections" : "Cash & bank")}</Field>
           <Field label={inbound ? "Booked receipt" : "Booked payment"}>
             {move.linked_id ? <span className="inline-flex items-center gap-1">{inbound ? <Receipt className="size-3.5" /> : <Banknote className="size-3.5" />} #{move.linked_id}</span> : "-"}

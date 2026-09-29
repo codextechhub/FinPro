@@ -34,9 +34,9 @@ import { useGetPayoutsQuery, useGetPayoutsSummaryQuery, useInitiatePayoutMutatio
 import { useGetVendorQuery, useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
 import { useGetAccountsQuery } from "@/redux/services/finance/setup-api";
 import type { PayoutInstruction } from "@/redux/services/payments/payments-types";
+import { useDates } from "../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
-const fmtDateTime = (s?: string | null) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "-");
 /** Field Access resource for a payout instruction. */
 const PAYOUT = "payments.payout";
 
@@ -72,6 +72,7 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 const accountLine = (p: PayoutInstruction) => [p.beneficiary_bank_code, p.beneficiary_account_number].filter(Boolean).join(" · ");
 
 export function PayoutsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
@@ -96,7 +97,7 @@ export function PayoutsTab({ entity, currency }: { entity: string; currency?: st
 
   const columns: Column<PayoutInstruction>[] = [
     { header: "Reference", cell: (p) => <span className="font-semibold tabular-nums text-gray-01">{p.reference}</span> },
-    { header: "Created", cell: (p) => <span className="tabular-nums text-gray-05">{fmtDateTime(p.created_at)}</span> },
+    { header: "Created", cell: (p) => <span className="tabular-nums text-gray-05">{dates.dateTime(p.created_at)}</span> },
     ...(showRecipient ? [{ header: "Recipient", cell: (p: PayoutInstruction) => <span>{access.isHidden("beneficiary_name") ? null : <span className="font-medium text-gray-01">{p.beneficiary_name || "-"}</span>}{accountLine(p) ? <span className="block font-mont text-[11px] tabular-nums text-gray-05">{accountLine(p)}</span> : null}</span> }] : []),
     { header: "Provider", cell: (p) => <ProviderTag provider={p.provider} /> },
     { header: "Amount", align: "right", cell: (p) => <Money kobo={p.amount} currency={currency} align="right" /> },
@@ -173,6 +174,7 @@ function TimelineStep({ done, current, title, sub }: { done: boolean; current?: 
 }
 
 function PayoutDrawer({ payoutId, payouts, currency, onClose }: { payoutId: number | null; payouts: PayoutInstruction[]; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const p = useMemo(() => payouts.find((x) => x.id === payoutId) ?? null, [payouts, payoutId]);
   const access = useFieldAccess(PAYOUT, p);
   if (payoutId == null || !p) return null;
@@ -197,11 +199,11 @@ function PayoutDrawer({ payoutId, payouts, currency, onClose }: { payoutId: numb
         <div className="rounded-md border border-white-02 bg-white p-4">
           <p className="mb-3 font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">Status timeline</p>
           <div className="space-y-3">
-            <TimelineStep done title="Payout created" sub={fmtDateTime(p.created_at)} />
+            <TimelineStep done title="Payout created" sub={dates.dateTime(p.created_at)} />
             <TimelineStep done={dispatched && !failed} current={!dispatched && !failed} title={failed && !p.provider_reference ? "Provider rejected" : "Sent to provider"}
               sub={failed && !p.provider_reference ? (p.failure_reason || "The provider declined the transfer") : `${providerInfo(p.provider).label}${p.provider_reference ? ` · ${p.provider_reference}` : ""}`} />
             <TimelineStep done={paid} current={dispatched && !paid && !failed} title={failed ? "Settlement failed" : "Settled"}
-              sub={paid ? `Confirmed - journal booked (Dr payable / Cr bank)${p.confirmed_at ? ` · ${fmtDateTime(p.confirmed_at)}` : ""}` : failed ? (p.failure_reason || "The provider reported a failed/reversed transfer") : "Awaiting the provider's settlement"} />
+              sub={paid ? `Confirmed - journal booked (Dr payable / Cr bank)${p.confirmed_at ? ` · ${dates.dateTime(p.confirmed_at)}` : ""}` : failed ? (p.failure_reason || "The provider reported a failed/reversed transfer") : "Awaiting the provider's settlement"} />
           </div>
         </div>
 

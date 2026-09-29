@@ -34,11 +34,11 @@ import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api
 import type { PayoutBatchSummary, PayoutInstruction, PayoutBatchItemPayload } from "@/redux/services/payments/payments-types";
 import type { Vendor } from "@/redux/services/procurement/procurement-types";
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
+import { useDates } from "../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 /** Field Access resource for a payout instruction, which is what a batch line becomes. */
 const PAYOUT = "payments.payout";
-const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : "-");
 
 const BATCH_STATUS: Record<string, { label: string; cls: string }> = {
   DRAFT: { label: "Draft", cls: "bg-gray-02/70 text-gray-01" },
@@ -80,6 +80,7 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 }
 
 export function BatchesTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<number | null>(() => (
     sourceDocumentIdFromParams(searchParams)
@@ -94,7 +95,7 @@ export function BatchesTab({ entity, currency }: { entity: string; currency?: st
 
   const columns: Column<PayoutBatchSummary>[] = [
     { header: "Batch", cell: (b) => <span className="font-semibold tabular-nums text-gray-01">{b.reference}</span> },
-    { header: "Run date", cell: (b) => <span className="tabular-nums text-gray-05">{fmtDate(b.created_at)}</span> },
+    { header: "Run date", cell: (b) => <span className="tabular-nums text-gray-05">{dates.day(b.created_at)}</span> },
     { header: "Purpose", cell: (b) => b.title || <span className="text-gray-05">-</span> },
     { header: "Items", align: "right", cell: (b) => <span className="tabular-nums">{b.item_count}</span> },
     { header: "Total", align: "right", cell: (b) => <Money kobo={b.total_amount} currency={currency} align="right" /> },

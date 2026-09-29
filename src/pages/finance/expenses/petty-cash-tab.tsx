@@ -29,9 +29,9 @@ import {
   useCreatePettyCashVoucherMutation, usePostPettyCashVoucherMutation, useVoidPettyCashVoucherMutation,
 } from "@/redux/services/finance/ops-api";
 import type { PettyCashFund, PettyCashVoucher, PettyCashMovement } from "@/redux/services/finance/ops-types";
+import { useDates } from "../../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
-const fmtDate = (s: string) => new Date(s).toLocaleDateString();
 
 function Initials({ name }: { name: string }) {
   const init = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
@@ -91,6 +91,7 @@ export function PettyCashTab({ entity, currency }: { entity: string; currency?: 
 const TABS = [{ key: "register", label: "Movement register", icon: ListChecks }, { key: "vouchers", label: "Vouchers", icon: FileText }] as const;
 
 function FundWorkbench({ fund, entity, currency, onEstablish }: { fund: PettyCashFund; entity: string; currency?: string | null; onEstablish: () => void }) {
+  const dates = useDates();
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("register");
   const [drawer, setDrawer] = useState<null | "voucher" | "replenish">(null);
   const { data: detailData } = useGetPettyCashFundQuery({ id: fund.id, entity });
@@ -106,7 +107,7 @@ function FundWorkbench({ fund, entity, currency, onEstablish }: { fund: PettyCas
   })), [vouchers.length]);
 
   const registerCols: Column<PettyCashMovement>[] = [
-    { header: "Date", cell: (m) => <span className="tabular-nums text-gray-05">{fmtDate(m.date)}</span> },
+    { header: "Date", cell: (m) => <span className="tabular-nums text-gray-05">{dates.day(m.date)}</span> },
     { header: "Description", cell: (m) => m.description },
     { header: "Category", cell: (m) => <span className={cn(PILL, m.in ? "bg-green-01/10 text-green-01" : "bg-gray-03/60 text-gray-05")}>{m.category}</span> },
     { header: "In", align: "right", cell: (m) => m.in ? <span className="tabular-nums text-green-01">{formatMoney(m.in, currency)}</span> : <span className="text-gray-05">-</span> },
@@ -168,6 +169,7 @@ function FundWorkbench({ fund, entity, currency, onEstablish }: { fund: PettyCas
 }
 
 function VouchersList({ vouchers, entity, currency, loading }: { vouchers: PettyCashVoucher[]; entity: string; currency?: string | null; loading: boolean }) {
+  const dates = useDates();
   const { can } = useCan();
   const [post, { isLoading: posting }] = usePostPettyCashVoucherMutation();
   const [voidVoucher, { isLoading: voiding }] = useVoidPettyCashVoucherMutation();
@@ -191,7 +193,7 @@ function VouchersList({ vouchers, entity, currency, loading }: { vouchers: Petty
     { header: "Voucher no.", cell: (v) => <span className="font-semibold tabular-nums">{v.document_number}</span> },
     { header: "Expense account", cell: (v) => <span className="tabular-nums text-gray-05">{v.expense_account || "-"}</span> },
     { header: "Note", cell: (v) => v.narration || "-" },
-    { header: "Date", cell: (v) => <span className="tabular-nums text-gray-05">{fmtDate(v.voucher_date)}</span> },
+    { header: "Date", cell: (v) => <span className="tabular-nums text-gray-05">{dates.day(v.voucher_date)}</span> },
     { header: "Amount", align: "right", cell: (v) => <Money kobo={v.total} currency={currency} align="right" /> },
     { header: "Status", cell: (v) => <StatusPill status={v.status} /> },
     { header: "Action", align: "right", cell: (v) => !canManage ? null

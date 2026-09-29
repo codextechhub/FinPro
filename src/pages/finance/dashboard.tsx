@@ -53,13 +53,7 @@ import {
   AgingCard, AttentionCard, BankAccountsCard, BilledCollectedCard, BranchesCard, BudgetCard,
   ChannelsCard, DASH_COLORS, KpiTile, PayersCard, PostingsCard, UpcomingCard, YearCloseStrip,
 } from "./dashboard-cards";
-
-/** "2026-06-16" → "16 Jun 2026". */
-function fmtDate(iso?: string) {
-  if (!iso) return "";
-  const d = new Date(`${iso}T00:00:00`);
-  return isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
+import { useDates } from "../../lib/display-prefs";
 
 const F = routesPath.PROTECTED.FINANCE;
 
@@ -78,7 +72,8 @@ function rowCols(n: number) {
 function FiscalRunwayBanner({ runway, canManage, onManage }: {
   runway: FiscalRunway; canManage: boolean; onManage: () => void;
 }) {
-  const notice = fiscalRunwayNotice(runway, fmtDate);
+  const dates = useDates();
+  const notice = fiscalRunwayNotice(runway, dates.day);
   if (!notice) return null;
   const critical = notice.tone === "critical";
   const Icon = critical ? AlertTriangle : CalendarClock;
@@ -107,6 +102,7 @@ function FiscalRunwayBanner({ runway, canManage, onManage }: {
 }
 
 export default function FinanceDashboard() {
+  const dates = useDates();
   const navigate = useNavigate();
   const { code: entity, currency } = useActiveEntity();
   const { can } = useCan();
@@ -192,7 +188,7 @@ export default function FinanceDashboard() {
               </InfoHint>
             </div>
             <p className="mt-0.5 font-mont text-xs text-gray-05">
-              {head ? [head.window?.name, head.as_of ? `as of ${fmtDate(head.as_of)}` : null, head.narrowed ? "your branches only" : null]
+              {head ? [head.window?.name, head.as_of ? `as of ${dates.day(head.as_of)}` : null, head.narrowed ? "your branches only" : null]
                 .filter(Boolean).join(" · ") : "-"}
             </p>
           </div>

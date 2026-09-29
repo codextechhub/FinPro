@@ -40,11 +40,11 @@ import {
 } from "@/redux/services/finance/ops-api";
 import type { ExpenseClaim, ExpenseClaimLine } from "@/redux/services/finance/ops-types";
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
+import { useDates } from "../../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const tdCls = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
-const fmtDate = (s: string) => new Date(s).toLocaleDateString();
 
 // Our model: status DRAFT/PENDING_APPROVAL/POSTED/CANCELLED × payment status.
 // Collapse to the prototype's display states.
@@ -81,6 +81,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export function ExpenseClaimsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [searchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput.trim(), 250);
@@ -111,7 +112,7 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
   const columns: Column<ExpenseClaim>[] = [
     { header: "Claim no.", cell: (c) => <span className="font-semibold tabular-nums">{c.document_number}</span> },
     { header: "Claimant", cell: (c) => <span className="inline-flex items-center gap-2"><Initials name={c.claimant_name || "-"} /><span className="font-medium text-gray-01">{c.claimant_name || "-"}</span></span> },
-    { header: "Date", cell: (c) => <span className="tabular-nums text-gray-05">{fmtDate(c.claim_date)}</span> },
+    { header: "Date", cell: (c) => <span className="tabular-nums text-gray-05">{dates.day(c.claim_date)}</span> },
     { header: "Purpose", cell: (c) => <span className="text-gray-01">{c.title || "-"}</span> },
     { header: "Total", align: "right", cell: (c) => <Money kobo={c.total} currency={currency} align="right" /> },
     { header: "Status", cell: (c) => <StatusPill claim={c} /> },
@@ -190,6 +191,7 @@ function Step({ done, active, title, sub }: { done: boolean; active?: boolean; t
 }
 
 function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: ExpenseClaim | null; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const { can } = useCan();
   const [paying, setPaying] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
@@ -227,13 +229,13 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
       <DetailDrawer
         open={!!claim} onOpenChange={(o) => (o ? undefined : onClose())}
         title={full.document_number}
-        description={`${full.claimant_name || "-"} · ${fmtDate(full.claim_date)}${full.title ? ` · ${full.title}` : ""}`}
+        description={`${full.claimant_name || "-"} · ${dates.day(full.claim_date)}${full.title ? ` · ${full.title}` : ""}`}
         widthClass="sm:max-w-3xl"
         footer={
           <>
             <StatusPill claim={full} />
             <div className="flex-1" />
-            <Button variant="outline" onClick={() => printExpenseClaim(full, disp(full).label, currency)} className="gap-1.5"><Printer className="size-4" /> Print</Button>
+            <Button variant="outline" onClick={() => printExpenseClaim(full, disp(full).label, currency, dates.prefs)} className="gap-1.5"><Printer className="size-4" /> Print</Button>
             {isDraft && full.approval_required ? (
               <Can permission={P.FIN_CREATE_EXPENSE_CLAIM}>
                 <Button disabled={submitting} onClick={doSubmit} className="gap-1.5"><Send className="size-4" />{submitting ? "Submitting…" : "Submit for approval"}</Button>
@@ -267,7 +269,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
           <div>
             <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Approval workflow</p>
             <div className="space-y-3 rounded-md border border-gray-03 bg-gray-03 px-3 py-3">
-              <Step done title="Submitted" sub={`${full.claimant_name || "Staff"} · ${fmtDate(full.claim_date)}`} />
+              <Step done title="Submitted" sub={`${full.claimant_name || "Staff"} · ${dates.day(full.claim_date)}`} />
               {d.key === "REJECTED"
                 ? <Step done={false} active title="Rejected" sub="The claim was rejected." />
                 : <Step done={full.status === "POSTED"} active={isDraft || isPending} title="Approved & accrued" sub={full.status === "POSTED" ? "Booked to Accrued Reimbursements" : isPending ? "Waiting in the approver queue" : "Ready to submit"} />}

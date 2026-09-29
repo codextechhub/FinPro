@@ -18,16 +18,16 @@ import { Input } from "@/components/ui/input";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { printTaxFilingPack } from "../../../utils/finance-print";
+import { printTaxFilingPack, taxPeriodLabel } from "../../../utils/finance-print";
 import { P } from "../../../permissions";
 import {
   useGetTaxFilingsQuery, useGetTaxFilingSummaryQuery, useGetTaxObligationsQuery, useCreateTaxObligationMutation,
   useCreateTaxFilingMutation, useFileTaxFilingMutation, useUnfileTaxFilingMutation, usePayTaxFilingMutation,
 } from "@/redux/services/finance/ops-api";
 import type { TaxFiling } from "@/redux/services/finance/ops-types";
+import { useDates } from "../../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
-const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : "-");
 
 const OB_TYPES: [string, string][] = [["VAT", "VAT"], ["WHT", "WHT"], ["PAYE", "PAYE"], ["PENSION", "Pension"], ["OTHER", "Other levy"]];
 const FREQ: [string, string][] = [["MONTHLY", "Monthly"], ["QUARTERLY", "Quarterly"], ["ANNUAL", "Annual"]];
@@ -51,17 +51,8 @@ function Select({ value, onChange, children, className }: { value: string; onCha
   );
 }
 
-// A compact period label from the filing's start/end dates.
-function periodLabel(start: string, end: string) {
-  const s = new Date(start), e = new Date(end);
-  const sameMonth = s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth();
-  if (sameMonth) return e.toLocaleDateString(undefined, { month: "short", year: "numeric" });
-  const fullYear = s.getMonth() === 0 && e.getMonth() === 11 && s.getFullYear() === e.getFullYear();
-  if (fullYear) return `FY${e.getFullYear()}`;
-  return `${s.toLocaleDateString(undefined, { month: "short" })}–${e.toLocaleDateString(undefined, { month: "short", year: "numeric" })}`;
-}
-
 export function TaxTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [newFiling, setNewFiling] = useState(false);
   const [newObligation, setNewObligation] = useState(false);
@@ -76,11 +67,11 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
 
   const columns: Column<TaxFiling>[] = [
     { header: "Tax", cell: (f) => <span className="font-semibold text-gray-01">{f.obligation_code}</span> },
-    { header: "Period", cell: (f) => <span className="tabular-nums text-gray-05">{periodLabel(f.period_start, f.period_end)}</span> },
+    { header: "Period", cell: (f) => <span className="tabular-nums text-gray-05">{taxPeriodLabel(f.period_start, f.period_end, dates.prefs)}</span> },
     { header: "Authority", cell: (f) => <span className="font-mont text-[11px] text-gray-05">{f.authority_name || "-"}</span> },
     { header: "Accrued", align: "right", cell: (f) => <Money kobo={f.gross_liability} currency={currency} align="right" /> },
     { header: "Outstanding", align: "right", cell: (f) => f.balance_due > 0 ? <span className="font-mont text-xs tabular-nums text-destructive">{formatMoney(f.balance_due, currency)}</span> : <span className="text-gray-05">-</span> },
-    { header: "Due date", cell: (f) => <span className="tabular-nums text-gray-05">{fmtDate(f.due_date)}</span> },
+    { header: "Due date", cell: (f) => <span className="tabular-nums text-gray-05">{dates.day(f.due_date)}</span> },
     { header: "Filing ref", cell: (f) => <span className="font-mont text-[11px] tabular-nums text-gray-05">{f.filing_reference || "-"}</span> },
     { header: "Status", cell: (f) => <StatusPill status={f.filing_status} /> },
   ];
@@ -100,7 +91,7 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
           {Object.entries(STATUS).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
         </Select>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => printTaxFilingPack(rows, currency)} disabled={!rows.length} className="gap-1.5"><Printer className="size-4" /> Filing pack</Button>
+          <Button variant="outline" onClick={() => printTaxFilingPack(rows, currency, dates.prefs)} disabled={!rows.length} className="gap-1.5"><Printer className="size-4" /> Filing pack</Button>
           <Can permission={P.FIN_CREATE_TAX}>
             <Button variant="outline" onClick={() => setNewObligation(true)} className="gap-1.5"><Plus className="size-4" /> New obligation</Button>
           </Can>
@@ -145,6 +136,7 @@ function Step({ state, title, sub }: { state: "done" | "current" | "todo"; title
 }
 
 function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filingId: number | null; filings: TaxFiling[]; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const f = useMemo(() => filings.find((x) => x.id === filingId) ?? null, [filings, filingId]);
   const [filing, setFiling] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -168,8 +160,8 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
   return (
     <>
       <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-        title={`${f.obligation_code} - ${periodLabel(f.period_start, f.period_end)}`}
-        description={`${f.authority_name || "-"} · due ${fmtDate(f.due_date)}`} widthClass="sm:max-w-2xl"
+        title={`${f.obligation_code} - ${taxPeriodLabel(f.period_start, f.period_end, dates.prefs)}`}
+        description={`${f.authority_name || "-"} · due ${dates.day(f.due_date)}`} widthClass="sm:max-w-2xl"
         footer={<>
           <StatusPill status={f.filing_status} />
           <div className="flex-1" />
@@ -189,7 +181,7 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
             <p className="mb-3 font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">Filing lifecycle</p>
             <div className="space-y-3">
               <Step state="done" title="Accrued" sub={`Posted to ${f.liability_account_name || f.obligation_code + " payable"} during the period`} />
-              <Step state={filed ? "done" : "current"} title="Filed with authority" sub={filed ? `Filed${f.filing_reference ? ` · ref ${f.filing_reference}` : ""}${f.filed_at ? ` · ${fmtDate(f.filed_at)}` : ""}` : "Not yet filed"} />
+              <Step state={filed ? "done" : "current"} title="Filed with authority" sub={filed ? `Filed${f.filing_reference ? ` · ref ${f.filing_reference}` : ""}${f.filed_at ? ` · ${dates.day(f.filed_at)}` : ""}` : "Not yet filed"} />
               <Step state={paid ? "done" : filed ? "current" : "todo"} title="Paid / remitted" sub={paid ? "Remitted in full" : f.amount_paid > 0 ? `Part-paid · ${formatMoney(f.balance_due, currency)} left` : "Awaiting payment"} />
             </div>
           </div>
@@ -208,7 +200,7 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
       <ConfirmActionModal
         open={unfiling}
         onOpenChange={setUnfiling}
-        title={`Un-file ${f.obligation_code} - ${periodLabel(f.period_start, f.period_end)}?`}
+        title={`Un-file ${f.obligation_code} - ${taxPeriodLabel(f.period_start, f.period_end, dates.prefs)}?`}
         description="Reverts this return to draft and reverses its netting/penalty journal. Use it to correct a return filed in error. Only possible while nothing has been remitted."
         confirmText="Un-file return"
         destructive
@@ -220,6 +212,7 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
 }
 
 function FileDrawer({ filing, entity, currency, onClose }: { filing: TaxFiling; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const [filedDate, setFiledDate] = useState("");
   const [ref, setRef] = useState("");
   const [adjust, setAdjust] = useState(0);
@@ -233,7 +226,7 @@ function FileDrawer({ filing, entity, currency, onClose }: { filing: TaxFiling; 
   };
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title="File return" description={`${filing.obligation_code} · ${periodLabel(filing.period_start, filing.period_end)}`} widthClass="sm:max-w-md"
+      title="File return" description={`${filing.obligation_code} · ${taxPeriodLabel(filing.period_start, filing.period_end, dates.prefs)}`} widthClass="sm:max-w-md"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
         <Button disabled={isLoading || !filedDate || (!!adjust && !adjustAccount)} onClick={submit} className="gap-1.5"><FileCheck2 className="size-4" />{isLoading ? "Filing…" : "Mark as filed"}</Button>

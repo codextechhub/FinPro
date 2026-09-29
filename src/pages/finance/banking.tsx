@@ -53,14 +53,13 @@ import { useCancelImportBatchMutation, useRollbackImportJobMutation } from "@/re
 import { baseApi } from "@/redux/services/base-api";
 import { useAppDispatch } from "@/redux/store";
 import { routesPath } from "@/routes/routes-path";
-import { todayISO } from "@/utils/posting-window";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const tdCls = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
-const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString() : "-");
 const partialMask = (n: string) => {
   const s = n.replace(/\s+/g, "");
   return s.length <= 4 ? s : `${s.slice(0, 4)} **** ${s.slice(-4)}`;
@@ -79,6 +78,7 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
 }
 
 export default function BankingPage() {
+  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
   const [selected, setSelected] = useState<BankAccount | null>(null);
   const [creating, setCreating] = useState(false);
@@ -120,7 +120,7 @@ export default function BankingPage() {
     { header: "GL", cell: (a) => <span className="tabular-nums text-gray-05">{a.gl_account}</span> },
     { header: "Currency", cell: (a) => a.currency ?? "-" },
     { header: "Book balance", align: "right", cell: (a) => <Money kobo={a.book_balance} currency={currency} align="right" /> },
-    { header: "Last reconciled", cell: (a) => <span className="tabular-nums text-gray-05">{fmtDate(a.last_reconciled_at)}</span> },
+    { header: "Last reconciled", cell: (a) => <span className="tabular-nums text-gray-05">{dates.day(a.last_reconciled_at, a.branch_id)}</span> },
     { header: "Status", cell: (a) => <StatusPill status={a.is_active ? "ACTIVE" : "INACTIVE"} /> },
   ];
 
@@ -148,7 +148,7 @@ export default function BankingPage() {
           <Kpi label="Total bank balance" value={formatMoney(kpis.total, currency)} hint="Across active accounts" />
           <Kpi label="Active accounts" value={String(kpis.active)} />
           <Kpi label="Unreconciled lines" value={String(kpis.unrec)} hint="Awaiting a match" />
-          <Kpi label="Last reconciled" value={fmtDate(kpis.last)} />
+          <Kpi label="Last reconciled" value={dates.day(kpis.last)} />
         </div>
 
         <div className="relative w-72">
@@ -307,6 +307,7 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
 }
 
 function TransactionsTab({ detail, currency }: { detail?: { transactions: import("@/redux/services/finance/ops-types").BankTransaction[] }; currency?: string | null }) {
+  const dates = useDates();
   const txns = detail?.transactions ?? [];
   if (txns.length === 0) return <EmptyState title="No transactions" message="Posted movements on this account's GL appear here." />;
   return (
@@ -320,7 +321,7 @@ function TransactionsTab({ detail, currency }: { detail?: { transactions: import
         <tbody>
           {txns.map((t) => (
             <tr key={t.id}>
-              <td className={cn(tdCls, "tabular-nums text-gray-05")}>{fmtDate(t.date)}</td>
+              <td className={cn(tdCls, "tabular-nums text-gray-05")}>{dates.day(t.date)}</td>
               <td className={tdCls}>{t.description}</td>
               <td className={cn(tdCls, "tabular-nums text-gray-05")}>{t.reference || "-"}</td>
               <td className={cn(tdCls, "text-right tabular-nums")}>{t.debit ? <span className="text-black-01">{formatMoney(t.debit, currency)}</span> : <span className="text-gray-05">-</span>}</td>
@@ -423,6 +424,7 @@ export function StatementsTab({
   canEdit: boolean;
   onEdit: (statementId: number) => void;
 }) {
+  const dates = useDates();
   const dispatch = useAppDispatch();
   const [rollingBack, setRollingBack] = useState<import("@/redux/services/finance/ops-types").BankStatement | null>(null);
   const [reason, setReason] = useState("");
@@ -458,7 +460,7 @@ export function StatementsTab({
         <tbody>
           {sts.map((s) => (
             <tr key={s.id}>
-              <td className={cn(tdCls, "tabular-nums")}>{fmtDate(s.statement_date)}</td>
+              <td className={cn(tdCls, "tabular-nums")}>{dates.day(s.statement_date)}</td>
               <td className={tdCls}>{s.period_label || "-"}</td>
               <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(s.opening_balance, currency)}</td>
               <td className={cn(tdCls, "text-right tabular-nums font-medium")}>{formatMoney(s.closing_balance, currency)}</td>
@@ -519,6 +521,7 @@ export function StatementsTab({
 }
 
 function ReconciliationsTab({ detail, currency }: { detail?: { reconciliations: import("@/redux/services/finance/ops-types").BankReconciliationRun[] }; currency?: string | null }) {
+  const dates = useDates();
   const recs = detail?.reconciliations ?? [];
   if (recs.length === 0) return <EmptyState title="No reconciliations yet" message="Each Auto-reconcile run is recorded here for audit." />;
   return (
@@ -532,7 +535,7 @@ function ReconciliationsTab({ detail, currency }: { detail?: { reconciliations: 
         <tbody>
           {recs.map((r) => (
             <tr key={r.id}>
-              <td className={cn(tdCls, "tabular-nums")}>{fmtDate(r.created_at)}</td>
+              <td className={cn(tdCls, "tabular-nums")}>{dates.day(r.created_at)}</td>
               <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(r.book_balance, currency)}</td>
               <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(r.statement_balance, currency)}</td>
               <td className={cn(tdCls, "text-right tabular-nums", r.difference !== 0 ? "text-destructive" : "")}>{formatMoney(r.difference, currency)}</td>
@@ -803,12 +806,13 @@ function EditStatementForm({
 }
 
 type ImportRow = { txn_date: string; description: string; amount: string; reference: string };
-const emptyRow = (): ImportRow => ({ txn_date: todayISO(), description: "", amount: "", reference: "" });
+const emptyRow = (today: string): ImportRow => ({ txn_date: today, description: "", amount: "", reference: "" });
 
 function ImportStatementDrawer({ id, entity, onClose }: { id: number; entity: string; onClose: () => void }) {
+  const dates = useDates();
   const [periodLabel, setPeriodLabel] = useState("");
   const [opening, setOpening] = useState("");
-  const [rows, setRows] = useState<ImportRow[]>([emptyRow()]);
+  const [rows, setRows] = useState<ImportRow[]>(() => [emptyRow(dates.today())]);
   const [dupWarning, setDupWarning] = useState<number>(0);   // suspected dupes held back on last attempt
   const [doImport, { isLoading }] = useImportStatementMutation();
 
@@ -870,7 +874,7 @@ function ImportStatementDrawer({ id, entity, onClose }: { id: number; entity: st
         <div>
           <div className="mb-2 flex items-center justify-between">
             <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Lines</p>
-            <Button variant="outline" size="sm" onClick={() => setRows((s) => [...s, emptyRow()])} className="gap-1.5"><Plus className="size-3.5" /> Add line</Button>
+            <Button variant="outline" size="sm" onClick={() => setRows((s) => [...s, emptyRow(dates.today())])} className="gap-1.5"><Plus className="size-3.5" /> Add line</Button>
           </div>
           <div className="space-y-2">
             {rows.map((r, i) => (
@@ -892,10 +896,11 @@ function ImportStatementDrawer({ id, entity, onClose }: { id: number; entity: st
 }
 
 function BulkImportStatementDrawer({ id, entity, onClose }: { id: number; entity: string; onClose: () => void }) {
+  const dates = useDates();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
-  const [statementDate, setStatementDate] = useState(todayISO());
+  const [statementDate, setStatementDate] = useState(() => dates.today());
   const [periodLabel, setPeriodLabel] = useState("");
   const [opening, setOpening] = useState("");
   const [closing, setClosing] = useState("");
@@ -917,7 +922,7 @@ function BulkImportStatementDrawer({ id, entity, onClose }: { id: number; entity
   const startAnother = () => {
     setBatchId(null);
     setFile(null);
-    setStatementDate(todayISO());
+    setStatementDate(dates.today());
     setPeriodLabel("");
     setOpening("");
     setClosing("");

@@ -53,6 +53,7 @@ import {
   yearCloseState,
   type YearCloseState,
 } from "./periods-model";
+import { useDates } from "../../../lib/display-prefs";
 
 /**
  * Subtitle for the screen this file renders. Both routes that reach the
@@ -70,11 +71,6 @@ const humanize = (value: string) => {
   const text = value.replace(/_/g, " ");
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
-const formatDate = (value: string) => new Intl.DateTimeFormat("en-NG", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-}).format(new Date(`${value}T00:00:00`));
 const isForbidden = (error: unknown) => (
   typeof error === "object" && error !== null && "status" in error && error.status === 403
 );
@@ -290,6 +286,7 @@ function FiscalYearOverview({
   periods: FiscalPeriod[];
   summary: ReturnType<typeof summarizePeriods>;
 }) {
+  const dates = useDates();
   const progress = summary.total ? Math.round((summary.progressed / summary.total) * 100) : 0;
   return (
     <section className="rounded-lg border border-white-02 bg-[#F7F8FA] p-4 sm:p-5">
@@ -300,7 +297,7 @@ function FiscalYearOverview({
             <StatusPill status={fiscalYear.status} />
           </div>
           <p className="mt-1 font-mont text-xs text-gray-05">
-            {formatDate(fiscalYear.start_date)} - {formatDate(fiscalYear.end_date)} · {periods.length === 4 ? "Quarterly" : periods.length === 12 ? "Monthly" : "Custom"}
+            {dates.day(fiscalYear.start_date)} - {dates.day(fiscalYear.end_date)} · {periods.length === 4 ? "Quarterly" : periods.length === 12 ? "Monthly" : "Custom"}
           </p>
         </div>
         <div className="w-full sm:w-52">
@@ -389,6 +386,7 @@ function YearCloseReadiness({
 }
 
 function PeriodCard({ period, selected, onClick }: { period: FiscalPeriod; selected: boolean; onClick: () => void }) {
+  const dates = useDates();
   const tone = period.status === "OPEN"
     ? "bg-primary"
     : period.status === "SOFT_CLOSED"
@@ -416,7 +414,7 @@ function PeriodCard({ period, selected, onClick }: { period: FiscalPeriod; selec
         <StatusPill status={period.status} />
       </div>
       <p className="mt-4 pl-1 font-mont text-xs text-gray-05 tabular-nums">
-        {formatDate(period.start_date)} - {formatDate(period.end_date)}
+        {dates.day(period.start_date)} - {dates.day(period.end_date)}
       </p>
       <div className="mt-4 flex items-center justify-between gap-2 border-t border-white-02 pt-3 pl-1">
         <span className="font-mont text-xs font-semibold text-primary">{periodActionLabel(period.status)}</span>
@@ -512,6 +510,7 @@ function PeriodCloseDrawer({
   finalPeriodOfOpenYear: boolean;
   onClose: () => void;
 }) {
+  const dates = useDates();
   const { data, isLoading, isError, error, refetch } = useGetPeriodChecklistQuery(id ? { id, entity } : skipToken);
   const [close, { isLoading: closing }] = useClosePeriodMutation();
   const [reopen, { isLoading: reopening }] = useReopenPeriodMutation();
@@ -587,7 +586,7 @@ function PeriodCloseDrawer({
         open={id != null}
         onOpenChange={(open) => !open && closeDrawer()}
         title={period ? `Manage ${period.name}` : "Period close"}
-        description={period ? `Period ${period.period_no} · ${formatDate(period.start_date)} - ${formatDate(period.end_date)}` : undefined}
+        description={period ? `Period ${period.period_no} · ${dates.day(period.start_date)} - ${dates.day(period.end_date)}` : undefined}
         widthClass="w-full sm:max-w-2xl"
         footer={(canClose || canReopen || canLock) ? (
           <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">

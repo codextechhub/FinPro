@@ -29,10 +29,9 @@ import {
   useReplayWebhookEventMutation,
 } from "@/redux/services/payments/payments-api";
 import type { WebhookEvent } from "@/redux/services/payments/payments-types";
+import { useDates } from "../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
-const fmtDateTime = (s?: string | null) =>
-  (s ? new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "-");
 
 const STATUS_PILL: Record<string, { label: string; cls: string }> = {
   FAILED: { label: "Failed to book", cls: "bg-destructive/10 text-destructive" },
@@ -54,6 +53,7 @@ const FILTERS: TabStripItem<string>[] = [
 ];
 
 export function WebhooksTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const { can } = useCan();
   const [status, setStatus] = useState<string>("");
   const [searchInput, setSearchInput] = useState("");
@@ -98,7 +98,7 @@ export function WebhooksTab({ entity, currency }: { entity: string; currency?: s
   const columns: Column<WebhookEvent>[] = [
     {
       header: "Received",
-      cell: (e) => <span className="tabular-nums text-gray-05">{fmtDateTime(e.created_at)}</span>,
+      cell: (e) => <span className="tabular-nums text-gray-05">{dates.dateTime(e.created_at)}</span>,
     },
     {
       header: "Reference",

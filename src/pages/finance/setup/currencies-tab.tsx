@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
 import { useGetCurrenciesQuery, useGetFxRatesQuery, useCreateFxRateMutation } from "@/redux/services/finance/setup-api";
 import type { Currency, FxRate } from "@/redux/services/finance/setup-types";
+import { useDates } from "../../../lib/display-prefs";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
 const fmtRate = (r: string | number) => Number(r).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
@@ -140,11 +141,12 @@ export function CurrenciesTab() {
 }
 
 function NewFxRateModal({ open, onClose, currencies }: { open: boolean; onClose: () => void; currencies: Currency[] }) {
+  const dates = useDates();
   const [create, { isLoading }] = useCreateFxRateMutation();
   const [baseC, setBaseC] = useState("");
   const [quoteC, setQuoteC] = useState("");
   const [rate, setRate] = useState("");
-  const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10));
+  const [asOf, setAsOf] = useState(() => dates.today());
   const [src, setSrc] = useState("");
   const canSubmit = baseC !== "" && quoteC !== "" && baseC !== quoteC && Number(rate) > 0 && !!asOf;
 

@@ -28,6 +28,7 @@ import {
 } from "@/redux/services/payments/payments-api";
 import type { VirtualAccount } from "@/redux/services/payments/payments-types";
 import { PROVIDER_CHOICES, providerInfo } from "../payment-providers";
+import { useDates } from "../../../lib/display-prefs";
 
 const providerLabel = (p: string) => providerInfo(p).label;
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
@@ -144,6 +145,7 @@ function VirtualAccountDetailDrawer({ va, entity, currency, onClose, onUpdated }
   va: VirtualAccount | null; entity: string; currency?: string | null;
   onClose: () => void; onUpdated: (v: VirtualAccount) => void;
 }) {
+  const dates = useDates();
   const { can } = useCan();
   const access = useFieldAccess(VIRTUAL_ACCOUNT, va);
   const [update, { isLoading }] = useUpdateVirtualAccountMutation();
@@ -190,7 +192,7 @@ function VirtualAccountDetailDrawer({ va, entity, currency, onClose, onUpdated }
           {access.isHidden("account_name") ? null : <Field label="Account name">{va.account_name || "-"}</Field>}
           <Field label="Provider reference">{va.provider_reference || "-"}</Field>
           <Field label="Deposit (GL) account">{va.deposit_account_code ? `${va.deposit_account_code} · ${va.deposit_account_name}` : "-"}</Field>
-          <Field label="Created">{new Date(va.created_at).toLocaleDateString()}</Field>
+          <Field label="Created">{dates.day(va.created_at)}</Field>
         </div>
 
         <div>
@@ -212,7 +214,7 @@ function VirtualAccountDetailDrawer({ va, entity, currency, onClose, onUpdated }
                   {collections.map((c) => (
                     <tr key={c.id}>
                       <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums text-black-01">{c.reference}</td>
-                      <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums text-gray-05">{new Date(c.created_at).toLocaleDateString()}</td>
+                      <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums text-gray-05">{dates.day(c.created_at)}</td>
                       <td className="border-t border-white-02 px-3 py-2 text-right"><Money kobo={c.amount} currency={currency} align="right" /></td>
                       <td className="border-t border-white-02 px-3 py-2"><StatusPill status={c.status} /></td>
                     </tr>

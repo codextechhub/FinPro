@@ -23,6 +23,7 @@ import {
   AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, fmtShortDate, plural,
 } from "./dashboard-cards";
 import type { DashboardWords } from "./dashboard-words";
+import { useDates } from "../../lib/display-prefs";
 
 type S = SpendDashboard;
 const F = routesPath.PROTECTED.FINANCE;
@@ -31,7 +32,6 @@ function rowCols(n: number) {
   return n >= 3 ? "md:grid-cols-2 xl:grid-cols-3" : n === 2 ? "md:grid-cols-2" : "";
 }
 
-const dayMonth = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 // ── headline ─────────────────────────────────────────────────────────────────
 
@@ -95,6 +95,7 @@ const BAR_COLOR = { total: DASH_COLORS.primary, in: DASH_COLORS.green, out: DASH
  * side, one row per step, so a phone reads a list instead of eleven slivers.
  */
 function CashMovementCard({ cash, words, currency }: { cash: NonNullable<S["cash_movement"]>; words: DashboardWords; currency?: string | null }) {
+  const dates = useDates();
   const labels: Record<CashFlowKey, string> = {
     receipts: words.receiptsLabel, other_income: "Other income", equity: "Capital and balances in",
     other_in: "Other money in", payroll: "Salaries", vendors: "Suppliers", tax: "Tax remitted",
@@ -102,7 +103,7 @@ function CashMovementCard({ cash, words, currency }: { cash: NonNullable<S["cash
     spending: "Bills paid", other_out: "Other payments",
   };
   const bars = cashBars(cash.opening.kobo, cash.steps.map((s) => ({ key: s.key, amount: s.amount.kobo })),
-    (k) => labels[k], `Opening ${dayMonth(cash.start)}`, `Today, ${dayMonth(cash.end)}`);
+    (k) => labels[k], `Opening ${dates.dayMonth(cash.start)}`, `Today, ${dates.dayMonth(cash.end)}`);
   const values = bars.flatMap((b) => [b.from, b.to]);
   const lo = Math.min(0, ...values);
   const hi = Math.max(...values, lo + 1);
@@ -113,7 +114,7 @@ function CashMovementCard({ cash, words, currency }: { cash: NonNullable<S["cash
     : `${b.amount >= 0 ? "+" : "-"}${compactMoney(Math.abs(b.amount), currency)}`;
 
   return (
-    <Panel title={`Cash movement ${dayMonth(cash.start)} to ${dayMonth(cash.end)}`}
+    <Panel title={`Cash movement ${dates.dayMonth(cash.start)} to ${dates.dayMonth(cash.end)}`}
       subtitle="From the opening balance to today, across all bank and cash accounts"
       footer={`In ${compactMoney(into, currency)} · out ${compactMoney(out, currency)} · net ${into - out >= 0 ? "+" : "-"}${compactMoney(Math.abs(into - out), currency)}`}>
       {cash.steps.length === 0 ? <AllClear>No money moved in this window.</AllClear> : (
@@ -164,6 +165,7 @@ function CashMovementCard({ cash, words, currency }: { cash: NonNullable<S["cash
 // ── bank reconciliation ──────────────────────────────────────────────────────
 
 function ReconciliationCard({ accounts, unmatched, currency }: { accounts: NonNullable<S["reconciliation"]>; unmatched: S["unmatched"]; currency?: string | null }) {
+  const dates = useDates();
   return (
     <Panel title="Bank reconciliation" subtitle="Statement lines matched to the ledger"
       action={<LinkAction label="Reconcile" to={F.BANK_RECON} />}
@@ -176,7 +178,7 @@ function ReconciliationCard({ accounts, unmatched, currency }: { accounts: NonNu
             const pct = a.lines ? (a.matched * 100) / a.lines : 0;
             const status = a.lines === 0 ? "No statement imported"
               : a.unmatched > 0 ? `${plural(a.unmatched, "line")} open`
-                : a.last_reconciled ? `Reconciled ${dayMonth(a.last_reconciled)}` : "All lines matched";
+                : a.last_reconciled ? `Reconciled ${dates.dayMonth(a.last_reconciled)}` : "All lines matched";
             return (
               <div key={a.id} className="flex flex-col gap-1.5">
                 <div className="flex items-baseline justify-between gap-2 font-mont text-[13px]">
@@ -283,12 +285,13 @@ const RUN_STATUS: Record<string, string> = {
 };
 
 function PayrollCard({ run, currency }: { run: NonNullable<S["payroll"]>; currency?: string | null }) {
+  const dates = useDates();
   const rows: [string, number][] = [
     ["Net pay to staff", run.net.kobo], ["PAYE", run.paye.kobo], ["Pension (staff share)", run.pension.kobo],
     ...(run.other.kobo > 0 ? [["Other deductions", run.other.kobo] as [string, number]] : []),
   ];
   return (
-    <Panel title="Payroll" subtitle={`${run.label} · pays ${dayMonth(run.pay_date)}`}
+    <Panel title="Payroll" subtitle={`${run.label} · pays ${dates.dayMonth(run.pay_date)}`}
       action={<LinkAction label="Payroll" to={F.PAYROLL} />}
       footer={`${plural(run.heads, "member", "members")} of staff · ${RUN_STATUS[run.status] ?? run.status.toLowerCase()}`}>
       <div>
@@ -341,6 +344,7 @@ function ClaimsCard({ claims, windowName, currency }: { claims: NonNullable<S["c
 }
 
 function PettyCashCard({ petty, currency }: { petty: NonNullable<S["petty_cash"]>; currency?: string | null }) {
+  const dates = useDates();
   const low = petty.funds.filter((f) => f.low).length;
   return (
     <Panel title="Petty cash floats" action={<LinkAction label="Petty cash" to={`${F.EXPENSES}/petty-cash`} />}
@@ -360,7 +364,7 @@ function PettyCashCard({ petty, currency }: { petty: NonNullable<S["petty_cash"]
               </div>
               <span className={cn("truncate font-mont text-[11px]", f.low ? "text-amber-700" : "text-gray-05")}>
                 {[f.branch, f.low ? `Below the ${petty.threshold_pct}% threshold`
-                  : f.last_topped_up ? `Last top-up ${dayMonth(f.last_topped_up)}` : "Not topped up yet"].filter(Boolean).join(" · ")}
+                  : f.last_topped_up ? `Last top-up ${dates.dayMonth(f.last_topped_up)}` : "Not topped up yet"].filter(Boolean).join(" · ")}
               </span>
             </div>
           );
@@ -445,6 +449,7 @@ function AssetsCard({ assets, windowName, currency }: { assets: NonNullable<S["a
 // ── the tab ──────────────────────────────────────────────────────────────────
 
 export function SpendTab({ d, words, currency }: { d: S; words: DashboardWords; currency?: string | null }) {
+  const dates = useDates();
   const windowName = d.window.label.toLowerCase();
   const nothing = !d.runway && !d.cash_movement && !d.spend && !d.spending && !d.reconciliation && !d.unmatched && !d.budgets
     && !d.payroll && !d.claims && !d.petty_cash && !d.tax_owed && !d.tax_calendar && !d.assets;
@@ -468,7 +473,7 @@ export function SpendTab({ d, words, currency }: { d: S; words: DashboardWords; 
             d.spend.delta_pct != null ? `vs the same point ${PREVIOUS[d.window.key] ?? "last time"}` : null]
             .filter(Boolean).join(" · ") || d.window.name} />}
         {d.payroll && <KpiTile label={`Payroll · ${d.payroll.label}`} value={formatMoney(d.payroll.gross.kobo, currency)}
-          note={`${plural(d.payroll.heads, "member", "members")} of staff · pays ${dayMonth(d.payroll.pay_date)}`} />}
+          note={`${plural(d.payroll.heads, "member", "members")} of staff · pays ${dates.dayMonth(d.payroll.pay_date)}`} />}
         {tax && <KpiTile label="Tax owed" value={formatMoney(tax.amount.kobo, currency)}
           color={tax.next && tax.next.days < 0 ? DASH_COLORS.red : DASH_COLORS.amber}
           note={tax.next ? `${tax.next.name} ${dueIn(tax.next.days)}` : "Nothing owed on open returns"} />}

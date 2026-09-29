@@ -32,8 +32,8 @@ import {
 import type { BankAccount, BankStatementLine } from "@/redux/services/finance/ops-types";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
-const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString() : "-");
 const signedCls = (kobo: number) => (kobo < 0 ? "text-destructive" : "text-green-01");
 
 function Kpi({ label, value, danger, children }: { label: string; value: string; danger?: boolean; children?: React.ReactNode }) {
@@ -91,6 +91,7 @@ export default function BankReconciliationPage() {
 }
 
 function Workbench({ account, entity, currency }: { account: BankAccount; entity: string; currency?: string | null }) {
+  const dates = useDates();
   const { can } = useCan();
   // Both columns are multi-select; the selection shape decides the match kind:
   //   1 bank + 1 book (equal)      → 1:1 match
@@ -191,7 +192,7 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-mont text-xs text-gray-05">{account.bank_name || "-"} · {account.gl_account}{detail?.statements?.[0]?.period_label ? ` · ${detail.statements[0].period_label}` : ""}</p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => printBankReconciliation({ account, currency, book, statement, difference, matched, unmatched })} className="gap-1.5"><Printer className="size-4" /> Reconciliation report</Button>
+          <Button variant="outline" onClick={() => printBankReconciliation({ account, currency, book, statement, difference, matched, unmatched, prefs: dates.prefs })} className="gap-1.5"><Printer className="size-4" /> Reconciliation report</Button>
           <Can permission={P.FIN_RECONCILE_BANK}>
             <Button onClick={doComplete} disabled={completing} className="gap-1.5"><CheckCircle2 className="size-4" />{completing ? "Saving…" : "Complete reconciliation"}</Button>
           </Can>
@@ -348,6 +349,7 @@ function MatchedLineDrawer({ line, currency, onClose, onUnmatch, canUnmatch, unm
   line: BankStatementLine | null; currency?: string | null; onClose: () => void;
   onUnmatch: (id: number) => void; canUnmatch: boolean; unmatching: boolean;
 }) {
+  const dates = useDates();
   if (!line) return null;
   const isAdjustment = line.match_source === "ADJUSTMENT";
   return (
@@ -368,7 +370,7 @@ function MatchedLineDrawer({ line, currency, onClose, onUnmatch, canUnmatch, unm
           <ReconField label="Description">{line.description || "-"}</ReconField>
           <ReconField label="Reference">{line.reference || "-"}</ReconField>
           <ReconField label="Book entry / JE">{line.matched_reference || (isAdjustment ? "Adjusting entry" : "-")}</ReconField>
-          <ReconField label="Matched">{line.match_source_display || "Manual"}{line.reconciled_at ? ` · ${fmtDate(line.reconciled_at)}` : ""}</ReconField>
+          <ReconField label="Matched">{line.match_source_display || "Manual"}{line.reconciled_at ? ` · ${dates.day(line.reconciled_at)}` : ""}</ReconField>
         </div>
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
           {isAdjustment

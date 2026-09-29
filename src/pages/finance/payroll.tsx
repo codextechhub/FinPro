@@ -46,11 +46,11 @@ import {
 import type { PayrollLine, PayrollRun, EmployeeSalary, SalaryStructure, SalaryComponent, PayslipComponent } from "@/redux/services/finance/ops-types";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const tdCls = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
-const fmtDate = (s: string) => new Date(s).toLocaleDateString();
 
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
   DRAFT: { label: "Draft", cls: "bg-gray-03/60 text-gray-05" },
@@ -176,6 +176,7 @@ export default function PayrollPage() {
 }
 
 function RunsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
@@ -203,7 +204,7 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
         ? <span className="text-gray-01">{r.branch_name}</span>
         : <span className={cn(PILL, "bg-gray-03/60 text-gray-05")}>Whole school</span>,
     }] : []),
-    { header: "Payment date", cell: (r) => <span className="tabular-nums text-gray-05">{fmtDate(r.pay_date)}</span> },
+    { header: "Payment date", cell: (r) => <span className="tabular-nums text-gray-05">{dates.day(r.pay_date)}</span> },
     { header: "Employees", align: "right", cell: (r) => <span className="tabular-nums text-gray-05">{r.lines.length}</span> },
     { header: "Total gross", align: "right", cell: (r) => <Money kobo={r.gross_total} currency={currency} align="right" /> },
     { header: "Deductions", align: "right", cell: (r) => <Money kobo={r.paye_total + r.pension_total} currency={currency} align="right" /> },
@@ -239,6 +240,7 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
 }
 
 function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const [paying, setPaying] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const { data } = useGetPayrollRunQuery(runId != null ? { id: runId, entity } : skipToken);
@@ -301,7 +303,7 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
                         ))}
                         {payslips ? (
                           <td className={cn(tdCls, "text-right")}>
-                            <button type="button" onClick={() => printPayslip(r, l, currency)} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Payslip</button>
+                            <button type="button" onClick={() => printPayslip(r, l, currency, dates.prefs)} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Payslip</button>
                           </td>
                         ) : null}
                       </tr>
@@ -907,6 +909,7 @@ function StructureDrawer({ open, structure, entity, currency, onClose }: { open:
 // ── Payslips (flattened across runs) ─────────────────────────────────────────
 type PayslipRow = { run: PayrollRun; line: PayrollLine };
 function PayslipsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [searchInput, setSearchInput] = useState("");
   const [selected, setSelected] = useState<PayslipRow | null>(null);
   // This view flattens *every* run into payslips, so pull a wide page rather than the
@@ -926,11 +929,11 @@ function PayslipsTab({ entity, currency }: { entity: string; currency?: string |
     ...(access.isHidden("employee_name") ? [] : [{ header: "Employee", cell: ({ line }: PayslipRow) => <span className="font-medium text-gray-01">{line.employee_name || "-"}</span> }]),
     { header: "Period", cell: ({ run }) => run.period_label || "-" },
     { header: "Run no.", cell: ({ run }) => <span className="tabular-nums text-gray-05">{run.document_number}</span> },
-    { header: "Pay date", cell: ({ run }) => <span className="tabular-nums text-gray-05">{fmtDate(run.pay_date)}</span> },
+    { header: "Pay date", cell: ({ run }) => <span className="tabular-nums text-gray-05">{dates.day(run.pay_date)}</span> },
     ...visibleFigures(access, ["gross_amount", "net_amount"]).map(([name, label]): Column<PayslipRow> => ({ header: label, align: "right", cell: ({ line }) => <Money kobo={line[name] ?? 0} currency={currency} align="right" /> })),
     { header: "Status", cell: ({ run }) => <RunPill status={run.run_status} /> },
     ...(payslips ? [{ header: "", align: "right" as const, cell: ({ run, line }: PayslipRow) => (
-      <button type="button" onClick={(e) => { e.stopPropagation(); printPayslip(run, line, currency); }} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Print</button>
+      <button type="button" onClick={(e) => { e.stopPropagation(); printPayslip(run, line, currency, dates.prefs); }} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Print</button>
     ) }] : []),
   ];
 
@@ -999,16 +1002,17 @@ function PayslipBreakdown({ line, access, currency }: { line: PayrollLine; acces
 }
 
 function PayslipDrawer({ row, access, currency, onClose }: { row: PayslipRow | null; access: FieldAccess; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   if (!row) return null;
   const { run, line } = row;
   const metrics = visibleFigures(access, ["gross_amount", "net_amount"]);
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title={(!access.isHidden("employee_name") && line.employee_name) || "Payslip"} description={`${run.period_label || "-"} · ${run.document_number} · paid ${fmtDate(run.pay_date)}`}
+      title={(!access.isHidden("employee_name") && line.employee_name) || "Payslip"} description={`${run.period_label || "-"} · ${run.document_number} · paid ${dates.day(run.pay_date)}`}
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" onClick={onClose}>Close</Button>
-        {canPrintPayslip(access) ? <Button onClick={() => printPayslip(run, line, currency)} className="gap-1.5"><Printer className="size-4" /> Print payslip</Button> : null}
+        {canPrintPayslip(access) ? <Button onClick={() => printPayslip(run, line, currency, dates.prefs)} className="gap-1.5"><Printer className="size-4" /> Print payslip</Button> : null}
       </>}>
       <div className="space-y-4">
         {metrics.length ? (
@@ -1026,9 +1030,10 @@ function PayslipDrawer({ row, access, currency, onClose }: { row: PayslipRow | n
 // ── Statutory returns (filing-ready PAYE / pension schedules) ─────────────────
 /** A schedule lists each employee's name and figure, so it prints only when both are visible. */
 function SchedButton({ run, kind, access, currency, label }: { run: PayrollRun; kind: "PAYE" | "PENSION"; access: FieldAccess; currency?: string | null; label?: string }) {
+  const dates = useDates();
   if (access.isHidden("employee_name") || access.isHidden(kind === "PAYE" ? "paye_amount" : "pension_amount")) return null;
   return (
-    <button type="button" onClick={(e) => { e.stopPropagation(); printPayrollSchedule(run, kind, currency); }}
+    <button type="button" onClick={(e) => { e.stopPropagation(); printPayrollSchedule(run, kind, currency, dates.prefs); }}
       title={`Print the ${kind} schedule`}
       className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline">
       <Printer className="size-3" /> {label ?? (kind === "PAYE" ? "PAYE" : "Pension")}
@@ -1037,6 +1042,7 @@ function SchedButton({ run, kind, access, currency, label }: { run: PayrollRun; 
 }
 
 function StatutoryTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [selected, setSelected] = useState<PayrollRun | null>(null);
   const access = useFieldAccess(PAYROLL_LINE);
   const schedules = !access.isHidden("employee_name") && access.anyVisible("paye_amount", "pension_amount");
@@ -1051,7 +1057,7 @@ function StatutoryTab({ entity, currency }: { entity: string; currency?: string 
   const cols: Column<PayrollRun>[] = [
     { header: "Period", cell: (r) => r.period_label || "-" },
     { header: "Run no.", cell: (r) => <span className="tabular-nums text-gray-05">{r.document_number}</span> },
-    { header: "Pay date", cell: (r) => <span className="tabular-nums text-gray-05">{fmtDate(r.pay_date)}</span> },
+    { header: "Pay date", cell: (r) => <span className="tabular-nums text-gray-05">{dates.day(r.pay_date)}</span> },
     { header: "PAYE payable", align: "right", cell: (r) => <Money kobo={r.paye_total} currency={currency} align="right" /> },
     { header: "Pension payable", align: "right", cell: (r) => <Money kobo={r.pension_total} currency={currency} align="right" /> },
     { header: "Status", cell: (r) => <RunPill status={r.run_status} /> },
@@ -1075,6 +1081,7 @@ function StatutoryTab({ entity, currency }: { entity: string; currency?: string 
 }
 
 function StatutoryDrawer({ run, entity, access, currency, onClose }: { run: PayrollRun | null; entity: string; access: FieldAccess; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   // Real outstanding balance of the run's PAYE / pension payable accounts (from the
   // trial balance). Honest: this is the entity-wide unremitted liability for that
   // account - remittance isn't tracked per run, so we never fake a per-run "remitted".
@@ -1096,7 +1103,7 @@ function StatutoryDrawer({ run, entity, access, currency, onClose }: { run: Payr
 
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title={`Statutory · ${run.period_label || run.document_number}`} description={`${run.document_number} · pay date ${fmtDate(run.pay_date)}`}
+      title={`Statutory · ${run.period_label || run.document_number}`} description={`${run.document_number} · pay date ${dates.day(run.pay_date)}`}
       widthClass="sm:max-w-2xl"
       footer={<>
         <SchedButton run={run} kind="PAYE" access={access} currency={currency} label="PAYE schedule" />

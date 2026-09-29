@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
 import { useGetJournalQuery, useReverseJournalMutation, useSubmitJournalMutation } from "@/redux/services/finance/gl-api";
 import { DocumentVoidAction } from "../receivables/document-void-action";
+import { useDates } from "../../../lib/display-prefs";
 
 const cap = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 const th = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -33,6 +34,7 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
 export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
   journalId: number | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const dates = useDates();
   const open = journalId != null;
   const { data, isLoading, isError, refetch } = useGetJournalQuery({ id: journalId!, entity }, { skip: !open });
   const [submitJournal, { isLoading: submitting }] = useSubmitJournalMutation();
@@ -72,7 +74,7 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
             <span className="font-mont text-xs text-gray-05">
-              Created by {j?.created_by ?? "-"}{j?.posted_at ? ` · Posted ${new Date(j.posted_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+              Created by {j?.created_by ?? "-"}{j?.posted_at ? ` · Posted ${dates.day(j.posted_at)}` : ""}
             </span>
             <div className="flex flex-wrap items-center gap-2">
               {j?.status === "DRAFT" && (

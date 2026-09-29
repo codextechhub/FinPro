@@ -15,7 +15,11 @@ import {
   buildTaxFilingPackPrintDocument,
   openFinancePrintDocument,
   renderFinancePrintHtml,
+  taxPeriodLabel,
 } from "./finance-print";
+import { DEFAULT_DISPLAY_PREFS, type DisplayPrefs } from "./dates";
+
+const PREFS = DEFAULT_DISPLAY_PREFS;
 
 const attack = '<img src=x onerror="globalThis.compromised=true"><script>globalThis.compromised=true</script>';
 
@@ -76,11 +80,11 @@ afterEach(() => {
 
 describe("finance print document rendering", () => {
   it("keeps malicious payroll schedule values as text", () => {
-    expectAttackIsText(renderFinancePrintHtml(buildPayrollSchedulePrintDocument(payrollRun(payrollLine), "PAYE", "NGN")));
+    expectAttackIsText(renderFinancePrintHtml(buildPayrollSchedulePrintDocument(payrollRun(payrollLine), "PAYE", "NGN", PREFS)));
   });
 
   it("keeps malicious payslip values as text", () => {
-    expectAttackIsText(renderFinancePrintHtml(buildPayslipPrintDocument(payrollRun(payrollLine), payrollLine, "NGN")));
+    expectAttackIsText(renderFinancePrintHtml(buildPayslipPrintDocument(payrollRun(payrollLine), payrollLine, "NGN", PREFS)));
   });
 
   it("keeps malicious bank reconciliation values as text", () => {
@@ -127,6 +131,7 @@ describe("finance print document rendering", () => {
       difference: 0,
       matched: [line],
       unmatched: [line],
+      prefs: PREFS,
     })));
   });
 
@@ -165,7 +170,7 @@ describe("finance print document rendering", () => {
         receipt_url: null,
       }],
     } satisfies ExpenseClaim;
-    expectAttackIsText(renderFinancePrintHtml(buildExpenseClaimPrintDocument(claim, attack, "NGN")));
+    expectAttackIsText(renderFinancePrintHtml(buildExpenseClaimPrintDocument(claim, attack, "NGN", PREFS)));
   });
 
   it("keeps malicious tax filing values as text", () => {
@@ -195,7 +200,7 @@ describe("finance print document rendering", () => {
       filed_at: "2026-09-08",
       narration: attack,
     } satisfies TaxFiling;
-    expectAttackIsText(renderFinancePrintHtml(buildTaxFilingPackPrintDocument([filing], "NGN")));
+    expectAttackIsText(renderFinancePrintHtml(buildTaxFilingPackPrintDocument([filing], "NGN", PREFS)));
   });
 
   it("opens the generated document with noopener and removes any returned opener", () => {
@@ -204,7 +209,7 @@ describe("finance print document rendering", () => {
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:safe-print");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
 
-    openFinancePrintDocument(buildPayslipPrintDocument(payrollRun(payrollLine), payrollLine, "NGN"));
+    openFinancePrintDocument(buildPayslipPrintDocument(payrollRun(payrollLine), payrollLine, "NGN", PREFS));
 
     expect(openSpy).toHaveBeenCalledWith(
       "blob:safe-print",
@@ -213,5 +218,34 @@ describe("finance print document rendering", () => {
     );
     expect(openSpy.mock.calls[0][2]).toContain("noreferrer");
     expect(popup.opener).toBeNull();
+  });
+});
+
+describe("finance print dates", () => {
+  const textOf = (html: string) => new DOMParser().parseFromString(html, "text/html").body.textContent ?? "";
+  const plainLine = { ...payrollLine, employee_name: "Adaeze Okafor", components: [] };
+  const plainRun = { ...payrollRun(plainLine), document_number: "PAY-0009", period_label: "September 2026", pay_date: "2026-09-01" };
+
+  it("prints a pay date on its own day in the school's format, whatever the zone", () => {
+    // `new Date("2026-09-01").toLocaleDateString()` printed 31 Aug west of UTC.
+    const slashed: DisplayPrefs = { ...PREFS, dateFormat: "DD_MM_YYYY", timeZone: "America/Los_Angeles" };
+    expect(textOf(renderFinancePrintHtml(buildPayslipPrintDocument(plainRun, plainLine, "NGN", PREFS)))).toContain("paid 1 Sep 2026");
+    expect(textOf(renderFinancePrintHtml(buildPayslipPrintDocument(plainRun, plainLine, "NGN", slashed)))).toContain("paid 01/09/2026");
+  });
+
+  it("dates a reconciliation report by the school's day, not the UTC one", () => {
+    const html = renderFinancePrintHtml(buildBankReconciliationPrintDocument({
+      account: { name: "Main", bank_name: "Zenith", gl_account: "1100" } as BankAccount,
+      currency: "NGN", book: 0, statement: 0, difference: 0, matched: [], unmatched: [],
+      prefs: PREFS,
+      now: new Date("2026-09-30T23:30:00Z"),
+    }));
+    expect(textOf(html)).toContain("GL 1100 · 1 Oct 2026");
+  });
+
+  it("names a tax period by its months, and a calendar year as FY", () => {
+    expect(taxPeriodLabel("2026-09-01", "2026-09-30", PREFS)).toBe("Sep 2026");
+    expect(taxPeriodLabel("2026-07-01", "2026-09-30", PREFS)).toBe("Jul–Sep 2026");
+    expect(taxPeriodLabel("2026-01-01", "2026-12-31", PREFS)).toBe("FY2026");
   });
 });

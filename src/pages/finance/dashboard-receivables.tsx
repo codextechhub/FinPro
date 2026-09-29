@@ -22,6 +22,7 @@ import type { ReceivablesDashboard } from "@/redux/services/finance/reports-type
 import { routesPath } from "@/routes/routes-path";
 import { AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, plural } from "./dashboard-cards";
 import { termWordOf, type DashboardWords } from "./dashboard-words";
+import { useDates } from "../../lib/display-prefs";
 
 type R = ReceivablesDashboard;
 const F = routesPath.PROTECTED.FINANCE;
@@ -175,6 +176,7 @@ function CurveCard({ curve, windowName, unit }: {
 // ── payment plans ────────────────────────────────────────────────────────────
 
 function PlansCard({ plans, currency }: { plans: NonNullable<R["plans"]>; currency?: string | null }) {
+  const dates = useDates();
   const total = plans.on_track + plans.behind || 1;
   return (
     <Panel title="Payment plans" subtitle={`${plural(plans.active, "active plan")}`}
@@ -202,7 +204,7 @@ function PlansCard({ plans, currency }: { plans: NonNullable<R["plans"]>; curren
               <span className="font-mont text-xs font-semibold text-gray-01">Next instalments</span>
               {plans.next.map((n) => (
                 <div key={n.date} className="flex justify-between font-mont text-xs">
-                  <span className="text-gray-05">{new Date(`${n.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
+                  <span className="text-gray-05">{dates.dayMonth(n.date)}</span>
                   <span className="tabular-nums">{plural(n.plans, "plan")} · {compactMoney(n.amount.kobo, currency)}</span>
                 </div>
               ))}
