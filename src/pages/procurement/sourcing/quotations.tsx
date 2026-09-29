@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import {
-  ChevronRight, FilePenLine, FileText, GitCompareArrows, History, Layers,
+  ChevronLeft, ChevronRight, FilePenLine, FileText, GitCompareArrows, History, Layers,
   Lock, Paperclip, Plus, Search,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { P } from "../../../permissions";
@@ -208,15 +209,55 @@ function QuotationDrawer({ id, entity, currency, onClose }: { id: number | null;
 
 function QuotationEvidence({ quotation }: { quotation: QuotationDetail }) {
   const dates = useDates();
+  const [selectedImage, setSelectedImage] = useState<number | null>(null);
+  const images = quotation.attachments.filter((attachment) => attachment.content_type.startsWith("image/"));
   return <div className="space-y-4">
     <section><h3 className="font-mont text-xs font-semibold">Submission history</h3><div className="mt-2 space-y-2">{quotation.submissions.length ? quotation.submissions.map((row) => <div key={row.id} className="rounded-md border border-white-02 p-3 font-mont text-xs"><span className="font-semibold">Revision {row.revision}</span><span className="text-gray-05"> · RFQ version {row.rfq_version} · {dates.dateTime(row.submitted_at)}</span><p className="mt-1 text-gray-05">Submitted by {row.submitted_by_email}</p></div>) : <EmptyPanel>No vendor submission receipt has been recorded.</EmptyPanel>}</div></section>
-    <section><h3 className="font-mont text-xs font-semibold">Attachments</h3><div className="mt-2 space-y-2">{quotation.attachments.length ? quotation.attachments.map((row) => <AttachmentRow key={row.id} attachment={row} />) : <EmptyPanel>No PDF or image evidence was attached.</EmptyPanel>}</div></section>
+    <section><h3 className="font-mont text-xs font-semibold">Attachments</h3><div className="mt-2 space-y-2">{quotation.attachments.length ? quotation.attachments.map((row) => <AttachmentRow key={row.id} attachment={row} onViewImage={() => setSelectedImage(images.findIndex((image) => image.id === row.id))} />) : <EmptyPanel>No PDF or image evidence was attached.</EmptyPanel>}</div></section>
+    <QuotationImageViewer images={images} selectedIndex={selectedImage} onSelect={setSelectedImage} />
   </div>;
 }
 
-function AttachmentRow({ attachment }: { attachment: QuotationDetail["attachments"][number] }) {
+function AttachmentRow({ attachment, onViewImage }: { attachment: QuotationDetail["attachments"][number]; onViewImage: () => void }) {
+  const isImage = attachment.content_type.startsWith("image/");
+  return <div className="flex flex-wrap items-center gap-3 rounded-md border border-white-02 p-3"><Paperclip className="size-4 shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="truncate font-mont text-xs font-semibold">{attachment.name}</p><p className="mt-0.5 font-mont text-[11px] text-gray-05">{Math.ceil(attachment.size / 1024)}KB · Revision {attachment.revision}</p></div>{isImage ? <Button size="sm" variant="outline" onClick={onViewImage}>View image</Button> : <PdfAttachmentLink attachment={attachment} />}</div>;
+}
+
+function PdfAttachmentLink({ attachment }: { attachment: QuotationDetail["attachments"][number] }) {
   const { data: blobUrl, isLoading } = useFetchAuthMediaQuery(attachment.url);
-  return <div className="flex flex-wrap items-center gap-3 rounded-md border border-white-02 p-3"><Paperclip className="size-4 text-primary" /><div className="min-w-0 flex-1"><p className="truncate font-mont text-xs font-semibold">{attachment.name}</p><p className="mt-0.5 font-mont text-[11px] text-gray-05">{Math.ceil(attachment.size / 1024)}KB · Revision {attachment.revision}</p></div><Button asChild size="sm" variant="outline" disabled={isLoading || !blobUrl}><a href={blobUrl || "#"} target="_blank" rel="noreferrer">{attachment.content_type === "application/pdf" ? "Open PDF" : "View image"}</a></Button></div>;
+  return <Button asChild size="sm" variant="outline" disabled={isLoading || !blobUrl}><a href={blobUrl || "#"} target="_blank" rel="noreferrer">Open PDF</a></Button>;
+}
+
+/** Displays one authorised evidence image at a time while retaining the quotation drawer. */
+function QuotationImageViewer({ images, selectedIndex, onSelect }: { images: QuotationDetail["attachments"]; selectedIndex: number | null; onSelect: (index: number | null) => void }) {
+  const image = selectedIndex == null ? undefined : images[selectedIndex];
+  const { currentData: blobUrl, isLoading, isError } = useFetchAuthMediaQuery(image?.url || "", { skip: !image });
+  useEffect(() => {
+    if (selectedIndex == null || images.length < 2) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        onSelect((selectedIndex + (event.key === "ArrowRight" ? 1 : -1) + images.length) % images.length);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [images.length, onSelect, selectedIndex]);
+
+  return <Dialog open={selectedIndex != null} onOpenChange={(open) => !open && onSelect(null)}>
+    <DialogContent className="w-[calc(100vw-2rem)] p-4 sm:max-w-5xl sm:p-6">
+      <DialogHeader className="min-w-0 pr-8"><DialogTitle className="truncate">{image?.name || "Evidence image"}</DialogTitle><DialogDescription>{selectedIndex == null ? "" : `Image ${selectedIndex + 1} of ${images.length}`}</DialogDescription></DialogHeader>
+      <div className="flex min-h-48 items-center justify-center rounded-md bg-black/5 p-2 sm:p-4">
+        {isLoading && <p className="font-mont text-sm text-gray-05">Loading image…</p>}
+        {isError && <p className="font-mont text-sm text-gray-05">This image could not be opened.</p>}
+        {blobUrl && image && <img key={image.id} src={blobUrl} alt={image.name} className="max-h-[65dvh] max-w-full object-contain" />}
+      </div>
+      {images.length > 1 && selectedIndex != null && <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button variant="outline" size="sm" onClick={() => onSelect((selectedIndex - 1 + images.length) % images.length)}><ChevronLeft className="size-4" />Previous</Button>
+        <Button variant="outline" size="sm" onClick={() => onSelect((selectedIndex + 1) % images.length)}>Next<ChevronRight className="size-4" /></Button>
+      </div>}
+    </DialogContent>
+  </Dialog>;
 }
 
 // Loads a sibling quote's detail so the lowest unit price per RFQ line can be
