@@ -27,13 +27,12 @@ import {
   useDisposeFixedAssetMutation,
 } from "@/redux/services/finance/ops-api";
 import type { FixedAsset } from "@/redux/services/finance/ops-types";
-import { todayISO } from "@/utils/posting-window";
+import { monthBounds } from "../../../utils/dates";
+import { useDates } from "../../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const tdCls = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
-const monthEndISO = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10); };
-const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : "-");
 
 const CATEGORIES: [string, string][] = [
   ["VEHICLES", "Vehicles"], ["BUILDINGS", "Buildings"], ["PLANT_MACHINERY", "Plant & machinery"],
@@ -63,7 +62,7 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 function yearlySchedule(asset: FixedAsset) {
   const byYear = new Map<number, { dep: number; posted: number; count: number }>();
   for (const r of asset.schedule) {
-    const y = new Date(r.depreciation_date).getFullYear();
+    const y = Number(r.depreciation_date.slice(0, 4));
     const e = byYear.get(y) ?? { dep: 0, posted: 0, count: 0 };
     e.dep += r.amount; e.count += 1; if (r.is_posted) e.posted += 1;
     byYear.set(y, e);
@@ -157,6 +156,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 function AssetDrawer({ assetId, assets, entity, currency, onClose }: { assetId: number | null; assets: FixedAsset[]; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const asset = useMemo(() => assets.find((a) => a.id === assetId) ?? null, [assets, assetId]);
   const [acquiring, setAcquiring] = useState(false);
   const [disposing, setDisposing] = useState(false);
@@ -164,10 +164,11 @@ function AssetDrawer({ assetId, assets, entity, currency, onClose }: { assetId: 
 
   if (assetId == null || !asset) return null;
   const years = yearlySchedule(asset);
-  const hasDue = asset.schedule.some((r) => !r.is_posted && r.depreciation_date <= todayISO());
+  const assetToday = dates.today(asset.branch_id);
+  const hasDue = asset.schedule.some((r) => !r.is_posted && r.depreciation_date <= assetToday);
 
   const doDepreciate = async () => {
-    try { const r = await depreciate({ id: asset.id, entity, up_to_date: todayISO() }).unwrap(); toast.success(r.message || "Depreciation posted."); }
+    try { const r = await depreciate({ id: asset.id, entity, up_to_date: assetToday }).unwrap(); toast.success(r.message || "Depreciation posted."); }
     catch { /* central */ }
   };
 
@@ -187,7 +188,7 @@ function AssetDrawer({ assetId, assets, entity, currency, onClose }: { assetId: 
             <Metric label="Cost" value={formatMoney(asset.cost, currency)} />
             <Metric label="Accumulated dep." value={formatMoney(asset.accumulated_depreciation, currency)} />
             <Metric label="Net book value" value={formatMoney(asset.net_book_value, currency)} />
-            <Metric label={asset.asset_status === "DISPOSED" ? "Disposed" : "In service"} value={asset.asset_status === "DISPOSED" ? fmtDate(asset.disposal_date) : fmtDate(asset.acquisition_date)} />
+            <Metric label={asset.asset_status === "DISPOSED" ? "Disposed" : "In service"} value={asset.asset_status === "DISPOSED" ? dates.day(asset.disposal_date) : dates.day(asset.acquisition_date)} />
           </div>
 
           <div>
@@ -358,7 +359,8 @@ function NewAssetDrawer({ open, onClose, entity, currency }: { open: boolean; on
 }
 
 function RunDepreciationDrawer({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {
-  const [upTo, setUpTo] = useState(monthEndISO());
+  const dates = useDates();
+  const [upTo, setUpTo] = useState(() => monthBounds(dates.today()).to);
   const { data, isFetching } = useGetDepreciationPreviewQuery({ entity, up_to_date: upTo }, { skip: !open || !upTo });
   const preview = data?.data;
   const [run, { isLoading }] = useRunDepreciationMutation();
@@ -381,13 +383,13 @@ function RunDepreciationDrawer({ open, onClose, entity, currency }: { open: bool
         {isFetching && !preview ? <p className="py-6 text-center font-mont text-xs text-gray-05">Loading…</p> : null}
         {preview ? (
           nothing ? (
-            <p className="rounded-md border border-dashed border-white-02 px-3 py-6 text-center font-mont text-xs text-gray-05">No depreciation is due up to {fmtDate(upTo)}.</p>
+            <p className="rounded-md border border-dashed border-white-02 px-3 py-6 text-center font-mont text-xs text-gray-05">No depreciation is due up to {dates.day(upTo)}.</p>
           ) : (
             <>
               <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-[11px] text-amber-700">
                 This posts depreciation for {preview.asset_count} in-use asset(s) - one compound journal per fiscal period in range. A closed period in the range will block the run; re-open it first.
               </p>
-              <PostingRecap title={`Depreciation posting - to ${fmtDate(upTo)}`} dr={dr} cr={cr} currency={currency} />
+              <PostingRecap title={`Depreciation posting - to ${dates.day(upTo)}`} dr={dr} cr={cr} currency={currency} />
             </>
           )
         ) : null}
