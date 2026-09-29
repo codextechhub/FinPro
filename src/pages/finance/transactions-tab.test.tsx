@@ -5,6 +5,10 @@
  * must then show nothing in their place: no dash, no bullets, and no
  * Beneficiary section in the drawer. A collection's party is its customer and
  * stays.
+ *
+ * A payout's `amount` is what was sent, net of WHT. Where WHT was withheld the
+ * drawer shows the line it settles and the WHT beside the amount; where none
+ * was, it shows the amount alone.
  */
 
 import { act } from "react";
@@ -27,11 +31,19 @@ const ROWS = [
   {
     kind: "collection", gateway_id: 1, reference: "COL-1", created_at: "2026-09-20T09:00:00Z", direction: "in",
     party: "Tunde Bello", provider: "PAYSTACK", amount: 250000, amount_naira: "2,500.00", status: "SUCCEEDED",
+    gross_amount: 250000, wht_amount: 0,
     narration: "", provider_reference: null, confirmed_at: null, linked_id: null, email: "", account_code: null, account_name: null,
   },
   {
     kind: "payout", gateway_id: 2, reference: "PO-2", created_at: "2026-09-20T10:00:00Z", direction: "out",
     provider: "PAYSTACK", amount: 500000, amount_naira: "5,000.00", status: "PAID",
+    gross_amount: 500000, wht_amount: 0,
+    narration: "", provider_reference: null, confirmed_at: null, linked_id: null, email: "", account_code: null, account_name: null,
+  },
+  {
+    kind: "payout", gateway_id: 3, reference: "PO-3", created_at: "2026-09-20T11:00:00Z", direction: "out",
+    provider: "PAYSTACK", amount: 950000, amount_naira: "9,500.00", status: "PAID",
+    gross_amount: 1000000, wht_amount: 50000,
     narration: "", provider_reference: null, confirmed_at: null, linked_id: null, email: "", account_code: null, account_name: null,
   },
 ];
@@ -80,5 +92,21 @@ describe("Movements feed under Field Access", () => {
     act(() => row("PO-2").click());
     expect(document.body.textContent).toContain("Payout out");
     expect(document.body.textContent).not.toContain("Beneficiary");
+  });
+});
+
+describe("A payout's WHT in the drawer", () => {
+  it("shows the line amount and the WHT withheld beside what was sent", () => {
+    act(() => root.render(<TransactionsTab entity="COD" />));
+    act(() => row("PO-3").click());
+    expect(document.body.textContent).toContain("Line amount");
+    expect(document.body.textContent).toContain("WHT withheld");
+  });
+
+  it("shows the amount alone where no WHT was withheld", () => {
+    act(() => root.render(<TransactionsTab entity="COD" />));
+    act(() => row("PO-2").click());
+    expect(document.body.textContent).not.toContain("Line amount");
+    expect(document.body.textContent).not.toContain("WHT withheld");
   });
 });

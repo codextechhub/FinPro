@@ -188,6 +188,12 @@ function MovementDrawer({ move, currency, onClose }: { move: Movement | null; cu
           <Field label="Provider"><ProviderTag provider={move.provider} /></Field>
           {move.provider_reference ? <Field label="Provider ref" mono>{move.provider_reference}</Field> : null}
           <Field label="Amount" mono><span className={!inbound ? "text-destructive" : ""}>{formatMoney(move.amount, currency)}</span></Field>
+          {move.wht_amount > 0 ? (
+            <>
+              <Field label="Line amount" mono>{formatMoney(move.gross_amount, currency)}</Field>
+              <Field label="WHT withheld" mono>{formatMoney(move.wht_amount, currency)}</Field>
+            </>
+          ) : null}
           <Field label="Status"><StatusPill status={move.status} /></Field>
           <Field label="Created" mono>{fmtDateTime(move.created_at)}</Field>
         </Section>

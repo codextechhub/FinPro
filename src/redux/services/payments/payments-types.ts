@@ -160,14 +160,14 @@ export interface SettlementRow {
   reference: string;
   provider: string;
   provider_reference: string;
-  amount: number; // signed kobo (+ in, − out) - the gateway gross
+  amount: number; // signed kobo (+ in, − out) - a payout at what it sent, net of WHT
   amount_naira: string;
   confirmed_at: string | null;
   settled: boolean;
   match_basis: "reference" | "amount" | "";
   matched_bank_line_id: number | null;
   settled_amount: number | null; // the matched bank line's signed amount (net of fees)
-  fee_amount: number; // |gross| − |net| - the PSP fee
+  fee_amount: number; // |amount| − |settled_amount| - the PSP fee
   settlement_reference: string; // the matched bank line's reference
   settlement_date: string | null; // the matched bank line's txn date
   settlement_description: string; // the matched bank line's description
@@ -246,7 +246,8 @@ export interface PayoutBatchKpis {
 
 // Unified money-movement feed row (collections in + payouts out). On a payout
 // row `party` and `beneficiary_account` are the beneficiary name and account
-// number, absent when Field Access on payments.payout hides them.
+// number, absent when Field Access on payments.payout hides them. `amount` is
+// the money that moved: on a payout, the line less the WHT withheld.
 export interface Movement {
   kind: "collection" | "payout";
   gateway_id: number;
@@ -255,8 +256,10 @@ export interface Movement {
   direction: "in" | "out";
   party?: string;
   provider: string;
-  amount: number;
+  amount: number; // kobo that moved (a payout's line net of WHT)
   amount_naira: string;
+  gross_amount: number; // kobo: a payout's line before WHT; a collection's amount
+  wht_amount: number; // kobo withheld on a payout; 0 on a collection
   status: string;
   narration: string;
   provider_reference: string | null;
