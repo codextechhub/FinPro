@@ -10,8 +10,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAppSelector } from "@/redux/store";
 import { selectIsPlatformTenant } from "@/redux/features/auth/auth-slice";
-import { usePermissions } from "@/hooks/use-permissions";
-import { P } from "@/permissions";
 import { routesPath } from "../paths";
 import {
   useGetApproverGroupsQuery,
@@ -20,7 +18,9 @@ import {
   useGetWorkflowTemplateQuery,
   usePublishWorkflowTemplateMutation,
 } from "@/redux/services/dashboard/workflow-api";
-import { createsWorkflowTemplates, platformName, useBranches, useDirectory, usePositions, useRoles } from "@xvs/finance/host";
+import {
+  createsWorkflowTemplates, platformName, useBranches, useCanUseOrganogram, useDirectory, usePositions, useRoles,
+} from "@xvs/finance/host";
 import {
   type ConditionCatalogue,
   type ConditionChoices,
@@ -62,7 +62,7 @@ const SOURCE_OPTIONS = [
   { value: "ROLE", label: "Role holders" },
   { value: "WORKFLOW_GROUP", label: "Approver group" },
   { value: "DYNAMIC_ROLE", label: "Dynamic Role" },
-  { value: "ORGANOGRAM", label: "Organogram (relative to requester)" },
+  { value: "ORGANOGRAM", label: "Organogram" },
 ];
 // What each source resolves to, in the words an administrator uses. Shown under
 // the picker because the choice decides who can approve, and the difference
@@ -73,7 +73,7 @@ const SOURCE_HINT: Record<string, string> = {
     "A named pool built on the Approvers screen - people, roles and org seats mixed.",
   DYNAMIC_ROLE:
     "A Dynamic Role from the Approvers screen: its rules look at the document and who raised it, and the first one that fits decides.",
-  ORGANOGRAM: "Climbs the org chart relative to whoever raised the request.",
+  ORGANOGRAM: "Climbs the org chart from whoever raised the request, or goes to one named post.",
 };
 const TARGET_OPTIONS = [
   { value: "DIRECT_MANAGER", label: "Direct manager" },
@@ -289,21 +289,8 @@ export default function TemplateBuilder() {
 
   const isPlatformTenant = useAppSelector(selectIsPlatformTenant);
   const self = useAppSelector((s) => s.auth.user);
-  const { hasPermission } = usePermissions();
-
-  // An organogram-sourced stage resolves its approver by climbing a reporting
-  // line, and that chart belongs to the platform: its endpoint answers to
-  // platform staff alone, so a school administrator can never resolve such a
-  // stage and is not offered the source. The seats themselves arrive through the
-  // host, which answers with an empty list in an app that keeps no organogram.
-  //
-  // The gate is "can this person read the organogram", the permission that read
-  // is enforced on.
-  //
-  // Was `self.user_type === "CX_STAFF"` - a field the API does not return, so it
-  // was always false and ORGANOGRAM never appeared in the picker for anyone. The
-  // model calls user_type an inert marker that must never drive authorization.
-  const canUseOrganogram = hasPermission(P.VIEW_ORGANOGRAM);
+  // Offered where the reader may read this app's organogram; the host knows which chart and key.
+  const canUseOrganogram = useCanUseOrganogram();
 
   const {
     data: existing, isLoading: isLoadingExisting, isError: existingFailed,

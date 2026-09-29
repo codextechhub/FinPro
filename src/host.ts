@@ -186,15 +186,22 @@ export interface HostContract {
   useRoles(): HostQueryResult<HostRole>;
   /** Every organogram seat an approval step may be pointed at.
    *
-   *  In the contract because the organogram is not a thing every application
-   *  has. It is CodeX's own reporting structure, read from a platform endpoint
-   *  a school administrator may not call at all - so a package that queried it
-   *  directly gave a school a picker that answered 403 and a tab that could
-   *  never list anything.
+   *  In the contract because each application keeps its own organogram: the
+   *  console reads CodeX's reporting structure from a platform endpoint, and the
+   *  school app reads the school's own chart. A package that queried either
+   *  directly would answer 403 in the other app.
    *
-   *  An app with no organogram supplies a hook returning an empty list, and the
-   *  Positions tab disappears rather than standing there empty. */
+   *  An app with no organogram, or a reader who may not read it, gets an empty
+   *  list, and the Positions tab disappears rather than standing there empty. */
   usePositions(): HostQueryResult<HostPosition>;
+  /** Whether the reader may route an approval step through this app's
+   *  organogram, which offers "Organogram" under "Decided by".
+   *
+   *  In the contract because the answer is a permission, and each app's chart
+   *  is read under its own key: platform.organogram.view in the console,
+   *  school.organogram.view in the school app. A package that asked either key
+   *  itself would hide the option in the other app for everybody. */
+  useCanUseOrganogram(): boolean;
   /** Note that the reader opened something, for the app's own "recently
    *  opened" trail. The console keeps one; an app that does not supplies a hook
    *  that ignores the call, which is a real answer rather than a gap. */
@@ -284,7 +291,7 @@ const _satisfies: HostContract = host;
 void _satisfies;
 
 export const {
-  useBranches, useDirectory, useRoles, usePositions, AppLogo, QuickExportButton, UserAvatar,
+  useBranches, useDirectory, useRoles, usePositions, useCanUseOrganogram, AppLogo, QuickExportButton, UserAvatar,
   useDashboardTitle, PlatformLedgerInventory, useLogRecentOpen,
   financeSettingsSections, setupSections, FeeDuePolicyPanel, createsWorkflowTemplates,
   platformName,
