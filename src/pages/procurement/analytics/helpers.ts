@@ -75,9 +75,6 @@ export const DONUT_COLORS = [
   CHART_COLORS.teal, CHART_COLORS.violet,
 ];
 
-/** Today as an ISO date string (YYYY-MM-DD) for the as-of/date controls. */
-export const todayISO = (): string => new Date().toISOString().slice(0, 10);
-
 // Score-band colour for a performance meter (0..1): strong green → fair lime → weak amber.
 export function meterScoreColor(ratio: number): string {
   if (ratio >= 0.9) return CHART_COLORS.green;

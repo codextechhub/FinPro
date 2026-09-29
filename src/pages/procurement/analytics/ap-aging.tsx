@@ -20,9 +20,10 @@ import { Card, ChartEmpty, DateFilter, Pill, ScopeNote, StatusDotPill, SectionHe
 import { paymentTermsLabel } from "../payment-terms";
 import { PageShell } from "@/components/layout/page-shell";
 import {
-  BUCKET_LABEL, TD, TDR, TFOOT, TFOOTR, TH, THR, ageColor, excludedScopeNote, kobo, todayISO,
+  BUCKET_LABEL, TD, TDR, TFOOT, TFOOTR, TH, THR, ageColor, excludedScopeNote, kobo,
   type SectionProps,
 } from "./helpers";
+import { useDates } from "../../../lib/display-prefs";
 
 // Status from the vendor's real buckets - any position 31+ days late reads Overdue.
 function apStatus(buckets: Record<string, ReportMoney>): { label: string; tone: PillTone } {
@@ -41,7 +42,8 @@ function bucketTone(bucket: string): PillTone {
 }
 
 export default function ApAgingScreen({ entity, currency }: SectionProps) {
-  const [asOf, setAsOf] = useState(todayISO());
+  const dates = useDates();
+  const [asOf, setAsOf] = useState(() => dates.today());
   const params = useMemo(() => ({ entity, ...(asOf ? { as_of: asOf } : {}) }), [entity, asOf]);
   const aging = useGetApAgingQuery(params);
   const cash = useGetApCashRequirementsQuery(params);
