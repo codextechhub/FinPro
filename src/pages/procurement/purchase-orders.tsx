@@ -41,6 +41,7 @@ import { formatQuantity } from "@/utils/quantity";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
 const STATUS_TABS = [
   { label: "All", value: "" },
@@ -68,28 +69,13 @@ const DETAIL_TAB_ITEMS: TabStripItem<DetailTab>[] = DETAIL_TABS.map(({ value, la
   label: <><Icon className="size-3.5" />{label}</>,
 }));
 
-function shortDate(value?: string | null) {
-  if (!value) return "-";
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-}
-
-function shortDateTime(value?: string | null) {
-  if (!value) return "-";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
 function percent(value: string | number | null | undefined) {
   const number = Number(value ?? 0);
   return `${Number.isFinite(number) ? Math.round(number) : 0}%`;
 }
 
 export default function PurchaseOrdersPage() {
+  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
   // Asked before the tables below fetch on mount. A finance grant does not
   // carry procurement.purchase_order.view with it, and without this the screen
@@ -137,8 +123,8 @@ export default function PurchaseOrdersPage() {
       cell: (po) => <div className="min-w-32"><p className="font-mont text-sm font-semibold text-primary">{po.document_number}</p><p className="mt-1 max-w-56 truncate font-mont text-[11px] text-gray-05">{po.requisition_number || po.quotation_number || "Direct purchase order"}</p></div>,
     },
     { header: "Vendor", cell: (po) => <div className="min-w-36"><p className="font-mont text-sm font-semibold">{po.vendor_name || po.vendor_code}</p><p className="mt-0.5 font-mont text-[11px] text-gray-05">{po.vendor_code}</p></div> },
-    { header: "Issue date", cell: (po) => shortDate(po.order_date) },
-    { header: "Delivery", cell: (po) => shortDate(po.expected_date) },
+    { header: "Issue date", cell: (po) => dates.day(po.order_date) },
+    { header: "Delivery", cell: (po) => dates.day(po.expected_date) },
     { header: "Total", align: "right", cell: (po) => <span className="tabular-nums">{money(po.total)}</span> },
     { header: "Received", cell: (po) => <span className="tabular-nums">{percent(po.received_pct)}</span> },
     { header: "Status", cell: (po) => <StatusPill status={po.display_status} /> },
@@ -201,6 +187,7 @@ export default function PurchaseOrdersPage() {
 }
 
 function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const navigate = useNavigate();
   const { name } = useUserDirectory();
   const { can } = useCan();
@@ -270,7 +257,7 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
   };
   const openRoute = (route: string) => { onClose(); navigate(route); };
 
-  return <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} widthClass="sm:max-w-[720px]" title={po?.document_number || "Purchase order"} description={po ? `${po.vendor_name || po.vendor_code} · ${shortDate(po.order_date)}` : "Loading purchase order"} footer={po && <>
+  return <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} widthClass="sm:max-w-[720px]" title={po?.document_number || "Purchase order"} description={po ? `${po.vendor_name || po.vendor_code} · ${dates.day(po.order_date)}` : "Loading purchase order"} footer={po && <>
     <Button variant="outline" onClick={() => window.print()}><Printer className="size-4" /> Print</Button>
     {po.can_email_vendor && <Can permission={P.PROC_EMAIL_PURCHASE_ORDER_VENDOR}><Button variant="outline" onClick={() => openEmail()}><Mail className="size-4" /> Email Vendor</Button></Can>}
     {draftEditable && <Can permission={P.PROC_UPDATE_PURCHASE_ORDER}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
@@ -290,7 +277,7 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
       />
 
       {tab === "overview" && <div className="space-y-5">
-        <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Vendor" value={po.vendor_name || po.vendor_code} /><Field label="Order date" value={shortDate(po.order_date)} /><Field label="Expected delivery" value={shortDate(po.expected_date)} /><Field label="Payment terms" value={po.payment_terms || "Not specified"} /><Field label="Delivery address" value={po.delivery_address || "Not specified"} /><Field label="Invoice progress" value={percent(po.invoiced_pct)} /></dl>
+        <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Vendor" value={po.vendor_name || po.vendor_code} /><Field label="Order date" value={dates.day(po.order_date)} /><Field label="Expected delivery" value={dates.day(po.expected_date)} /><Field label="Payment terms" value={po.payment_terms || "Not specified"} /><Field label="Delivery address" value={po.delivery_address || "Not specified"} /><Field label="Invoice progress" value={percent(po.invoiced_pct)} /></dl>
         <section className="rounded-md border border-white-02 p-4"><p className="font-mont text-sm font-semibold">Document Flow</p><div className="mt-3 grid gap-2 sm:grid-cols-2">
           <DocumentLink label="Source requisition" value={po.requisition_number || "Not linked"} disabled={!po.requisition_id} onClick={() => openRoute(routesPath.PROTECTED.PROCUREMENT.REQUISITIONS)} />
           <DocumentLink label="Awarded quotation" value={po.quotation_number || "Not linked"} disabled={!po.quotation_number} onClick={() => openRoute(`${routesPath.PROTECTED.PROCUREMENT.SOURCING}/quotations`)} />
@@ -312,10 +299,10 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
           <div className="border-t border-white-02 px-3 py-3 text-right font-semibold tabular-nums">{money(line.net_amount + line.tax_amount)}</div>
         </div>)}
       </div></div> : <EmptyBlock text="No line items were added." />)}
-      {tab === "receipts" && (po.receipt_documents.length ? <div className="overflow-hidden rounded-md border border-white-02"><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 bg-[#F1F1F1] px-3 py-2 font-mont text-[11px] font-semibold text-gray-01"><span>Receipt</span><span>Date</span><span>Status</span></div>{po.receipt_documents.map((receipt) => <button type="button" key={receipt.id} onClick={() => openRoute(routesPath.PROTECTED.PROCUREMENT.GOODS_RECEIPTS)} className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-3 border-t border-white-02 px-3 py-3 text-left font-mont text-xs hover:bg-gray-50"><span className="font-semibold text-primary">{receipt.document_number}<span className="ml-2 font-normal text-gray-05">{receipt.item_count} item{receipt.item_count === 1 ? "" : "s"}</span></span><span>{shortDate(receipt.received_date)}</span><StatusPill status={receipt.status} /></button>)}</div> : <EmptyBlock text="No goods receipts have been posted against this purchase order." />)}
-      {tab === "invoices" && (po.invoice_documents.length ? <div className="overflow-hidden rounded-md border border-white-02"><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 bg-[#F1F1F1] px-3 py-2 font-mont text-[11px] font-semibold text-gray-01"><span>Invoice</span><span>Amount</span><span>Status</span></div>{po.invoice_documents.map((invoice) => <button type="button" key={invoice.id} onClick={() => openRoute(routesPath.PROTECTED.PROCUREMENT.VENDOR_INVOICES)} className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-3 border-t border-white-02 px-3 py-3 text-left font-mont text-xs hover:bg-gray-50"><span className="font-semibold text-primary">{invoice.document_number}<span className="ml-2 font-normal text-gray-05">{shortDate(invoice.invoice_date)}</span></span><span className="font-semibold tabular-nums">{money(invoice.total)}</span><StatusPill status={invoice.status} /></button>)}</div> : <EmptyBlock text="No vendor invoices are linked to this purchase order." />)}
+      {tab === "receipts" && (po.receipt_documents.length ? <div className="overflow-hidden rounded-md border border-white-02"><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 bg-[#F1F1F1] px-3 py-2 font-mont text-[11px] font-semibold text-gray-01"><span>Receipt</span><span>Date</span><span>Status</span></div>{po.receipt_documents.map((receipt) => <button type="button" key={receipt.id} onClick={() => openRoute(routesPath.PROTECTED.PROCUREMENT.GOODS_RECEIPTS)} className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-3 border-t border-white-02 px-3 py-3 text-left font-mont text-xs hover:bg-gray-50"><span className="font-semibold text-primary">{receipt.document_number}<span className="ml-2 font-normal text-gray-05">{receipt.item_count} item{receipt.item_count === 1 ? "" : "s"}</span></span><span>{dates.day(receipt.received_date)}</span><StatusPill status={receipt.status} /></button>)}</div> : <EmptyBlock text="No goods receipts have been posted against this purchase order." />)}
+      {tab === "invoices" && (po.invoice_documents.length ? <div className="overflow-hidden rounded-md border border-white-02"><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 bg-[#F1F1F1] px-3 py-2 font-mont text-[11px] font-semibold text-gray-01"><span>Invoice</span><span>Amount</span><span>Status</span></div>{po.invoice_documents.map((invoice) => <button type="button" key={invoice.id} onClick={() => openRoute(routesPath.PROTECTED.PROCUREMENT.VENDOR_INVOICES)} className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-3 border-t border-white-02 px-3 py-3 text-left font-mont text-xs hover:bg-gray-50"><span className="font-semibold text-primary">{invoice.document_number}<span className="ml-2 font-normal text-gray-05">{dates.day(invoice.invoice_date)}</span></span><span className="font-semibold tabular-nums">{money(invoice.total)}</span><StatusPill status={invoice.status} /></button>)}</div> : <EmptyBlock text="No vendor invoices are linked to this purchase order." />)}
       {tab === "approval" && (workflow?.stage_instances.length ? <div className="space-y-3">{workflow.stage_instances.map((stage) => <section key={stage.id} className="rounded-md border border-white-02 p-3"><div className="flex items-center justify-between gap-3"><p className="font-mont text-sm font-semibold">{stage.stage_label}</p><StatusPill status={stage.status} /></div>{stage.actions.length ? <div className="mt-3 space-y-2">{stage.actions.filter((action) => !action.is_reversal_of).map((action) => <div key={action.id} className="border-t border-white-02 pt-2 font-mont text-xs"><p><span className="font-semibold">{name(action.actor)}</span> · {action.action.toLowerCase()}</p><p className="mt-0.5 text-gray-05">{action.comment || "No comment"}</p></div>)}</div> : <p className="mt-2 font-mont text-xs text-gray-05">No decision recorded for this stage.</p>}</section>)}</div> : <EmptyBlock text={po.status === "DRAFT" ? "Submit this draft to begin its approval trail." : "No approval trail is available."} />)}
-      {tab === "email" && (po.email_deliveries?.length ? <div className="space-y-3">{po.email_deliveries.map((delivery) => <section key={delivery.id} className="rounded-md border border-white-02 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-mont text-sm font-semibold">{delivery.source === "AUTOMATIC" ? "Automatic after approval" : delivery.source === "RETRY" ? "Retry" : "Manual send"}</p><p className="mt-1 font-mont text-[11px] text-gray-05">Requested by {delivery.requested_by_name} · {shortDateTime(delivery.created_at)}</p></div><StatusPill status={delivery.status} /></div><div className="mt-3 grid grid-cols-2 gap-2 rounded bg-gray-50 p-2 font-mont text-xs"><span className="text-gray-05">Recipients</span><span className="text-right font-semibold">{delivery.recipient_count}</span><span className="text-gray-05">BCC recipients</span><span className="text-right font-semibold">{delivery.bcc_count}</span></div>{delivery.buyer_message && <p className="mt-3 whitespace-pre-wrap font-mont text-xs leading-5 text-gray-05">{delivery.buyer_message}</p>}{delivery.failure_reason && <div className="mt-3 rounded border border-red-200 bg-red-50 p-2 font-mont text-xs text-red-700">{delivery.failure_reason}</div>}{delivery.status === "FAILED" && canVendorEmail && <div className="mt-3 flex justify-end"><Button size="sm" variant="outline" onClick={() => openEmail(delivery)}>Retry Email</Button></div>}</section>)}</div> : <EmptyBlock text={po.can_email_vendor ? "This approved purchase order has not been emailed yet." : "Email Vendor becomes available after the purchase order is fully approved."} />)}
+      {tab === "email" && (po.email_deliveries?.length ? <div className="space-y-3">{po.email_deliveries.map((delivery) => <section key={delivery.id} className="rounded-md border border-white-02 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-mont text-sm font-semibold">{delivery.source === "AUTOMATIC" ? "Automatic after approval" : delivery.source === "RETRY" ? "Retry" : "Manual send"}</p><p className="mt-1 font-mont text-[11px] text-gray-05">Requested by {delivery.requested_by_name} · {dates.dateTime(delivery.created_at)}</p></div><StatusPill status={delivery.status} /></div><div className="mt-3 grid grid-cols-2 gap-2 rounded bg-gray-50 p-2 font-mont text-xs"><span className="text-gray-05">Recipients</span><span className="text-right font-semibold">{delivery.recipient_count}</span><span className="text-gray-05">BCC recipients</span><span className="text-right font-semibold">{delivery.bcc_count}</span></div>{delivery.buyer_message && <p className="mt-3 whitespace-pre-wrap font-mont text-xs leading-5 text-gray-05">{delivery.buyer_message}</p>}{delivery.failure_reason && <div className="mt-3 rounded border border-red-200 bg-red-50 p-2 font-mont text-xs text-red-700">{delivery.failure_reason}</div>}{delivery.status === "FAILED" && canVendorEmail && <div className="mt-3 flex justify-end"><Button size="sm" variant="outline" onClick={() => openEmail(delivery)}>Retry Email</Button></div>}</section>)}</div> : <EmptyBlock text={po.can_email_vendor ? "This approved purchase order has not been emailed yet." : "Email Vendor becomes available after the purchase order is fully approved."} />)}
     </div>}
     {po && editing && <EditPurchaseOrderDrawer po={po} entity={entity} currency={currency} onClose={() => setEditing(false)} />}
     {po && <ConfirmActionModal open={confirmApproval} onOpenChange={setConfirmApproval} title="Raise this purchase order for approval?" description="Submitting locks the purchase order while approvers review it. You can email the vendor only after full approval." confirmText="Raise for Approval" onConfirm={submitForApproval} loading={submitting} confirmDisabled={autoEmailVendor && (previewLoading || previewError || !emailPreview?.recipients.length)}>
@@ -384,9 +371,10 @@ function EditPurchaseOrderDrawer({ po, entity, currency, onClose }: { po: Purcha
 }
 
 function CreatePurchaseOrderDrawer({ open, entity, currency, onClose, onCreated }: { open: boolean; entity: string; currency?: string | null; onClose: () => void; onCreated: (id: number) => void }) {
+  const dates = useDates();
   const [requisition, setRequisition] = useState("");
   const [vendor, setVendor] = useState("");
-  const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
+  const [orderDate, setOrderDate] = useState(() => dates.today());
   const [expectedDate, setExpectedDate] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [paymentTerms, setPaymentTerms] = useState("");

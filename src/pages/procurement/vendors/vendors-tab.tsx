@@ -35,6 +35,7 @@ import { CategoryPicker } from "../pickers";
 import { buildVendorUpdatePayload, type VendorFormValues } from "./vendor-update-payload";
 import { VendorGovernanceFields } from "./vendor-governance-fields";
 import { PAYMENT_TERMS, paymentTermsLabel } from "../payment-terms";
+import { useDates } from "../../../lib/display-prefs";
 
 const STATUS_TABS = [
   ["All", "all"], ["Active", "active"], ["On Hold", "hold"], ["Inactive", "inactive"],
@@ -60,10 +61,6 @@ const NO_CONTACTS_TAB_ITEMS = DETAIL_TAB_ITEMS.filter((item) => item.value !== "
 
 function isForbidden(error: unknown) {
   return !!error && typeof error === "object" && "status" in error && error.status === 403;
-}
-function shortDate(value?: string | null) {
-  if (!value) return "-";
-  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value}T00:00:00`));
 }
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "V";
@@ -256,8 +253,9 @@ function BankTab({ vendor, access }: { vendor: Vendor; access: FieldAccess }) {
   </div>;
 }
 function HistoryTab({ contracts, pos, invoices, loading, contractAllowed, poAllowed, invoiceAllowed, currency }: { contracts: VendorContract[]; pos: PurchaseOrder[]; invoices: VendorInvoice[]; loading: boolean; contractAllowed: boolean; poAllowed: boolean; invoiceAllowed: boolean; currency?: string | null }) {
+  const dates = useDates();
   if (loading) return <LoadingState rows={4} />;
-  return <div className="space-y-5"><HistorySection title="Contracts" restricted={!contractAllowed} empty="No contracts are registered for this vendor.">{contracts.map((contract) => <HistoryRow key={contract.id} title={contract.title} sub={`${contract.reference} · ends ${shortDate(contract.end_date)}`} value={formatMoney(contract.contract_value, currency)} status={contract.status} />)}</HistorySection><HistorySection title="Purchase orders" restricted={!poAllowed} empty="No purchase orders are recorded for this vendor.">{pos.map((po) => <HistoryRow key={po.id} title={po.document_number} sub={shortDate(po.order_date)} value={formatMoney(po.total, currency)} status={po.display_status || po.status} />)}</HistorySection><HistorySection title="Vendor invoices" restricted={!invoiceAllowed} empty="No vendor invoices are recorded for this vendor.">{invoices.map((invoice) => <HistoryRow key={invoice.id} title={invoice.document_number} sub={shortDate(invoice.invoice_date)} value={formatMoney(invoice.total, currency)} status={invoice.display_status || invoice.status} />)}</HistorySection></div>;
+  return <div className="space-y-5"><HistorySection title="Contracts" restricted={!contractAllowed} empty="No contracts are registered for this vendor.">{contracts.map((contract) => <HistoryRow key={contract.id} title={contract.title} sub={`${contract.reference} · ends ${dates.day(contract.end_date)}`} value={formatMoney(contract.contract_value, currency)} status={contract.status} />)}</HistorySection><HistorySection title="Purchase orders" restricted={!poAllowed} empty="No purchase orders are recorded for this vendor.">{pos.map((po) => <HistoryRow key={po.id} title={po.document_number} sub={dates.day(po.order_date)} value={formatMoney(po.total, currency)} status={po.display_status || po.status} />)}</HistorySection><HistorySection title="Vendor invoices" restricted={!invoiceAllowed} empty="No vendor invoices are recorded for this vendor.">{invoices.map((invoice) => <HistoryRow key={invoice.id} title={invoice.document_number} sub={dates.day(invoice.invoice_date)} value={formatMoney(invoice.total, currency)} status={invoice.display_status || invoice.status} />)}</HistorySection></div>;
 }
 function HistorySection({ title, restricted, empty, children }: { title: string; restricted: boolean; empty: string; children: React.ReactNode }) {
   const hasChildren = Array.isArray(children) ? children.length > 0 : !!children;

@@ -29,6 +29,7 @@ import type {
 import { formatMoney } from "@/utils/money";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
 const DOCUMENT_TYPES = [
   ["", "All document types"],
@@ -44,16 +45,6 @@ const DETAIL_TABS: TabStripItem<"overview" | "activity">[] = [
   { value: "activity", label: <><History className="size-3.5" />Activity</> },
 ];
 
-function dateTime(value?: string | null) {
-  if (!value) return "-";
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime())
-    ? "-"
-    : new Intl.DateTimeFormat("en-GB", {
-        day: "2-digit", month: "short", year: "numeric",
-      }).format(parsed);
-}
-
 function age(value?: string | null) {
   if (!value) return "-";
   const parsed = new Date(value);
@@ -67,6 +58,7 @@ function isForbidden(error: unknown) {
 }
 
 export default function ProcurementApprovalsPage() {
+  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
   const [params, setParams] = useSearchParams();
   const [page, setPage] = useState(1);
@@ -103,7 +95,7 @@ export default function ProcurementApprovalsPage() {
     { header: "Type", cell: (row) => row.document_type_label },
     { header: "Submitted By", cell: (row) => <div><p>{row.requester}</p>{row.on_behalf_of && <p className="mt-0.5 text-[11px] text-teal-600">On behalf of {row.on_behalf_of}</p>}</div> },
     { header: "Amount", align: "right", cell: (row) => <span className="font-semibold tabular-nums">{formatMoney(row.amount, currency ?? row.currency)}</span> },
-    { header: "Submitted", cell: (row) => dateTime(row.submitted_at) },
+    { header: "Submitted", cell: (row) => dates.day(row.submitted_at) },
     { header: "Age", cell: (row) => age(row.awaiting_since) },
     { header: "Status", cell: () => <StatusPill status="PENDING_APPROVAL" /> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
@@ -250,6 +242,7 @@ function ApprovalOverview({ approval, activeStage, currency, comment, setComment
   onReturn: () => void;
   onReject: () => void;
 }) {
+  const dates = useDates();
   return <div className="space-y-5">
     <section className="rounded-md border border-amber-200 bg-amber-50 p-4">
       <div className="flex items-start gap-2 text-amber-900"><ShieldCheck className="mt-0.5 size-4 shrink-0" /><div><p className="font-mont text-sm font-semibold">This document is awaiting your approval</p><p className="mt-0.5 font-mont text-xs">{stageRule(activeStage, approval.next_stage)}</p></div></div>
@@ -269,7 +262,7 @@ function ApprovalOverview({ approval, activeStage, currency, comment, setComment
       <Field label="Type" value={approval.document_type_label} />
       <Field label="Submitted by" value={approval.requester} />
       <Field label="Amount" value={formatMoney(approval.amount, currency ?? approval.currency)} />
-      <Field label="Submitted" value={dateTime(approval.submitted_at)} />
+      <Field label="Submitted" value={dates.day(approval.submitted_at)} />
       <Field label="Current stage" value={approval.stage} />
       <Field label="Status" value={<StatusPill status="PENDING_APPROVAL" />} />
     </dl>
@@ -312,10 +305,11 @@ function StageCard({ stage }: { stage: ProcurementApprovalStage }) {
 }
 
 function ApprovalActivity({ approval }: { approval: ProcurementApprovalDetail }) {
+  const dates = useDates();
   if (!approval.activity.length) return <EmptyState title="No activity yet" message="Workflow events will appear here as the approval advances." />;
   return <ol className="relative space-y-4">{approval.activity.map((event, index) => <li key={event.id} className="relative flex gap-3">
     {index !== approval.activity.length - 1 && <span className="absolute left-[5px] top-3.5 h-full w-px bg-gray-03" />}
     <span className="relative z-10 mt-1 size-2.5 shrink-0 rounded-full bg-primary" />
-    <div className="min-w-0 flex-1"><p className="font-mont text-sm font-medium text-black-01">{event.event_type.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</p>{event.message && <p className="mt-0.5 font-mont text-xs text-gray-05">{event.message}</p>}<p className="mt-0.5 font-mont text-[11px] text-gray-05">{event.actor || "System"} · {dateTime(event.occurred_at)}</p></div>
+    <div className="min-w-0 flex-1"><p className="font-mont text-sm font-medium text-black-01">{event.event_type.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</p>{event.message && <p className="mt-0.5 font-mont text-xs text-gray-05">{event.message}</p>}<p className="mt-0.5 font-mont text-[11px] text-gray-05">{event.actor || "System"} · {dates.dateTime(event.occurred_at)}</p></div>
   </li>)}</ol>;
 }

@@ -57,6 +57,7 @@ import { DocumentAttachments } from "./document-attachments";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
 const TABS = [
   ["All", ""], ["Draft", "DRAFT"], ["Under Review", "PENDING_APPROVAL"],
@@ -77,10 +78,6 @@ const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label,
   label: <><Icon className="size-3.5" />{label}</>,
 }));
 
-function shortDate(value?: string | null) {
-  if (!value) return "-";
-  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value}T00:00:00`));
-}
 function isForbidden(error: unknown) {
   return !!error && typeof error === "object" && "status" in error && error.status === 403;
 }
@@ -95,6 +92,7 @@ function EmptyPanel({ children }: { children: React.ReactNode }) {
 }
 
 export default function VendorInvoicesPage() {
+  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -120,7 +118,7 @@ export default function VendorInvoicesPage() {
     { header: "Invoice #", cell: (invoice) => <div className="min-w-36"><p className="font-mont text-sm font-semibold text-primary">{invoice.document_number}</p><p className="mt-1 text-[11px] text-gray-05">{invoice.vendor_reference || "No vendor reference"}</p></div> },
     { header: "Vendor", cell: (invoice) => <div className="min-w-32"><p className="font-semibold">{invoice.vendor_name || invoice.vendor_code}</p><p className="mt-0.5 text-[11px] text-gray-05">{invoice.vendor_code}</p></div> },
     { header: "PO Ref", cell: (invoice) => invoice.purchase_order_number || "Direct" },
-    { header: "Due Date", cell: (invoice) => shortDate(invoice.due_date) },
+    { header: "Due Date", cell: (invoice) => dates.day(invoice.due_date) },
     { header: "Amount", align: "right", cell: (invoice) => <span className="tabular-nums">{money(invoice.total)}</span> },
     { header: "Paid", align: "right", cell: (invoice) => <span className="tabular-nums">{money(invoice.amount_paid)}</span> },
     { header: "Status", cell: (invoice) => <div className="flex flex-wrap gap-1"><StatusPill status={invoice.status} />{invoice.display_status !== invoice.status && <StatusPill status={invoice.display_status} />}</div> },
@@ -160,6 +158,7 @@ export default function VendorInvoicesPage() {
 }
 
 function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const user = useAppSelector((state) => state.auth.user);
   const uid = user?.id == null ? "" : String(user.id);
   const { name } = useUserDirectory();
@@ -200,7 +199,7 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
   const postEligible = invoice?.status === "DRAFT" && invoice.approval_state === "APPROVED";
   const blockingVariance = !!invoice && isBlockingInvoiceVariance(invoice.match_status);
   return <>
-    <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={invoice?.document_number || "Vendor invoice"} description={invoice ? `${invoice.vendor_name || invoice.vendor_code} · ${invoice.purchase_order_number || "Direct invoice"} · due ${shortDate(invoice.due_date)}` : "Loading vendor invoice"} widthClass="sm:max-w-[720px]" footer={invoice && <>
+    <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={invoice?.document_number || "Vendor invoice"} description={invoice ? `${invoice.vendor_name || invoice.vendor_code} · ${invoice.purchase_order_number || "Direct invoice"} · due ${dates.day(invoice.due_date)}` : "Loading vendor invoice"} widthClass="sm:max-w-[720px]" footer={invoice && <>
       <Button variant="outline" onClick={() => window.print()}><Printer className="size-4" /> Print</Button>
       {editable && <Can permission={P.PROC_UPDATE_VENDOR_INVOICE}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
       {editable && <Can permission={P.PROC_MATCH_VENDOR_INVOICE}><Button variant="outline" loading={matching} onClick={() => action("match")}><Check className="size-4" /> Run Match</Button></Can>}
@@ -221,12 +220,12 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
         />
         {tab === "overview" && <div className="space-y-5">
           {invoice.approval_state === "PENDING" && <section className="rounded-md border border-amber-200 bg-amber-50 p-4"><p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>{canVote && <><Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" loading={voting} onClick={() => vote("APPROVED")}><Check className="size-4" /> Approve</Button><Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button><Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button></div></>}</section>}
-          <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Vendor invoice #" value={invoice.vendor_reference} /><Field label="Internal invoice #" value={invoice.document_number} /><Field label="Vendor" value={invoice.vendor_name || invoice.vendor_code} /><Field label="PO reference" value={invoice.purchase_order_number || "Direct invoice"} /><Field label="Invoice date" value={shortDate(invoice.invoice_date)} /><Field label="Due date" value={shortDate(invoice.due_date)} /><Field label="Subtotal" value={formatMoney(invoice.subtotal, currency)} /><Field label="Tax" value={formatMoney(invoice.tax_total, currency)} /><Field label="Paid" value={formatMoney(invoice.amount_paid, currency)} /><Field label="Balance due" value={formatMoney(invoice.balance_due, currency)} /></dl>
+          <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Vendor invoice #" value={invoice.vendor_reference} /><Field label="Internal invoice #" value={invoice.document_number} /><Field label="Vendor" value={invoice.vendor_name || invoice.vendor_code} /><Field label="PO reference" value={invoice.purchase_order_number || "Direct invoice"} /><Field label="Invoice date" value={dates.day(invoice.invoice_date)} /><Field label="Due date" value={dates.day(invoice.due_date)} /><Field label="Subtotal" value={formatMoney(invoice.subtotal, currency)} /><Field label="Tax" value={formatMoney(invoice.tax_total, currency)} /><Field label="Paid" value={formatMoney(invoice.amount_paid, currency)} /><Field label="Balance due" value={formatMoney(invoice.balance_due, currency)} /></dl>
           <InvoicePostingRecap invoice={invoice} currency={currency} />
         </div>}
         {tab === "lines" && (invoice.lines.length ? <div className="overflow-x-auto rounded-md border border-white-02"><table className="min-w-[580px] w-full"><thead><tr>{["Description", "Qty", "Unit price", "Tax", "Total"].map((label) => <th key={label} className="bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01">{label}</th>)}</tr></thead><tbody>{invoice.lines.map((line) => <tr key={line.id}><td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold">{line.description}</td><td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{formatQuantity(line.quantity)}</td><td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{formatMoney(line.unit_price, currency)}</td><td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{formatMoney(line.tax_amount, currency)}</td><td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold tabular-nums">{formatMoney(line.net_amount + line.tax_amount, currency)}</td></tr>)}</tbody></table></div> : <EmptyPanel>No invoice lines were recorded.</EmptyPanel>)}
         {tab === "match" && <MatchPanel invoice={invoice} currency={currency} />}
-        {tab === "payments" && (invoice.payments?.length ? <div className="space-y-2">{invoice.payments.map((payment) => <div key={payment.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 rounded-md border border-white-02 p-3"><div><p className="font-mont text-sm font-semibold">{payment.document_number}</p><p className="mt-1 font-mont text-xs text-gray-05">{shortDate(payment.payment_date)} · {payment.status}</p></div><p className="font-mont text-sm font-semibold tabular-nums">{formatMoney(payment.amount, currency)}</p></div>)}</div> : <EmptyPanel>No payment has been allocated to this invoice.</EmptyPanel>)}
+        {tab === "payments" && (invoice.payments?.length ? <div className="space-y-2">{invoice.payments.map((payment) => <div key={payment.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 rounded-md border border-white-02 p-3"><div><p className="font-mont text-sm font-semibold">{payment.document_number}</p><p className="mt-1 font-mont text-xs text-gray-05">{dates.day(payment.payment_date)} · {payment.status}</p></div><p className="font-mont text-sm font-semibold tabular-nums">{formatMoney(payment.amount, currency)}</p></div>)}</div> : <EmptyPanel>No payment has been allocated to this invoice.</EmptyPanel>)}
         {tab === "attachments" && <DocumentAttachments
           attachments={invoice.attachments || []}
           attachPermission={P.PROC_ATTACH_VENDOR_INVOICE_FILE}
@@ -298,6 +297,7 @@ function ActivityPanel({ invoice, workflow, name }: { invoice: VendorInvoice; wo
 
 type POLineDraft = { po_line: number; description: string; expense_account: string; quantity: number; unit_price: number };
 function InvoiceForm({ entity, currency, initial, onClose }: { entity: string; currency?: string | null; initial?: VendorInvoice; onClose: () => void }) {
+  const dates = useDates();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [mode, setMode] = useState<"po" | "direct">(initial ? (initial.purchase_order_id ? "po" : "direct") : "po");
   const { can } = useCan();
@@ -469,7 +469,7 @@ function InvoiceForm({ entity, currency, initial, onClose }: { entity: string; c
       {mode === "direct" && editingExistingDirect && !nonPoAllowed && <p className="font-mont text-[11px] leading-5 text-amber-800">Bills without a purchase order are now turned off for this entity. You can still edit this draft, but posting it will need a variance override.</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={(value) => { setVendor(value); setReferenceError(""); setReferenceCheck(null); }} disabled={mode === "po" && !!source} /></FormField>{mode === "po" && <FormField label="Purchase order" required><PurchaseOrderPicker entity={entity} value={po} onChange={setPo} placeholder="Select a received PO" /></FormField>}</div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><FormField label="Vendor invoice #" required><div><Input value={reference} onChange={(event) => { setReference(event.target.value); setReferenceError(""); setReferenceCheck(null); }} aria-invalid={!!referenceError} className={cn("bg-white", referenceError && "border-red-500 focus-visible:ring-red-200")} />{checkingReference && <p className="mt-1 font-mont text-[11px] text-gray-05">Checking this number...</p>}{referenceError && <p role="alert" className="mt-1 font-mont text-[11px] font-medium text-red-600">{referenceError}</p>}</div></FormField><PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} /><FormField label="Due date"><DatePickerInput value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="bg-white" /></FormField></div>
-      {otherMatches.length > 0 && <section className="rounded-md border border-amber-300 bg-amber-50 p-3" aria-label="Invoice number warning"><div className="flex items-start gap-2"><AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700" /><div className="min-w-0"><p className="font-mont text-xs font-semibold text-amber-900">This invoice number is used by another vendor</p><p className="mt-1 font-mont text-[11px] text-amber-800">Review the existing record. You will need to confirm before this invoice can be saved.</p></div></div><div className="mt-3 space-y-2">{otherMatches.map((match) => <div key={match.id} className="grid grid-cols-1 gap-1 rounded border border-amber-200 bg-white px-3 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center sm:gap-3"><div className="min-w-0"><p className="truncate font-mont text-xs font-semibold text-gray-01">{match.vendor_name}</p><p className="font-mont text-[11px] text-gray-05">{match.vendor_code} · {match.document_number}</p></div><span className="font-mont text-[11px] text-gray-05">{shortDate(match.invoice_date)}</span><span className="font-mont text-xs font-semibold tabular-nums">{formatMoney(match.total, currency)}</span><StatusPill status={match.status} /></div>)}{(referenceCheck?.other_vendor_match_count || 0) > otherMatches.length && <p className="font-mont text-[11px] text-amber-800">Plus {(referenceCheck?.other_vendor_match_count || 0) - otherMatches.length} more matching invoice(s).</p>}</div></section>}
+      {otherMatches.length > 0 && <section className="rounded-md border border-amber-300 bg-amber-50 p-3" aria-label="Invoice number warning"><div className="flex items-start gap-2"><AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700" /><div className="min-w-0"><p className="font-mont text-xs font-semibold text-amber-900">This invoice number is used by another vendor</p><p className="mt-1 font-mont text-[11px] text-amber-800">Review the existing record. You will need to confirm before this invoice can be saved.</p></div></div><div className="mt-3 space-y-2">{otherMatches.map((match) => <div key={match.id} className="grid grid-cols-1 gap-1 rounded border border-amber-200 bg-white px-3 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center sm:gap-3"><div className="min-w-0"><p className="truncate font-mont text-xs font-semibold text-gray-01">{match.vendor_name}</p><p className="font-mont text-[11px] text-gray-05">{match.vendor_code} · {match.document_number}</p></div><span className="font-mont text-[11px] text-gray-05">{dates.day(match.invoice_date)}</span><span className="font-mont text-xs font-semibold tabular-nums">{formatMoney(match.total, currency)}</span><StatusPill status={match.status} /></div>)}{(referenceCheck?.other_vendor_match_count || 0) > otherMatches.length && <p className="font-mont text-[11px] text-amber-800">Plus {(referenceCheck?.other_vendor_match_count || 0) - otherMatches.length} more matching invoice(s).</p>}</div></section>}
       <FormField label="Narration"><Textarea value={narration} onChange={(event) => setNarration(event.target.value)} className="bg-white" /></FormField>
       {mode === "po" ? <div className="space-y-3">
         {poPosition && <div className="grid grid-cols-3 gap-2 rounded-md border border-primary/15 bg-primary/5 p-3">

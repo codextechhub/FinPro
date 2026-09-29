@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import type { PermissionCode } from "../../permissions";
 import type { DocumentAttachment } from "@/redux/services/procurement/procurement-types";
 import { openAttachment } from "@/utils/attachment-download";
+import { useDates } from "../../lib/display-prefs";
 
 /** Mirrors core.uploads on the backend. The server stays authoritative; this only
  *  saves the user a round trip to be told what we already know. */
@@ -32,15 +33,6 @@ function humanSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function shortDateTime(value?: string | null) {
-  if (!value) return "-";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "-";
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-  }).format(parsed);
 }
 
 /** Reject locally what the server would reject anyway, and say why. */
@@ -64,6 +56,7 @@ export function DocumentAttachments({
   onDelete: (attachmentId: number) => Promise<void>;
   emptyMessage: string;
 }) {
+  const dates = useDates();
   const inputRef = useRef<HTMLInputElement>(null);
   const [caption, setCaption] = useState("");
 
@@ -128,7 +121,7 @@ export function DocumentAttachments({
                 <p className="truncate font-mont text-sm font-semibold text-black-01">{row.name}</p>
                 <p className="mt-0.5 font-mont text-[11px] text-gray-05">
                   {row.caption ? `${row.caption} · ` : ""}
-                  {humanSize(row.size)} · {row.uploaded_by_name} · {shortDateTime(row.uploaded_at)}
+                  {humanSize(row.size)} · {row.uploaded_by_name} · {dates.dateTime(row.uploaded_at)}
                 </p>
               </div>
               <button

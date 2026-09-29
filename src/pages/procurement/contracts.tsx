@@ -34,11 +34,12 @@ import {
 import type { ContractMilestone, VendorContract } from "@/redux/services/procurement/procurement-types";
 import { formatMoney } from "@/utils/money";
 import { ActivityFeed, EmptyPanel, Field } from "./sourcing/shared";
-import { isForbidden, shortDate } from "./sourcing/helpers";
+import { isForbidden } from "./sourcing/helpers";
 import { ContractRenewButton } from "./procurement-action-gates";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { PAYMENT_TERMS, paymentTermsLabel } from "./payment-terms";
+import { useDates } from "../../lib/display-prefs";
 
 const STATUS_TABS = [
   ["All", ""], ["Active", "ACTIVE"], ["Expiring", "EXPIRING"], ["Expired", "EXPIRED"],
@@ -64,6 +65,7 @@ function ExpiredOverlay() {
 }
 
 export default function ContractsPage() {
+  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
   // Asked before the tables below fetch on mount. A finance grant does not
   // carry procurement.contract.view with it, and without this the screen
@@ -96,7 +98,7 @@ export default function ContractsPage() {
     { header: "Contract #", cell: (c) => <span className="font-mont text-sm font-semibold text-primary">{c.reference}</span> },
     { header: "Vendor", cell: (c) => <div className="min-w-32"><p className="font-semibold">{c.vendor_name || c.vendor_code}</p><p className="mt-0.5 text-xs text-gray-05">{c.vendor_code}</p></div> },
     { header: "Type", cell: (c) => <span className="min-w-40 block">{c.title}</span> },
-    { header: "End date", cell: (c) => shortDate(c.end_date) },
+    { header: "End date", cell: (c) => dates.day(c.end_date) },
     { header: "Value", align: "right", cell: (c) => <span className="tabular-nums">{formatMoney(c.contract_value, currency)}</span> },
     { header: "Status", cell: (c) => <div className="flex flex-wrap items-center gap-1.5"><StatusPill status={c.status} />{c.is_expired && <ExpiredOverlay />}</div> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
@@ -148,6 +150,7 @@ export default function ContractsPage() {
 }
 
 function ContractDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const [tab, setTab] = useState("overview");
   const [editing, setEditing] = useState(false);
   const [renewing, setRenewing] = useState(false);
@@ -199,9 +202,9 @@ function ContractDrawer({ id, entity, currency, onClose }: { id: number | null; 
             <Field label="Status" value={<div className="flex items-center gap-1.5"><StatusPill status={c.status} />{c.is_expired && <ExpiredOverlay />}</div>} />
             <Field label="Vendor" value={c.vendor_name || c.vendor_code} />
             <Field label="Type" value={c.title} />
-            <Field label="Start" value={shortDate(c.start_date)} />
-            <Field label="End" value={shortDate(c.end_date)} />
-            <Field label="Renewal window from" value={shortDate(c.renewal_window_start)} />
+            <Field label="Start" value={dates.day(c.start_date)} />
+            <Field label="End" value={dates.day(c.end_date)} />
+            <Field label="Renewal window from" value={dates.day(c.renewal_window_start)} />
             <Field label="Value" value={formatMoney(c.contract_value, currency)} />
             {c.renews_reference && <Field label="Renews" value={c.renews_reference} />}
             {c.renewed_by_reference && <Field label="Renewed by" value={c.renewed_by_reference} />}
@@ -228,6 +231,7 @@ function ContractDrawer({ id, entity, currency, onClose }: { id: number | null; 
 }
 
 function MilestonesTab({ contract, entity, currency }: { contract: VendorContract; entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [complete] = useCompleteMilestoneMutation();
   const milestones = contract.milestones ?? [];
   const editable = contract.status !== "TERMINATED" && contract.status !== "RENEWED";
@@ -238,7 +242,7 @@ function MilestonesTab({ contract, entity, currency }: { contract: VendorContrac
       <tbody>{milestones.map((m: ContractMilestone) => (
         <tr key={m.id}>
           <td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold">{m.name}</td>
-          <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{shortDate(m.due_date)}</td>
+          <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{dates.day(m.due_date)}</td>
           <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{m.amount ? <Money kobo={m.amount} currency={currency} /> : "-"}</td>
           <td className="border-t border-white-02 px-3 py-2"><StatusPill status={m.status} /></td>
           <td className="border-t border-white-02 px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
@@ -253,6 +257,7 @@ function MilestonesTab({ contract, entity, currency }: { contract: VendorContrac
 }
 
 function LinkedPosTab({ contract, entity, currency }: { contract: VendorContract; entity: string; currency?: string | null }) {
+  const dates = useDates();
   const { data, isLoading, isError, error } = useGetContractLinkedPosQuery({ id: contract.id, entity });
   // An empty list serialises as {} - toArray normalises it back to [].
   const rows = toArray(data?.data);
@@ -275,7 +280,7 @@ function LinkedPosTab({ contract, entity, currency }: { contract: VendorContract
                   {po.link_type === "linked" ? "Linked" : "In-term"}
                 </span>
               </td>
-              <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{shortDate(po.order_date)}</td>
+              <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{dates.day(po.order_date)}</td>
               <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums"><Money kobo={po.total} currency={currency} /></td>
               <td className="border-t border-white-02 px-3 py-2"><StatusPill status={po.status} /></td>
             </tr>

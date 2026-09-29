@@ -49,6 +49,7 @@ import { formatQuantity } from "@/utils/quantity";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
 const STATUS_TABS = [
   { label: "All", value: "" },
@@ -71,14 +72,6 @@ function displayStatus(row: Requisition) {
   return row.approval_state === "REJECTED" ? "REJECTED" : row.status;
 }
 
-function shortDate(value?: string | null) {
-  if (!value) return "-";
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-}
-
 function age(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
@@ -86,6 +79,7 @@ function age(value?: string | null) {
 }
 
 export default function RequisitionsPage() {
+  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
   // Asked before the tables below fetch on mount. A finance grant does not
   // carry procurement.requisition.view with it, and without this the screen
@@ -143,7 +137,7 @@ export default function RequisitionsPage() {
     { header: "Requested by", cell: (r) => r.requested_by_name },
     {
       header: "Date",
-      cell: (r) => <div><p>{shortDate(r.request_date)}</p><p className="mt-0.5 text-[11px] text-gray-05">{age(r.created_at)}</p></div>,
+      cell: (r) => <div><p>{dates.day(r.request_date)}</p><p className="mt-0.5 text-[11px] text-gray-05">{age(r.created_at)}</p></div>,
     },
     { header: "Amount", align: "right", cell: (r) => <span className="tabular-nums">{money(r.estimated_total)}</span> },
     { header: "Status", cell: (r) => <StatusPill status={displayStatus(r)} /> },
@@ -245,6 +239,7 @@ export default function RequisitionsPage() {
 function RequisitionDrawer({ id, entity, currency, onClose }: {
   id: number | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const dates = useDates();
   const navigate = useNavigate();
   const servesPath = useServesPath();
   const user = useAppSelector((state) => state.auth.user);
@@ -340,8 +335,8 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
               <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">
                 <Info label="Requested by" value={req.requested_by_name} />
                 <Info label="Cost Centre" value={req.cost_center_name || "Not assigned"} />
-                <Info label="Request date" value={shortDate(req.request_date)} />
-                <Info label="Needed by" value={shortDate(req.needed_by)} />
+                <Info label="Request date" value={dates.day(req.request_date)} />
+                <Info label="Needed by" value={dates.day(req.needed_by)} />
               </dl>
               <div><p className="font-mont text-xs font-semibold text-gray-05">Business case</p><p className="mt-2 font-mont text-sm leading-6 text-black-01">{req.justification || "No business case was provided."}</p></div>
             </div>}
@@ -387,9 +382,10 @@ function RequisitionForm({ open, onClose, entity, currency, initial, onSaved }: 
   open: boolean; onClose: () => void; entity: string; currency?: string | null;
   initial?: Requisition; onSaved?: () => void;
 }) {
+  const dates = useDates();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [costCenter, setCostCenter] = useState(initial?.cost_center_code ?? "");
-  const [requestDate, setRequestDate] = useState(initial?.request_date ?? new Date().toISOString().slice(0, 10));
+  const [requestDate, setRequestDate] = useState(() => initial?.request_date ?? dates.today());
   const [neededBy, setNeededBy] = useState(initial?.needed_by ?? "");
   const [justification, setJustification] = useState(initial?.justification ?? "");
   const [lines, setLines] = useState<FormLine[]>(initial?.lines.length ? initial.lines.map((line) => ({

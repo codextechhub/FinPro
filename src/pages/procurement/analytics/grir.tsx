@@ -19,13 +19,14 @@ import {
 import type { GrirAging, GrirPoLineDetail } from "@/redux/services/procurement/procurement-ext-types";
 import { formatMoney } from "@/utils/money";
 import { formatQuantity } from "@/utils/quantity";
-import { isForbidden, shortDate } from "../sourcing/helpers";
+import { isForbidden } from "../sourcing/helpers";
 import { Field, EmptyPanel } from "../sourcing/shared";
 import { Card, ChartEmpty, ScopeNote, StatusDotPill, SectionHeader, type PillTone } from "./shared";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   BUCKET_LABEL, TD, TDR, TH, THR, ageColor, excludedScopeNote, kobo, type SectionProps,
 } from "./helpers";
+import { useDates } from "../../../lib/display-prefs";
 
 // Status chip tone for a PO line's GR/IR position.
 function lineTone(status: string): PillTone {
@@ -219,6 +220,7 @@ function GrirPoLineDrawer({ poLine, entity, currency, onClose }: {
 }
 
 function GrirPoLineBody({ d, currency }: { d: GrirPoLineDetail; currency?: string | null }) {
+  const dates = useDates();
   const grns = toArray(d.grns);
   const invoices = toArray(d.invoices);
   const bal = kobo(d.grir_balance);
@@ -270,7 +272,7 @@ function GrirPoLineBody({ d, currency }: { d: GrirPoLineDetail; currency?: strin
                 {grns.map((g) => (
                   <tr key={g.id}>
                     <td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold tabular-nums text-primary">{g.reference}</td>
-                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{shortDate(g.received_date)}</td>
+                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{dates.day(g.received_date)}</td>
                     <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{qty(g.accepted_qty)}</td>
                     <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{formatMoney(kobo(g.value), currency)}</td>
                   </tr>
@@ -299,7 +301,7 @@ function GrirPoLineBody({ d, currency }: { d: GrirPoLineDetail; currency?: strin
                 {invoices.map((vi) => (
                   <tr key={vi.id}>
                     <td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold tabular-nums text-primary">{vi.document_number}</td>
-                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{shortDate(vi.invoice_date)}</td>
+                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{dates.day(vi.invoice_date)}</td>
                     <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{qty(vi.quantity)}</td>
                     <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{formatMoney(kobo(vi.net), currency)}</td>
                   </tr>

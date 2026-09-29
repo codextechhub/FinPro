@@ -45,6 +45,7 @@ import { DocumentAttachments } from "./document-attachments";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["invoices", "Invoices", ListChecks],
@@ -58,10 +59,6 @@ const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label,
   label: <><Icon className="size-3.5" />{label}</>,
 }));
 
-function shortDate(value?: string | null) {
-  if (!value) return "-";
-  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value}T00:00:00`));
-}
 function isForbidden(error: unknown) {
   return !!error && typeof error === "object" && "status" in error && error.status === 403;
 }
@@ -73,6 +70,7 @@ function EmptyPanel({ children }: { children: React.ReactNode }) {
 }
 
 export default function VendorPaymentsPage() {
+  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -92,7 +90,7 @@ export default function VendorPaymentsPage() {
     { header: "Payment Ref", cell: (payment) => <div className="min-w-40"><p className="font-mont text-sm font-semibold text-primary">{payment.document_number}</p><p className="mt-1 max-w-44 truncate text-[11px] text-gray-05">{payment.reference || "No bank reference"}</p></div> },
     { header: "Vendor", cell: (payment) => <div className="min-w-36"><p className="font-semibold">{payment.vendor_name || payment.vendor_code}</p><p className="mt-0.5 text-[11px] text-gray-05">{payment.vendor_code}</p></div> },
     { header: "Invoice(s)", cell: (payment) => <span className="block max-w-44 truncate">{payment.allocations.map((row) => row.invoice_number).join(", ") || "-"}</span> },
-    { header: "Date", cell: (payment) => shortDate(payment.payment_date) },
+    { header: "Date", cell: (payment) => dates.day(payment.payment_date) },
     { header: "Method", cell: (payment) => payment.method.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()) },
     { header: "Net Paid", align: "right", cell: (payment) => <span className="font-semibold tabular-nums">{formatMoney(payment.net_amount, currency)}</span> },
     { header: "Status", cell: (payment) => <div className="flex min-w-28 flex-wrap gap-1"><StatusPill status={payment.status} />{payment.status !== "REVERSED" && <StatusPill status={payment.approval_state} />}{payment.status === "POSTED" && <StatusPill status={payment.allocation_status} />}</div> },
@@ -110,6 +108,7 @@ export default function VendorPaymentsPage() {
 }
 
 function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const user = useAppSelector((state) => state.auth.user);
   const uid = user?.id == null ? "" : String(user.id);
   const { name } = useUserDirectory();
@@ -162,7 +161,7 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
   };
 
   return <>
-    <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={payment?.document_number || "Vendor payment"} description={payment ? `${payment.vendor_name || payment.vendor_code} · ${shortDate(payment.payment_date)} · ${payment.method.replaceAll("_", " ")}` : "Loading vendor payment"} widthClass="sm:max-w-[720px]" footer={payment && <>
+    <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={payment?.document_number || "Vendor payment"} description={payment ? `${payment.vendor_name || payment.vendor_code} · ${dates.day(payment.payment_date)} · ${payment.method.replaceAll("_", " ")}` : "Loading vendor payment"} widthClass="sm:max-w-[720px]" footer={payment && <>
       <Button variant="outline" onClick={() => window.print()}><Printer className="size-4" /> Print</Button>
       {editable && <Can permission={P.PROC_UPDATE_VENDOR_PAYMENT}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
       {editable && <Can permission={P.PROC_SUBMIT_VENDOR_PAYMENT}><Button loading={submitting} onClick={() => run("submit")}><Send className="size-4" /> Submit for Approval</Button></Can>}
@@ -184,7 +183,7 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
         />
         {tab === "overview" && <div className="space-y-5">
           {payment.approval_state === "PENDING" && <section className="rounded-md border border-amber-200 bg-amber-50 p-4"><p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>{canVote && <><Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" loading={voting} onClick={() => vote("APPROVED")}><Check className="size-4" /> Approve</Button><Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button><Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button></div></>}</section>}
-          <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Payment reference" value={payment.reference} /><Field label="Vendor" value={payment.vendor_name || payment.vendor_code} /><Field label="Payment date" value={shortDate(payment.payment_date)} /><Field label="Method" value={payment.method.replaceAll("_", " ")} /><Field label="Bank account" value={payment.bank_account_name || payment.payment_account_name || payment.payment_code} /><Field label="WHT code" value={payment.wht_tax_code_value} /><Field label="Gross settled" value={formatMoney(payment.gross_amount, currency)} /><Field label="WHT withheld" value={formatMoney(payment.wht_amount, currency)} /><Field label="Net cash paid" value={formatMoney(payment.net_amount, currency)} /><Field label="Allocated to bills" value={formatMoney(payment.allocated_amount, currency)} />{payment.status === "POSTED" && payment.advance_remaining > 0 && <Field label="Paid in advance" value={formatMoney(payment.advance_remaining, currency)} />}</dl>
+          <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Payment reference" value={payment.reference} /><Field label="Vendor" value={payment.vendor_name || payment.vendor_code} /><Field label="Payment date" value={dates.day(payment.payment_date)} /><Field label="Method" value={payment.method.replaceAll("_", " ")} /><Field label="Bank account" value={payment.bank_account_name || payment.payment_account_name || payment.payment_code} /><Field label="WHT code" value={payment.wht_tax_code_value} /><Field label="Gross settled" value={formatMoney(payment.gross_amount, currency)} /><Field label="WHT withheld" value={formatMoney(payment.wht_amount, currency)} /><Field label="Net cash paid" value={formatMoney(payment.net_amount, currency)} /><Field label="Allocated to bills" value={formatMoney(payment.allocated_amount, currency)} />{payment.status === "POSTED" && payment.advance_remaining > 0 && <Field label="Paid in advance" value={formatMoney(payment.advance_remaining, currency)} />}</dl>
           {payment.narration && <div className="rounded-md border border-white-02 p-4"><p className="font-mont text-[11px] text-gray-05">Narration</p><p className="mt-1 font-mont text-sm">{payment.narration}</p></div>}
         </div>}
         {tab === "invoices" && <AllocationTable payment={payment} currency={currency} />}
@@ -211,8 +210,9 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
 }
 
 function AllocationTable({ payment, currency }: { payment: VendorPayment; currency?: string | null }) {
+  const dates = useDates();
   if (!payment.allocations.length) return <EmptyPanel>No invoice allocations were recorded.</EmptyPanel>;
-  return <div className="overflow-x-auto rounded-md border border-white-02"><table className="min-w-[560px] w-full"><thead><tr>{["Invoice", "Due", "Applied", "Invoice balance", "Status"].map((label) => <th key={label} className="bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01">{label}</th>)}</tr></thead><tbody>{payment.allocations.map((row) => <tr key={row.id}><td className="border-t border-white-02 px-3 py-3 font-mont text-xs font-semibold text-primary">{row.invoice_number}</td><td className="border-t border-white-02 px-3 py-3 font-mont text-xs">{shortDate(row.due_date)}</td><td className="border-t border-white-02 px-3 py-3 font-mont text-xs font-semibold tabular-nums">{formatMoney(row.amount, currency)}</td><td className="border-t border-white-02 px-3 py-3 font-mont text-xs tabular-nums">{formatMoney(row.invoice_balance, currency)}</td><td className="border-t border-white-02 px-3 py-3"><StatusPill status={payment.status === "DRAFT" ? "PLANNED" : payment.status === "REVERSED" ? "REVERSED" : "APPLIED"} /></td></tr>)}</tbody></table></div>;
+  return <div className="overflow-x-auto rounded-md border border-white-02"><table className="min-w-[560px] w-full"><thead><tr>{["Invoice", "Due", "Applied", "Invoice balance", "Status"].map((label) => <th key={label} className="bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01">{label}</th>)}</tr></thead><tbody>{payment.allocations.map((row) => <tr key={row.id}><td className="border-t border-white-02 px-3 py-3 font-mont text-xs font-semibold text-primary">{row.invoice_number}</td><td className="border-t border-white-02 px-3 py-3 font-mont text-xs">{dates.day(row.due_date)}</td><td className="border-t border-white-02 px-3 py-3 font-mont text-xs font-semibold tabular-nums">{formatMoney(row.amount, currency)}</td><td className="border-t border-white-02 px-3 py-3 font-mont text-xs tabular-nums">{formatMoney(row.invoice_balance, currency)}</td><td className="border-t border-white-02 px-3 py-3"><StatusPill status={payment.status === "DRAFT" ? "PLANNED" : payment.status === "REVERSED" ? "REVERSED" : "APPLIED"} /></td></tr>)}</tbody></table></div>;
 }
 
 function PaymentPosting({ payment, currency }: { payment: VendorPayment; currency?: string | null }) {
@@ -270,6 +270,7 @@ function PaymentForm({ entity, currency, initial, onClose }: { entity: string; c
 }
 
 function InvoiceAllocationRow({ invoice, amount, currency, onChange }: { invoice: VendorPaymentEligibleInvoice; amount: number; currency?: string | null; onChange: (amount: number) => void }) {
+  const dates = useDates();
   const checked = amount > 0;
-  return <div className="grid grid-cols-1 gap-3 rounded-md border border-white-02 p-3 sm:grid-cols-[auto_minmax(0,1fr)_160px]"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked ? invoice.balance_due : 0)} className="mt-1 size-4 accent-primary" aria-label={`Select ${invoice.document_number}`} /><div className="min-w-0"><p className="font-mont text-sm font-semibold text-primary">{invoice.document_number}</p><p className="mt-1 font-mont text-[11px] text-gray-05">Due {shortDate(invoice.due_date)} · balance {formatMoney(invoice.balance_due, currency)}</p></div><MoneyInput valueKobo={amount} onChangeKobo={onChange} currency={currency} disabled={!checked} /></div>;
+  return <div className="grid grid-cols-1 gap-3 rounded-md border border-white-02 p-3 sm:grid-cols-[auto_minmax(0,1fr)_160px]"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked ? invoice.balance_due : 0)} className="mt-1 size-4 accent-primary" aria-label={`Select ${invoice.document_number}`} /><div className="min-w-0"><p className="font-mont text-sm font-semibold text-primary">{invoice.document_number}</p><p className="mt-1 font-mont text-[11px] text-gray-05">Due {dates.day(invoice.due_date)} · balance {formatMoney(invoice.balance_due, currency)}</p></div><MoneyInput valueKobo={amount} onChangeKobo={onChange} currency={currency} disabled={!checked} /></div>;
 }

@@ -35,10 +35,11 @@ import type { Quotation, QuotationDetail } from "@/redux/services/procurement/pr
 import { formatMoney } from "@/utils/money";
 import { formatQuantity } from "@/utils/quantity";
 import { ActivityFeed, CompareModal, EmptyPanel, Field, ExpiredPill } from "./shared";
-import { QUOTATION_TABS, isForbidden, shortDate } from "./helpers";
+import { QUOTATION_TABS, isForbidden } from "./helpers";
 import { useFetchAuthMediaQuery } from "@/redux/services/media-api";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../../lib/display-prefs";
 
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["comparison", "Line comparison", Layers],
@@ -54,6 +55,7 @@ const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label,
 }));
 
 export default function QuotationsPage() {
+  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
   const [status, setStatus] = useState("");
   const [rfqFilter, setRfqFilter] = useState("");
@@ -87,7 +89,7 @@ export default function QuotationsPage() {
     { header: "Quote #", cell: (q) => <span className="font-mont text-sm font-semibold text-primary">{q.document_number}</span> },
     { header: "Vendor", cell: (q) => <div className="min-w-32"><p className="font-semibold">{q.vendor_name || q.vendor_code}</p><p className="mt-0.5 text-xs text-gray-05">{q.vendor_code}</p></div> },
     { header: "RFQ Ref", cell: (q) => q.rfq_number || "-" },
-    { header: "Submitted", cell: (q) => shortDate(q.quote_date) },
+    { header: "Submitted", cell: (q) => dates.day(q.quote_date) },
     { header: "Lead time", align: "right", cell: (q) => q.lead_time_days == null ? "-" : `${q.lead_time_days}d` },
     { header: "Total", align: "right", cell: (q) => <span className="tabular-nums">{formatMoney(q.total, currency)}</span> },
     { header: "Status", cell: (q) => <div className="flex flex-wrap items-center gap-1.5"><StatusPill status={q.quotation_status} />{q.is_expired && <ExpiredPill />}</div> },
@@ -136,6 +138,7 @@ export default function QuotationsPage() {
 }
 
 function QuotationDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const [tab, setTab] = useState("overview");
   const [editing, setEditing] = useState(false);
   const [competitionExceptionReason, setCompetitionExceptionReason] = useState("");
@@ -183,8 +186,8 @@ function QuotationDrawer({ id, entity, currency, onClose }: { id: number | null;
             <Field label="Status" value={<div className="flex items-center gap-1.5"><StatusPill status={q.quotation_status} />{q.is_expired && <ExpiredPill />}</div>} />
             <Field label="Vendor" value={q.vendor_name || q.vendor_code} />
             <Field label="RFQ reference" value={q.rfq_number || "-"} />
-            <Field label="Quote date" value={shortDate(q.quote_date)} />
-            <Field label="Valid until" value={shortDate(q.valid_until)} />
+            <Field label="Quote date" value={dates.day(q.quote_date)} />
+            <Field label="Valid until" value={dates.day(q.valid_until)} />
             <Field label="Lead time" value={q.lead_time_days == null ? "-" : `${q.lead_time_days} days`} />
             <Field label="Reference" value={q.reference} />
             <Field label="Subtotal" value={formatMoney(q.subtotal, currency)} />
@@ -204,8 +207,9 @@ function QuotationDrawer({ id, entity, currency, onClose }: { id: number | null;
 }
 
 function QuotationEvidence({ quotation }: { quotation: QuotationDetail }) {
+  const dates = useDates();
   return <div className="space-y-4">
-    <section><h3 className="font-mont text-xs font-semibold">Submission history</h3><div className="mt-2 space-y-2">{quotation.submissions.length ? quotation.submissions.map((row) => <div key={row.id} className="rounded-md border border-white-02 p-3 font-mont text-xs"><span className="font-semibold">Revision {row.revision}</span><span className="text-gray-05"> · RFQ version {row.rfq_version} · {new Date(row.submitted_at).toLocaleString()}</span><p className="mt-1 text-gray-05">Submitted by {row.submitted_by_email}</p></div>) : <EmptyPanel>No vendor submission receipt has been recorded.</EmptyPanel>}</div></section>
+    <section><h3 className="font-mont text-xs font-semibold">Submission history</h3><div className="mt-2 space-y-2">{quotation.submissions.length ? quotation.submissions.map((row) => <div key={row.id} className="rounded-md border border-white-02 p-3 font-mont text-xs"><span className="font-semibold">Revision {row.revision}</span><span className="text-gray-05"> · RFQ version {row.rfq_version} · {dates.dateTime(row.submitted_at)}</span><p className="mt-1 text-gray-05">Submitted by {row.submitted_by_email}</p></div>) : <EmptyPanel>No vendor submission receipt has been recorded.</EmptyPanel>}</div></section>
     <section><h3 className="font-mont text-xs font-semibold">Attachments</h3><div className="mt-2 space-y-2">{quotation.attachments.length ? quotation.attachments.map((row) => <AttachmentRow key={row.id} attachment={row} />) : <EmptyPanel>No PDF or image evidence was attached.</EmptyPanel>}</div></section>
   </div>;
 }
@@ -274,9 +278,10 @@ function LineComparison({ quotation, entity, currency }: { quotation: QuotationD
 // even if it re-words the description); the backend rejects any rfq_line that is
 // not on the referenced RFQ, so the link can never point across RFQs.
 function QuotationForm({ entity, currency, initial, onClose }: { entity: string; currency?: string | null; initial?: QuotationDetail; onClose: () => void }) {
+  const dates = useDates();
   const [rfq, setRfq] = useState(initial?.rfq_id ? String(initial.rfq_id) : "");
   const [vendor, setVendor] = useState(initial?.vendor_code || "");
-  const [quoteDate, setQuoteDate] = useState(initial?.quote_date || new Date().toISOString().slice(0, 10));
+  const [quoteDate, setQuoteDate] = useState(() => initial?.quote_date || dates.today());
   const [validUntil, setValidUntil] = useState(initial?.valid_until || "");
   const [leadTime, setLeadTime] = useState(initial?.lead_time_days != null ? String(initial.lead_time_days) : "");
   const [reference, setReference] = useState(initial?.reference || "");

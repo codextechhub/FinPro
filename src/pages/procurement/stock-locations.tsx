@@ -35,10 +35,11 @@ import { useIsSchool, wholeBooksLabel } from "../../lib/reader-words";
 import { apiFieldError } from "@/utils/api-errors";
 import { ProcurementShell } from "./procurement-shell";
 import { EmptyPanel, Field } from "./sourcing/shared";
-import { isForbidden, shortDate } from "./sourcing/helpers";
+import { isForbidden } from "./sourcing/helpers";
 import { PageShell } from "@/components/layout/page-shell";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
+import { useDates } from "../../lib/display-prefs";
 
 const fmtQty = (value?: string | null) => {
   const n = Number(value);
@@ -46,6 +47,7 @@ const fmtQty = (value?: string | null) => {
 };
 
 export function LocationsSection({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const wholeBooks = wholeBooksLabel(useIsSchool());
   const { can } = useCan();
   const [page, setPage] = useState(1);
@@ -87,7 +89,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
     { header: "Branch", cell: (l) => l.branch_name || <span className="text-gray-05">{wholeBooks}</span> },
     { header: "Default", cell: (l) => (l.is_default ? <StatusPill status="DEFAULT" /> : <span className="text-gray-05">-</span>) },
     { header: "Status", cell: (l) => <StatusPill status={l.is_active ? "ACTIVE" : "INACTIVE"} /> },
-    { header: "Created", cell: (l) => shortDate(l.created_at) },
+    { header: "Created", cell: (l) => dates.day(l.created_at) },
     {
       header: "",
       align: "right",

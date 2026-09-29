@@ -36,9 +36,11 @@ import { useGetRequisitionQuery, useGetVendorsQuery } from "@/redux/services/pro
 import type { Rfq, RfqDetail, RfqInvitation } from "@/redux/services/procurement/procurement-types";
 import { formatQuantity } from "@/utils/quantity";
 import { ActivityFeed, EmptyPanel, Field, ExpiredPill } from "./shared";
-import { RFQ_TABS, isForbidden, shortDate } from "./helpers";
+import { RFQ_TABS, isForbidden } from "./helpers";
+import { zonedInstantFromInput } from "../../../utils/dates";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../../lib/display-prefs";
 
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["lines", "Lines", List],
@@ -63,6 +65,7 @@ function RfqStatusPill({ status }: { status: string }) {
 }
 
 export default function RfqsPage() {
+  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
   // Asked before the tables below fetch on mount. A finance grant does not
   // carry procurement.rfq.view with it, and without this the screen
@@ -103,8 +106,8 @@ export default function RfqsPage() {
     { header: "Lines", align: "right", cell: (r) => <span className="tabular-nums">{r.line_count}</span> },
     { header: "Invited", align: "right", cell: (r) => <span className="tabular-nums">{r.invited_count}</span> },
     { header: "Responses", align: "right", cell: (r) => <span className="tabular-nums">{r.response_count}</span> },
-    { header: "Issued", cell: (r) => shortDate(r.issue_date) },
-    { header: "Deadline", cell: (r) => shortDate(r.response_due_date) },
+    { header: "Issued", cell: (r) => dates.day(r.issue_date) },
+    { header: "Deadline", cell: (r) => dates.day(r.response_due_date) },
     { header: "Status", cell: (r) => <RfqStatusPill status={r.rfq_status} /> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
@@ -153,6 +156,7 @@ export default function RfqsPage() {
 }
 
 function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+  const dates = useDates();
   const [tab, setTab] = useState("overview");
   const [editing, setEditing] = useState(false);
   const [amending, setAmending] = useState(false);
@@ -181,7 +185,7 @@ function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entit
     <DetailDrawer
       open={id != null} onOpenChange={(open) => !open && onClose()}
       title={rfq?.document_number || "RFQ"}
-      description={rfq ? `${rfq.title || "Untitled"} · issued ${shortDate(rfq.issue_date)}` : "Loading RFQ"}
+      description={rfq ? `${rfq.title || "Untitled"} · issued ${dates.day(rfq.issue_date)}` : "Loading RFQ"}
       widthClass="sm:max-w-2xl"
       footer={rfq && <>
         {isDraft && <Can permission={P.PROC_UPDATE_RFQ}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
@@ -212,8 +216,8 @@ function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entit
             <Field label="Status" value={<RfqStatusPill status={rfq.rfq_status} />} />
             <Field label="Title" value={rfq.title} />
             <Field label="Requisition" value={rfq.requisition_number || "-"} />
-            <Field label="Issued" value={shortDate(rfq.issue_date)} />
-            <Field label="Response deadline" value={shortDate(rfq.response_due_date)} />
+            <Field label="Issued" value={dates.day(rfq.issue_date)} />
+            <Field label="Response deadline" value={dates.day(rfq.response_due_date)} />
             <Field label="Published version" value={`Version ${rfq.version}`} />
             <Field label="Budget estimate" value={rfq.budget_estimate != null ? <Money kobo={rfq.budget_estimate} currency={currency} /> : "-"} />
             <Field label="Vendors invited" value={rfq.invited_count} />
@@ -244,7 +248,7 @@ function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entit
             <tbody>{rfq.invitations.map((inv) => (
               <tr key={inv.vendor_id}>
                 <td className="border-t border-white-02 px-3 py-2 font-mont text-xs"><p className="font-semibold">{inv.vendor_name}</p><p className="mt-0.5 text-gray-05">{inv.vendor_code}</p></td>
-                <td className="border-t border-white-02 px-3 py-2"><StatusPill status={inv.status || (inv.responded ? "RESPONDED" : "AWAITED")} /><p className="mt-1 font-mont text-[10px] text-gray-05">{inv.deadline ? new Date(inv.deadline).toLocaleString() : "No deadline"}</p></td>
+                <td className="border-t border-white-02 px-3 py-2"><StatusPill status={inv.status || (inv.responded ? "RESPONDED" : "AWAITED")} /><p className="mt-1 font-mont text-[10px] text-gray-05">{inv.deadline ? dates.dateTime(inv.deadline) : "No deadline"}</p></td>
                 {showRecipients ? <td className="border-t border-white-02 px-3 py-2 font-mont text-xs"><p>{inv.recipients.map((row) => row.name || row.email).join(", ") || "No RFQ contact"}</p><p className="mt-0.5 text-[10px] text-gray-05">{inv.recipients.map((row) => row.email).join(", ")}</p></td> : null}
                 <td className="border-t border-white-02 px-3 py-2 font-mont text-xs">{inv.quotation_id ? <span className="flex flex-wrap items-center gap-1.5"><StatusPill status={inv.quotation_status || ""} /></span> : "-"}</td>
                 <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{inv.quotation_total != null ? <Money kobo={inv.quotation_total} currency={currency} /> : "-"}</td>
@@ -279,6 +283,7 @@ function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entit
 }
 
 function RfqAmendmentForm({ rfq, entity, onClose }: { rfq: RfqDetail; entity: string; onClose: () => void }) {
+  const dates = useDates();
   const [summary, setSummary] = useState("");
   const [responseRequired, setResponseRequired] = useState(true);
   const [deadline, setDeadline] = useState("");
@@ -287,8 +292,9 @@ function RfqAmendmentForm({ rfq, entity, onClose }: { rfq: RfqDetail; entity: st
   const [create, { isLoading }] = useCreateRfqAmendmentMutation();
   const apiLines = lines.filter((line) => line.description.trim()).map((line) => ({ description: line.description.trim(), quantity: line.quantity || 1, ...(line.account ? { expense_account: line.account } : {}), ...(line.taxCode ? { tax_code: line.taxCode } : {}) }));
   const publish = async () => {
+    const deadlineAt = zonedInstantFromInput(deadline, dates.prefs.timeZone);
     try {
-      await create({ id: rfq.id, entity, summary: summary.trim(), response_required: responseRequired, ...(deadline ? { deadline: new Date(deadline).toISOString() } : {}), ...(changeLines ? { lines: apiLines } : {}) }).unwrap();
+      await create({ id: rfq.id, entity, summary: summary.trim(), response_required: responseRequired, ...(deadlineAt ? { deadline: deadlineAt } : {}), ...(changeLines ? { lines: apiLines } : {}) }).unwrap();
       toast.success(`RFQ version ${rfq.version + 1} published.`);
       onClose();
     } catch { /* central */ }
@@ -305,11 +311,14 @@ function RfqAmendmentForm({ rfq, entity, onClose }: { rfq: RfqDetail; entity: st
 }
 
 function RfqExtensionForm({ rfq, invitation, entity, onClose }: { rfq: RfqDetail; invitation: RfqInvitation; entity: string; onClose: () => void }) {
+  const dates = useDates();
   const [deadline, setDeadline] = useState("");
   const [extend, { isLoading }] = useExtendRfqInvitationMutation();
   const save = async () => {
+    const deadlineAt = zonedInstantFromInput(deadline, dates.prefs.timeZone);
+    if (!deadlineAt) return;
     try {
-      await extend({ id: rfq.id, invitationId: invitation.id, entity, deadline: new Date(deadline).toISOString() }).unwrap();
+      await extend({ id: rfq.id, invitationId: invitation.id, entity, deadline: deadlineAt }).unwrap();
       toast.success(`Deadline extended for ${invitation.vendor_name}.`);
       onClose();
     } catch { /* central */ }
@@ -366,8 +375,9 @@ function InviteVendorsEditor({ entity, invited, onChange }: { entity: string; in
 }
 
 function RfqForm({ entity, currency, initial, onClose }: { entity: string; currency?: string | null; initial?: RfqDetail; onClose: () => void }) {
+  const dates = useDates();
   const [title, setTitle] = useState(initial?.title || "");
-  const [issueDate, setIssueDate] = useState(initial?.issue_date || new Date().toISOString().slice(0, 10));
+  const [issueDate, setIssueDate] = useState(() => initial?.issue_date || dates.today());
   const [dueDate, setDueDate] = useState(initial?.response_due_date || "");
   const [budgetKobo, setBudgetKobo] = useState(initial?.budget_estimate ?? 0);
   const [notes, setNotes] = useState(initial?.notes || "");

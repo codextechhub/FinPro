@@ -19,11 +19,11 @@ import { routesPath } from "@/routes/routes-path";
 import {
   AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, plural,
 } from "../finance/dashboard-cards";
+import { useDates } from "../../lib/display-prefs";
 
 type S = ProcurementSuppliersDashboard;
 const R = routesPath.PROTECTED.PROCUREMENT;
 
-const dayMonth = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 const pct = (v: number | null | undefined) => (v == null ? "-" : `${Math.round(v * 10) / 10}%`);
 
 const GRADE_CLS: Record<string, string> = {
@@ -96,6 +96,7 @@ function ScorecardCard({ rows, windowName, currency }: { rows: NonNullable<S["sc
 // ── sourcing ─────────────────────────────────────────────────────────────────
 
 function OpenRfqsCard({ rfqs, currency }: { rfqs: NonNullable<S["open_rfqs"]>; currency?: string | null }) {
+  const dates = useDates();
   return (
     <Panel title="Open RFQs" action={<LinkAction label="RFQs" to={`${R.SOURCING}/rfqs`} />}
       footer={rfqs.count > rfqs.items.length ? `${plural(rfqs.count - rfqs.items.length, "more")} open` : undefined}>
@@ -111,7 +112,7 @@ function OpenRfqsCard({ rfqs, currency }: { rfqs: NonNullable<S["open_rfqs"]>; c
               <span className="shrink-0 text-right">
                 <span className="block font-mont text-[13px] font-semibold tabular-nums">{compactMoney(r.budget.kobo, currency)}</span>
                 <span className={cn("block font-mont text-[11px]", r.ready ? "font-medium text-green-01" : "text-gray-05")}>
-                  {r.ready ? "Ready to award" : r.closes ? `Closes ${dayMonth(r.closes)}` : "No closing date"}
+                  {r.ready ? "Ready to award" : r.closes ? `Closes ${dates.dayMonth(r.closes)}` : "No closing date"}
                 </span>
               </span>
             </div>

@@ -17,6 +17,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
 function PayoutsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [page, setPage] = useState(1);
@@ -89,10 +90,11 @@ function SettlementTab({ entity, currency }: { entity: string; currency?: string
 // The append-only gateway action log (PaymentEvent): every collection, payout,
 // virtual-account and webhook action, including failed/rejected attempts.
 function TransactionsTab({ entity }: { entity: string }) {
+  const dates = useDates();
   const { data, isLoading, isFetching, isError, refetch } = useGetTransactionsLogQuery({ entity });
   const rows = toArray<TransactionLogEntry>(data?.data);
   const columns: Column<TransactionLogEntry>[] = [
-    { header: "When", cell: (t) => <span className="text-gray-05">{new Date(t.created_at).toLocaleString()}</span> },
+    { header: "When", cell: (t) => <span className="text-gray-05">{dates.dateTime(t.created_at)}</span> },
     { header: "Action", cell: (t) => <span className="font-semibold">{t.action_display || t.action}</span> },
     { header: "Provider", cell: (t) => t.provider || "-" },
     { header: "Reference", cell: (t) => <span className="font-mono text-xs">{t.reference || "-"}</span> },

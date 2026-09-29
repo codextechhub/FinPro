@@ -21,7 +21,7 @@ import type {
 import { toArray } from "@/components/finance-ui";
 import { formatMoney } from "@/utils/money";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { shortDate } from "./helpers";
+import { useDates } from "../../../lib/display-prefs";
 
 // ── Small presentational helpers (match the finance-ui drawer typography) ─────
 export function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -124,6 +124,7 @@ export function CompareModal({ entity, currency, open, onClose }: { entity: stri
 }
 
 function CompareMatrix({ rfqId, entity, currency, onAwarded }: { rfqId: number; entity: string; currency?: string | null; onAwarded: () => void }) {
+  const dates = useDates();
   const [competitionExceptionReason, setCompetitionExceptionReason] = useState("");
   const { hasPermission } = usePermissions();
   const canOverrideCompetition = hasPermission(P.PROC_OVERRIDE_COMPETITION);
@@ -187,12 +188,12 @@ function CompareMatrix({ rfqId, entity, currency, onAwarded }: { rfqId: number; 
             <MatrixRow label="Valid until" labelCell={labelCell}>
               {quotes.map((q) => (
                 <td key={q.id} className={dataCell}>
-                  {shortDate(q.valid_until)}{q.is_expired && <span className="ml-1.5 text-amber-600">(expired)</span>}
+                  {dates.day(q.valid_until)}{q.is_expired && <span className="ml-1.5 text-amber-600">(expired)</span>}
                 </td>
               ))}
             </MatrixRow>
             <MatrixRow label="Submitted" labelCell={labelCell}>
-              {quotes.map((q) => <td key={q.id} className={dataCell}>{shortDate(q.quote_date)}</td>)}
+              {quotes.map((q) => <td key={q.id} className={dataCell}>{dates.day(q.quote_date)}</td>)}
             </MatrixRow>
             <MatrixRow label="Reference" labelCell={labelCell}>
               {quotes.map((q) => <td key={q.id} className={dataCell}>{q.reference || "-"}</td>)}

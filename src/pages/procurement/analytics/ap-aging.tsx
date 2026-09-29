@@ -14,7 +14,7 @@ import {
 import type { ApAging, ApCashRequirements, ApVendorDetail } from "@/redux/services/procurement/procurement-ext-types";
 import type { ReportMoney } from "@/redux/services/finance/reports-types";
 import { formatMoney } from "@/utils/money";
-import { isForbidden, shortDate } from "../sourcing/helpers";
+import { isForbidden } from "../sourcing/helpers";
 import { Field, EmptyPanel } from "../sourcing/shared";
 import { Card, ChartEmpty, DateFilter, Pill, ScopeNote, StatusDotPill, SectionHeader, type PillTone } from "./shared";
 import { paymentTermsLabel } from "../payment-terms";
@@ -196,6 +196,7 @@ function ApVendorDrawer({ sel, entity, asOf, currency, onClose }: {
 }
 
 function ApVendorBody({ d, currency }: { d: ApVendorDetail; currency?: string | null }) {
+  const dates = useDates();
   const invoices = toArray(d.invoices);
   const outstanding = kobo(d.outstanding);
   const stack = d.buckets
@@ -241,8 +242,8 @@ function ApVendorBody({ d, currency }: { d: ApVendorDetail; currency?: string | 
                 {invoices.map((inv) => (
                   <tr key={inv.invoice_id}>
                     <td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold tabular-nums text-primary">{inv.document_number}</td>
-                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{shortDate(inv.invoice_date)}</td>
-                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{inv.due_date ? shortDate(inv.due_date) : "-"}</td>
+                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{dates.day(inv.invoice_date)}</td>
+                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{inv.due_date ? dates.day(inv.due_date) : "-"}</td>
                     <td className={cn("border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums", inv.days_overdue > 0 ? "text-destructive" : "text-gray-05")}>{inv.days_overdue > 0 ? `${inv.days_overdue}d` : "-"}</td>
                     <td className="border-t border-white-02 px-3 py-2"><Pill tone={bucketTone(inv.bucket)}>{BUCKET_LABEL[inv.bucket] ?? inv.bucket}</Pill></td>
                     <td className="border-t border-white-02 px-3 py-2 text-right"><Money kobo={kobo(inv.balance_due)} currency={currency} align="right" /></td>

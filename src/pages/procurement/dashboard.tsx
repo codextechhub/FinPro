@@ -43,6 +43,7 @@ import {
 } from "../finance/dashboard-cards";
 import { greeting } from "../finance/dashboard-words";
 import { useServesPath } from "../../lib/host-routes";
+import { useDates } from "../../lib/display-prefs";
 
 const R = routesPath.PROTECTED.PROCUREMENT;
 type D = Dashboard;
@@ -53,15 +54,6 @@ const DONUT_COLORS = [DASH_COLORS.primary, DASH_COLORS.mid, "#E0B25C", DASH_COLO
 function rowCols(n: number) {
   return n >= 3 ? "md:grid-cols-2 xl:grid-cols-3" : n === 2 ? "md:grid-cols-2" : "";
 }
-
-function fmtDate(iso?: string) {
-  if (!iso) return "";
-  const date = new Date(`${iso}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? iso
-    : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
-
-const dayMonth = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 /** Whole days since an ISO timestamp, as the approval list reads it: "today", "1 day", "6 days". */
 export function waitingFor(iso: string | null, now: Date = new Date()): { label: string; days: number } {
@@ -332,6 +324,7 @@ function BillsDueCard({ due, to, currency }: { due: NonNullable<D["bills_due"]>;
 }
 
 function ContractsCard({ rows, currency }: { rows: NonNullable<D["contracts_ending"]>; currency?: string | null }) {
+  const dates = useDates();
   return (
     <Panel title="Contracts ending soon" subtitle="Next 90 days" action={<LinkAction label="Contracts" to={R.CONTRACTS} />}>
       {rows.length === 0 ? <AllClear>No contract ends in the next 90 days.</AllClear> : (
@@ -343,7 +336,7 @@ function ContractsCard({ rows, currency }: { rows: NonNullable<D["contracts_endi
                 <div className="flex items-baseline justify-between gap-2 font-mont text-[13px]">
                   <span className="min-w-0 truncate"><span className="font-medium text-gray-01">{c.title}</span>
                     <span className="text-gray-05"> · {c.vendor}</span></span>
-                  <span className={cn("shrink-0 text-[11px]", c.days <= 30 ? "text-amber-700" : "text-gray-05")}>Ends {dayMonth(c.end_date)}</span>
+                  <span className={cn("shrink-0 text-[11px]", c.days <= 30 ? "text-amber-700" : "text-gray-05")}>Ends {dates.dayMonth(c.end_date)}</span>
                 </div>
                 {c.ordered && (
                   <div className="h-2 overflow-hidden rounded-full bg-gray-03/50">
@@ -385,6 +378,7 @@ function ActivityCard({ items, canAudit }: { items: NonNullable<D["recent_activi
 // ── the page ─────────────────────────────────────────────────────────────────
 
 export default function ProcurementDashboard() {
+  const dates = useDates();
   const navigate = useNavigate();
   const { code: entity, currency: entityCurrency } = useActiveEntity();
   const { can } = useCan();
@@ -441,7 +435,7 @@ export default function ProcurementDashboard() {
               </InfoHint>
             </div>
             <p className="mt-0.5 font-mont text-xs text-gray-05">
-              {head ? [head.window.name, `as of ${fmtDate(head.as_of)}`, head.narrowed ? "your branches only" : null].filter(Boolean).join(" · ") : "-"}
+              {head ? [head.window.name, `as of ${dates.day(head.as_of)}`, head.narrowed ? "your branches only" : null].filter(Boolean).join(" · ") : "-"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

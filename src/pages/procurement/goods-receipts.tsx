@@ -27,6 +27,7 @@ import { formatQuantity } from "@/utils/quantity";
 import { canReceiveRemaining, completeReceiptSave } from "./goods-receipt-fulfilment";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
 const DETAIL_TABS = [
   { value: "overview", label: "Overview", icon: FileText },
@@ -41,15 +42,8 @@ const DETAIL_TAB_ITEMS: TabStripItem<DetailTab>[] = DETAIL_TABS.map(({ value, la
   label: <><Icon className="size-3.5" /> {label}</>,
 }));
 
-function shortDate(value?: string | null) {
-  if (!value) return "-";
-  const parsed = new Date(`${value}T00:00:00`);
-  return Number.isNaN(parsed.getTime())
-    ? value
-    : parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-}
-
 export default function GoodsReceiptsPage() {
+  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
   // Asked before the tables below fetch on mount. A finance grant does not
   // carry procurement.goods_receipt.view with it, and without this the screen
@@ -70,7 +64,7 @@ export default function GoodsReceiptsPage() {
     { header: "GR Number", cell: (receipt) => <span className="font-mont text-sm font-semibold text-primary">{receipt.document_number}</span> },
     { header: "PO Ref", cell: (receipt) => receipt.purchase_order_number || "-" },
     { header: "Vendor", cell: (receipt) => <span className="font-mont text-sm font-semibold">{receipt.vendor_name || receipt.vendor_code}</span> },
-    { header: "Received", cell: (receipt) => shortDate(receipt.received_date) },
+    { header: "Received", cell: (receipt) => dates.day(receipt.received_date) },
     { header: "Items", cell: (receipt) => `${formatQuantity(receipt.received_item_count)} of ${formatQuantity(receipt.ordered_item_count)}` },
     { header: "Status", cell: (receipt) => <div className="flex flex-wrap items-center gap-1.5"><StatusPill status={receipt.status} /><StatusPill status={receipt.receipt_status} /></div> },
   ];
@@ -120,6 +114,7 @@ function ReceiptDrawer({ id, entity, currency, onClose, onSelectReceipt }: {
   id: number | null; entity: string; currency?: string | null; onClose: () => void;
   onSelectReceipt: (id: number) => void;
 }) {
+  const dates = useDates();
   const [tab, setTab] = useState<DetailTab>("overview");
   const [editing, setEditing] = useState(false);
   const [receivingRemaining, setReceivingRemaining] = useState(false);
@@ -184,7 +179,7 @@ function ReceiptDrawer({ id, entity, currency, onClose, onSelectReceipt }: {
             <Field label="GR number" value={receipt.document_number} />
             <Field label="PO reference" value={receipt.purchase_order_number || "Not linked"} />
             <Field label="Vendor" value={receipt.vendor_name || receipt.vendor_code} />
-            <Field label="Received date" value={shortDate(receipt.received_date)} />
+            <Field label="Received date" value={dates.day(receipt.received_date)} />
             <Field label="Items" value={`${formatQuantity(receipt.received_item_count)} of ${formatQuantity(receipt.ordered_item_count)}`} />
             <Field label="Received by" value={receipt.received_by_name} />
           </dl>

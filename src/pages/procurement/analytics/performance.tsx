@@ -19,7 +19,7 @@ import {
 } from "@/redux/services/procurement/procurement-ext-api";
 import type { VendorPerformanceRow } from "@/redux/services/procurement/procurement-ext-types";
 import { formatMoney } from "@/utils/money";
-import { isForbidden, shortDate } from "../sourcing/helpers";
+import { isForbidden } from "../sourcing/helpers";
 import { Field, EmptyPanel } from "../sourcing/shared";
 import { AssessmentFormDrawer } from "./assessment-form";
 import { DateFilter, GradeBadge, GradePill, Meter, Pill, ScopeNote, SectionHeader } from "./shared";
@@ -27,6 +27,7 @@ import { TD, TH, excludedScopeNote, meanOrNull, meterScoreColor, type SectionPro
 import { PageShell } from "@/components/layout/page-shell";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
+import { useDates } from "../../../lib/display-prefs";
 
 function otPct(rate: number | null) {
   return rate == null ? null : Math.round(rate * 100);
@@ -185,6 +186,7 @@ function VendorPerformanceDrawer({ row, entity, currency, onClose }: {
   currency?: string | null;
   onClose: () => void;
 }) {
+  const dates = useDates();
   const { data, isLoading } = useGetVendorAssessmentsQuery(
     { entity, vendor: row?.code ?? "" }, { skip: !row },
   );
@@ -225,7 +227,7 @@ function VendorPerformanceDrawer({ row, entity, currency, onClose }: {
               <dl className="grid grid-cols-2 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-3">
                 <Field label="Overall score" value={`${a.overall_score} / 100`} />
                 <Field label="On-time (computed)" value={otPct(row.on_time_rate) == null ? "-" : `${otPct(row.on_time_rate)}%`} />
-                <Field label="Assessed" value={shortDate(a.assessment_date)} />
+                <Field label="Assessed" value={dates.day(a.assessment_date)} />
                 <Field label="Quality acceptance" value={a.quality_acceptance} />
                 <Field label="Invoice accuracy" value={a.invoice_accuracy} />
                 <Field label="Responsiveness" value={a.responsiveness} />
@@ -254,7 +256,7 @@ function VendorPerformanceDrawer({ row, entity, currency, onClose }: {
                   <tbody>
                     {history.map((h) => (
                       <tr key={h.id}>
-                        <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{shortDate(h.assessment_date)}</td>
+                        <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{dates.day(h.assessment_date)}</td>
                         <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{h.on_time_delivery}</td>
                         <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{h.quality_acceptance}</td>
                         <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{h.invoice_accuracy}</td>

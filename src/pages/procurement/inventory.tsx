@@ -31,13 +31,14 @@ import {
 import type { StockItem, StockItemDetail, StockMovement } from "@/redux/services/procurement/procurement-types";
 import { formatMoney } from "@/utils/money";
 import { ActivityFeed, EmptyPanel, Field } from "./sourcing/shared";
-import { isForbidden, shortDate } from "./sourcing/helpers";
+import { isForbidden } from "./sourcing/helpers";
 import { BalancesTable, LocationsSection } from "./stock-locations";
 import { StockLocationPicker } from "./pickers";
 import { useStockLocations } from "./use-stock-locations";
 import { DEFAULT_INVENTORY_SECTION, type InventorySection } from "./console-sections";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { useDates } from "../../lib/display-prefs";
 
 // ── Shared small helpers ─────────────────────────────────────────────────────
 // Quantities arrive as 14,4 decimal strings ("10.0000"); show them trimmed.
@@ -310,6 +311,7 @@ function ItemLocationBreakdown({ itemId, entity, currency }: { itemId: number; e
 }
 
 function MovementsSubTable({ movements, currency, multi }: { movements: StockMovement[]; currency?: string | null; multi?: boolean }) {
+  const dates = useDates();
   if (!movements.length) return <EmptyPanel>No movements recorded for this item yet.</EmptyPanel>;
   const heads = ["Date", "Type", ...(multi ? ["Store"] : []), "Qty", "Value", multi ? "Bal. at store" : "Bal. qty", "Bal. value"];
   return (
@@ -319,7 +321,7 @@ function MovementsSubTable({ movements, currency, multi }: { movements: StockMov
         const q = num(m.quantity);
         return (
           <tr key={m.id}>
-            <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{shortDate(m.movement_date)}</td>
+            <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{dates.day(m.movement_date)}</td>
             <td className="border-t border-white-02 px-3 py-2"><StatusPill status={m.movement_type} /></td>
             {multi && <td className="border-t border-white-02 px-3 py-2 font-mont text-xs">{m.location_code || "-"}</td>}
             <td className={cn("border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums", signClass(q))}>{q > 0 ? "+" : ""}{fmtQty(m.quantity)}</td>
@@ -611,6 +613,7 @@ function AdjustDrawer({ entity, currency, item, onClose }: { entity: string; cur
 
 // ── Stock Movements (read-only ledger) ───────────────────────────────────────
 function MovementsSection({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [tab, setTab] = useState("");
   const [page, setPage] = useState(1);
   const [location, setLocation] = useState("");
@@ -624,7 +627,7 @@ function MovementsSection({ entity, currency }: { entity: string; currency?: str
   const rows = toArray(data?.data);
 
   const columns: Column<StockMovement>[] = [
-    { header: "Date", cell: (m) => shortDate(m.movement_date) },
+    { header: "Date", cell: (m) => dates.day(m.movement_date) },
     { header: "Move #", cell: (m) => <span className="font-mont font-semibold text-primary">#{m.id}</span> },
     { header: "Type", cell: (m) => <StatusPill status={m.movement_type} /> },
     { header: "Item", cell: (m) => m.stock_item_code || "-" },
