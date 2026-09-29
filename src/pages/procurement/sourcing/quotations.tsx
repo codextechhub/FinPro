@@ -246,7 +246,7 @@ function QuotationImageViewer({ images, selectedIndex, onSelect }: { images: Quo
 
   return <Dialog open={selectedIndex != null} onOpenChange={(open) => !open && onSelect(null)}>
     <DialogContent className="w-[calc(100vw-2rem)] p-4 sm:max-w-5xl sm:p-6">
-      <DialogHeader className="min-w-0 pr-8"><DialogTitle className="truncate">{image?.name || "Evidence image"}</DialogTitle><DialogDescription>{selectedIndex == null ? "" : `Image ${selectedIndex + 1} of ${images.length}`}</DialogDescription></DialogHeader>
+      <DialogHeader className="min-w-0 pr-8"><DialogTitle className="break-words">{image?.name || "Evidence image"}</DialogTitle><DialogDescription>{selectedIndex == null ? "" : `Image ${selectedIndex + 1} of ${images.length}`}</DialogDescription></DialogHeader>
       <div className="flex min-h-48 items-center justify-center rounded-md bg-black/5 p-2 sm:p-4">
         {isLoading && <p className="font-mont text-sm text-gray-05">Loading image…</p>}
         {isError && <p className="font-mont text-sm text-gray-05">This image could not be opened.</p>}
