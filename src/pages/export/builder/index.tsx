@@ -43,7 +43,9 @@ import type { Dataset, ExportFormat, ValuesMode } from "@/redux/services/dashboa
 import { ChoiceCard } from "./choice-card";
 import { FieldPicker } from "./field-picker";
 import { FilterEditor } from "./filter-editor";
-import { filterIsSet } from "./helpers";
+import { filterIsSet, renderFileNamePreview } from "./helpers";
+import { useDisplayPrefs } from "../../../lib/display-prefs";
+import { nowIn } from "../../../utils/dates";
 import { FormatOptions } from "./format-options";
 import { SummaryBar, SummaryRail } from "./summary-rail";
 import { type BuilderState, defaultsForDataset, useBuilderState, usePreview } from "./use-builder-state";
@@ -661,6 +663,7 @@ function StepFile({
   fileNamePattern: string;
   onFileNamePattern: (next: string) => void;
 }) {
+  const { timeZone } = useDisplayPrefs();
   const FORMAT_COPY: Record<string, { title: string; description: string }> = {
     xlsx: {
       title: "Excel (.xlsx)",
@@ -672,13 +675,7 @@ function StepFile({
     },
   };
 
-  const today = new Date();
-  const rendered =
-    fileNamePattern
-      .replace("{date}", today.toISOString().slice(0, 10))
-      .replace("{datetime}", `${today.toISOString().slice(0, 10)}-${String(today.getHours()).padStart(2, "0")}${String(today.getMinutes()).padStart(2, "0")}`)
-      .replace("{entity}", "entity")
-      .replace("{run}", "1") + `.${format}`;
+  const rendered = renderFileNamePreview(fileNamePattern, format, nowIn(timeZone));
 
   return (
     <section className={cn(INFORMATION_CARD_SURFACE, "space-y-5 rounded-md p-4")}>
