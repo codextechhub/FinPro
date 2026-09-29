@@ -591,6 +591,7 @@ const KIND_CHIP: Record<string, { label: string; cls: string }> = {
 };
 
 export function PostingsCard({ journals, currency, to }: { journals: NonNullable<D["recent_journals"]>; currency?: string | null; to: string }) {
+  const dates = useDates();
   return (
     <Panel title="Recent postings" action={<LinkAction label="Ledger" to={to} />}>
       {journals.length === 0 ? <EmptyState title="No postings yet" /> : (
@@ -602,7 +603,7 @@ export function PostingsCard({ journals, currency, to }: { journals: NonNullable
                 <span className={cn("mt-0.5 w-11 shrink-0 rounded px-1 py-0.5 text-center font-mont text-[10px] font-semibold tracking-wide", chip.cls)}>{chip.label}</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-mont text-[13px] text-gray-01">{j.narration || j.document_number}</p>
-                  <p className="truncate font-mont text-[11px] text-gray-05">{j.document_number} · {j.date}</p>
+                  <p className="truncate font-mont text-[11px] text-gray-05">{j.document_number} · {dates.day(j.date)}</p>
                 </div>
                 <span className="shrink-0 font-mont text-xs font-semibold tabular-nums text-black-01">{compactMoney(j.amount.kobo, currency)}</span>
               </div>

@@ -40,6 +40,7 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { CreditNote } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
+import { useDates } from "../../../lib/display-prefs";
 
 const kindLabel = (k: string) => (k === "DEBIT" ? "Debit note" : "Credit note");
 const DRAWER_W = "sm:max-w-3xl";
@@ -113,6 +114,7 @@ function noteRecap(n: CreditNote): { dr: RecapRow[]; cr: RecapRow[] } {
 }
 
 export function CreditNotesTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [searchParams] = useSearchParams();
   const [typeFilter, setTypeFilter] = useState("");   // "" | CREDIT | DEBIT
   const [statusFilter, setStatusFilter] = useState(""); // "" | ISSUED | APPLIED
@@ -141,7 +143,7 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
   const columns: Column<CreditNote>[] = [
     { header: "Note no.", cell: (r) => <span className="font-semibold tabular-nums">{r.document_number}</span> },
     { header: "Type", cell: (r) => <TypeChip kind={r.kind} /> },
-    { header: "Date", cell: (r) => <span className="tabular-nums">{r.note_date}</span> },
+    { header: "Date", cell: (r) => <span className="tabular-nums">{dates.day(r.note_date)}</span> },
     { header: "Customer", cell: (r) => (
       <span className="inline-flex items-center gap-2"><Initials name={r.customer_name} /><span className="font-medium text-gray-01">{r.customer_name}</span></span>
     ) },
@@ -201,6 +203,7 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
 function NoteDetailDrawer({ note, entity, currency, onClose }: {
   note: CreditNote | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const dates = useDates();
   const { can } = useCan();
   const [confirmApply, setConfirmApply] = useState(false);
   const [allocate, { isLoading: applying }] = useAllocateCreditNoteMutation();
@@ -254,7 +257,7 @@ function NoteDetailDrawer({ note, entity, currency, onClose }: {
             <Field label="Amount"><Money kobo={note.total} currency={currency} /></Field>
             <Field label="Status"><span className={cn("inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[status])}>{STATUS_LABEL[status]}</span></Field>
             <Field label="Against invoice">{note.invoice_number ?? "-"}</Field>
-            <Field label="Date">{note.note_date}</Field>
+            <Field label="Date">{dates.day(note.note_date)}</Field>
           </div>
           <Field label="Reason"><span className="font-normal">{note.reason || "-"}</span></Field>
 

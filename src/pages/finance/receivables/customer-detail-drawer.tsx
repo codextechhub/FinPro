@@ -70,6 +70,7 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
 export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
   id: number | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const dates = useDates();
   const { entity: activeEntity } = useActiveEntity();
   const { data, isLoading, isError, refetch } = useGetCustomerDetailQuery(id ? { entity, id } : skipToken);
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("statement");
@@ -151,7 +152,7 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
                   <tbody>
                     {d.transactions.map((t, i) => (
                       <tr key={`${t.reference}-${i}`}>
-                        <td className={cn(td, "tabular-nums text-gray-05")}>{t.date}</td>
+                        <td className={cn(td, "tabular-nums text-gray-05")}>{dates.day(t.date)}</td>
                         <td className={td}><span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", TXN_META[t.type]?.cls ?? "bg-blue-50 text-blue-700")}>{TXN_META[t.type]?.label ?? t.type}</span></td>
                         <td className={cn(td, "font-semibold")}>{t.reference}</td>
                         <td className={cn(td, "text-right tabular-nums")}><Money kobo={t.amount.kobo} currency={currency} align="right" /></td>
@@ -305,7 +306,7 @@ function StatementTab({ d, entity, entityName, currency }: { d: CustomerDetail; 
               </tr>
               {rows.map((r, i) => (
                 <tr key={i}>
-                  <td className={cn(td, "tabular-nums text-gray-05")}>{r.date}</td>
+                  <td className={cn(td, "tabular-nums text-gray-05")}>{dates.day(r.date)}</td>
                   <td className={td}>{r.description}</td>
                   <td className={cn(td, "text-right tabular-nums")}>{r.debit.kobo ? <Money kobo={r.debit.kobo} currency={currency} align="right" /> : "-"}</td>
                   <td className={cn(td, "text-right tabular-nums")}>{r.credit.kobo ? <Money kobo={r.credit.kobo} currency={currency} align="right" /> : "-"}</td>

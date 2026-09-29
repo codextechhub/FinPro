@@ -170,7 +170,7 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
             <Stat label="Settled"><Money kobo={s.settled.kobo} currency={currency} /></Stat>
             <Stat label="Balance due"><Money kobo={s.balance.kobo} currency={currency} /></Stat>
             <Stat label="Aging">
-              {s.due_date ? <span className={cn(overdue && "text-destructive")}>{overdue ? "Overdue · " : "Due "}{s.due_date}</span> : "-"}
+              {s.due_date ? <span className={cn(overdue && "text-destructive")}>{overdue ? "Overdue · " : "Due "}{dates.day(s.due_date)}</span> : "-"}
             </Stat>
           </div>
 
@@ -234,7 +234,7 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
                   <div key={i} className="overflow-hidden rounded-md border border-white-02">
                     <div className="flex items-center justify-between gap-2 bg-[#F1F1F1] px-3 py-2">
                       <span className="flex items-center gap-2"><TypeBadge type={j.document_type} /><span className="font-mont text-xs font-semibold text-gray-01">{j.reference}</span></span>
-                      <span className="font-mont text-[11px] tabular-nums text-gray-05">{j.date}</span>
+                      <span className="font-mont text-[11px] tabular-nums text-gray-05">{dates.day(j.date)}</span>
                     </div>
                     <table className="w-full border-collapse">
                       <thead><tr>
@@ -269,7 +269,7 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
               {d.activity.map((a, i) => (
                 <li key={i} className="flex items-start gap-2 font-mont text-xs">
                   <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-green-01 text-white"><Check className="size-3" /></span>
-                  <span><span className="tabular-nums text-gray-05">{a.date}</span> - <span className="text-gray-01">{a.label}</span></span>
+                  <span><span className="tabular-nums text-gray-05">{dates.day(a.date)}</span> - <span className="text-gray-01">{a.label}</span></span>
                 </li>
               ))}
             </ol>

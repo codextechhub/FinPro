@@ -337,6 +337,7 @@ function TransactionsTab({ detail, currency }: { detail?: { transactions: import
 }
 
 function StatementLinesTab({ id, entity, currency }: { id: number; entity: string; currency?: string | null }) {
+  const dates = useDates();
   const { can } = useCan();
   const { data, isFetching } = useGetStatementLinesQuery({ id, entity });
   const [deleting, setDeleting] = useState<import("@/redux/services/finance/ops-types").BankStatementLine | null>(null);
@@ -365,7 +366,7 @@ function StatementLinesTab({ id, entity, currency }: { id: number; entity: strin
           <tbody>
             {lines.map((l) => (
               <tr key={l.id}>
-                <td className={cn(tdCls, "tabular-nums text-gray-05")}>{l.txn_date}</td>
+                <td className={cn(tdCls, "tabular-nums text-gray-05")}>{dates.day(l.txn_date)}</td>
                 <td className={tdCls}>{l.description || "-"}</td>
                 <td className={cn(tdCls, "tabular-nums text-gray-05")}>{l.reference || "-"}</td>
                 <td className={cn(tdCls, "text-right tabular-nums", l.amount < 0 ? "text-destructive" : "text-black-01")}>{formatMoney(l.amount, currency)}</td>

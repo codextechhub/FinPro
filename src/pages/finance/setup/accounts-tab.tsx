@@ -27,6 +27,7 @@ import {
   type AccountTreeNode,
 } from "./account-group";
 import { getAccountDetailTabKeys, type AccountDetailTabKey } from "./account-detail-tabs";
+import { useDates } from "../../../lib/display-prefs";
 
 type Node = AccountTreeNode;
 
@@ -331,6 +332,7 @@ const DRAWER_TABS = [
 function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
   id: number | null; entity: string; accounts: Account[]; currency?: string | null; onClose: () => void;
 }) {
+  const dates = useDates();
   const { data, isLoading, isError, refetch } = useGetAccountDetailQuery(id ? { entity, id } : skipToken);
   const [tab, setTab] = useState<AccountDetailTabKey>("activity");
   const [groupView, setGroupView] = useState<"balances" | "activity" | null>(null);
@@ -437,7 +439,7 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
                   <tbody>
                     {d.activity.map((a, i) => (
                       <tr key={`${a.journal_no}-${i}`}>
-                        <td className={cn(cell, "text-gray-05")}>{a.date}</td>
+                        <td className={cn(cell, "text-gray-05")}>{dates.day(a.date)}</td>
                         <td className={cn(cell, "font-semibold")}>{a.journal_no}</td>
                         <td className={cn(cell, "max-w-xs truncate")}>{a.description || "-"}</td>
                         <td className={cn(cell, "text-gray-05")}>{a.cost_center || "-"}</td>
@@ -505,6 +507,7 @@ function GroupLedger({ initialView, entity, account, accounts, summary, currency
   currency?: string | null;
   onBack: () => void;
 }) {
+  const dates = useDates();
   const [view, setView] = useState<"balances" | "activity">(initialView);
   const [balanceSearch, setBalanceSearch] = useState("");
   const [balancePage, setBalancePage] = useState(1);
@@ -578,7 +581,7 @@ function GroupLedger({ initialView, entity, account, accounts, summary, currency
     },
   ];
   const activityColumns: Column<ConsolidatedAccountActivityLine>[] = [
-    { header: "Date", cell: (line) => <span className="whitespace-nowrap text-gray-05">{line.date}</span> },
+    { header: "Date", cell: (line) => <span className="whitespace-nowrap text-gray-05">{dates.day(line.date)}</span> },
     {
       header: "Account",
       cell: (line) => (
@@ -698,7 +701,7 @@ function GroupLedger({ initialView, entity, account, accounts, summary, currency
               <div className="space-y-2 font-mont">
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-sm font-semibold"><span className="tabular-nums">{line.account_code}</span> {line.account_name}</p>
-                  <span className="shrink-0 text-xs text-gray-05">{line.date}</span>
+                  <span className="shrink-0 text-xs text-gray-05">{dates.day(line.date)}</span>
                 </div>
                 <div>
                   <p className="text-xs font-semibold">{line.journal_no}</p>

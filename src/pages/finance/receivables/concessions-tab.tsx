@@ -35,6 +35,7 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { Concession } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
+import { useDates } from "../../../lib/display-prefs";
 
 const KINDS: [string, string][] = [["WAIVER", "Waiver"], ["DISCOUNT", "Discount"], ["SCHOLARSHIP", "Scholarship"]];
 const kindLabel = (k: string) => KINDS.find(([v]) => v === k)?.[1] ?? k;
@@ -74,6 +75,7 @@ function concessionRecap(allowance: string | null, amount: number): { dr: RecapR
 }
 
 export function ConcessionsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [searchParams] = useSearchParams();
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -105,7 +107,7 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
     { header: "Invoice", cell: (c) => <span className="tabular-nums text-gray-05">{c.invoice_number ?? "-"}</span> },
     { header: "Type", cell: (c) => <TypeChip kind={c.kind} /> },
     { header: "Amount", align: "right", cell: (c) => <Money kobo={c.amount} currency={currency} align="right" /> },
-    { header: "Date", cell: (c) => <span className="tabular-nums">{c.concession_date}</span> },
+    { header: "Date", cell: (c) => <span className="tabular-nums">{dates.day(c.concession_date)}</span> },
     { header: "Status", cell: (c) => <StatusPill status={c.status} /> },
   ];
 
@@ -158,6 +160,7 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
 function ConcessionDetailDrawer({ concession, entity, currency, onClose }: {
   concession: Concession | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const dates = useDates();
   const { can } = useCan();
   const [confirmPost, setConfirmPost] = useState(false);
   const [post, { isLoading: posting }] = usePostConcessionMutation();
@@ -222,7 +225,7 @@ function ConcessionDetailDrawer({ concession, entity, currency, onClose }: {
             <Field label="Amount"><Money kobo={concession.amount} currency={currency} /></Field>
             <Field label="Status"><StatusPill status={concession.status} /></Field>
             <Field label="Against invoice">{concession.invoice_number ?? "-"}</Field>
-            <Field label="Date">{concession.concession_date}</Field>
+            <Field label="Date">{dates.day(concession.concession_date)}</Field>
           </div>
           {isDraft && gated ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">

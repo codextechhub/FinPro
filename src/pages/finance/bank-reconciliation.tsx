@@ -225,7 +225,7 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
             return (
               <LineCard key={l.id} selected={selBanks.includes(l.id)} candidate={candidate}
                 onClick={() => toggleBank(l.id)}
-                title={l.description || "-"} sub={`${l.txn_date}${l.reference ? ` · ${l.reference}` : ""}`}
+                title={l.description || "-"} sub={`${dates.day(l.txn_date)}${l.reference ? ` · ${l.reference}` : ""}`}
                 amount={l.amount} currency={currency} />
             );
           })}
@@ -239,7 +239,7 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
             return (
               <LineCard key={b.id} selected={selBooks.includes(b.id)} candidate={candidate}
                 onClick={() => toggleBook(b.id)}
-                title={b.description} sub={`${b.date}${b.reference ? ` · ${b.reference}` : ""}`}
+                title={b.description} sub={`${dates.day(b.date)}${b.reference ? ` · ${b.reference}` : ""}`}
                 amount={b.amount} currency={currency} />
             );
           })}
@@ -275,7 +275,7 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
               <tbody>
                 {matched.map((l) => (
                   <tr key={l.id} onClick={() => setViewing(l)} className="cursor-pointer hover:bg-gray-03/40">
-                    <td className={cn(td, "tabular-nums text-gray-05")}>{l.txn_date}</td>
+                    <td className={cn(td, "tabular-nums text-gray-05")}>{dates.day(l.txn_date)}</td>
                     <td className={td}>{l.description || "-"}</td>
                     <td className={cn(td, "text-right tabular-nums", signedCls(l.amount))}>{formatMoney(l.amount, currency)}</td>
                     <td className={cn(td, "tabular-nums text-gray-05")}>{l.matched_reference || (l.adjusting_journal_id ? "Adjusting entry" : "-")}</td>
@@ -308,7 +308,7 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
               <tbody>
                 {ignored.map((l) => (
                   <tr key={l.id}>
-                    <td className={cn(td, "tabular-nums text-gray-05")}>{l.txn_date}</td>
+                    <td className={cn(td, "tabular-nums text-gray-05")}>{dates.day(l.txn_date)}</td>
                     <td className={td}>{l.description || "-"}</td>
                     <td className={cn(td, "text-right tabular-nums", signedCls(l.amount))}>{formatMoney(l.amount, currency)}</td>
                     <td className={cn(td, "text-right")}>
@@ -365,7 +365,7 @@ function MatchedLineDrawer({ line, currency, onClose, onUnmatch, canUnmatch, unm
     >
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
-          <ReconField label="Statement date">{line.txn_date}</ReconField>
+          <ReconField label="Statement date">{dates.day(line.txn_date)}</ReconField>
           <ReconField label="Amount"><span className={signedCls(line.amount)}>{formatMoney(line.amount, currency)}</span></ReconField>
           <ReconField label="Description">{line.description || "-"}</ReconField>
           <ReconField label="Reference">{line.reference || "-"}</ReconField>
@@ -446,6 +446,7 @@ function LineCard({ title, sub, amount, currency, selected, candidate, onClick }
 function AdjustDrawer({ line, entity, currency, onClose, onDone }: {
   line: BankStatementLine; entity: string; currency?: string | null; onClose: () => void; onDone: () => void;
 }) {
+  const dates = useDates();
   const [counter, setCounter] = useState("");
   const [narration, setNarration] = useState(line.description || "");
   // Unlike the import, an adjustment posts - so it needs a date in an open period:
@@ -500,8 +501,8 @@ function AdjustDrawer({ line, entity, currency, onClose, onDone }: {
         </div>
         {lineDateClosed && (
           <p className="rounded-md bg-amber-50 px-3 py-2 font-mont text-[11px] text-amber-900 ring-1 ring-amber-200">
-            This line is dated {line.txn_date}. {reasonFor(line.txn_date) ?? "That period is closed."} A closed period
-            can’t be rewritten, so the entry books on the first open day after it - {line.txn_date} stays on the journal
+            This line is dated {dates.day(line.txn_date)}. {reasonFor(line.txn_date) ?? "That period is closed."} A closed period
+            can’t be rewritten, so the entry books on the first open day after it - {dates.day(line.txn_date)} stays on the journal
             as the bank’s value date.
           </p>
         )}
@@ -510,7 +511,7 @@ function AdjustDrawer({ line, entity, currency, onClose, onDone }: {
         </FormField>
         <PostingDateField
           label="Posting date" entity={entity} value={postingDate} onChange={setChosen}
-          hint={deferred ? `Books in this period; ${line.txn_date} stays as the bank’s value date.` : undefined}
+          hint={deferred ? `Books in this period; ${dates.day(line.txn_date)} stays as the bank’s value date.` : undefined}
         />
         <FormField label="Narration">
           <textarea value={narration} onChange={(e) => setNarration(e.target.value)} rows={2}

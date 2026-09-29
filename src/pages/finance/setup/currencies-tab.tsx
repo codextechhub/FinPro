@@ -35,6 +35,7 @@ function Delta({ pct }: { pct: number | null }) {
 }
 
 export function CurrenciesTab() {
+  const dates = useDates();
   const [tab, setTab] = useState<"fx" | "currencies">("fx");
   const cur = useGetCurrenciesQuery();
   const fx = useGetFxRatesQuery();
@@ -73,7 +74,7 @@ export function CurrenciesTab() {
     .slice().sort((a, b) => b.as_of.localeCompare(a.as_of)), [rates, base, source]);
 
   const fxCols: Column<FxRate>[] = [
-    { header: "Date", cell: (r) => <span className="tabular-nums">{r.as_of}</span> },
+    { header: "Date", cell: (r) => <span className="tabular-nums">{dates.day(r.as_of)}</span> },
     { header: "Pair", cell: (r) => <span className="font-semibold">{r.base} → {r.quote}</span> },
     { header: "Rate", align: "right", cell: (r) => <span className="tabular-nums">{fmtRate(r.rate)}</span> },
     { header: "Source", cell: (r) => r.source ? <span className="rounded bg-pry-01 px-1.5 py-0.5 font-mont text-[10px] font-semibold uppercase text-primary">{r.source}</span> : "-" },

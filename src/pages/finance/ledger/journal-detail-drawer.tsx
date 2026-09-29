@@ -69,7 +69,7 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
         open={open}
         onOpenChange={(o) => !o && onClose()}
         title={j ? j.document_number : "Journal"}
-        description={j ? `${j.date}${j.period ? ` · ${j.period}` : ""} · ${cap(j.source)} journal` : undefined}
+        description={j ? `${dates.day(j.date)}${j.period ? ` · ${j.period}` : ""} · ${cap(j.source)} journal` : undefined}
         widthClass="sm:max-w-3xl"
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">

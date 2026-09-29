@@ -23,6 +23,7 @@ import type { Payment } from "@/redux/services/finance/ar-types";
 import { openPaymentReceipt } from "@/utils/finance-documents";
 import { RecordReceiptDrawer } from "./record-receipt-drawer";
 import { PaymentAllocationDrawer } from "./payment-allocation-drawer";
+import { useDates } from "../../../lib/display-prefs";
 
 const STATUS_TABS = [
   { key: "", label: "All" }, { key: "ALLOCATED", label: "Allocated" },
@@ -56,6 +57,7 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
 }
 
 export function ReceiptsAllocationTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput.trim(), 350);
   const [status, setStatus] = useState("");
@@ -98,7 +100,7 @@ export function ReceiptsAllocationTab({ entity, currency }: { entity: string; cu
 
   const columns: Column<Payment>[] = [
     { header: "Receipt No.", cell: (p) => <span className="font-semibold">{p.document_number}</span> },
-    { header: "Date", cell: (p) => <span className="tabular-nums text-gray-05">{p.payment_date}</span> },
+    { header: "Date", cell: (p) => <span className="tabular-nums text-gray-05">{dates.day(p.payment_date)}</span> },
     { header: "Customer", cell: (p) => <span className="inline-flex items-center gap-2"><Initials name={p.customer_name} /><span className="font-medium text-gray-01">{p.customer_name}</span></span> },
     { header: "Method", cell: (p) => <span className="rounded bg-gray-03/40 px-2 py-0.5 font-mont text-[11px] text-gray-01">{methodLabel(p.method)}</span> },
     { header: "Amount", align: "right", cell: (p) => <span className="block text-right tabular-nums">{formatMoney(p.amount, currency)}</span> },

@@ -119,7 +119,7 @@ export function PaymentPlansTab({ entity, currency }: { entity: string; currency
     { header: "Progress", cell: (p) => <ProgressBar paid={paidCount(p)} total={p.installment_count} /> },
     { header: "Next due", cell: (p) => {
       const n = nextUnpaid(p);
-      return n ? <span className="font-mont text-sm text-gray-01">{n.due_date} · <span className="tabular-nums">{formatMoney(n.balance, currency)}</span></span> : <span className="text-gray-05">-</span>;
+      return n ? <span className="font-mont text-sm text-gray-01">{dates.day(n.due_date)} · <span className="tabular-nums">{formatMoney(n.balance, currency)}</span></span> : <span className="text-gray-05">-</span>;
     } },
     { header: "Status", cell: (p) => { const h = planHealth(p, dates.today()); return <span className={cn(PILL, h.cls)}>{h.label}</span>; } },
   ];
@@ -229,7 +229,7 @@ function PlanDetailDrawer({ plan, entity, currency, onClose }: {
                     return (
                       <tr key={inst.id}>
                         <td className={cn(tdCls, "tabular-nums text-gray-05")}>{inst.seq_no}</td>
-                        <td className={cn(tdCls, "tabular-nums")}>{inst.due_date}</td>
+                        <td className={cn(tdCls, "tabular-nums")}>{dates.day(inst.due_date)}</td>
                         <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={inst.amount} currency={currency} align="right" /></td>
                         <td className={tdCls}><span className={cn(PILL, s.cls)}>{s.label}</span></td>
                       </tr>
@@ -401,7 +401,7 @@ function NewPlanDrawer({ open, onClose, entity, currency }: {
                 ) : schedule.map((s) => (
                   <tr key={s.seq}>
                     <td className={cn(tdCls, "tabular-nums text-gray-05")}>{s.seq}</td>
-                    <td className={cn(tdCls, "tabular-nums")}>{s.date}</td>
+                    <td className={cn(tdCls, "tabular-nums")}>{dates.day(s.date)}</td>
                     <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={s.amount} currency={currency} align="right" /></td>
                   </tr>
                 ))}

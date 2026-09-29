@@ -49,6 +49,7 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { ArAdjustment, RefundAvailabilityCustomer } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
+import { useDates } from "../../../lib/display-prefs";
 
 type Mode = "REFUND" | "WRITEOFF";
 
@@ -101,6 +102,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function RefundsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
   const [searchParams] = useSearchParams();
   const { can, canAny } = useCan();
   const [filter, setFilter] = useState<"" | Mode>("");
@@ -132,7 +134,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
   const columns: Column<ArAdjustment>[] = [
     { header: "Ref", cell: (r) => <span className="font-semibold tabular-nums">{r.reference || "-"}</span> },
     { header: "Type", cell: (r) => <TypeChip kind={r.kind} /> },
-    { header: "Date", cell: (r) => <span className="tabular-nums">{r.date}</span> },
+    { header: "Date", cell: (r) => <span className="tabular-nums">{dates.day(r.date)}</span> },
     { header: "Customer", cell: (r) => <span className="text-gray-01">{r.customer_name}</span> },
     { header: "Reason", cell: (r) => <span className="block max-w-[260px] truncate text-gray-01" title={r.reason}>{r.reason || "-"}</span> },
     { header: "Amount", align: "right", cell: (r) => <Money kobo={r.amount} currency={currency} align="right" /> },
@@ -196,6 +198,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
 function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
   row: ArAdjustment | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const dates = useDates();
   const { can } = useCan();
   const [post, { isLoading: posting }] = usePostRefundMutation();
   const [submitRefund, { isLoading: submittingRefund }] = useSubmitRefundMutation();
@@ -292,7 +295,7 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
           <Field label="Amount"><Money kobo={row.amount} currency={currency} /></Field>
           <Field label="Status"><StatusPill status={row.status || "DRAFT"} /></Field>
           <Field label={wo ? "Against invoice" : "Reference"}>{row.reference || "-"}</Field>
-          <Field label="Date">{row.date}</Field>
+          <Field label="Date">{dates.day(row.date)}</Field>
         </div>
         <Field label="Reason"><span className="font-normal">{row.reason || "-"}</span></Field>
         <div>

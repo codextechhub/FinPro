@@ -86,7 +86,7 @@ export default function GeneralLedgerPage() {
 
   const columns: Column<JournalListItem>[] = [
     { header: "Journal No.", cell: (j) => <span className="font-semibold">{j.document_number}</span> },
-    { header: "Date", cell: (j) => j.date },
+    { header: "Date", cell: (j) => dates.day(j.date) },
     { header: "Period", cell: (j) => j.period ?? "-" },
     { header: "Source", cell: (j) => cap(j.source) },
     { header: "Reference", cell: (j) => <span className="block max-w-xs truncate text-gray-01">{j.narration || j.reference || "-"}</span> },
