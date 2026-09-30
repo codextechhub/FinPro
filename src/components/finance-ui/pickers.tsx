@@ -49,11 +49,27 @@ export function ReceivableAccountPicker({ entity, value, onChange, label, placeh
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} />;
 }
 
+/** The list CustomerPicker reads; `useCustomerBranch` reads the same cache. */
+const customerListArgs = (entity: string) => ({ entity, is_active: "true", page_size: 100 });
+
 /** Customer / payer picker. List-backed (grows per entity) → reveal-on-search. */
 export function CustomerPicker({ entity, value, onChange, label, placeholder = "Select customer", isRequired, disabled }: PickerProps) {
-  const { data, isLoading } = useGetCustomersQuery({ entity, is_active: "true", page_size: 100 });
+  const { data, isLoading } = useGetCustomersQuery(customerListArgs(entity));
   const options = toArray(data?.data).map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }));
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
+}
+
+/**
+ * The branch of the customer CustomerPicker has chosen, by code: a number for
+ * a customer filed under a branch, null for one every branch shares, and
+ * undefined while it is not known (no customer yet, or a server that does not
+ * report a customer's branch). Reads the picker's own list, so it costs no
+ * request of its own.
+ */
+export function useCustomerBranch(entity: string, code: string): number | null | undefined {
+  const { data } = useGetCustomersQuery(customerListArgs(entity), { skip: !code });
+  if (!code) return undefined;
+  return toArray(data?.data).find((c) => c.code === code)?.branch_id;
 }
 
 /** Vendor picker - entity's active vendors; reports the vendor code. Used by

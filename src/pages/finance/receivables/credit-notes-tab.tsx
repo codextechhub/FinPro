@@ -21,7 +21,7 @@ import { Plus, Printer, Check, Search, Send } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, ConfirmActionModal, DetailDrawer, FormField,
   CustomerPicker, AccountPicker, CostCenterPicker, PostingRecap, Segmented, toArray, type Column, type RecapRow,
-  PostingDateField,} from "@/components/finance-ui";
+  PostingDateField, CUSTOMER_BRANCH_HINT, RaisingBranchChoiceField, useCustomerBranch, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -319,6 +319,9 @@ function IssueNoteDrawer({ open, onClose, entity, currency }: {
   const [submitForApproval, { isLoading: submitting }] = useSubmitCreditNoteMutation();
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "note" });
   const saving = creating || posting || submitting;
+  // A note against an invoice takes the invoice's branch; see useRaisingBranchChoice.
+  const customerBranch = useCustomerBranch(entity, customer);
+  const branch = useRaisingBranchChoice({ unless: !!invoice || customerBranch != null });
   const debit = kind === "DEBIT";
   // Labels only, from the published ladder - the created note's own
   // `approval_required` is what the flow actually acts on.
@@ -347,9 +350,9 @@ function IssueNoteDrawer({ open, onClose, entity, currency }: {
     return { dr: [rev], cr: [target] };
   }, [debit, account, amount, costCenter, applyNow]);
 
-  const canSubmit = !!customer && !!account && amount > 0 && reason.trim() !== "";
+  const canSubmit = !!customer && !!account && amount > 0 && reason.trim() !== "" && branch.ready;
 
-  const reset = () => { setKind("CREDIT"); setDate(""); setCustomer(""); setAccount(""); setInvoice(""); setAmount(0); setCostCenter(""); setReason(""); setApplyNow(false); };
+  const reset = () => { setKind("CREDIT"); setDate(""); setCustomer(""); setAccount(""); setInvoice(""); setAmount(0); setCostCenter(""); setReason(""); setApplyNow(false); branch.reset(); };
   const close = () => { reset(); onClose(); };
   const changeKind = (k: string) => { setKind(k); if (k === "DEBIT") setApplyNow(false); };
 
@@ -357,7 +360,7 @@ function IssueNoteDrawer({ open, onClose, entity, currency }: {
     try {
       const res = await create({
         entity, customer: customer.trim().toUpperCase(), kind, note_date: date,
-        invoice: invoice ? Number(invoice) : undefined, reason: reason.trim(),
+        invoice: invoice ? Number(invoice) : undefined, reason: reason.trim(), ...branch.body(),
         lines: [{ revenue_account: account, description: reason.trim(), quantity: 1, unit_price: amount, cost_center: costCenter || undefined }],
       }).unwrap();
       // Post immediately. For credit notes the toggle decides: auto-allocate
@@ -426,6 +429,7 @@ function IssueNoteDrawer({ open, onClose, entity, currency }: {
             loading={invQ.isFetching} disabled={!customer}
             placeholder={customer ? "Optional - search this customer's invoices" : "Select a customer first"} />
         </FormField>
+        <RaisingBranchChoiceField choice={branch} hint={CUSTOMER_BRANCH_HINT} />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} /></FormField>

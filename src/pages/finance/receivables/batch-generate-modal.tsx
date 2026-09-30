@@ -11,7 +11,10 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
-import { FormModal, FormField, toArray, PostingDateField,} from "@/components/finance-ui";
+import {
+  FormModal, FormField, toArray, PostingDateField, FEE_RUN_BRANCH_HINT, RaisingBranchChoiceField,
+  useRaisingBranchChoice,
+} from "@/components/finance-ui";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { apiErrorMessage } from "@/utils/api-errors";
 import { useGetFeeStructuresQuery, useGenerateFromFeeStructureMutation } from "@/redux/services/finance/ar-api";
@@ -31,6 +34,8 @@ export function BatchGenerateModal({ open, onOpenChange, entity, currency }: {
   const [failure, setFailure] = useState("");
   const [handedOver, setHandedOver] = useState<FeeStructure | null>(null);
   const [generate, { isLoading }] = useGenerateFromFeeStructureMutation();
+  // The all-active run only; a host panel names its own payers and branch.
+  const branch = useRaisingBranchChoice({ unless: !!FeeGenerationPanel });
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) setFailure("");
     onOpenChange(nextOpen);
@@ -46,10 +51,10 @@ export function BatchGenerateModal({ open, onOpenChange, entity, currency }: {
     try {
       const res = await generate({
         id: structure, entity, all_active: true,
-        invoice_date: invoiceDate || undefined, due_date: dueDate || undefined,
+        invoice_date: invoiceDate || undefined, due_date: dueDate || undefined, ...branch.body(),
       }).unwrap();
       toast.success(res.message || `${res.data?.generated ?? 0} invoice(s) generated.`);
-      onOpenChange(false); setStructure(""); setDueDate(""); setFailure("");
+      onOpenChange(false); setStructure(""); setDueDate(""); setFailure(""); branch.reset();
     } catch (error) {
       setFailure(apiErrorMessage(error, "The invoices could not be generated. Check the billing setup and try again."));
     }
@@ -93,7 +98,7 @@ export function BatchGenerateModal({ open, onOpenChange, entity, currency }: {
       description="Raise a posted invoice for every active customer from the selected fee structure."
       submitText="Generate"
       loading={isLoading}
-      canSubmit={!!structure}
+      canSubmit={!!structure && branch.ready}
       onSubmit={submit}
     >
       <FormField label="Fee structure" required>
@@ -110,6 +115,7 @@ export function BatchGenerateModal({ open, onOpenChange, entity, currency }: {
           <DatePickerInput value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" />
         </FormField>
       </div>
+      <RaisingBranchChoiceField choice={branch} hint={FEE_RUN_BRANCH_HINT} />
       {failure ? (
         <div role="alert" className="flex gap-2 rounded-md border border-error/30 bg-error/5 px-3 py-2.5">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-error" aria-hidden="true" />

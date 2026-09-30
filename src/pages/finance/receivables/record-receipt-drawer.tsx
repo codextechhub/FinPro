@@ -8,7 +8,10 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { toKobo } from "@/utils/money";
 import { ArrowRight } from "lucide-react";
-import { DetailDrawer, FormField, Money, CustomerPicker, AccountPicker, PostingDateField, toArray } from "@/components/finance-ui";
+import {
+  DetailDrawer, FormField, Money, CustomerPicker, AccountPicker, PostingDateField, toArray,
+  CUSTOMER_BRANCH_HINT, RaisingBranchChoiceField, useCustomerBranch, useRaisingBranchChoice,
+} from "@/components/finance-ui";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -33,6 +36,7 @@ export function RecordReceiptDrawer({ open, onOpenChange, entity, currency, onCr
   const [account, setAccount] = useState("");
   const [reference, setReference] = useState("");
   const [record, { isLoading }] = useRecordCustomerReceiptMutation();
+  const branch = useRaisingBranchChoice({ unless: useCustomerBranch(entity, customer) != null });
 
   // Resolve account names for the posting preview (Dr bank, Cr AR control).
   const { data: coaData } = useGetTaggedAccountsQuery({ entity }, { skip: !open });
@@ -41,8 +45,8 @@ export function RecordReceiptDrawer({ open, onOpenChange, entity, currency, onCr
   const arAcc = useMemo(() => accounts.find((a) => a.account_type === "ASSET" && a.tag === "CONTROL"), [accounts]);
 
   const kobo = toKobo(amount);
-  const canSubmit = !!customer && kobo > 0 && !!date && !!account;
-  const reset = () => { setCustomer(""); setAmount(""); setDate(""); setMethod("BANK_TRANSFER"); setAccount(""); setReference(""); };
+  const canSubmit = !!customer && kobo > 0 && !!date && !!account && branch.ready;
+  const reset = () => { setCustomer(""); setAmount(""); setDate(""); setMethod("BANK_TRANSFER"); setAccount(""); setReference(""); branch.reset(); };
   const close = () => { reset(); onOpenChange(false); };
 
   const submit = async () => {
@@ -51,6 +55,7 @@ export function RecordReceiptDrawer({ open, onOpenChange, entity, currency, onCr
         entity, id: customer, amount: kobo, payment_date: date,
         method, deposit_account: account, reference: reference || undefined,
         auto_allocate: false,   // capture only - allocate in the next step
+        ...branch.body(),
       }).unwrap();
       toast.success(res.message || "Receipt captured.");
       reset();
@@ -79,6 +84,7 @@ export function RecordReceiptDrawer({ open, onOpenChange, entity, currency, onCr
         <FormField label="Customer" required>
           <CustomerPicker entity={entity} value={customer} onChange={setCustomer} placeholder="Type a customer name…" />
         </FormField>
+        <RaisingBranchChoiceField choice={branch} hint={CUSTOMER_BRANCH_HINT} />
         <div className="grid grid-cols-2 gap-3">
           <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
           <FormField label="Method" required>

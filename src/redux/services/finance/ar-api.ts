@@ -59,7 +59,7 @@ export const arApi = baseApi.injectEndpoints({
     }),
     createInvoice: builder.mutation<ApiEnvelope<Invoice>, {
       entity: string; customer: string | number; invoice_date: string; due_date?: string;
-      reference?: string; narration?: string; post?: boolean;
+      reference?: string; narration?: string; post?: boolean; branch?: number;
       lines: { revenue_account: string | number; description?: string; quantity?: number; unit_price: number; tax_code?: string | number | null }[];
     }>({
       query: ({ entity, ...body }) => ({ url: `/finance/invoices/${qs({ entity })}`, method: "POST", body }),
@@ -106,7 +106,7 @@ export const arApi = baseApi.injectEndpoints({
       query: (params) => ({ url: `/finance/credit-notes/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceCreditNotes"],
     }),
-    createCreditNote: builder.mutation<ApiEnvelope<CreditNote>, { entity: string; customer: string; kind: string; note_date: string; invoice?: number; reason?: string; reference?: string; lines: Record<string, unknown>[] }>({
+    createCreditNote: builder.mutation<ApiEnvelope<CreditNote>, { entity: string; customer: string; branch?: number; kind: string; note_date: string; invoice?: number; reason?: string; reference?: string; lines: Record<string, unknown>[] }>({
       query: ({ entity, ...body }) => ({ url: `/finance/credit-notes/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceCreditNotes"],
     }),
@@ -252,7 +252,7 @@ export const arApi = baseApi.injectEndpoints({
       query: (params) => ({ url: `/finance/payment-plans/${qs(params)}`, method: "GET" }),
       providesTags: ["FinancePaymentPlans"],
     }),
-    createPaymentPlan: builder.mutation<ApiEnvelope<PaymentPlan>, { entity: string; customer: string; invoice?: number; start_date: string; frequency: string; installment_count: number; total_amount?: number; notes?: string }>({
+    createPaymentPlan: builder.mutation<ApiEnvelope<PaymentPlan>, { entity: string; customer: string; branch?: number; invoice?: number; start_date: string; frequency: string; installment_count: number; total_amount?: number; notes?: string }>({
       query: ({ entity, ...body }) => ({ url: `/finance/payment-plans/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePaymentPlans"],
     }),
@@ -356,7 +356,7 @@ export const arApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/customers/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceCustomers"],
     }),
-    createCustomer: builder.mutation<ApiEnvelope<Customer>, { entity: string; name: string; billing_email: string; billing_phone: string; billing_address?: string; receivable_account?: string; opening_balance?: number; opening_date?: string; is_active?: boolean }>({
+    createCustomer: builder.mutation<ApiEnvelope<Customer>, { entity: string; opening_branch?: number; name: string; billing_email: string; billing_phone: string; billing_address?: string; receivable_account?: string; opening_balance?: number; opening_date?: string; is_active?: boolean }>({
       query: ({ entity, ...body }) => ({ url: `/finance/customers/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceCustomers"],
     }),
@@ -368,7 +368,7 @@ export const arApi = baseApi.injectEndpoints({
       query: ({ entity, id, ...body }) => ({ url: `/finance/customers/${id}/${qs({ entity })}`, method: "PATCH", body }),
       invalidatesTags: ["FinanceCustomers"],
     }),
-    recordCustomerReceipt: builder.mutation<ApiEnvelope<{ id: number; payment: string; allocated: number; unallocated: number }>, { entity: string; id: string | number; amount: number; payment_date: string; method?: string; deposit_account: string | number; reference?: string; auto_allocate?: boolean; allocation_strategy?: string }>({
+    recordCustomerReceipt: builder.mutation<ApiEnvelope<{ id: number; payment: string; allocated: number; unallocated: number }>, { entity: string; id: string | number; branch?: number; amount: number; payment_date: string; method?: string; deposit_account: string | number; reference?: string; auto_allocate?: boolean; allocation_strategy?: string }>({
       query: ({ entity, id, ...body }) => ({ url: `/finance/customers/${id}/receipt/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceCustomers", "FinanceInvoices", "FinanceReports", "FinanceJournals", "FinancePayments", "FinancePaymentPlans"],
     }),
@@ -420,7 +420,7 @@ export const arApi = baseApi.injectEndpoints({
       query: ({ id, entity, ...body }) => ({ url: `/finance/fee-structures/${id}/duplicate/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceFeeStructures"],
     }),
-    generateFromFeeStructure: builder.mutation<ApiEnvelope<{ structure: string; generated: number; invoices: Invoice[] }>, { id: string | number; entity: string; customers?: (string | number)[]; all_active?: boolean; invoice_date?: string; due_date?: string }>({
+    generateFromFeeStructure: builder.mutation<ApiEnvelope<{ structure: string; generated: number; invoices: Invoice[] }>, { id: string | number; entity: string; branch?: number; customers?: (string | number)[]; all_active?: boolean; invoice_date?: string; due_date?: string }>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/fee-structures/${id}/generate/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceFeeStructures", "FinanceInvoices"],
     }),

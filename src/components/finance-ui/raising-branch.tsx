@@ -149,9 +149,15 @@ export function raisingBranchReady(raising: RaisingBranch, value: string): boole
  * The value is derived rather than copied into state on open, so a form opened
  * before the branch list arrives still starts on the working branch. `reset`
  * forgets the pick when the form closes.
+ *
+ * `unless` turns the question off where the document takes its branch from
+ * something else. A document raised against a customer filed under a branch
+ * takes that customer's branch whatever the request says, so it is asked only
+ * for a customer every branch shares, or one whose branch is not known.
  */
-export function useRaisingBranchChoice() {
-  const raising = useRaisingBranch();
+export function useRaisingBranchChoice({ unless = false }: { unless?: boolean } = {}) {
+  const rule = useRaisingBranch();
+  const raising = useMemo(() => (unless && rule.ask ? { ...rule, ask: false, choices: [] } : rule), [rule, unless]);
   const [picked, setPicked] = useState<string | null>(null);
   const value = picked ?? raising.initial;
   return {
@@ -194,6 +200,14 @@ export function RaisingBranchField({ raising, value, onChange, label = "Branch",
     </FormField>
   );
 }
+
+/** The hint under the Branch field of a document raised against a customer. */
+export const CUSTOMER_BRANCH_HINT =
+  "Used when the customer is shared by every branch. A customer filed under a branch keeps that branch.";
+
+/** The hint under the Branch field of a fee run, which bills many customers. */
+export const FEE_RUN_BRANCH_HINT =
+  "Invoices for customers shared by every branch are raised for this branch. A customer filed under a branch keeps that branch.";
 
 /** `RaisingBranchField` bound to a form's `useRaisingBranchChoice`. */
 export function RaisingBranchChoiceField({ choice, label, hint }: { choice: RaisingBranchChoice; label?: string; hint?: string }) {

@@ -358,6 +358,9 @@ export interface Customer {
   source_type: string;
   source_id: string;
   is_active: boolean;
+  // The branch the customer is filed under; null for one every branch shares.
+  // Absent from servers that do not report it.
+  branch_id?: number | null;
   // Enriched on the list endpoint: net AR position (signed kobo; + owes, − credit).
   balance?: number;
   balance_naira?: string;

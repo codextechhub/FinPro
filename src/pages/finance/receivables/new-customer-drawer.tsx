@@ -1,11 +1,21 @@
-// New customer / payer - a right-side drawer (prototype style). The receivable
-// control account uses the app's type-to-search AccountPicker; opening balance is
-// entered in naira and sent as integer kobo. Defaults the AR control to 1200.
+/**
+ * New customer / payer - a right-side drawer (prototype style). The receivable
+ * control account uses the app's type-to-search AccountPicker; opening balance is
+ * entered in naira and sent as integer kobo. Defaults the AR control to 1200.
+ *
+ * A customer is shared by every branch when a whole-school reader adds one, but
+ * the opening balance is a transaction and belongs to one branch. At a school
+ * with several branches the form therefore asks which branch the opening
+ * balance is for, once one is entered, and sends it as `opening_branch`.
+ */
 import { useState } from "react";
 import { toast } from "sonner";
 import { toKobo } from "@/utils/money";
 import { Plus } from "lucide-react";
-import { DetailDrawer, FormField, ReceivableAccountPicker, PostingDateField,} from "@/components/finance-ui";
+import {
+  DetailDrawer, FormField, ReceivableAccountPicker, PostingDateField, RaisingBranchChoiceField,
+  useRaisingBranchChoice,
+} from "@/components/finance-ui";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useCreateCustomerMutation } from "@/redux/services/finance/ar-api";
@@ -23,9 +33,11 @@ export function NewCustomerDrawer({ open, onOpenChange, entity }: {
   const [openingDate, setOpeningDate] = useState("");
   const [active, setActive] = useState(true);
   const [create, { isLoading }] = useCreateCustomerMutation();
+  const hasOpening = toKobo(opening) > 0;
+  const openingBranch = useRaisingBranchChoice({ unless: !hasOpening });
 
-  const canSubmit = name.trim() !== "" && email.trim() !== "" && phone.trim() !== "";
-  const reset = () => { setName(""); setEmail(""); setPhone(""); setAddress(""); setAccount(""); setOpening(""); setOpeningDate(""); setActive(true); };
+  const canSubmit = name.trim() !== "" && email.trim() !== "" && phone.trim() !== "" && openingBranch.ready;
+  const reset = () => { setName(""); setEmail(""); setPhone(""); setAddress(""); setAccount(""); setOpening(""); setOpeningDate(""); setActive(true); openingBranch.reset(); };
   const close = () => { reset(); onOpenChange(false); };
 
   const submit = async () => {
@@ -37,6 +49,7 @@ export function NewCustomerDrawer({ open, onOpenChange, entity }: {
         receivable_account: account || undefined,
         opening_balance: opening ? toKobo(opening) : undefined,
         opening_date: opening && openingDate ? openingDate : undefined,
+        ...openingBranch.body("opening_branch"),
         is_active: active,
       }).unwrap();
       toast.success(res.message || "Customer created.");
@@ -75,6 +88,7 @@ export function NewCustomerDrawer({ open, onOpenChange, entity }: {
           <PostingDateField label="Opening as of" entity={entity} value={openingDate} onChange={setOpeningDate} required={false} disabled={!opening} />
         </div>
         {opening ? <p className="-mt-1 font-mont text-[11px] text-gray-05">Backdates the opening-balance invoice into its period. Leave blank to date it today. The period must be open.</p> : null}
+        <RaisingBranchChoiceField choice={openingBranch} label="Opening balance branch" hint="The branch the opening-balance invoice is raised for." />
         <label className="flex items-center gap-2 font-mont text-sm text-gray-01">
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active
         </label>

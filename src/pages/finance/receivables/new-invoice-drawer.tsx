@@ -8,7 +8,10 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { toKobo } from "@/utils/money";
 import { Plus, Trash2 } from "lucide-react";
-import { DetailDrawer, Money, CustomerPicker, AccountPicker, TaxCodePicker, toArray, PostingDateField,} from "@/components/finance-ui";
+import {
+  DetailDrawer, Money, CustomerPicker, AccountPicker, TaxCodePicker, toArray, PostingDateField,
+  CUSTOMER_BRANCH_HINT, RaisingBranchChoiceField, useCustomerBranch, useRaisingBranchChoice,
+} from "@/components/finance-ui";
 import { SearchSelect } from "@/components/custom/search-select";
 import { Input } from "@/components/ui/input";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
@@ -46,6 +49,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
   const [post, setPost] = useState(true);
   const [lines, setLines] = useState<Line[]>([blankLine()]);
   const [create, { isLoading }] = useCreateInvoiceMutation();
+  const branch = useRaisingBranchChoice({ unless: useCustomerBranch(entity, customer) != null });
 
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -76,11 +80,11 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
   }, [lines, taxByCode]);
 
   const validLines = lines.filter((l) => l.account && toKobo(l.price) > 0);
-  const canSubmit = !!customer && !!invoiceDate && validLines.length > 0;
+  const canSubmit = !!customer && !!invoiceDate && validLines.length > 0 && branch.ready;
 
   const reset = () => {
     setStructure(""); setCustomer(""); setDueDate(""); setReference(""); setNarration("");
-    setPost(true); setLines([blankLine()]); setInvoiceDate("");
+    setPost(true); setLines([blankLine()]); setInvoiceDate(""); branch.reset();
   };
   const close = () => { reset(); onOpenChange(false); };
 
@@ -89,7 +93,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
       const res = await create({
         entity, customer, invoice_date: invoiceDate,
         due_date: dueDate || undefined, reference: reference || undefined,
-        narration: narration || undefined, post,
+        narration: narration || undefined, post, ...branch.body(),
         lines: validLines.map((l) => ({
           revenue_account: l.account,
           description: l.description || undefined,
@@ -123,6 +127,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
         {/* customer & dates */}
         <div className="space-y-3">
           <CustomerPicker entity={entity} value={customer} onChange={setCustomer} label="Customer" isRequired placeholder="Type a customer name…" />
+          <RaisingBranchChoiceField choice={branch} hint={CUSTOMER_BRANCH_HINT} />
           <div className="grid grid-cols-2 gap-3">
             <PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} />
             <label className="block space-y-1">

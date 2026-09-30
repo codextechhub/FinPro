@@ -19,7 +19,7 @@ import { Plus, Search, Trash2, FileStack, Pencil, Copy, CircleCheck, RefreshCw, 
 import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField,
   AccountPicker, TaxCodePicker, toArray, type Column,
-  PostingDateField,} from "@/components/finance-ui";
+  PostingDateField, FEE_RUN_BRANCH_HINT, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -263,11 +263,12 @@ function GenerateDrawer({ structure, entity, onClose }: { structure: FeeStructur
   const [dueDate, setDueDate] = useState("");
   const [failure, setFailure] = useState("");
   const [generate, { isLoading }] = useGenerateFromFeeStructureMutation();
+  const branch = useRaisingBranchChoice();
 
   const submit = async () => {
     setFailure("");
     try {
-      const res = await generate({ id: structure.code, entity, all_active: true, invoice_date: invoiceDate, due_date: dueDate || undefined }).unwrap();
+      const res = await generate({ id: structure.code, entity, all_active: true, invoice_date: invoiceDate, due_date: dueDate || undefined, ...branch.body() }).unwrap();
       toast.success(res.message || `Generated ${res.data?.generated ?? 0} invoice(s).`);
       onClose();
     } catch (error) {
@@ -282,7 +283,7 @@ function GenerateDrawer({ structure, entity, onClose }: { structure: FeeStructur
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !invoiceDate} onClick={submit} className="gap-1.5"><FileStack className="size-4" />{isLoading ? "Generating…" : "Generate"}</Button>
+        <Button disabled={isLoading || !invoiceDate || !branch.ready} onClick={submit} className="gap-1.5"><FileStack className="size-4" />{isLoading ? "Generating…" : "Generate"}</Button>
       </>}
     >
       <div className="space-y-4">
@@ -293,6 +294,7 @@ function GenerateDrawer({ structure, entity, onClose }: { structure: FeeStructur
           <PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} />
           <FormField label="Due date"><DatePickerInput value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" /></FormField>
         </div>
+        <RaisingBranchChoiceField choice={branch} hint={FEE_RUN_BRANCH_HINT} />
         {failure ? (
           <div role="alert" className="flex gap-2 rounded-md border border-error/30 bg-error/5 px-3 py-2.5">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-error" aria-hidden="true" />

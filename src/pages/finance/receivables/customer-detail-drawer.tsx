@@ -181,6 +181,7 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
             entity={entity}
             customerId={c.id}
             customerName={c.name}
+            customerBranchId={c.branch_id}
             owedKobo={s?.current_balance.kobo ?? 0}
           />
           <ConfirmActionModal

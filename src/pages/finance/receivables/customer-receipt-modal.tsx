@@ -3,7 +3,10 @@
 // credit). Amount entered in naira → integer kobo. Prefilled with the amount owed.
 import { useState } from "react";
 import { toast } from "sonner";
-import { FormModal, FormField, AccountPicker, PostingDateField,} from "@/components/finance-ui";
+import {
+  FormModal, FormField, AccountPicker, PostingDateField, CUSTOMER_BRANCH_HINT, RaisingBranchChoiceField,
+  useRaisingBranchChoice,
+} from "@/components/finance-ui";
 import { toKobo } from "@/utils/money";
 import { Input } from "@/components/ui/input";
 import { useRecordCustomerReceiptMutation } from "@/redux/services/finance/ar-api";
@@ -12,9 +15,11 @@ const selectCls = "h-9 w-full rounded-md border border-white-02 bg-white px-2 fo
 const METHODS = ["BANK_TRANSFER", "CASH", "CARD", "CHEQUE", "ONLINE", "OTHER"] as const;
 const methodLabel = (m: string) => m.replace("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
-export function CustomerReceiptModal({ open, onOpenChange, entity, customerId, customerName, owedKobo }: {
+export function CustomerReceiptModal({ open, onOpenChange, entity, customerId, customerName, customerBranchId, owedKobo }: {
   open: boolean; onOpenChange: (o: boolean) => void; entity: string;
   customerId: string | number; customerName: string; owedKobo: number;
+  /** The customer's branch: null for one every branch shares, undefined when not known. */
+  customerBranchId?: number | null;
 }) {
   // Initialised from props; the parent remounts (key) on open so it prefills fresh.
   const [amount, setAmount] = useState((Math.max(owedKobo, 0) / 100).toFixed(2));
@@ -23,15 +28,16 @@ export function CustomerReceiptModal({ open, onOpenChange, entity, customerId, c
   const [account, setAccount] = useState("");
   const [reference, setReference] = useState("");
   const [record, { isLoading }] = useRecordCustomerReceiptMutation();
+  const branch = useRaisingBranchChoice({ unless: customerBranchId != null });
 
   const kobo = toKobo(amount);
-  const canSubmit = kobo > 0 && !!date && !!account;
+  const canSubmit = kobo > 0 && !!date && !!account && branch.ready;
 
   const submit = async () => {
     try {
       const res = await record({
         entity, id: customerId, amount: kobo, payment_date: date,
-        method, deposit_account: account, reference: reference || undefined,
+        method, deposit_account: account, reference: reference || undefined, ...branch.body(),
       }).unwrap();
       toast.success(res.message || "Payment recorded.");
       onOpenChange(false);
@@ -55,6 +61,7 @@ export function CustomerReceiptModal({ open, onOpenChange, entity, customerId, c
         </FormField>
         <PostingDateField label="Receipt date" entity={entity} value={date} onChange={setDate} />
       </div>
+      <RaisingBranchChoiceField choice={branch} hint={CUSTOMER_BRANCH_HINT} />
       <FormField label="Method">
         <select value={method} onChange={(e) => setMethod(e.target.value)} className={selectCls} aria-label="Payment method">
           {METHODS.map((m) => <option key={m} value={m}>{methodLabel(m)}</option>)}
