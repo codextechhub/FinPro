@@ -204,10 +204,13 @@ function ReconciliationCard({ accounts, unmatched, currency }: { accounts: NonNu
 
 /**
  * Each of this year's plans in the reader's reach and how much of its spending is
- * used, against how much of the year has gone (the thin mark on each bar). A
- * branch bursar sees the school's plan listed without figures: their branches'
- * spending against the whole plan would read as a shortfall that is only the
- * other branches' share.
+ * used, against how much of the year has gone (the thin mark on each bar).
+ *
+ * Every budget belongs to a branch. A plan with no branch is measured against
+ * every branch, so it reads "All branches", the school's total. A server that
+ * still keeps such plans sends a branch bursar one without figures: her
+ * branches' spending against the whole plan would read as a shortfall that is
+ * only the other branches' share.
  */
 function BudgetsCard({ budgets, currency }: { budgets: NonNullable<S["budgets"]>; currency?: string | null }) {
   const elapsed = budgets.year_elapsed_pct;
@@ -224,7 +227,7 @@ function BudgetsCard({ budgets, currency }: { budgets: NonNullable<S["budgets"]>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 font-mont text-[13px]">
                   <span className="min-w-0 truncate">
                     <span className="font-medium text-gray-01">{b.name}</span>
-                    <span className="text-gray-05"> · {b.branch ?? "School-wide"}</span>
+                    <span className="text-gray-05"> · {b.branch ?? "All branches"}</span>
                     {!b.approved && <span className="ml-1.5 rounded bg-gray-03/50 px-1.5 py-0.5 text-[10px] font-medium text-gray-01">Draft</span>}
                   </span>
                   {b.used && (

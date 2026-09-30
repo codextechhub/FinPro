@@ -530,7 +530,8 @@ export interface SpendDashboard {
   unmatched: { lines: number; amount: ReportMoney } | null;
   budgets: {
     year_elapsed_pct: number;
-    /** `plan`, `used` and `pct` are null on the school's plan for a branch-bound reader. */
+    /** `branch` is null on a plan measured against every branch. `plan`, `used`
+     *  and `pct` are null on such a plan for a branch-bound reader. */
     items: {
       id: number;
       name: string;

@@ -345,9 +345,10 @@ export interface Budget {
   consumed_pct?: number | null;
 }
 
-/** Whose plan the reader may create: the school's, and which branches'. */
+/** The branches the reader may file a budget for. `school` is sent only by a
+ *  server that still accepts a budget with no branch. */
 export interface BudgetFiling {
-  school: boolean;
+  school?: boolean;
   branches: { id: number; name: string }[];
 }
 

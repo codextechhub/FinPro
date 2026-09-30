@@ -2,12 +2,13 @@
  * The Budgets list and the New budget drawer, for a branch bursar and for the school.
  *
  * Chukwuemeka is the bursar at Holy Cross College Main Branch. He sees two plans:
- * the school's, which the server sends without actuals because they would cover
- * the Annex too, and his branch's own, which comes with its actuals. The list
- * must show the branch plan's figures and a dash for the school's, offer only
- * the branch plan in the heatmap, and file anything he creates to his branch
- * without asking. The proprietor sees every figure and chooses School-wide or a
- * branch for a new plan.
+ * one with no branch, measured against every branch, which a server that still
+ * keeps such plans sends without actuals because they would cover the Annex too,
+ * and his branch's own, which comes with its actuals. The list must show the
+ * branch plan's figures and a dash for the other, offer only the branch plan in
+ * the heatmap, and file anything he creates to his branch without asking. The
+ * proprietor sees every figure and must name a branch for a new plan: every
+ * budget belongs to one.
  */
 
 import { act } from "react";
@@ -17,6 +18,7 @@ import type { Budget, BudgetFiling } from "@/redux/services/finance/ops-types";
 import { FINANCE_PERMISSION_REGISTRY, type PermissionCode } from "../../../permissions";
 
 const mocks = vi.hoisted(() => ({
+  state: { auth: {} } as { auth: Record<string, unknown> },
   held: new Set<string>(),
   list: null as unknown,
   mutation: () => [() => undefined, { isLoading: false }],
@@ -35,6 +37,14 @@ vi.mock("@/hooks/use-permissions", () => ({
 }));
 
 vi.mock("@/hooks/use-action-param", () => ({ useActionParam: () => undefined }));
+vi.mock("@/redux/store", () => ({
+  useAppSelector: (select: (state: unknown) => unknown) => select(mocks.state),
+  useAppDispatch: () => vi.fn(),
+}));
+vi.mock("../../../host", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useBranches: () => ({ data: [ANNEX, MAIN], isLoading: false, isError: false }),
+}));
 
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -57,10 +67,13 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
 
 import { BudgetsTab } from "./budgets-tab";
 
+const { MAIN, ANNEX } = vi.hoisted(() => ({
+  MAIN: { id: 19, name: "Holy Cross College Main Branch" },
+  ANNEX: { id: 31, name: "Annex" },
+}));
+
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const MAIN = { id: 19, name: "Holy Cross College Main Branch" };
-const ANNEX = { id: 31, name: "Annex" };
 
 const budget = (over: Partial<Budget>): Budget => ({
   id: 1, code: "BUD-1", name: "Operating plan", fiscal_year: 2026, fiscal_year_id: 1,
@@ -90,6 +103,9 @@ afterEach(() => {
 });
 
 const render = (rows: Budget[], filing: BudgetFiling, narrowed: boolean, ...keys: string[]) => {
+  mocks.state = {
+    auth: { tenant: {}, branch_reach: narrowed ? { whole_tenant: false, branch_ids: [MAIN.id] } : { whole_tenant: true, branch_ids: [] } },
+  };
   mocks.held = new Set(["finance.budget.view", ...keys]);
   mocks.list = { data: rows, narrowed, filing, pagination: { currentPage: 1, totalPages: 1 } };
   act(() => root.render(<BudgetsTab entity="HOLYCROSS" currency="NGN" />));
@@ -111,7 +127,7 @@ describe("Budgets for a branch bursar", () => {
     const text = render([MAIN_PLAN, SCHOOL_PLAN_TO_BRANCH], filing, true);
 
     expect(text).toContain("Branch");
-    expect(text).toContain("School-wide");
+    expect(text).toContain("All branches");
     expect(text).toContain(MAIN.name);
     expect(text).toContain("Actual YTD");
     expect(text).not.toContain("The school’s plan only");
@@ -137,9 +153,8 @@ describe("Budgets for a branch bursar", () => {
     render([SCHOOL_PLAN_TO_BRANCH], filing, true, "finance.budget.create");
     openNewBudget();
 
-    const drawer = document.body.textContent ?? "";
-    expect(drawer).toContain(MAIN.name);
-    expect(optionLabels(document.body)).not.toContain("School-wide");
+    expect(document.body.querySelector('[aria-label="Branch"]')).toBeNull();
+    expect(optionLabels(document.body)).not.toContain("Select branch");
     expect(optionLabels(document.body)).not.toContain(ANNEX.name);
   });
 
@@ -150,7 +165,7 @@ describe("Budgets for a branch bursar", () => {
 });
 
 describe("Budgets for the proprietor", () => {
-  it("shows every plan's actuals and offers School-wide or any branch for a new one", () => {
+  it("shows every plan's actuals and asks which branch a new one is for, with no School-wide choice", () => {
     const text = render(
       [MAIN_PLAN, budget({})], { school: true, branches: [ANNEX, MAIN] }, false, "finance.budget.create",
     );
@@ -159,8 +174,11 @@ describe("Budgets for the proprietor", () => {
 
     openNewBudget();
     const labels = optionLabels(document.body);
-    expect(labels).toContain("School-wide");
+    expect(labels).not.toContain("School-wide");
+    expect(labels).toContain("Select branch");
     expect(labels).toContain(ANNEX.name);
     expect(labels).toContain(MAIN.name);
+    const create = [...document.body.querySelectorAll("button")].find((b) => b.textContent?.includes("Create budget"));
+    expect(create?.disabled).toBe(true);
   });
 });
