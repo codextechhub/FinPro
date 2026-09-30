@@ -11,7 +11,10 @@
  * picker, narrowed to that branch's accounts, and sends the accounts chosen as
  * `bank_accounts`. Mrs Bello keeps Ikeja's payroll at Corona, which pays all
  * staff in one central run: they are not offered a roster run for all staff, only
- * a run they type for their own branch.
+ * a run they type for their own branch. When they open that central run they
+ * are told it covers the whole school and that they see only Lekki's part, and
+ * are offered nothing to post, pay or void; a whole-school bursar opening the
+ * same run is offered paying and voiding as before.
  */
 
 import { act } from "react";
@@ -25,6 +28,8 @@ const mocks = vi.hoisted(() => ({
   pay: vi.fn(),
   pickers: [] as { documentBranchId?: number | null }[],
   wholeSchool: true,
+  branchIds: null as number[] | null,
+  run: null as unknown,
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -42,6 +47,9 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useCreateEmployeeSalaryMutation: () => [mocks.create, { isLoading: false }],
   useUpdateEmployeeSalaryMutation: () => [mocks.update, { isLoading: false }],
   usePayPayrollRunMutation: () => [mocks.pay, { isLoading: false }],
+  useGetPayrollRunQuery: () => ({ data: mocks.run ? { data: mocks.run } : undefined }),
+  usePostPayrollRunMutation: () => [vi.fn(), { isLoading: false }],
+  useCancelPayrollRunMutation: () => [vi.fn(), { isLoading: false }],
   useGetEmployeeSalariesQuery: () => ({ data: { data: [] } }),
   useGeneratePayrollRunMutation: () => [vi.fn(), { isLoading: false }],
   useCreatePayrollRunMutation: () => [vi.fn(), { isLoading: false }],
@@ -50,7 +58,7 @@ vi.mock("@/redux/services/finance/reports-api", () => ({}));
 vi.mock("@/redux/services/tenants-api", () => ({ useGetBranchOptionsQuery: () => ({ data: { data: [] } }) }));
 vi.mock("../../host", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: null, covers: () => true }),
+  useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.branchIds, covers: () => true }),
   hostBranchLens: undefined,
 }));
 
@@ -68,7 +76,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { EmployeeDrawer, NewRunDrawer, PayDrawer } from "./payroll";
+import { EmployeeDrawer, NewRunDrawer, PayDrawer, RunDrawer } from "./payroll";
 import type { EmployeeSalary, PayrollRun } from "@/redux/services/finance/ops-types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -186,5 +194,52 @@ describe("A branch officer at a central school", () => {
   it("leaves the roster run to a whole-school reader", () => {
     act(() => root.render(<NewRunDrawer open entity="CORONA" perBranch={false} onClose={() => undefined} />));
     expect(document.body.textContent).toContain("Generate run");
+  });
+});
+
+/** Lekki's part of September as the server sends it to Lekki's bursar. */
+const SEPT_LEKKI_PART: PayrollRun = {
+  ...SEPT, gross_total: 100, paye_total: 10, pension_total: 5, net_total: 85, partial_view: true,
+  branch_shares: [SEPT.branch_shares![1]],
+  lines: [{ id: 41, line_no: 1, employee_id: null, employee_name: "Bola Lawal", gross_amount: 100, paye_amount: 10, pension_amount: 5, net_amount: 85, components: [], cost_center: null, branch_id: 20, branch_name: "Lekki Branch" }],
+};
+
+const buttonLabels = () => [...document.body.querySelectorAll("button")].map((b) => b.textContent ?? "");
+
+describe("Opening a run for the whole school", () => {
+  afterEach(() => { mocks.wholeSchool = true; mocks.branchIds = null; mocks.run = null; });
+
+  it("tells a branch bursar they see only their branch's part, and offers no action", () => {
+    mocks.wholeSchool = false;
+    mocks.branchIds = [20];
+    mocks.run = SEPT_LEKKI_PART;
+    act(() => root.render(<RunDrawer runId={7} entity="CORONA" onClose={() => undefined} />));
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("This run covers the whole school. You are shown only your branch's part.");
+    expect(text).toContain("Bola Lawal");
+    expect(text).not.toContain("Ikeja");
+    const labels = buttonLabels();
+    for (const action of ["Pay net", "Void run", "Cancel run", "Calculate & post"]) {
+      expect(labels.some((label) => label.includes(action))).toBe(false);
+    }
+  });
+
+  it("says so from the server's flag alone, whatever the reach reads", () => {
+    mocks.run = SEPT_LEKKI_PART;
+    act(() => root.render(<RunDrawer runId={7} entity="CORONA" onClose={() => undefined} />));
+
+    expect(document.body.textContent).toContain("You are shown only your branch's part.");
+    expect(buttonLabels().some((label) => label.includes("Pay net"))).toBe(false);
+  });
+
+  it("offers a whole-school bursar paying and voiding, with no note", () => {
+    mocks.run = SEPT;
+    act(() => root.render(<RunDrawer runId={7} entity="CORONA" onClose={() => undefined} />));
+
+    expect(document.body.textContent).not.toContain("You are shown only");
+    const labels = buttonLabels();
+    expect(labels.some((label) => label.includes("Pay net"))).toBe(true);
+    expect(labels.some((label) => label.includes("Void run"))).toBe(true);
   });
 });

@@ -10,6 +10,25 @@
 
 import type { PayrollRun, PayrollRunBranchShare } from "@/redux/services/finance/ops-types";
 
+/**
+ * Whether the reader holds only their own branches' part of a run that covers
+ * the whole school.
+ *
+ * A bursar bound to Lekki opens the school's central January run through
+ * Lekki's share: the server sends Lekki's staff, Lekki's share and totals
+ * summed from them, and nothing of any other branch. Posting, paying and
+ * voiding act on every branch at once, so they stay with somebody who covers
+ * the whole school. The server says so with `partial_view`; a central run in
+ * front of a branch-bound reader is read the same way, so the answer does not
+ * depend on the server's version.
+ */
+export function isBranchPartOfWholeSchoolRun(
+  run: Pick<PayrollRun, "branch_id" | "partial_view">,
+  wholeSchool: boolean,
+): boolean {
+  return run.partial_view === true || (run.branch_id == null && !wholeSchool);
+}
+
 /** The run's branch shares; empty for a run posted as one journal. */
 export function sharesOf(run: Pick<PayrollRun, "branch_shares">): PayrollRunBranchShare[] {
   return run.branch_shares ?? [];

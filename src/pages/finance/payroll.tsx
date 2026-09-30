@@ -16,7 +16,9 @@
  * account, the run reads Paid only when every share is, and it cannot be voided
  * once any share is paid (see payroll-shares.ts). A run for all staff is raised
  * by somebody who covers the whole school; a branch officer raises their own
- * branch's, so the new-run drawer does not offer them the other.
+ * branch's, so the new-run drawer does not offer them the other. A branch
+ * officer opens such a run through their own branch's share and is shown that
+ * part alone, with nothing to post, pay or void (isBranchPartOfWholeSchoolRun).
  *
  * Honest adaptations: deductions route only to PAYE/pension (the two payables the GL
  * has) - other deduction types (loans/union) are a noted backend expansion.
@@ -35,7 +37,7 @@ import { useGetBranchOptionsQuery, type BranchOption } from "@/redux/services/te
 import { FinanceShell } from "./finance-shell";
 import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, useFieldAccess, fieldWriteErrors, toArray, type Column, type FieldAccess, type FieldErrors, type TabStripItem, PostingDateField, BankAccountPicker, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { useReaderReach } from "../../host";
-import { isPartlyPaid, mayCancelRun, sharesOf, singleJournalBranch, unassignedStaffRefusal, unpaidShares } from "./payroll-shares";
+import { isBranchPartOfWholeSchoolRun, isPartlyPaid, mayCancelRun, sharesOf, singleJournalBranch, unassignedStaffRefusal, unpaidShares } from "./payroll-shares";
 import { EmptyState } from "@/components/finance-ui/states";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
@@ -205,6 +207,8 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
   // branch, so the column would be a stack of dashes - and a school that has not
   // opted into per-branch payroll should not be able to tell it was built.
   const showBranch = useMemo(() => rows.some((r) => r.branch_id != null), [rows]);
+  const { wholeSchool, branchIds } = useReaderReach();
+  const showsParts = useMemo(() => rows.some((r) => isBranchPartOfWholeSchoolRun(r, wholeSchool)), [rows, wholeSchool]);
 
   const columns: Column<PayrollRun>[] = [
     { header: "Run no.", cell: (r) => <span className="font-semibold tabular-nums">{r.document_number}</span> },
@@ -232,6 +236,10 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
         <Kpi label="Awaiting payment" value={formatMoney(kpis.toPay, currency)} danger={kpis.toPay > 0} hint="Calculated, not yet paid" />
       </div>
 
+      {showsParts ? (
+        <p className="font-mont text-xs text-gray-05">{`Runs for the whole school show only ${yourBranchesPart(branchIds)}: its staff and its totals.`}</p>
+      ) : null}
+
       <div className="flex justify-end">
         <Can permission={P.FIN_CREATE_PAYROLL}>
           <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New payroll run</Button>
@@ -250,7 +258,7 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
   );
 }
 
-function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+export function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
   const [paying, setPaying] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -259,8 +267,10 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
   const [cancelRun, { isLoading: cancelling }] = useCancelPayrollRunMutation();
   const [unassigned, setUnassigned] = useState<{ runId: number; message: string; employees: string[] } | null>(null);
   const access = useFieldAccess(PAYROLL_LINE);
+  const { wholeSchool, branchIds } = useReaderReach();
   const r = data?.data;
   if (runId == null || !r) return null;
+  const partOnly = isBranchPartOfWholeSchoolRun(r, wholeSchool);
   const shares = sharesOf(r);
   const status = isPartlyPaid(r) ? "PART_PAID" : r.run_status;
   const refusal = unassigned?.runId === r.id ? unassigned : null;
@@ -280,7 +290,7 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
     }
   };
   // Undo a run raised in error; see mayCancelRun for when it is still possible.
-  const canCancel = mayCancelRun(r);
+  const canCancel = !partOnly && mayCancelRun(r);
   const isPosted = r.run_status === "POSTED";
   const doCancel = async () => { try { const res = await cancelRun({ id: r.id, entity }).unwrap(); toast.success(res.message || "Run cancelled."); setCancelOpen(false); } catch { /* central */ } };
 
@@ -295,11 +305,16 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
             <RunPill status={status} />
             <div className="flex-1" />
             {canCancel ? <Can permission={P.FIN_POST_PAYROLL}><Button variant="outline" disabled={cancelling} onClick={() => setCancelOpen(true)} className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/5"><Ban className="size-4" />{isPosted ? "Void run" : "Cancel run"}</Button></Can> : null}
-            {r.run_status === "DRAFT" ? <Can permission={P.FIN_POST_PAYROLL}><Button disabled={posting} onClick={doPost} className="gap-1.5"><Banknote className="size-4" />{posting ? "Posting…" : "Calculate & post"}</Button></Can> : null}
-            {r.run_status === "POSTED" ? <Can permission={P.FIN_PAY_PAYROLL}><Button onClick={() => setPaying(true)} className="gap-1.5"><Banknote className="size-4" /> Pay net</Button></Can> : null}
+            {r.run_status === "DRAFT" && !partOnly ? <Can permission={P.FIN_POST_PAYROLL}><Button disabled={posting} onClick={doPost} className="gap-1.5"><Banknote className="size-4" />{posting ? "Posting…" : "Calculate & post"}</Button></Can> : null}
+            {r.run_status === "POSTED" && !partOnly ? <Can permission={P.FIN_PAY_PAYROLL}><Button onClick={() => setPaying(true)} className="gap-1.5"><Banknote className="size-4" /> Pay net</Button></Can> : null}
           </>
         }>
         <div className="space-y-5">
+          {partOnly ? (
+            <p role="note" className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-xs leading-5 text-gray-05">
+              {`This run covers the whole school. You are shown only ${yourBranchesPart(branchIds)}. Posting, paying and voiding it are for someone who covers the whole school.`}
+            </p>
+          ) : null}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <Metric label="Gross" kobo={r.gross_total} currency={currency} />
             <Metric label="PAYE" kobo={r.paye_total} currency={currency} />
@@ -321,7 +336,7 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
           ) : null}
 
           {shares.length ? <BranchShares shares={shares} currency={currency} /> : null}
-          {r.run_status === "POSTED" && shares.some((share) => share.status === "PAID") ? (
+          {!partOnly && r.run_status === "POSTED" && shares.some((share) => share.status === "PAID") ? (
             <p className="font-mont text-[11px] text-gray-05">A branch&rsquo;s share has been paid, so this run can no longer be voided.</p>
           ) : null}
 
@@ -403,6 +418,11 @@ function BranchShares({ shares, currency }: { shares: PayrollRunBranchShare[]; c
       </div>
     </div>
   );
+}
+
+/** "your branch's part", or "your branches' part" for a reader who works in several. */
+function yourBranchesPart(branchIds: number[] | null): string {
+  return (branchIds?.length ?? 0) > 1 ? "your branches' part" : "your branch's part";
 }
 
 function Metric({ label, kobo, currency }: { label: string; kobo: number; currency?: string | null }) {

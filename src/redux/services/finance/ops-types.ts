@@ -321,6 +321,10 @@ export interface PayrollRun {
   // Empty unless the run posted one journal per branch; absent from older servers.
   branch_shares?: PayrollRunBranchShare[];
   lines: PayrollLine[];
+  // True when the run covers the whole school and the reader, bound to their own
+  // branches, is sent only those branches' lines, shares and totals. Absent from
+  // older servers, which never send such a part.
+  partial_view?: boolean;
 }
 
 // ── Budgets ──────────────────────────────────────────────────────────────────

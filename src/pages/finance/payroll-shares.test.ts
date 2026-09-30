@@ -11,7 +11,7 @@
 import { describe, expect, it } from "vitest";
 import type { PayrollRun, PayrollRunBranchShare } from "@/redux/services/finance/ops-types";
 import {
-  isPartlyPaid, mayCancelRun, singleJournalBranch, unassignedStaffRefusal, unpaidShares,
+  isBranchPartOfWholeSchoolRun, isPartlyPaid, mayCancelRun, singleJournalBranch, unassignedStaffRefusal, unpaidShares,
 } from "./payroll-shares";
 
 const share = (id: number, branch: string, status: PayrollRunBranchShare["status"]): PayrollRunBranchShare => ({
@@ -76,5 +76,18 @@ describe("unassignedStaffRefusal", () => {
   it("is null for any other refusal", () => {
     expect(unassignedStaffRefusal({ status: 400, data: { error: { code: "VALIDATION_ERROR" } } })).toBeNull();
     expect(unassignedStaffRefusal(undefined)).toBeNull();
+  });
+});
+
+describe("a branch's part of a run for the whole school", () => {
+  it("is what a branch-bound reader holds of a central run", () => {
+    expect(isBranchPartOfWholeSchoolRun({ branch_id: null }, false)).toBe(true);
+    expect(isBranchPartOfWholeSchoolRun({ branch_id: null, partial_view: true }, true)).toBe(true);
+  });
+
+  it("is not a branch's own run, nor the run a whole-school reader holds", () => {
+    expect(isBranchPartOfWholeSchoolRun({ branch_id: 20 }, false)).toBe(false);
+    expect(isBranchPartOfWholeSchoolRun({ branch_id: null, partial_view: false }, true)).toBe(false);
+    expect(isBranchPartOfWholeSchoolRun({ branch_id: null }, true)).toBe(false);
   });
 });
