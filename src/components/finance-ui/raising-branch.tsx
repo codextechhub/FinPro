@@ -11,9 +11,12 @@
  * Lekki, is asked; Mrs Adeyemi, posted to Ikeja alone, and Harbour Primary's
  * bursar at a one-branch school are not, and their forms send no branch.
  *
- * The field starts from the branch the reader is working in on the app's
- * branch switcher, so Mr Bello, working in Lekki, raises for Lekki unless he
- * changes it.
+ * The field starts on the branch the reader is working in when the lens knows
+ * it (`ReaderBranchLens.branch`), so Mr Bello, working in Lekki, would raise for
+ * Lekki unless he changed it. The lens here is derived from the host's branch
+ * list and the session's reach, which cannot see the app's branch switcher, so
+ * it always reads "all" and Mr Bello picks; `useReaderBranchLens` is the one
+ * place a host's own lens would be read instead.
  *
  * Budgets are plans, not transactions, and keep their own owner field with a
  * School-wide choice (see the budgets tab).
