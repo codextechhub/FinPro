@@ -11,12 +11,11 @@
  * Lekki, is asked; Mrs Adeyemi, posted to Ikeja alone, and Harbour Primary's
  * bursar at a one-branch school are not, and their forms send no branch.
  *
- * The field starts on the branch the reader is working in when the lens knows
- * it (`ReaderBranchLens.branch`), so Mr Bello, working in Lekki, would raise for
- * Lekki unless he changed it. The lens here is derived from the host's branch
- * list and the session's reach, which cannot see the app's branch switcher, so
- * it always reads "all" and Mr Bello picks; `useReaderBranchLens` is the one
- * place a host's own lens would be read instead.
+ * The field starts on the branch the reader is working in on the app's branch
+ * switcher, so Mr Bello, working in Lekki, raises for Lekki unless he changes
+ * it. That comes from the host's own lens (`useBranchLens` in the host
+ * contract). A host without one gets a lens derived from its branch list and
+ * the session's reach, which cannot see a switcher, so Mr Bello picks.
  *
  * Budgets are plans, not transactions, and keep their own owner field with a
  * School-wide choice (see the budgets tab).
@@ -26,23 +25,11 @@ import { useMemo, useState } from "react";
 
 import { NativeSelect } from "@/components/ui/native-select";
 import { useAppSelector } from "@/redux/store";
-import { useBranches, type HostBranch } from "../../host";
+import { hostBranchLens, useBranches, type HostBranch, type HostBranchLens } from "../../host";
 import { FormField } from "./form-modal";
 
-/** The reader's branch lens: which branches they may work in, and which one
- *  they are working in now. The school app's own lens has this shape. */
-export interface ReaderBranchLens {
-  /** True when the school runs more than one branch. */
-  applies: boolean;
-  /** The one branch the reader may work in, when their reach is exactly one. */
-  pinnedBranch: number | null;
-  /** The branch the reader is working in, or "all" when the lens reads every
-   *  branch in their reach. */
-  branch: number | "all";
-  /** The branches this reader may pick between. */
-  choices: HostBranch[];
-  isLoading: boolean;
-}
+/** The reader's branch lens; see `HostBranchLens` in the host contract. */
+export type ReaderBranchLens = HostBranchLens;
 
 /** The session's branch reach, as the school app stores it. */
 interface SessionReach {
@@ -95,9 +82,9 @@ function useFallbackBranchLens(): ReaderBranchLens {
   );
 }
 
-/** The reader's branch lens, derived from the app's branch list and the
- *  session's branch reach. */
-export const useReaderBranchLens: () => ReaderBranchLens = useFallbackBranchLens;
+/** The host's own lens when it supplies one, otherwise the derived one. Chosen
+ *  once, at load, so the hooks behind it never change between renders. */
+export const useReaderBranchLens: () => ReaderBranchLens = hostBranchLens ?? useFallbackBranchLens;
 
 /** What a create form needs to know about the branch it raises for. */
 export interface RaisingBranch {

@@ -53,7 +53,7 @@ vi.mock("@/redux/services/payments/payments-api", () => ({
   useGetMovementsSummaryQuery: () => ({ data: undefined }),
 }));
 
-vi.mock("../../host", () => ({ QuickExportButton: () => null }));
+vi.mock("../../host", () => ({ QuickExportButton: () => null, hostBranchLens: undefined }));
 
 import { TransactionsTab } from "./transactions-tab";
 

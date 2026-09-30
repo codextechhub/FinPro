@@ -6,7 +6,7 @@
  * starts on Lekki when Lekki is the branch he is working in. Mrs Adeyemi is
  * posted to Ikeja alone; the server files her refund under Ikeja, so her form
  * does not ask. Harbour Primary runs one branch, and nobody there is ever
- * asked.
+ * asked. Where the host keeps its own branch lens, that lens is the one read.
  */
 
 import { act } from "react";
@@ -17,10 +17,14 @@ vi.mock("@/components/ui/native-select", () => ({
   NativeSelect: ({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) => <select {...props}>{children}</select>,
 }));
 vi.mock("@/redux/store", () => ({ useAppSelector: () => ({}) }));
-vi.mock("../../host", () => ({ useBranches: () => ({ data: [], isLoading: false, isError: false }) }));
+vi.mock("../../host", () => ({
+  hostBranchLens: undefined,
+  useBranches: () => ({ data: [], isLoading: false, isError: false }),
+}));
 
 import {
   type ReaderBranchLens, RaisingBranchField, fallbackBranchLens, raisedBranchBody, raisingBranchFor, raisingBranchReady,
+  useReaderBranchLens,
 } from "./raising-branch";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -135,5 +139,28 @@ describe("RaisingBranchField", () => {
     act(() => root.render(<RaisingBranchField raising={raisingBranchFor(lens({ applies: false }))} value="" onChange={() => undefined} />));
 
     expect(container.innerHTML).toBe("");
+  });
+});
+
+describe("useReaderBranchLens", () => {
+  afterEach(() => {
+    vi.doUnmock("../../host");
+    vi.resetModules();
+  });
+
+  it("reads the host's own lens when the host supplies one", async () => {
+    const hostLens = () => lens({ branch: 20 });
+    vi.resetModules();
+    vi.doMock("../../host", () => ({
+      hostBranchLens: hostLens,
+      useBranches: () => ({ data: [], isLoading: false, isError: false }),
+    }));
+    const mod = await import("./raising-branch");
+
+    expect(mod.useReaderBranchLens).toBe(hostLens);
+  });
+
+  it("derives a lens when the host supplies none", () => {
+    expect(useReaderBranchLens.name).toBe("useFallbackBranchLens");
   });
 });

@@ -32,6 +32,26 @@ export interface HostBranch {
   name: string;
 }
 
+/** The reader's branch lens: which branches they may work in, and which one
+ *  they are working in now.
+ *
+ *  Every transaction names a branch, so a create form at a school with several
+ *  branches asks which one, and starts on the branch the reader is working in on
+ *  the app's own branch switcher. Only the app knows that switcher, so it says.
+ *  The school app's `useBranchLens` returns this shape (and more). */
+export interface HostBranchLens {
+  /** True when the school runs more than one branch. */
+  applies: boolean;
+  /** The one branch the reader may work in, when their reach is exactly one. */
+  pinnedBranch: number | null;
+  /** The branch the reader is working in, or "all" when the lens reads every
+   *  branch in their reach. */
+  branch: number | "all";
+  /** The branches this reader may pick between. */
+  choices: HostBranch[];
+  isLoading: boolean;
+}
+
 /** The minimum a person must expose to be named on an approval.
  *
  *  Every field here is one the screens actually read, discovered by the
@@ -202,6 +222,13 @@ export interface HostContract {
   useDashboardTitle(title: string): void;
   /** Every branch the signed-in caller may see. Scoped by the app, not here. */
   useBranches(): HostQueryResult<HostBranch>;
+  /** The reader's branch lens, where the app keeps one; see :type:`HostBranchLens`.
+   *
+   *  Optional. An app that omits it gets a lens derived from `useBranches` and
+   *  the session's branch reach, which knows who is pinned to a branch but not
+   *  which branch a whole-school reader is working in, so her create forms start
+   *  with no branch chosen. */
+  useBranchLens?(): HostBranchLens;
   /** Everyone the signed-in caller may name. Scoped by the app, not here. */
   useDirectory(): HostQueryResult<HostPerson>;
   /** Every role an approval step may be pointed at. Supplied by the app because
@@ -330,3 +357,4 @@ export const {
 // Read through the contract type, not the module: an optional member a host
 // leaves out is not an export of its module at all.
 export const FeeGenerationPanel = _satisfies.FeeGenerationPanel;
+export const hostBranchLens = _satisfies.useBranchLens;

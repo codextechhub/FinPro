@@ -48,7 +48,7 @@ vi.mock("@/redux/services/finance/setup-api", () => ({
   useGetAccountsQuery: () => ({ data: { data: [] } }),
 }));
 
-vi.mock("../../host", () => ({ QuickExportButton: () => null }));
+vi.mock("../../host", () => ({ QuickExportButton: () => null, hostBranchLens: undefined }));
 
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

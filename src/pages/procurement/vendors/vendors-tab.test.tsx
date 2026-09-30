@@ -34,7 +34,7 @@ vi.mock("@/redux/services/procurement/procurement-api", () => ({
 }));
 
 vi.mock("@/redux/services/procurement/procurement-ext-api", () => ({}));
-vi.mock("../../../host", () => ({ QuickExportButton: () => null }));
+vi.mock("../../../host", () => ({ QuickExportButton: () => null, hostBranchLens: undefined }));
 vi.mock("../pickers", () => ({ CategoryPicker: () => null }));
 
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
