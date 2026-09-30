@@ -94,7 +94,7 @@ const customerListArgs = (entity: string) => ({ entity, is_active: "true", page_
  * Customer / payer picker. List-backed (grows per entity) → reveal-on-search.
  *
  * `own` lists only the customers the reader may raise a gateway record for:
- * those filed under her branches, or every customer for a whole-school reader.
+ * those filed under their branches, or every customer for a whole-school reader.
  * The payments screens pass it, because a branch clerk is refused a virtual
  * account or payment request for a customer every branch shares. A server
  * that does not know `?own=` lists every customer, as before.

@@ -1,10 +1,10 @@
 /**
  * The Finance overview draws the blocks a reader was sent, in the words of the books.
  *
- * Chukwuemeka is the bursar at Holy Cross Main Branch: he may read invoices, and
- * the server sends him his branch's receivables and aging with every ledger block
- * `null`. He must see those cards and no empty "Cash & bank" beside them, and no
- * button he cannot use. Ngozi, the proprietor, is sent every block.
+ * Chukwuemeka is the bursar at Holy Cross Main Branch: they may read invoices, and
+ * the server sends them their branch's receivables and aging with every ledger block
+ * `null`. They must see those cards and no empty "Cash & bank" beside them, and no
+ * button they cannot use. Ngozi, the proprietor, is sent every block.
  *
  * Holy Cross's books are a school's, so the page says "How parents paid" and
  * "Collected this term". The platform's own books are not, and the same page
@@ -133,7 +133,7 @@ describe("Finance overview for a branch bursar", () => {
     top_payers: [],
   };
 
-  it("shows the receivables and aging it was sent, and says they cover his branches", () => {
+  it("shows the receivables and aging it was sent, and says they cover their branches", () => {
     const text = render(bursar, "finance.invoice.view");
 
     expect(text).toContain("Receivables");
@@ -151,7 +151,7 @@ describe("Finance overview for a branch bursar", () => {
     }
   });
 
-  it("offers no button he cannot use", () => {
+  it("offers no button they cannot use", () => {
     const text = render(bursar, "finance.invoice.view");
 
     expect(text).not.toContain("New invoice");

@@ -2,9 +2,9 @@
  * When a create form asks which branch a transaction is for.
  *
  * Corona Schools runs Ikeja and Lekki. Mr Bello reads the whole school, so
- * the server refuses his refund unless it names a branch: his form asks, and
- * starts on Lekki when Lekki is the branch he is working in. Mrs Adeyemi is
- * posted to Ikeja alone; the server files her refund under Ikeja, so her form
+ * the server refuses their refund unless it names a branch: their form asks, and
+ * starts on Lekki when Lekki is the branch they are working in. Mrs Adeyemi is
+ * posted to Ikeja alone; the server files their refund under Ikeja, so their form
  * does not ask. Harbour Primary runs one branch, and nobody there is ever
  * asked. Where the host keeps its own branch lens, that lens is the one read.
  */

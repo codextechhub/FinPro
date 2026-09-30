@@ -5,7 +5,7 @@
  * branch. Mr Eze pays Ikeja's share from Ikeja's account first: the run is then
  * partly paid, not paid, and can no longer be voided. It reads Paid once Lekki's
  * share is paid too. A run from a server without shares keeps the old rules, and
- * a post refused because Okon Udo has no branch names him.
+ * a post refused because Okon Udo has no branch names them.
  */
 
 import { describe, expect, it } from "vitest";

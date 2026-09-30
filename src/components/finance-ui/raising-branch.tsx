@@ -4,7 +4,7 @@
  * Every transaction names a real branch. At a school with several branches the
  * server refuses a whole-school reader who names none ("Name the branch this is
  * for; the school has more than one."), takes a branch-bound reader's own
- * branch when she works in one, and at a school with one branch files every
+ * branch when they work in one, and at a school with one branch files every
  * transaction under it without asking. So a create form asks only when there is
  * a real question: the school runs more than one branch AND the reader is not
  * pinned to one. Mr Bello, the whole-school bursar at a school with Ikeja and
@@ -12,7 +12,7 @@
  * bursar at a one-branch school are not, and their forms send no branch.
  *
  * The field starts on the branch the reader is working in on the app's branch
- * switcher, so Mr Bello, working in Lekki, raises for Lekki unless he changes
+ * switcher, so Mr Bello, working in Lekki, raises for Lekki unless they change
  * it. That comes from the host's own lens (`useBranchLens` in the host
  * contract). A host without one gets a lens derived from its branch list and
  * the session's reach, which cannot see a switcher, so Mr Bello picks.
@@ -98,7 +98,7 @@ export interface RaisingBranch {
   ask: boolean;
   /** The branches it offers when it asks. */
   choices: HostBranch[];
-  /** The reader's one branch when she is pinned to it; the server files her
+  /** The reader's one branch when they are pinned to it; the server files their
    *  transactions there without being told. */
   pinned: number | null;
   /** The branch the field starts on: the one the reader is working in, when it
@@ -163,7 +163,7 @@ export function useRaisingBranchChoice({ unless = false }: { unless?: boolean } 
     reset: () => setPicked(null),
     ready: raisingBranchReady(raising, value),
     /** The branch the new row will belong to, where the form knows it: the
-     *  one chosen, or the reader's own when she is pinned. Undefined at a
+     *  one chosen, or the reader's own when they are pinned. Undefined at a
      *  one-branch school or before a choice, which leaves a bank picker
      *  un-narrowed. */
     branchId: raising.ask ? (value ? Number(value) : undefined) : raising.pinned ?? undefined,

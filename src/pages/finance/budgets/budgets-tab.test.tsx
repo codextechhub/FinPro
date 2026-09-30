@@ -1,10 +1,10 @@
 /**
  * The Budgets list and the New budget drawer, for a branch bursar and for the school.
  *
- * Chukwuemeka is the bursar at Holy Cross College Main Branch. He sees his
- * branch's plan with its actuals, and files anything he creates to his branch
+ * Chukwuemeka is the bursar at Holy Cross College Main Branch. They see their
+ * branch's plan with its actuals, and files anything they create to their branch
  * without being asked. A server that still keeps a plan for the whole school
- * sends him that one too, without actuals: it reads "All branches", its actual
+ * sends them that one too, without actuals: it reads "All branches", its actual
  * is a dash rather than a zero, and it stays out of the heatmap. The proprietor
  * sees every figure, must name a branch for a new plan (every budget belongs to
  * one), and sees the school's total across Main and Annex as one line; a server
@@ -126,7 +126,7 @@ const optionLabels = (scope: ParentNode) => [...scope.querySelectorAll("option")
 describe("Budgets for a branch bursar", () => {
   const filing = { branches: [MAIN] };
 
-  it("names each plan's branch and shows actuals only for his branch's plan", () => {
+  it("names each plan's branch and shows actuals only for their branch's plan", () => {
     const text = render([MAIN_PLAN, SCHOOL_PLAN_TO_BRANCH], filing, true);
 
     expect(text).toContain("Branch");
@@ -135,7 +135,7 @@ describe("Budgets for a branch bursar", () => {
     expect(text).toContain("Actual YTD");
   });
 
-  it("offers only his branch's plan in the variance heatmap", () => {
+  it("offers only their branch's plan in the variance heatmap", () => {
     render([MAIN_PLAN, SCHOOL_PLAN_TO_BRANCH], filing, true);
 
     const heatmapPicker = [...container.querySelectorAll("select")].find((s) => s.textContent?.includes("BUD-2"));
@@ -151,7 +151,7 @@ describe("Budgets for a branch bursar", () => {
     expect(text).not.toContain("Variance heatmap");
   });
 
-  it("files a new plan to his branch without offering a choice", () => {
+  it("files a new plan to their branch without offering a choice", () => {
     render([SCHOOL_PLAN_TO_BRANCH], filing, true, "finance.budget.create");
     openNewBudget();
 
@@ -203,7 +203,7 @@ describe("The school's total", () => {
     expect(schoolTotal(ROLLUP)).toMatchObject({ budgeted: 700_000, actual: 350_000, pct: 50 });
   });
 
-  it("names a branch reader's total for her branches, and leaves out a total of one plan", () => {
+  it("names a branch reader's total for their branches, and leaves out a total of one plan", () => {
     expect(schoolTotal({ ...ROLLUP, narrowed: true })?.label).toBe("All my branches");
     expect(schoolTotal({ ...ROLLUP, budgets: [plan(MAIN.id, MAIN.name)] })).toBeNull();
   });

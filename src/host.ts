@@ -226,7 +226,7 @@ export interface HostContract {
    *
    *  Optional. An app that omits it gets a lens derived from `useBranches` and
    *  the session's branch reach, which knows who is pinned to a branch but not
-   *  which branch a whole-school reader is working in, so her create forms start
+   *  which branch a whole-school reader is working in, so their create forms start
    *  with no branch chosen. */
   useBranchLens?(): HostBranchLens;
   /** Everyone the signed-in caller may name. Scoped by the app, not here. */

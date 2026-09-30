@@ -10,8 +10,8 @@
  * Paying a run posted per branch gives each unpaid branch its own account
  * picker, narrowed to that branch's accounts, and sends the accounts chosen as
  * `bank_accounts`. Mrs Bello keeps Ikeja's payroll at Corona, which pays all
- * staff in one central run: she is not offered a roster run for all staff, only
- * a run she types for her own branch.
+ * staff in one central run: they are not offered a roster run for all staff, only
+ * a run they type for their own branch.
  */
 
 import { act } from "react";

@@ -238,7 +238,7 @@ export function budgetTotalLine(rollup: BudgetRollup | undefined) {
  *
  * Every budget belongs to a branch. A plan with no branch predates that rule and
  * is measured against every branch, so it reads "All branches". A server that
- * still keeps such plans sends a branch bursar one without figures: her
+ * still keeps such plans sends a branch bursar one without figures: their
  * branches' spending against the whole plan would read as a shortfall that is
  * only the other branches' share.
  */

@@ -247,7 +247,7 @@ function CollectionDrawer({ collectionId, collections, entity, currency, onClose
  * picker lists only families filed in the reader's branches. A Lekki bursar
  * collecting a Lekki invoice owed by a family filed under Ikeja therefore starts
  * from the invoice: with no family picked, the invoice list offers every open
- * invoice she can see, and the checkout is sent with the invoice alone, which
+ * invoice they can see, and the checkout is sent with the invoice alone, which
  * the backend bills to the invoice's own family.
  */
 function NewCheckoutDrawer({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {

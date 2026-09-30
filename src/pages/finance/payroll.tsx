@@ -15,8 +15,8 @@
  * journal per branch, each branch's share is paid from that branch's own bank
  * account, the run reads Paid only when every share is, and it cannot be voided
  * once any share is paid (see payroll-shares.ts). A run for all staff is raised
- * by somebody who covers the whole school; a branch officer raises her own
- * branch's, so the new-run drawer does not offer her the other.
+ * by somebody who covers the whole school; a branch officer raises their own
+ * branch's, so the new-run drawer does not offer them the other.
  *
  * Honest adaptations: deductions route only to PAYE/pension (the two payables the GL
  * has) - other deduction types (loans/union) are a noted backend expansion.
@@ -487,8 +487,8 @@ const WHOLE_SCHOOL = "all";
  * A run for all staff is raised only by somebody who covers the whole school
  * (`useReaderReach().wholeSchool`). A branch officer at a school with several
  * branches is refused one: at a central school the roster run is always for all
- * staff, so she is offered only the hand-typed run, filed to her branch (and
- * asked which, if she covers several); at a per-branch school she is offered her
+ * staff, so they are offered only the hand-typed run, filed to their branch (and
+ * asked which, if they cover several); at a per-branch school they are offered their
  * own branches and never "the whole school".
  */
 export function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: boolean; onClose: () => void; entity: string; currency?: string | null; perBranch: boolean }) {
@@ -505,7 +505,7 @@ export function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { o
   // A central school's roster run is for all staff, which a branch officer may not raise.
   const rosterAllowed = perBranch || wholeSchool;
   const activeMode = rosterAllowed ? mode : "manual";
-  // A central school's hand-typed run from a branch officer names her branch.
+  // A central school's hand-typed run from a branch officer names their branch.
   const manualBranch = useRaisingBranchChoice({ unless: perBranch || wholeSchool });
   const { data: rosterData } = useGetEmployeeSalariesQuery({ entity, is_active: "true" }, { skip: !open });
   const roster = useMemo(() => toArray(rosterData?.data), [rosterData]);
@@ -513,8 +513,8 @@ export function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { o
   const branches = useMemo(() => toArray(branchData?.data), [branchData]);
 
   // Only where there is a choice to make. A caller pinned to one branch has
-  // already answered by being pinned - the backend stamps her branch and
-  // refuses any other - so asking her would be a question with one answer. A
+  // already answered by being pinned - the backend stamps their branch and
+  // refuses any other - so asking them would be a question with one answer. A
   // central school is never asked at all: its runs cover everybody by design.
   const asksForScope = perBranch && branches.length > 1;
   const offersWholeSchool = wholeSchool;
@@ -546,7 +546,7 @@ export function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { o
     } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
-  // The people this run would pay, as chosen. Shown before she commits, because
+  // The people this run would pay, as chosen. Shown before they commit, because
   // "the whole school" and "Lekki" are the same two clicks apart and only one
   // of them is usually meant.
   const covered = useMemo(() => {
@@ -557,8 +557,8 @@ export function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { o
     ? "every branch"
     : branches.find((b) => String(b.id) === scopeChoice)?.name ?? "";
 
-  // No default when she is asked. A whole-school run under per-branch payroll is
-  // a legitimate thing to raise - head office does it - but it should be picked,
+  // No default when they are asked. A whole-school run under per-branch payroll is
+  // a legitimate thing to raise - a whole-school bursar does it - but it should be picked,
   // not fallen into by leaving a field alone.
   const canSubmit = !!payDate && (!asksForScope || !!scopeChoice) && manualBranch.ready
     && (activeMode === "roster" ? covered.length > 0 : manualAllowed && validLines.length > 0);
@@ -662,7 +662,7 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
 
   // The branches this caller may work in, from the tenant rather than from the
   // rows. Reading them off the roster only ever offered branches that already had
-  // somebody on them, which is never the new branch she is trying to fill.
+  // somebody on them, which is never the new branch they are trying to fill.
   const { data: branchData } = useGetBranchOptionsQuery();
   const branches = useMemo(() => toArray(branchData?.data), [branchData]);
   const unassignedCount = useMemo(() => all.filter((e) => e.branch_id == null).length, [all]);

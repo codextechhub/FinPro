@@ -6,7 +6,7 @@
  * receipts, salaries and bills along the way; spending is tagged to cost centres;
  * three staff claims wait for approval; PAYE is due in 14 days and VAT is a nil
  * return. Chukwuemeka, the Main Branch bursar, is sent no cash, bank, payroll or
- * tax block, and his tab leaves those cards out rather than drawing them empty.
+ * tax block, and their tab leaves those cards out rather than drawing them empty.
  *
  * The budgets card closes with the school's total from the roll-up: Ngozi's
  * Main and Annex plans add up to one "All branches" line. A server without the
@@ -194,7 +194,7 @@ describe("budgetTotalLine", () => {
     expect(budgetTotalLine(ROLLUP)).toEqual({ label: "All branches", count: 2, plan: 1_000_000, used: 400_000, pct: 40 });
   });
 
-  it("names a branch reader's total for her own branches", () => {
+  it("names a branch reader's total for their own branches", () => {
     expect(budgetTotalLine({ ...ROLLUP, narrowed: true })?.label).toBe("All my branches");
   });
 

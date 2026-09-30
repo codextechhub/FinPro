@@ -316,7 +316,7 @@ function LinesEditor({ entity, currency, rows, setRows }: { entity: string; curr
  *
  * The branch comes from the shared Branch field: asked only at a school with
  * several branches of a reader not pinned to one, and otherwise left to the
- * server, which files a pinned reader's budget to her branch and a one-branch
+ * server, which files a pinned reader's budget to their branch and a one-branch
  * school's to its only branch.
  */
 function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {

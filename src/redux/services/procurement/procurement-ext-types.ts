@@ -5,7 +5,7 @@
  * Branch-scoped reports: when the caller is bound to a branch the backend answers
  * with that branch's documents only. A document with no branch is outside every
  * branch reader's figures and is the whole-school reader's to place; the reports
- * do not count it for a branch reader, since that would tell her it exists.
+ * do not count it for a branch reader, since that would tell them it exists.
  */
 
 import type { DashboardWindow, ReportMoney } from "../finance/reports-types";

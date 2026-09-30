@@ -2,9 +2,9 @@
  * The Procurement overview draws the blocks a reader was sent.
  *
  * Ngozi, proprietor of Holy Cross, is sent every block: spend this month, the
- * pipeline from requisition to payment, committed against spent, her approval
+ * pipeline from requisition to payment, committed against spent, their approval
  * queue, the exceptions, bills falling due and the contracts ending. Funke, who
- * only raises requisitions, is sent her queue and the requisition stage, and the
+ * only raises requisitions, is sent their queue and the requisition stage, and the
  * page leaves every other card out rather than drawing it empty.
  */
 
@@ -146,7 +146,7 @@ describe("Procurement overview for the proprietor", () => {
 });
 
 describe("Procurement overview for a requisition raiser", () => {
-  it("shows her queue and the requisition stage, and no card she was not sent", () => {
+  it("shows their queue and the requisition stage, and no card they were not sent", () => {
     const text = render({
       ...FULL, narrowed: true, pipeline: { requisitions: stage(2, 100_000, 1) },
       kpis: { ...FULL.kpis, spend: null, open_purchase_orders: null, overdue_invoices: null, active_vendors: null },

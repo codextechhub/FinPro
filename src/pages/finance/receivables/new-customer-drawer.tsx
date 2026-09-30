@@ -5,7 +5,7 @@
  *
  * A customer is master data: it may be filed under one branch or shared by every
  * branch. Who decides is the reader's reach (see `customerBranchChoice`): a
- * reader covering several branches names one of hers, a whole-school reader may
+ * reader covering several branches names one of theirs, a whole-school reader may
  * name one or leave the customer shared, and a reader pinned to one branch, or a
  * school with one, is not asked.
  *
@@ -34,7 +34,7 @@ import { useCreateCustomerMutation } from "@/redux/services/finance/ar-api";
  * Whether a new customer's branch is asked, whether it must be named, and what
  * it starts on. Asked at a school with several branches of a reader not pinned
  * to one. A whole-school reader may leave it blank, which files the customer as
- * shared by every branch; one covering several branches must name one of hers,
+ * shared by every branch; one covering several branches must name one of theirs,
  * as the server requires. It starts on the branch the reader is working in.
  */
 export function customerBranchChoice(lens: ReaderBranchLens, wholeSchool: boolean) {

@@ -374,7 +374,7 @@ export interface BudgetFiling {
  * The school's total for a fiscal year: one plan per branch in the reader's
  * reach (its approved budget, else its latest draft) added together and set
  * against the same reader's journals. A whole-school reader gets every branch;
- * a branch-bound one her own branches (`narrowed`). `budgets` lists the plans
+ * a branch-bound one their own branches (`narrowed`). `budgets` lists the plans
  * summed.
  */
 export interface BudgetRollup {

@@ -4,7 +4,7 @@
  * Ngozi sees Holy Cross's stores in September: printer toner and white chalk are
  * out, diesel has three days left, the kitchen took the most stock, coloured
  * chalk arrived late with five boxes rejected, and goods worth ₦4.93M are waiting
- * for a bill. She may raise requisitions, so she is offered the restock draft;
+ * for a bill. They may raise requisitions, so they are offered the restock draft;
  * a storekeeper who may not raise them is not. A reader with orders but no stock
  * access sees expected deliveries only.
  */

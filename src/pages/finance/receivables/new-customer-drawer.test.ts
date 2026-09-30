@@ -1,9 +1,9 @@
 /**
  * Who is asked which branch a new customer belongs to.
  *
- * Corona runs Ikeja, Lekki and Yaba. Mrs Okafor covers Ikeja and Lekki: she
- * must file the Adeyemi family under one of hers, since the server asks her
- * which. Mr Eze covers the whole school: he may file them under a branch or
+ * Corona runs Ikeja, Lekki and Yaba. Mrs Okafor covers Ikeja and Lekki: they
+ * must file the Adeyemi family under one of theirs, since the server asks them
+ * which. Mr Eze covers the whole school: they may file them under a branch or
  * leave them shared. Mrs Bello, posted to Ikeja alone, and anyone at a school
  * with one branch are not asked.
  */
@@ -25,13 +25,13 @@ const lens = (over: Record<string, unknown>) => ({
 });
 
 describe("customerBranchChoice", () => {
-  it("makes a reader covering two branches name one of hers", () => {
+  it("makes a reader covering two branches name one of theirs", () => {
     const c = customerBranchChoice(lens({ choices: [IKEJA, LEKKI] }), false);
     expect(c).toMatchObject({ ask: true, required: true, initial: "" });
     expect(c.choices.map((b) => b.name)).toEqual(["Ikeja Branch", "Lekki Branch"]);
   });
 
-  it("lets a whole-school reader leave the customer shared, starting on his working branch", () => {
+  it("lets a whole-school reader leave the customer shared, starting on their working branch", () => {
     expect(customerBranchChoice(lens({ branch: 20 }), true)).toMatchObject({ ask: true, required: false, initial: "20" });
   });
 

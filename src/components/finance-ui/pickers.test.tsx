@@ -2,7 +2,7 @@
  * The receivable account picker reads the tagged chart, not the balances.
  *
  * Chukwuemeka, the Holy Cross bursar, may add customers but not open the chart
- * of accounts. The chart with balances refuses him, so a picker built on it was
+ * of accounts. The chart with balances refuses them, so a picker built on it was
  * empty. The tagged chart names the control accounts without any balance and
  * is readable on any finance key; the picker must use it and offer only the
  * postable asset accounts tagged CONTROL.

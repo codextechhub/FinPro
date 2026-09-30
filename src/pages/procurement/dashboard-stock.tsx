@@ -11,7 +11,7 @@
  * itself), then opens it. Nothing is submitted: the draft goes through review
  * and approval like any other requisition. The draft is raised for one branch:
  * at a school with several, a reader who is not pinned to one names it beside
- * the button, which starts on the branch she is working in.
+ * the button, which starts on the branch they are working in.
  */
 
 import { useState } from "react";
