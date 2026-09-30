@@ -186,6 +186,9 @@ export interface FinanceAuditLog {
   target_type: string;
   target_id: number | null;
   document_number: string | null;
+  /** The branch of the document the entry is about; null for an entry about the whole books. */
+  branch_id: number | null;
+  branch_name: string | null;
   message: string;
   // Field-level snapshot of the audited change; the UI summarises the diff.
   before: Record<string, unknown>;

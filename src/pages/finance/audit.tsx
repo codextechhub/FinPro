@@ -10,7 +10,7 @@
 import { useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
-import { DataTable, StatusPill, DetailDrawer, InfoHint, useActiveEntity, type Column } from "@/components/finance-ui";
+import { DataTable, StatusPill, DetailDrawer, InfoHint, useActiveEntity, useReaderBranchLens, type Column } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { P } from "../../permissions";
 import { EmptyState } from "@/components/finance-ui/states";
@@ -23,6 +23,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates, type DateFormatter } from "../../lib/display-prefs";
 import { sinceDate } from "../../utils/date-presets";
+import { useIsSchool, wholeBooksLabel } from "../../lib/reader-words";
 
 // Action tone: rejections read red, reversals/cancellations amber, master-data
 // edits blue, everything else (posts/approvals/completions) green.
@@ -93,6 +94,19 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
 
 const thd = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const tdd = "border-t border-white-02 px-3 py-2 align-top font-mont text-xs";
+
+/**
+ * The branch an audit entry belongs to, as the trail's Branch column shows it.
+ *
+ * An entry takes the branch of the document it is about. One with no branch is
+ * about the whole books (a setting, a year close, a payroll run for the whole
+ * school), so it reads as the books' whole-scope word rather than as a missing
+ * value. A branch reader is never sent such entries; only a whole-school reader
+ * sees them.
+ */
+export function auditBranchLabel(log: Pick<FinanceAuditLog, "branch_name">, wholeBooks: string): string {
+  return log.branch_name || wholeBooks;
+}
 
 function AuditDetail({ log }: { log: FinanceAuditLog }) {
   const dates = useDates();
@@ -185,6 +199,9 @@ export default function FinanceAuditPage() {
   const entityOptions = useMemo(() => [{ value: "", label: "All entities" }, ...(facets?.target_types ?? []).map((t) => ({ value: t, label: t }))], [facets]);
   const actorOptions = useMemo(() => [{ value: "", label: "All actors" }, ...(facets?.actors ?? []).map((a) => ({ value: String(a.id), label: a.email }))], [facets]);
 
+  const showBranch = useReaderBranchLens().applies;
+  const wholeBooks = wholeBooksLabel(useIsSchool());
+
   const columns: Column<FinanceAuditLog>[] = [
     { header: "When", cell: (l) => <span className="whitespace-nowrap tabular-nums text-gray-01">{dates.dateTime(l.created_at, null, { seconds: true })}</span> },
     { header: "Actor", cell: (l) => (
@@ -199,6 +216,7 @@ export default function FinanceAuditPage() {
         {l.action_display || l.action}
       </span>
     ) },
+    ...(showBranch ? [{ header: "Branch", cell: (l: FinanceAuditLog) => <span className="text-gray-05">{auditBranchLabel(l, wholeBooks)}</span> }] : []),
     { header: "Entity", cell: (l) => l.target_type || "-" },
     { header: "Reference", cell: (l) => (
       <span className="font-mono text-xs text-gray-01">{l.document_number || (l.target_id ? `#${l.target_id}` : "-")}</span>
