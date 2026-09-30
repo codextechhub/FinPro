@@ -30,7 +30,8 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
-import { openAttachment } from "@/utils/attachment-download";
+import { fetchAttachmentBlob } from "@/utils/attachment-download";
+import { FilePreviewDialog, type PreviewFile } from "../../../components/finance-ui/file-preview-dialog";
 import { printExpenseClaim } from "../../../utils/finance-print";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import {
@@ -296,7 +297,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
                       <td className={cn(tdCls, "tabular-nums text-gray-05")}>{l.cost_center || "-"}</td>
                       <td className={tdCls}>{l.tax_code ?? <span className="text-gray-05">Exempt</span>}</td>
                       <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={l.line_total} currency={currency} align="right" /></td>
-                      <td className={tdCls}><ReceiptCell line={l} claimId={full.id} entity={entity} attachable={attachable && can(P.FIN_CREATE_EXPENSE_CLAIM)} /></td>
+                      <td className={tdCls}><ReceiptCell line={l} siblings={full.lines} claimId={full.id} entity={entity} attachable={attachable && can(P.FIN_CREATE_EXPENSE_CLAIM)} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -322,10 +323,17 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
   );
 }
 
-export function ReceiptCell({ line, claimId, entity, attachable }: { line: ExpenseClaimLine; claimId: number; entity: string; attachable: boolean }) {
+export function ReceiptCell({ line, siblings, claimId, entity, attachable }: { line: ExpenseClaimLine; siblings?: ExpenseClaimLine[]; claimId: number; entity: string; attachable: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [upload, { isLoading: uploading }] = useUploadExpenseReceiptMutation();
   const [remove, { isLoading: removing }] = useDeleteExpenseReceiptMutation();
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const previewFiles = (siblings || [line]).filter((item) => item.receipt_url).map<PreviewFile>((item) => ({
+    id: item.id,
+    name: item.receipt_name || "Receipt",
+    loadPreview: (signal) => fetchAttachmentBlob(item.receipt_url!, signal),
+    loadDownload: () => fetchAttachmentBlob(item.receipt_url!),
+  }));
 
   const onPick = async (file?: File) => {
     if (!file) return;
@@ -336,10 +344,11 @@ export function ReceiptCell({ line, claimId, entity, attachable }: { line: Expen
   if (line.receipt_url) {
     return (
       <span className="inline-flex max-w-[150px] items-center gap-1">
-        <button type="button" onClick={() => openAttachment(line.receipt_url!, line.receipt_name || "Receipt").catch((error) => toast.error(error instanceof Error ? error.message : "Could not open the receipt."))} className="inline-flex min-w-0 items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline" title={line.receipt_name || "Receipt"}>
+        <button type="button" onClick={() => setSelectedIndex(previewFiles.findIndex((item) => item.id === line.id))} className="inline-flex min-w-0 items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline" title={line.receipt_name || "Receipt"}>
           <Paperclip className="size-3 shrink-0" /><span className="truncate">{line.receipt_name || "Receipt"}</span>
         </button>
         {attachable ? <button type="button" disabled={removing} onClick={() => remove({ id: claimId, lineId: line.id, entity })} className="shrink-0 text-gray-05 hover:text-destructive disabled:opacity-40" aria-label="Remove receipt"><X className="size-3" /></button> : null}
+        <FilePreviewDialog files={previewFiles} index={selectedIndex} onIndexChange={setSelectedIndex} onClose={() => setSelectedIndex(null)} />
       </span>
     );
   }

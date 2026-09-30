@@ -29,6 +29,7 @@ import type {
   ImportTemplateListItem,
   TemplateStatus,
 } from "@/redux/services/dashboard/import-types";
+import { showBlobPreview } from "../../../components/finance-ui/file-preview-dialog";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,9 +43,8 @@ const STATUS_BADGE: Record<TemplateStatus, "active" | "pending" | "inactive"> = 
 
 const TABLE_HEADERS = ["Code", "Template", "Dataset", "Format", "Status", "Columns", "Updated", "Action"];
 
-// The mutation resolves to an object URL (not a Blob) so redux state stays
-// serializable; revoke it here once the browser has taken the download.
-async function triggerDownload(
+/** Fetch template bytes and show their file details with a download action. */
+async function previewTemplate(
   download: (args: { id: number; format: "csv" | "xlsx" }) => { unwrap: () => Promise<string> },
   id: number,
   format: "csv" | "xlsx",
@@ -52,15 +52,11 @@ async function triggerDownload(
 ) {
   try {
     const blobUrl = await download({ id, format }).unwrap();
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const blob = await fetch(blobUrl).then((response) => response.blob());
     URL.revokeObjectURL(blobUrl);
+    showBlobPreview(filename, blob);
   } catch {
-    toast.error("Download failed. Please try again.");
+    toast.error("Template could not be opened. Please try again.");
   }
 }
 
@@ -310,16 +306,16 @@ export default function ImportTemplatesList() {
               }
               if (tpl.is_download_enabled) {
                 items.push({
-                  label: "Download CSV",
+                  label: "View CSV",
                   className: "",
                   onActionClick: () =>
-                    triggerDownload(downloadTemplate, tpl.id, "csv", `${tpl.code}_template.csv`),
+                    previewTemplate(downloadTemplate, tpl.id, "csv", `${tpl.code}_template.csv`),
                 });
                 items.push({
-                  label: "Download XLSX",
+                  label: "View XLSX",
                   className: "",
                   onActionClick: () =>
-                    triggerDownload(downloadTemplate, tpl.id, "xlsx", `${tpl.code}_template.xlsx`),
+                    previewTemplate(downloadTemplate, tpl.id, "xlsx", `${tpl.code}_template.xlsx`),
                 });
               }
               return items;

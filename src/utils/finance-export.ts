@@ -1,8 +1,8 @@
 /**
- * Authenticated file download for the finance report ?export= endpoints. The
+ * Authenticated file preview for the finance report ?export= endpoints. The
  * API is bearer-authenticated and the access token lives only in the host's
- * memory, so a plain <a href> can't carry it - the attachment is fetched with
- * the Authorization header and saved as a blob.
+ * memory, so a plain <a href> can't carry it. The file is fetched with the
+ * Authorization header and passed to the in-app viewer.
  *
  * This is a raw fetch, so it sits OUTSIDE RTK Query and gets none of what
  * `baseQuery` adds for free. That is the whole reason for the tenant handling
@@ -14,14 +14,15 @@ import { toast } from "sonner";
 
 import { getAccessToken } from "@/utils/access-token";
 import { getTenantSlug } from "@/utils/tenant-context";
+import { showBlobPreview } from "../components/finance-ui/file-preview-dialog";
 
 const baseUrl = import.meta.env.VITE_BACKEND_URL;
 
 /**
- * Download a report export. `path` is the report path (no query), `params`
+ * View a report export. `path` is the report path (no query), `params`
  * carries entity + any period, and `format` is csv | xlsx | pdf.
  */
-export async function downloadReportExport(
+export async function viewReportExport(
   path: string,
   params: Record<string, string | number | undefined>,
   format: "csv" | "xlsx" | "pdf",
@@ -51,14 +52,7 @@ export async function downloadReportExport(
     const match = /filename="?([^"]+)"?/.exec(disposition);
     const filename = match?.[1] || `export.${format}`;
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    showBlobPreview(filename, blob);
   } catch {
     toast.error("Could not reach the server. Please try again.");
   }

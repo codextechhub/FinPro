@@ -12,8 +12,8 @@
  * and `update` is refused on a posted document anyway.
  */
 
-import { useRef, useState } from "react";
-import { Download, Paperclip, Trash2, Upload } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Eye, Paperclip, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/finance-ui/can";
@@ -21,8 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { PermissionCode } from "../../permissions";
 import type { DocumentAttachment } from "@/redux/services/procurement/procurement-types";
-import { openAttachment } from "@/utils/attachment-download";
+import { fetchAttachmentBlob } from "@/utils/attachment-download";
 import { useDates } from "../../lib/display-prefs";
+import { FilePreviewDialog, type PreviewFile } from "../../components/finance-ui/file-preview-dialog";
 
 /** Mirrors core.uploads on the backend. The server stays authoritative; this only
  *  saves the user a round trip to be told what we already know. */
@@ -59,6 +60,15 @@ export function DocumentAttachments({
   const dates = useDates();
   const inputRef = useRef<HTMLInputElement>(null);
   const [caption, setCaption] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const previewFiles = useMemo<PreviewFile[]>(() => attachments.map((row) => ({
+    id: row.id,
+    name: row.name,
+    contentType: row.content_type,
+    size: row.size,
+    loadPreview: (signal) => fetchAttachmentBlob(row.url, signal),
+    loadDownload: () => fetchAttachmentBlob(row.url),
+  })), [attachments]);
 
   const pick = async (file: File | undefined) => {
     if (!file) return;
@@ -126,15 +136,10 @@ export function DocumentAttachments({
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  // Not an <a href>: the media endpoint needs the Bearer token, so a
-                  // plain navigation would 401. See utils/attachment-download.
-                  openAttachment(row.url, row.name).catch((error: Error) =>
-                    toast.error(error.message));
-                }}
+                onClick={() => setSelectedIndex(attachments.findIndex((item) => item.id === row.id))}
                 className="inline-flex items-center gap-1.5 font-mont text-xs font-medium text-primary"
               >
-                <Download className="size-3.5" /> Open
+                <Eye className="size-3.5" /> View
               </button>
               <Can permission={attachPermission}>
                 <Button
@@ -150,6 +155,7 @@ export function DocumentAttachments({
           ))}
         </ul>
       )}
+      <FilePreviewDialog files={previewFiles} index={selectedIndex} onIndexChange={setSelectedIndex} onClose={() => setSelectedIndex(null)} />
     </div>
   );
 }

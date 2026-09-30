@@ -10,13 +10,13 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { Download } from "lucide-react";
+import { Eye } from "lucide-react";
 import { Money, KpiCard, InfoHint } from "@/components/finance-ui";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { formatMoney } from "@/utils/money";
-import { downloadReportExport } from "@/utils/finance-export";
+import { viewReportExport } from "@/utils/finance-export";
 import { useGetTrialBalanceQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { TrialBalanceRow } from "@/redux/services/finance/reports-types";
@@ -119,9 +119,9 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
         </div>
         <div className="flex items-center gap-2">
           {(["csv", "xlsx", "pdf"] as const).map((f) => (
-            <button key={f} onClick={() => downloadReportExport("/finance/reports/trial-balance/", { entity, period: period || undefined }, f)}
+            <button key={f} onClick={() => viewReportExport("/finance/reports/trial-balance/", { entity, period: period || undefined }, f)}
               className="inline-flex items-center gap-1.5 rounded-md border border-white-02 px-2.5 py-1.5 font-mont text-xs font-semibold text-gray-01 hover:border-primary hover:text-primary">
-              <Download className="size-3.5" /> {f.toUpperCase()}
+              <Eye className="size-3.5" /> {f.toUpperCase()}
             </button>
           ))}
         </div>

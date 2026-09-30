@@ -8,13 +8,13 @@
  */
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Download, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Eye, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Money } from "@/components/finance-ui";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { formatMoney } from "@/utils/money";
-import { downloadReportExport } from "@/utils/finance-export";
+import { viewReportExport } from "@/utils/finance-export";
 import { useGetChangesInEquityQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { EquityColumn } from "@/redux/services/finance/reports-types";
@@ -79,9 +79,9 @@ export function EquityReport({ entity, currency }: { entity: string; currency?: 
         </Select>
         <div className="flex items-center gap-2">
           {(["csv", "xlsx", "pdf"] as const).map((f) => (
-            <button key={f} onClick={() => downloadReportExport("/finance/reports/changes-in-equity/", { entity, period: period || undefined }, f)}
+            <button key={f} onClick={() => viewReportExport("/finance/reports/changes-in-equity/", { entity, period: period || undefined }, f)}
               className="inline-flex items-center gap-1.5 rounded-md border border-white-02 px-2.5 py-1.5 font-mont text-xs font-semibold text-gray-01 hover:border-primary hover:text-primary">
-              <Download className="size-3.5" /> {f.toUpperCase()}
+              <Eye className="size-3.5" /> {f.toUpperCase()}
             </button>
           ))}
         </div>

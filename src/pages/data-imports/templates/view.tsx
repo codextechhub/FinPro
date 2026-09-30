@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router";
-import { Download, RefreshCw, FileText, Pencil } from "lucide-react";
+import { Eye, RefreshCw, FileText, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import type {
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { useDates } from "../../../lib/display-prefs";
+import { showBlobPreview } from "../../../components/finance-ui/file-preview-dialog";
 
 const STATUS_BADGE: Record<TemplateStatus, "active" | "pending" | "inactive"> = {
   active: "active",
@@ -32,9 +33,8 @@ const unwrap = <T,>(res: { data: T } | T | undefined): T | undefined => {
   return (res as { data: T }).data ?? (res as T);
 };
 
-// The mutation resolves to an object URL (not a Blob) so redux state stays
-// serializable; revoke it here once the browser has taken the download.
-async function triggerDownload(
+/** Fetch template bytes and show their file details with a download action. */
+async function previewTemplate(
   download: (args: { id: number; format: "csv" | "xlsx" }) => { unwrap: () => Promise<string> },
   id: number,
   format: "csv" | "xlsx",
@@ -42,15 +42,11 @@ async function triggerDownload(
 ) {
   try {
     const blobUrl = await download({ id, format }).unwrap();
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const blob = await fetch(blobUrl).then((response) => response.blob());
     URL.revokeObjectURL(blobUrl);
+    showBlobPreview(filename, blob);
   } catch {
-    toast.error("Download failed. Please try again.");
+    toast.error("Template could not be opened. Please try again.");
   }
 }
 
@@ -153,17 +149,17 @@ export default function ViewTemplate() {
                   variant="white"
                   size="sm"
                   disabled={downloadState.isLoading}
-                  onClick={() => triggerDownload(downloadTemplate, template.id, "csv", `${template.code}_template.csv`)}
+                  onClick={() => previewTemplate(downloadTemplate, template.id, "csv", `${template.code}_template.csv`)}
                 >
-                  <Download className="size-3.5" /> Download CSV
+                  <Eye className="size-3.5" /> View CSV
                 </Button>
                 <Button
                   variant="white"
                   size="sm"
                   disabled={downloadState.isLoading}
-                  onClick={() => triggerDownload(downloadTemplate, template.id, "xlsx", `${template.code}_template.xlsx`)}
+                  onClick={() => previewTemplate(downloadTemplate, template.id, "xlsx", `${template.code}_template.xlsx`)}
                 >
-                  <Download className="size-3.5" /> Download XLSX
+                  <Eye className="size-3.5" /> View XLSX
                 </Button>
               </>
             )}

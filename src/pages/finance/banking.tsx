@@ -13,10 +13,11 @@
 
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { showBlobPreview } from "../../components/finance-ui/file-preview-dialog";
 import { useActionParam } from "@/hooks/use-action-param";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, Upload, RefreshCw, ListChecks, FileText, History, Settings as SettingsIcon, ArrowLeftRight, ChevronDown, Rows3, FileSpreadsheet, Download, Pencil, Undo2 } from "lucide-react";
+import { Plus, Search, Trash2, Upload, RefreshCw, ListChecks, FileText, History, Settings as SettingsIcon, ArrowLeftRight, ChevronDown, Rows3, FileSpreadsheet, Eye, Pencil, Undo2 } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
 import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, AccessField, useFieldAccess, fieldWriteErrors, RaisingBranchChoiceField, useRaisingBranchChoice, type Column, type TabStripItem, type FieldErrors } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
@@ -990,13 +991,9 @@ function BulkImportStatementDrawer({ id, entity, onClose }: { id: number; entity
   const download = async (format: "csv" | "xlsx") => {
     try {
       const url = await downloadTemplate({ id, entity, format }).unwrap();
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `bank_statement_template.${format}`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      const blob = await fetch(url).then((response) => response.blob());
+      URL.revokeObjectURL(url);
+      showBlobPreview(`bank_statement_template.${format}`, blob);
     } catch { /* central */ }
   };
 
@@ -1028,10 +1025,10 @@ function BulkImportStatementDrawer({ id, entity, onClose }: { id: number; entity
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" disabled={downloading} onClick={() => download("xlsx")} className="gap-1.5">
-                <Download className="size-3.5" /> Excel template
+                <Eye className="size-3.5" /> View Excel template
               </Button>
               <Button variant="outline" size="sm" disabled={downloading} onClick={() => download("csv")} className="gap-1.5">
-                <Download className="size-3.5" /> CSV template
+                <Eye className="size-3.5" /> View CSV template
               </Button>
             </div>
           </div>

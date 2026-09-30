@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
-  Check, AlertTriangle, Download, Play, RefreshCw, Trash2, Inbox, ChevronRight, ShieldAlert,
+  Check, AlertTriangle, Eye, Play, RefreshCw, Trash2, Inbox, ChevronRight, ShieldAlert,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ import {
 import type { ImportBatch } from "@/redux/services/dashboard/import-types";
 import { IN_FLIGHT, STATUS_BADGE, STATUS_LABEL, importFailureNote } from "./components/batch-status";
 import { formatBytes } from "@/utils/format-bytes";
-import { unwrap, triggerBlobDownload } from "./components/batch-utils";
+import { unwrap, triggerBlobPreview } from "./components/batch-utils";
 import { PipelineTimeline } from "./components/pipeline-timeline";
 import { IssuesTab } from "./components/issues-tab";
 import { JobsTab } from "./components/jobs-tab";
@@ -254,10 +254,10 @@ export default function ViewBatch() {
             {batch.file && (
               <button
                 type="button"
-                onClick={() => triggerBlobDownload(importDownloadUrls.batchFileDownload(batch.id), batch.original_filename)}
+                onClick={() => triggerBlobPreview(importDownloadUrls.batchFileDownload(batch.id), batch.original_filename)}
                 className="inline-flex items-center gap-1.5 px-3 h-8 text-xs font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50"
               >
-                <Download className="size-3.5" /> Download original
+                <Eye className="size-3.5" /> View original
               </button>
             )}
             <div className="flex-1" />

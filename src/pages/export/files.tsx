@@ -33,7 +33,7 @@ import { formatBytes } from "@/utils/format-bytes";
 import { useDates, type DateFormatter } from "../../lib/display-prefs";
 import { daysUntil } from "./format";
 import { errorStatus } from "@/utils/api-errors";
-import { useFileDownload } from "./use-file-download";
+import { useFilePreview } from "./use-file-preview";
 import { PageShell } from "@/components/layout/page-shell";
 
 const POLL_MS = 10_000;
@@ -123,7 +123,7 @@ export default function ExportFilesPage() {
   });
   const { data: capsRes } = useGetExportCapabilitiesQuery(undefined, { skip: !canView });
 
-  const { save, busyId } = useFileDownload();
+  const filePreview = useFilePreview();
 
   const runs = useMemo(() => data?.data ?? [], [data]);
   const pagination = data?.pagination;
@@ -175,14 +175,13 @@ export default function ExportFilesPage() {
           <Button
             variant="ghost"
             size="sm"
-            loading={busyId === run.file.id}
             onClick={(e) => {
               e.stopPropagation();
-              if (run.file) save(run.file, run.id);
+              if (run.file) filePreview.open(run.file, run.id);
             }}
             className="font-mont"
           >
-            Download
+            View
           </Button>
         ) : null,
     },
@@ -265,6 +264,7 @@ export default function ExportFilesPage() {
         totalPages={pagination?.totalPages}
         onPageChange={(p) => patchParams({ page: String(p) })}
       />
+      {filePreview.viewer}
     </PageShell>
   );
 }

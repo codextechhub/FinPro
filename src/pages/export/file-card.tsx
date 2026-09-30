@@ -1,15 +1,14 @@
 /**
  * <FileCard> - the produced file, and whether you can still have it.
  *
- * One of the three genuinely new pieces of UI in the Export Centre. A format
- * tile, the file name, a metadata line (rows · columns · size · availability)
- * and exactly one primary action, which changes with what is actually possible:
- * download it, download it anyway, or run the export again because the bytes
+ * A format tile, the file name, a metadata line (rows · columns · size ·
+ * availability) and one primary action. It opens the file viewer when bytes
+ * remain, or offers another run because the bytes
  * are gone. Availability is derived server-side at read time (is_expired /
  * is_purged / is_downloadable) - never inferred here from a date.
  */
 
-import { Download, RotateCcw } from "lucide-react";
+import { Eye, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ExportFile } from "@/redux/services/dashboard/exports-types";
@@ -49,7 +48,7 @@ export function FileCard({
   canDownload?: boolean;
   onDownload: () => void;
   onRunAgain?: () => void;
-  /** "partial" softens the primary action to "Download anyway". */
+  /** "partial" warns that the available file omitted some rows or fields. */
   tone?: "ready" | "partial";
   lastDownload?: string;
   className?: string;
@@ -106,8 +105,8 @@ export function FileCard({
             title={canDownload ? undefined : "You do not have permission to download export files."}
             className="gap-1.5"
           >
-            <Download className="size-4" />
-            {tone === "partial" ? "Download anyway" : "Download"}
+            <Eye className="size-4" />
+            {tone === "partial" ? "View partial file" : "View file"}
           </Button>
         ) : onRunAgain ? (
           <Button variant="white" onClick={onRunAgain} className="gap-1.5">

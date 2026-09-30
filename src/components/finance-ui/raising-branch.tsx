@@ -82,9 +82,15 @@ function useFallbackBranchLens(): ReaderBranchLens {
   );
 }
 
-/** The host's own lens when it supplies one, otherwise the derived one. Chosen
- *  once, at load, so the hooks behind it never change between renders. */
-export const useReaderBranchLens: () => ReaderBranchLens = hostBranchLens ?? useFallbackBranchLens;
+/**
+ * The host's branch lens, or the derived lens when a host supplies none.
+ * Resolving it during render avoids reading the host contract while its module
+ * is still initializing through a consumer's import cycle. The host choice is
+ * fixed for the lifetime of the app, so the hook path stays stable.
+ */
+export function useReaderBranchLens(): ReaderBranchLens {
+  return (hostBranchLens ?? useFallbackBranchLens)();
+}
 
 /** What a create form needs to know about the branch it raises for. */
 export interface RaisingBranch {

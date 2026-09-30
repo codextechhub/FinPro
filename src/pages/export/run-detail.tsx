@@ -45,7 +45,7 @@ import { OMISSION_HEADING, omissionIsFixableInBuilder, remedyFor } from "./failu
 import { formatBytes } from "@/utils/format-bytes";
 import { useDates } from "../../lib/display-prefs";
 import { formatDuration } from "./format";
-import { useFileDownload } from "./use-file-download";
+import { useFilePreview } from "./use-file-preview";
 import { useState } from "react";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -135,7 +135,7 @@ export default function ExportRunDetailPage() {
 
   const [cancelRun, { isLoading: cancelling }] = useCancelExportRunMutation();
   const [retryRun, { isLoading: retrying }] = useRetryExportRunMutation();
-  const { save, busyId } = useFileDownload();
+  const filePreview = useFilePreview();
 
   const status = errorStatus(error);
   if (!canView || status === 403) return <PageAccessDenied />;
@@ -223,8 +223,8 @@ export default function ExportRunDetailPage() {
             run={run}
             canDownload={canDownload}
             canEdit={canEdit}
-            downloadingId={busyId}
-            onDownload={() => run.file && save(run.file, run.id)}
+            downloadingId={null}
+            onDownload={() => run.file && filePreview.open(run.file, run.id)}
             onEditExport={() =>
               run.definition_id && navigate(routesPath.PROTECTED.EXPORT.EDIT(run.definition_id))
             }
@@ -344,6 +344,7 @@ export default function ExportRunDetailPage() {
         loading={cancelling}
         onConfirm={onCancel}
       />
+      {filePreview.viewer}
     </PageShell>
   );
 }
@@ -545,6 +546,7 @@ function DownloadLog({ fileId }: { fileId: number }) {
 
   const columns: Column<ExportDownloadEntry>[] = [
     { header: "Who", cell: (d) => d.user_name || "-" },
+    { header: "Action", cell: (d) => d.access_kind === "VIEW" ? "View" : "Download" },
     { header: "When", cell: (d) => <span className={NUM}>{dates.dateTime(d.at)}</span> },
     { header: "IP", cell: (d) => <span className={NUM}>{d.ip_address || "-"}</span> },
     {
@@ -564,7 +566,7 @@ function DownloadLog({ fileId }: { fileId: number }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="font-mont text-[11px] uppercase tracking-widest text-gray-05">Download log</h2>
+      <h2 className="font-mont text-[11px] uppercase tracking-widest text-gray-05">File access log</h2>
       <DataTable
         columns={columns}
         rows={rows}
@@ -572,8 +574,8 @@ function DownloadLog({ fileId }: { fileId: number }) {
         loading={isLoading}
         error={isError}
         onRetry={refetch}
-        emptyTitle="Nobody has downloaded this file yet"
-        emptyMessage="Every download and every refused attempt is recorded here."
+        emptyTitle="Nobody has viewed or downloaded this file yet"
+        emptyMessage="Views, downloads and refused attempts appear here."
       />
     </section>
   );

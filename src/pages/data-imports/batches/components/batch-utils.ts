@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import { P, type PermissionCode } from "@/permissions";
 import { getAccessToken } from "@/utils/access-token";
+import { showBlobPreview } from "../../../../components/finance-ui/file-preview-dialog";
 
 // RTK responses are sometimes wrapped in a { data } envelope; this normalises.
 export const unwrap = <T,>(res: { data: T } | T | undefined): T | undefined => {
@@ -11,16 +12,15 @@ export const unwrap = <T,>(res: { data: T } | T | undefined): T | undefined => {
 };
 
 /**
- * Download a file from a bearer-authenticated import endpoint and save it.
+ * Fetch a file from a bearer-authenticated import endpoint for inspection.
  *
  * The access token lives in the host's memory, never in a cookie or storage,
  * so a plain link or a new tab reaches the endpoint with no credentials and is
  * refused. The file is fetched with the token instead, the same way the
  * finance report exports and printable documents are, and handed to the
- * browser as a blob. A failed download says so rather than opening a tab onto
- * the refusal.
+ * shared viewer as a blob. A failed request reports the refusal.
  */
-export async function triggerBlobDownload(url: string, filename: string) {
+export async function triggerBlobPreview(url: string, filename: string) {
   try {
     const token = getAccessToken();
     const res = await fetch(url, {
@@ -28,14 +28,7 @@ export async function triggerBlobDownload(url: string, filename: string) {
     });
     if (!res.ok) throw new Error(`${res.status}`);
     const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(blobUrl);
+    showBlobPreview(filename, blob);
   } catch {
     toast.error("Download failed. Please try again.");
   }

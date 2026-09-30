@@ -19,7 +19,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
-import { Plus, Upload, Download, Send, X } from "lucide-react";
+import { Plus, Upload, Eye, Send, X } from "lucide-react";
 import { DataTable, Money, MoneyInput, DetailDrawer, FormField, VendorPicker, AccountPicker, PostingRecap, KpiCard, toArray, useFieldAccess, type Column, type FieldAccess, type RecapRow } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
@@ -35,6 +35,7 @@ import type { PayoutBatchSummary, PayoutInstruction, PayoutBatchItemPayload } fr
 import type { Vendor } from "@/redux/services/procurement/procurement-types";
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
 import { useDates } from "../../lib/display-prefs";
+import { showBlobPreview } from "../../components/finance-ui/file-preview-dialog";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 /** Field Access resource for a payout instruction, which is what a batch line becomes. */
@@ -314,7 +315,7 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
         <span className="font-mont text-xs text-gray-05">{settled} settled · {failed} failed · {items.length} items</span>
         <div className="flex-1" />
         {awaitingApproval ? <span className={cn(PILL, "bg-amber-50 text-amber-700")}>Awaiting approval</span> : null}
-        <Button variant="outline" disabled={!items.length} onClick={() => batch && exportBankFile(batch.reference, items, access, currency)} className="gap-1.5"><Download className="size-4" /> Bank file</Button>
+        <Button variant="outline" disabled={!items.length} onClick={() => batch && exportBankFile(batch.reference, items, access, currency)} className="gap-1.5"><Eye className="size-4" /> View bank file</Button>
         {canSubmit && gated !== false ? (
           <Can permission={P.PAY_SUBMIT_PAYOUT_BATCH}>
             <Button disabled={routing} onClick={doSubmitForApproval} className="gap-1.5"><Send className="size-4" />{routing ? "Submitting…" : "Submit for approval"}</Button>
@@ -356,8 +357,5 @@ function exportBankFile(reference: string, items: PayoutInstruction[], access: F
   ].map(esc).join(","));
   const csv = [head.map(esc).join(","), ...body].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = `${reference}.csv`;
-  a.click(); URL.revokeObjectURL(url);
+  showBlobPreview(`${reference}.csv`, blob);
 }

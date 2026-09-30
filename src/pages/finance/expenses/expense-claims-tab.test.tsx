@@ -2,9 +2,13 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { openAttachment } = vi.hoisted(() => ({ openAttachment: vi.fn() }));
+const { fetchAttachmentBlob } = vi.hoisted(() => ({ fetchAttachmentBlob: vi.fn() }));
 
-vi.mock("@/utils/attachment-download", () => ({ openAttachment }));
+vi.mock("@/utils/attachment-download", () => ({ fetchAttachmentBlob }));
+vi.mock("../../../components/finance-ui/file-preview-dialog", () => ({
+  FilePreviewDialog: ({ files, index }: { files: Array<{ name: string; loadPreview: (signal: AbortSignal) => Promise<Blob> }>; index: number | null }) =>
+    index == null ? null : <div role="dialog">{files[index].name}</div>,
+}));
 vi.mock("@/redux/services/finance/ops-api", () => ({
   useUploadExpenseReceiptMutation: () => [vi.fn(), { isLoading: false }],
   useDeleteExpenseReceiptMutation: () => [vi.fn(), { isLoading: false }],
@@ -19,8 +23,7 @@ describe("expense claim receipt", () => {
   let root: Root;
 
   beforeEach(() => {
-    openAttachment.mockReset();
-    openAttachment.mockResolvedValue("receipt.pdf");
+    fetchAttachmentBlob.mockReset();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -31,7 +34,7 @@ describe("expense claim receipt", () => {
     container.remove();
   });
 
-  it("opens protected receipt media through the authenticated attachment helper", async () => {
+  it("opens a protected receipt in the file viewer", async () => {
     await act(async () => {
       root.render(
         <ReceiptCell
@@ -65,9 +68,6 @@ describe("expense claim receipt", () => {
       await Promise.resolve();
     });
 
-    expect(openAttachment).toHaveBeenCalledWith(
-      "https://api.example.test/media/expense-receipts/taxi-token.pdf",
-      "taxi-receipt.pdf",
-    );
+    expect(container.querySelector('[role="dialog"]')?.textContent).toBe("taxi-receipt.pdf");
   });
 });

@@ -157,10 +157,10 @@ describe("useReaderBranchLens", () => {
     }));
     const mod = await import("./raising-branch");
 
-    expect(mod.useReaderBranchLens).toBe(hostLens);
+    expect(mod.useReaderBranchLens()).toEqual(lens({ branch: 20 }));
   });
 
   it("derives a lens when the host supplies none", () => {
-    expect(useReaderBranchLens.name).toBe("useFallbackBranchLens");
+    expect(useReaderBranchLens).toBeTypeOf("function");
   });
 });

@@ -11,14 +11,14 @@
  */
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Download, RefreshCw, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Eye, RefreshCw, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { DataTable, Money, KpiCard, DetailDrawer, TabStrip, type Column } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PROVIDER_CHOICES, providerInfo } from "./payment-providers";
 import { formatMoney } from "@/utils/money";
 import { useGetSettlementReconciliationQuery } from "@/redux/services/payments/payments-api";
-import { downloadReportExport } from "@/utils/finance-export";
+import { viewReportExport } from "@/utils/finance-export";
 import type { SettlementRow, UnmatchedBankLine } from "@/redux/services/payments/payments-types";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { useDates } from "../../lib/display-prefs";
@@ -142,13 +142,13 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
                 key={f}
                 variant="outline"
                 className="gap-1.5"
-                onClick={() => downloadReportExport(
+                onClick={() => viewReportExport(
                   "/payments/reports/settlement-reconciliation/",
                   { entity, view: tab, ...(provider ? { provider } : {}) },
                   f,
                 )}
               >
-                <Download className="size-4" /> {f.toUpperCase()}
+                <Eye className="size-4" /> {f.toUpperCase()}
               </Button>
             ))}
           </div>
