@@ -15,6 +15,7 @@ import type { WorkflowInstance } from "@/redux/services/dashboard/workflow-types
 import { useUserDirectory } from "@/pages/protected/workflow/components/use-user-directory";
 import { DocumentRef, InstanceStatusBadge, UserChip } from "@/pages/protected/workflow/components/workflow-ui";
 import { PageShell } from "@/components/layout/page-shell";
+import { listEmptyText } from "../list-state";
 
 const TABLE_HEADERS = ["Document", "Template", "Status", "Current Stage", "Requested By", "Updated"];
 
@@ -47,7 +48,7 @@ export default function AllInstances() {
     [page, status, debouncedDocType],
   );
 
-  const { data, isLoading, isFetching, refetch } = useGetWorkflowInstancesQuery(params, {
+  const { data, error, isLoading, isFetching, refetch } = useGetWorkflowInstancesQuery(params, {
     refetchOnMountOrArgChange: true,
   });
 
@@ -148,7 +149,7 @@ export default function AllInstances() {
           tableHeaderList={TABLE_HEADERS}
           tableBodyList={tableData}
           loading={isLoading}
-          emptyText="No workflow instances match these filters."
+          emptyText={listEmptyText(error, "No workflow instances match these filters.", "view running approvals")}
           onRowClick={(row) => navigate(routesPath.PROTECTED.WORKFLOW.INSTANCE_DETAIL(row._id))}
           perPage={data?.pagination?.pageSize}
           totalPage={data?.pagination?.totalPages}
