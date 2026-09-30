@@ -30,6 +30,7 @@ import { formatMoney } from "@/utils/money";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
+import { isForbidden } from "../../lib/api-errors";
 
 const DOCUMENT_TYPES = [
   ["", "All document types"],
@@ -51,10 +52,6 @@ function age(value?: string | null) {
   return Number.isNaN(parsed.getTime())
     ? "-"
     : formatDistanceToNowStrict(parsed, { addSuffix: false });
-}
-
-function isForbidden(error: unknown) {
-  return !!error && typeof error === "object" && "status" in error && error.status === 403;
 }
 
 export default function ProcurementApprovalsPage() {

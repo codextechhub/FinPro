@@ -1,4 +1,5 @@
 import { noAccessMessage } from "@/components/finance-ui/no-access";
+import { isForbidden } from "../../lib/api-errors";
 
 /**
  * What an approval list says when it has no rows.
@@ -13,15 +14,11 @@ import { noAccessMessage } from "@/components/finance-ui/no-access";
  */
 export function listEmptyText(error: unknown, emptyText: string, action: string): string {
   if (!error) return emptyText;
-  if (isRefused(error)) return noAccessMessage(action);
+  if (isForbidden(error)) return noAccessMessage(action);
   return "This list could not be loaded. Try again.";
 }
 
 /** Whether a list may offer to create the first item: only when it truly loaded empty. */
 export function listLoadedEmpty(error: unknown): boolean {
   return !error;
-}
-
-function isRefused(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "status" in error && (error as { status: unknown }).status === 403;
 }

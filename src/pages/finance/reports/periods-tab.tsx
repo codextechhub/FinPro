@@ -54,6 +54,7 @@ import {
   type YearCloseState,
 } from "./periods-model";
 import { useDates } from "../../../lib/display-prefs";
+import { isForbidden } from "../../../lib/api-errors";
 
 /**
  * Subtitle for the screen this file renders. Both routes that reach the
@@ -71,9 +72,6 @@ const humanize = (value: string) => {
   const text = value.replace(/_/g, " ");
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
-const isForbidden = (error: unknown) => (
-  typeof error === "object" && error !== null && "status" in error && error.status === 403
-);
 
 /**
  * Fiscal close workbench for one ledger entity.

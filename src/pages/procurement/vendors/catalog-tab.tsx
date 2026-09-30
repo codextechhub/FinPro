@@ -29,6 +29,7 @@ import type {
 import { formatMoney } from "@/utils/money";
 import { CategoryPicker, VendorPicker } from "../pickers";
 import { useDates } from "../../../lib/display-prefs";
+import { isForbidden } from "../../../lib/api-errors";
 
 const STATUS_TABS = [["All", "all"], ["Active", "active"], ["Inactive", "inactive"]] as const;
 const DETAIL_TABS = [
@@ -43,10 +44,6 @@ const DETAIL_TAB_ITEMS: TabStripItem<(typeof DETAIL_TABS)[number][1]>[] = DETAIL
   value,
   label: <><Icon className="size-3.5" />{label}</>,
 }));
-
-function isForbidden(error: unknown) {
-  return !!error && typeof error === "object" && "status" in error && error.status === 403;
-}
 
 function categoryTree(rows: VendorCategory[]) {
   const children = new Map<number | null, VendorCategory[]>();

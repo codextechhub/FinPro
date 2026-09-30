@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { P } from "../../../permissions";
 import { formatMoney } from "@/utils/money";
+import { isForbidden } from "../../../lib/api-errors";
 import {
   useCreateCategoryMutation,
   useGetCategoriesQuery,
@@ -48,10 +49,6 @@ const DETAIL_TAB_ITEMS: TabStripItem<(typeof DETAIL_TABS)[number][1]>[] = DETAIL
   value,
   label: <><Icon className="size-3.5" />{label}</>,
 }));
-
-function isForbidden(error: unknown) {
-  return !!error && typeof error === "object" && "status" in error && error.status === 403;
-}
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return <div className="min-w-0"><dt className="font-mont text-[11px] text-gray-05">{label}</dt><dd className="mt-1 break-words font-mont text-sm font-semibold tabular-nums text-black-01">{value ?? "-"}</dd></div>;

@@ -36,6 +36,7 @@ import { buildVendorUpdatePayload, type VendorFormValues } from "./vendor-update
 import { VendorGovernanceFields } from "./vendor-governance-fields";
 import { PAYMENT_TERMS, paymentTermsLabel } from "../payment-terms";
 import { useDates } from "../../../lib/display-prefs";
+import { isForbidden } from "../../../lib/api-errors";
 
 const STATUS_TABS = [
   ["All", "all"], ["Active", "active"], ["On Hold", "hold"], ["Inactive", "inactive"],
@@ -58,10 +59,6 @@ const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label,
 }));
 /** The Contacts tab holds nothing but contact fields, so it goes when they are all hidden. */
 const NO_CONTACTS_TAB_ITEMS = DETAIL_TAB_ITEMS.filter((item) => item.value !== "contacts");
-
-function isForbidden(error: unknown) {
-  return !!error && typeof error === "object" && "status" in error && error.status === 403;
-}
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "V";
 }

@@ -26,4 +26,12 @@ describe("what a screen says before it has a set of books", () => {
   it("says so when the link names books the reader cannot open", () => {
     expect(noEntityReason({ loading: false, count: 1, requested: "GREENFIELD" })).toBe("not-yours");
   });
+
+  it("tells a reader whose role cannot view the books so, not that there are none", () => {
+    expect(noEntityReason({ loading: false, error: { status: 403 }, count: 0, requested: null })).toBe("refused");
+  });
+
+  it("says the books failed to load, not that there are none, when the request fails", () => {
+    expect(noEntityReason({ loading: false, error: { status: 500 }, count: 0, requested: null })).toBe("failed");
+  });
 });

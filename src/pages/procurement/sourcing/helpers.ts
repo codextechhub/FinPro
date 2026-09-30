@@ -14,6 +14,4 @@ export const QUOTATION_TABS = [
   ["Awarded", "AWARDED"], ["Rejected", "REJECTED"],
 ] as const;
 
-export function isForbidden(error: unknown) {
-  return !!error && typeof error === "object" && "status" in error && error.status === 403;
-}
+export { isForbidden } from "../../../lib/api-errors";

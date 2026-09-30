@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { P } from "../../permissions";
+import { isForbidden } from "../../lib/api-errors";
 import { useAppSelector } from "@/redux/store";
 import {
   useCreateVendorInvoiceMutation, useGetProcurementSettingsQuery,
@@ -77,10 +78,6 @@ const DETAIL_TAB_ITEMS: TabStripItem<string>[] = DETAIL_TABS.map(([value, label,
   value,
   label: <><Icon className="size-3.5" />{label}</>,
 }));
-
-function isForbidden(error: unknown) {
-  return !!error && typeof error === "object" && "status" in error && error.status === 403;
-}
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return <div><dt className="font-mont text-[11px] text-gray-05">{label}</dt><dd className="mt-1 font-mont text-sm font-semibold tabular-nums text-black-01">{value || "-"}</dd></div>;
 }
