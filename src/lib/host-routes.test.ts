@@ -27,7 +27,7 @@ describe("servesPath", () => {
   });
 
   it("does not serve an address only the 404 route answers", () => {
-    expect(servesPath(routes, "/workflow/instances/42")).toBe(false);
+    expect(servesPath(routes, "/workflow/team-load")).toBe(false);
     expect(servesPath(routes, "/audit/events")).toBe(false);
     expect(servesPath(routes, "/finance/payments/batches")).toBe(false);
   });

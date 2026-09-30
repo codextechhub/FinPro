@@ -30,6 +30,8 @@ import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt"
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { P } from "../../permissions";
+// The workflow instance codes are the host's to declare; see src/permissions.ts.
+import { P as HOST_P } from "@/permissions";
 import { useCan } from "@/components/finance-ui/can";
 import { useAppSelector } from "@/redux/store";
 import {
@@ -262,7 +264,8 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
     const stages = (workflow?.stage_instances ?? []).filter((stage) => stage.status === "ACTIVE");
     return stages.length ? stages.reduce((latest, stage) => stage.attempt > latest.attempt ? stage : latest) : undefined;
   }, [workflow]);
-  const workflowLink = approvalWorkflowLink(workflowId, workflow?.requested_by, uid, servesPath);
+  const canViewInstances = useCan().can(HOST_P.VIEW_WORKFLOW_INSTANCES);
+  const workflowLink = approvalWorkflowLink(workflowId, workflow?.requested_by, uid, servesPath, canViewInstances);
   const canVote = !!activeStage && workflow?.status === "IN_PROGRESS"
     && activeStage.eligible_approvers.some((approver) => sameId(approver.user, uid) && approver.attempt === activeStage.attempt)
     && !activeStage.actions.some((action) => sameId(action.actor, uid) && !action.reversed_at && !action.is_reversal_of && action.attempt === activeStage.attempt);

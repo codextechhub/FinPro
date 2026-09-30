@@ -266,6 +266,7 @@ export const BACKEND_KEY_CATALOGUE: readonly string[] = [
   "procurement.vendor_payment.update",
   "procurement.vendor_payment.view",
   "workflow.action.reverse",
+  "workflow.approvers.assign",
   "workflow.group.create",
   "workflow.group.delete",
   "workflow.group.update",

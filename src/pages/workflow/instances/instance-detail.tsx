@@ -27,6 +27,7 @@ import { DocumentPanel } from "@/pages/protected/workflow/components/document-pa
 import { StageTracker } from "@/pages/protected/workflow/components/stage-tracker";
 import { AuditTimeline } from "@/pages/protected/workflow/components/audit-timeline";
 import { PageShell } from "@/components/layout/page-shell";
+import { ApproversSection } from "./stage-approvers";
 
 const TERMINAL = ["APPROVED", "REJECTED", "WITHDRAWN", "CANCELLED"];
 
@@ -132,6 +133,10 @@ export default function InstanceDetail() {
             )}
 
             <DocumentPanel instance={instance} name={name} initials={initials} role={role} />
+
+            <PermissionGate permission={P.CHANGE_APPROVERS}>
+              <ApproversSection instanceId={id} />
+            </PermissionGate>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <Section title="Workflow progress">

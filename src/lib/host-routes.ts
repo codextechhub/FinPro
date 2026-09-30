@@ -5,8 +5,8 @@ import { matchRoutes, UNSAFE_DataRouterContext, type RouteObject } from "react-r
  * Whether the application this package runs inside serves an address.
  *
  * The screens here link to one another and to screens the host owns, and the
- * two hosts do not mount the same set. The console serves workflow instances,
- * the platform audit log and the Payments area; the school app serves none of
+ * two hosts do not mount the same set. The console serves team load, the
+ * platform audit log and the Payments area; the school app serves none of
  * them. A link that leads a school reader to a 404 is a broken screen, however
  * correct it is in the console.
  *

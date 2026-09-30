@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { EmptyState, ErrorState, ForbiddenState, LoadingRows } from "./states";
@@ -31,8 +32,52 @@ export interface Column<T> {
   className?: string;
 }
 
+/**
+ * Row selection for a list that acts on several rows at once.
+ *
+ * Selected rows are named by their `rowKey`, as strings. The header checkbox
+ * selects or clears the rows on the page in view and leaves any selected on
+ * other pages alone, so a selection can be built across pages.
+ */
+export interface RowSelection<T> {
+  selected: ReadonlySet<string>;
+  onChange: (next: Set<string>) => void;
+  /** What a row's checkbox is called for a screen reader ("Select JV-0042"). */
+  rowLabel: (row: T) => string;
+}
+
+/** The selection after the header checkbox is pressed on this page's keys. */
+export function toggledPageSelection(selected: ReadonlySet<string>, pageKeys: string[]): Set<string> {
+  const next = new Set(selected);
+  const allOn = pageKeys.length > 0 && pageKeys.every((k) => next.has(k));
+  for (const key of pageKeys) {
+    if (allOn) next.delete(key);
+    else next.add(key);
+  }
+  return next;
+}
+
+/** The selection after one row's checkbox is pressed. */
+export function toggledRowSelection(selected: ReadonlySet<string>, key: string): Set<string> {
+  const next = new Set(selected);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  return next;
+}
+
+/** A row's checkbox. Stops the click so ticking a row never opens it. */
+function RowCheckbox({ checked, label, onToggle }: { checked: boolean; label: string; onToggle: () => void }) {
+  return (
+    <span onClick={(e) => e.stopPropagation()} className="inline-flex">
+      <Checkbox checked={checked} onCheckedChange={onToggle} aria-label={label} />
+    </span>
+  );
+}
+
 /** One row as a stacked label/value card - the phone rendering of a list row. */
-function RowCard<T>({ columns, row, onClick }: { columns: Column<T>[]; row: T; onClick?: () => void }) {
+function RowCard<T>({ columns, row, onClick, select }: {
+  columns: Column<T>[]; row: T; onClick?: () => void; select?: React.ReactNode;
+}) {
   const [first, ...rest] = columns;
   // A column that renders nothing for this row contributes no card line. In a
   // table an empty cell is just whitespace under a header; on a card it is a
@@ -49,7 +94,10 @@ function RowCard<T>({ columns, row, onClick }: { columns: Column<T>[]; row: T; o
         onClick && "cursor-pointer transition-colors active:bg-primary/5",
       )}
     >
-      <div className="font-mont text-sm font-semibold text-black-01">{first.cell(row)}</div>
+      <div className="flex items-start gap-2.5">
+        {select}
+        <div className="min-w-0 flex-1 font-mont text-sm font-semibold text-black-01">{first.cell(row)}</div>
+      </div>
       {lines.map((line, i) => (
         <div key={i} className="flex items-start justify-between gap-3">
           <span className="shrink-0 font-mont text-[11px] text-gray-05">{line.header}</span>
@@ -84,6 +132,8 @@ interface DataTableProps<T> {
   mobileCard?: (row: T) => React.ReactNode;
   /** Keep cards through tablet widths when a persistent side rail narrows the content area. */
   cardBreakpoint?: "md" | "lg";
+  /** Checkboxes for acting on several rows at once; omit for a plain list. */
+  selection?: RowSelection<T>;
 }
 
 export const headCls =
@@ -108,8 +158,9 @@ export function DataTable<T>({
   mobile = "cards",
   mobileCard,
   cardBreakpoint = "md",
+  selection,
 }: DataTableProps<T>) {
-  const colCount = columns.length;
+  const colCount = columns.length + (selection ? 1 : 0);
   // Defensive: the backend returns `{}` (not `[]`) for an empty list endpoint,
   // so a caller may hand us a non-array. Never let `.map` throw.
   const safeRows: T[] = Array.isArray(rows) ? rows : [];
@@ -117,6 +168,19 @@ export function DataTable<T>({
   // error and forbidden states inside the desktop table leaves the table's
   // minimum width active and clips their messages on narrow screens.
   const cardsOnPhone = mobile === "cards";
+  const pageKeys = safeRows.map((row) => String(rowKey(row)));
+  const pageSelected = selection ? pageKeys.filter((k) => selection.selected.has(k)).length : 0;
+  const selectCell = (row: T) => {
+    if (!selection) return null;
+    const key = String(rowKey(row));
+    return (
+      <RowCheckbox
+        checked={selection.selected.has(key)}
+        label={selection.rowLabel(row)}
+        onToggle={() => selection.onChange(toggledRowSelection(selection.selected, key))}
+      />
+    );
+  };
 
   const body = () => {
     if (forbidden) {
@@ -156,6 +220,7 @@ export function DataTable<T>({
         onClick={onRowClick ? () => onRowClick(row) : undefined}
         className={cn(onRowClick && "cursor-pointer transition-colors hover:bg-primary/5")}
       >
+        {selection && <TableCell className={cn(cellCls, "w-10")}>{selectCell(row)}</TableCell>}
         {columns.map((col, ci) => (
           <TableCell
             key={ci}
@@ -213,6 +278,7 @@ export function DataTable<T>({
                 columns={columns}
                 row={row}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                select={selectCell(row)}
               />
             ),
           )}
@@ -221,6 +287,18 @@ export function DataTable<T>({
       <Table containerClassName={cn(cardsOnPhone && (cardBreakpoint === "lg" ? "max-lg:hidden" : "max-md:hidden"))}>
         <TableHeader className="border-0">
           <TableRow>
+            {selection && (
+              <TableHead className={cn(headCls, "w-10")}>
+                <Checkbox
+                  checked={
+                    pageSelected === 0 ? false : pageSelected === pageKeys.length ? true : "indeterminate"
+                  }
+                  disabled={pageKeys.length === 0}
+                  onCheckedChange={() => selection.onChange(toggledPageSelection(selection.selected, pageKeys))}
+                  aria-label="Select every row on this page"
+                />
+              </TableHead>
+            )}
             {columns.map((col, i) => (
               <TableHead key={i} className={cn(headCls, col.align === "right" && "text-right")}>
                 {col.header}

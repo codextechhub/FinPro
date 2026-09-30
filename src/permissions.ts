@@ -31,6 +31,10 @@
  *   Payments (80): 01 collection, 02 virtual_account, 03 payout, 04 report,
  *   05 payout_batch, 06 webhook, 07 unattributed_webhook.
  *
+ *   Workflow (60): 01 template, 02 instance, 03 action, 04 group, 05 approvers.
+ *   Most workflow codes are declared by each host, which gates its own menus on
+ *   them; the two here gate screens only this package renders.
+ *
  * Every code these modules use lives here and nowhere else; the host
  * applications spread this table into their own.
  */
@@ -245,6 +249,7 @@ export const P = {
   PROC_VIEW_VENDOR_PAYMENTS: "701101",
   VIEW_AUDIT: "101801",  // view audit events and entity trails
   VIEW_WORKFLOW_TEMPLATES: "600101",  // browse approval workflow templates
+  CHANGE_APPROVERS: "600511",  // change who approves a request; delegate for somebody else
 } as const;
 
 export type PermissionCode = (typeof P)[keyof typeof P];
@@ -257,6 +262,7 @@ export type PermissionCode = (typeof P)[keyof typeof P];
 export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "101801": "platform.audit.view",
   "600101": "workflow.template.view",
+  "600511": "workflow.approvers.assign",
   "203301": "finance.entity.view",
   "200102": "finance.entity.create",
   "200202": "finance.account.create",

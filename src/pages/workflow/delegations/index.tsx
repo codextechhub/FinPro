@@ -6,7 +6,6 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { CustomInput } from "@/components/custom/custom-input";
 import { CustomNativeSelect } from "@/components/custom/custom-native-select";
-import { SearchSelect } from "@/components/custom/search-select";
 import {
   Sheet,
   SheetContent,
@@ -28,6 +27,8 @@ import { TabStrip, type TabStripItem } from "@/components/finance-ui/tab-strip";
 import { cn } from "@/lib/utils";
 import { zonedInstant } from "../../../utils/dates";
 import { useAppSelector } from "@/redux/store";
+import { usePermissions } from "@/hooks/use-permissions";
+import { P } from "@/permissions";
 import {
   useGetDelegationsQuery,
   useGetDelegationDocumentTypesQuery,
@@ -41,6 +42,13 @@ import { humanizeDocumentType, sameId } from "@/pages/protected/workflow/compone
 import { PageShell } from "@/components/layout/page-shell";
 import { useDates } from "../../../lib/display-prefs";
 import { listEmptyText } from "../list-state";
+import { PersonPicker } from "../../../components/workflow/person-picker";
+import { appliedToWaitingMessage } from "../instances/manage-approvals";
+
+type DelegationTab = "mine" | "tome" | "all";
+
+/** How many delegations the "Everyone" tab shows per page. */
+const ALL_PAGE_SIZE = 25;
 
 type DelegationState = "Active" | "Scheduled" | "Expired" | "Revoked";
 
@@ -59,13 +67,26 @@ const STATE_VARIANT: Record<DelegationState, React.ComponentProps<typeof Badge>[
   Revoked: "rejected",
 };
 
+/**
+ * Approval delegations: who acts for whom, and when.
+ *
+ * Everybody sees the delegations they gave and the ones they received. A reader
+ * holding the permission to change approvers also gets everyone's delegations,
+ * may revoke any delegation in it, and may set one up for somebody else ("Funke
+ * is on leave and could not do it herself"). A delegation that starts at once
+ * also joins requests already waiting on the person it covers, and the screen
+ * says how many.
+ */
 export default function Delegations() {
   const dates = useDates();
   const user = useAppSelector((s) => s.auth.user);
   const uid = user?.id != null ? String(user.id) : "";
   const { name, initials, role } = useUserDirectory();
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission(P.CHANGE_APPROVERS);
 
-  const [tab, setTab] = useState<"mine" | "tome">("mine");
+  const [tab, setTab] = useState<DelegationTab>("mine");
+  const [allPage, setAllPage] = useState(1);
   const [newOpen, setNewOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<ApprovalDelegation | null>(null);
 
@@ -73,16 +94,25 @@ export default function Delegations() {
     { page: 1, page_size: 100 },
     { refetchOnMountOrArgChange: true },
   );
+  // Everyone's delegations, paged, fetched only while their tab is open.
+  const everyone = useGetDelegationsQuery(
+    { page: allPage, page_size: ALL_PAGE_SIZE },
+    { skip: !canManage || tab !== "all", refetchOnMountOrArgChange: true },
+  );
   const [revoke, { isLoading: isRevoking }] = useRevokeDelegationMutation();
 
   const all = useMemo(() => data?.data ?? [], [data]);
   const mine = useMemo(() => all.filter((d) => sameId(d.delegator, uid)), [all, uid]);
   const toMe = useMemo(() => all.filter((d) => sameId(d.delegate, uid)), [all, uid]);
-  const list = tab === "mine" ? mine : toMe;
+  const list = tab === "mine" ? mine : tab === "tome" ? toMe : everyone.data?.data ?? [];
+  const listLoading = tab === "all" ? everyone.isLoading : isLoading;
+  const listError = tab === "all" ? everyone.error : error;
+  const allPages = everyone.data?.pagination;
 
-  const scopeTabs: TabStripItem<"mine" | "tome">[] = [
+  const scopeTabs: TabStripItem<DelegationTab>[] = [
     { value: "mine", label: `My Delegations (${mine.length})` },
     { value: "tome", label: `Delegated to me (${toMe.length})` },
+    ...(canManage ? [{ value: "all" as const, label: "Everyone" }] : []),
   ];
 
   const doRevoke = () => {
@@ -124,15 +154,15 @@ export default function Delegations() {
             variant="white"
             size="lg"
             className="ml-auto [&_svg]:size-5 font-medium font-mont"
-            onClick={() => refetch()}
-            disabled={isFetching}
+            onClick={() => (tab === "all" ? everyone.refetch() : refetch())}
+            disabled={tab === "all" ? everyone.isFetching : isFetching}
           >
-            <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
+            <RefreshCw className={cn((tab === "all" ? everyone.isFetching : isFetching) && "animate-spin")} /> Refresh
           </Button>
         </div>
 
         <div data-guide="workflow-delegations.records">
-          {isLoading ? (
+          {listLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="h-24 animate-pulse rounded-lg border border-white-02 bg-gray-50" />
@@ -145,10 +175,12 @@ export default function Delegations() {
               </span>
               <p className="mt-3 text-sm text-gray-01">
                 {listEmptyText(
-                  error,
+                  listError,
                   tab === "mine"
                     ? "You haven't delegated your approvals to anyone."
-                    : "No one has delegated their approvals to you.",
+                    : tab === "tome"
+                      ? "No one has delegated their approvals to you."
+                      : "Nobody has delegated their approvals.",
                   "view delegations",
                 )}
               </p>
@@ -157,21 +189,27 @@ export default function Delegations() {
             <div className="space-y-3">
               {list.map((d) => {
                 const state = delegationState(d);
-                const counterpartId = tab === "mine" ? d.delegate : d.delegator;
-                const canRevoke = state === "Active" || state === "Scheduled";
+                const counterpartId = tab === "tome" ? d.delegator : d.delegate;
+                const live = state === "Active" || state === "Scheduled";
+                const canRevoke = live && tab !== "tome";
+                const setUpBy = d.created_by && !sameId(d.created_by.id, d.delegator) ? d.created_by.name : null;
                 return (
                   <div key={d.id} className="rounded-lg border border-white-02 bg-white p-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <InitialsAvatar initials={initials(counterpartId)} seed={counterpartId} size={36} />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-black-01">
-                          {tab === "mine" ? "To " : "From "}
-                          {name(counterpartId)}
+                          {tab === "all"
+                            ? <>{name(d.delegator)} to {name(d.delegate)}</>
+                            : <>{tab === "mine" ? "To " : "From "}{name(counterpartId)}</>}
                         </p>
-                        <p className="text-xs text-gray-01">{role(counterpartId)}</p>
+                        <p className="text-xs text-gray-01">
+                          {tab === "all" ? role(d.delegator) : role(counterpartId)}
+                          {setUpBy && <span> · Set up by {setUpBy}</span>}
+                        </p>
                       </div>
                       <Badge variant={STATE_VARIANT[state]}>{state}</Badge>
-                      {tab === "mine" && canRevoke && (
+                      {canRevoke && (
                         <Button variant="outline" size="sm" onClick={() => setRevokeTarget(d)}>
                           Revoke
                         </Button>
@@ -193,12 +231,35 @@ export default function Delegations() {
                   </div>
                 );
               })}
+              {tab === "all" && allPages && allPages.totalPages > 1 && (
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="ghost" size="sm" disabled={allPage <= 1} onClick={() => setAllPage((n) => n - 1)}>
+                    Prev
+                  </Button>
+                  <span className="font-mont text-sm text-gray-01">
+                    Page {allPages.currentPage} of {allPages.totalPages}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={allPage >= allPages.totalPages}
+                    onClick={() => setAllPage((n) => n + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
       </PageShell>
 
-      <NewDelegationSheet open={newOpen} onClose={() => setNewOpen(false)} selfId={uid} />
+      <NewDelegationSheet
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        selfId={uid}
+        canActForOthers={canManage}
+      />
 
       <Dialog open={!!revokeTarget} onOpenChange={(v) => !v && setRevokeTarget(null)}>
         <DialogContent className="sm:max-w-md">
@@ -207,8 +268,9 @@ export default function Delegations() {
             <DialogDescription>
               {revokeTarget && (
                 <>
-                  {name(revokeTarget.delegate)} will stop appearing in approver queues on your
-                  behalf immediately.
+                  {name(revokeTarget.delegate)} stops acting for{" "}
+                  {sameId(revokeTarget.delegator, uid) ? "you" : name(revokeTarget.delegator)} at once,
+                  and is taken off requests still waiting on them where they have not yet decided.
                 </>
               )}
             </DialogDescription>
@@ -228,19 +290,32 @@ export default function Delegations() {
 }
 
 // ── New delegation sheet ───────────────────────────────────────────────────────
+/**
+ * The form for a new delegation.
+ *
+ * `canActForOthers` adds "On behalf of", starting on the reader themselves; an
+ * admin picks the person whose approvals are handed over. Naming anybody else
+ * is checked again by the server, which needs the permission to change approvers.
+ */
 function NewDelegationSheet({
   open,
   onClose,
   selfId,
+  canActForOthers,
 }: {
   open: boolean;
   onClose: () => void;
   selfId: string;
+  canActForOthers: boolean;
 }) {
   const dates = useDates();
-  const { byId, name } = useUserDirectory();
+  const { name } = useUserDirectory();
   const [createDelegation, { isLoading }] = useCreateDelegationMutation();
 
+  // Blank means the reader themselves, which also covers a session still loading.
+  const [onBehalfOf, setOnBehalfOf] = useState("");
+  const delegator = onBehalfOf || selfId;
+  const forSomebodyElse = canActForOthers && !!delegator && !sameId(delegator, selfId);
   const [delegate, setDelegate] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -253,15 +328,8 @@ function NewDelegationSheet({
   const docTypeOptions = documentTypes.data ?? [];
   const docTypeLabel = docTypeOptions.find((t) => t.value === docType)?.label;
 
-  const userOptions = useMemo(
-    () =>
-      Array.from(byId.values())
-        .filter((u) => !sameId(u.id, selfId) && u.status === "ACTIVE")
-        .map((u) => ({ value: u.id, label: u.full_name || u.email })),
-    [byId, selfId],
-  );
-
   const reset = () => {
+    setOnBehalfOf("");
     setDelegate("");
     setStartDate("");
     setEndDate("");
@@ -273,7 +341,7 @@ function NewDelegationSheet({
   // The save button mirrors this so it can't be clicked while the required
   // fields are missing or the date range is invalid.
   const datesOutOfOrder = !!startDate && !!endDate && new Date(endDate) < new Date(startDate);
-  const isValid = !!delegate && !!startDate && !!endDate && !datesOutOfOrder;
+  const isValid = !!delegator && !!delegate && !sameId(delegate, delegator) && !!startDate && !!endDate && !datesOutOfOrder;
 
   const handleSubmit = () => {
     if (!delegate || !startDate || !endDate) {
@@ -285,6 +353,7 @@ function NewDelegationSheet({
       return;
     }
     createDelegation({
+      ...(forSomebodyElse ? { delegator } : {}),
       delegate,
       // the picked days run from the school's midnight to its last second
       starts_at: zonedInstant(startDate, "00:00:00", dates.prefs.timeZone) ?? "",
@@ -294,8 +363,12 @@ function NewDelegationSheet({
       reason: reason.trim(),
     })
       .unwrap()
-      .then(() => {
-        toast.success("Delegation created.");
+      .then((created) => {
+        const reach = appliedToWaitingMessage(
+          created?.applied_to_waiting,
+          forSomebodyElse ? name(delegator) : "you",
+        );
+        toast.success("Delegation created.", reach ? { description: reach } : undefined);
         reset();
         onClose();
       })
@@ -308,19 +381,34 @@ function NewDelegationSheet({
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-white-02">
           <SheetTitle className="text-base font-semibold text-black-01">New Delegation</SheetTitle>
           <SheetDescription className="text-xs text-gray-01">
-            Your delegate receives your pending items and acts with your authority for the period.
+            {forSomebodyElse
+              ? `The delegate receives ${name(delegator)}'s pending items and acts with their authority for the period.`
+              : "Your delegate receives your pending items and acts with your authority for the period."}
           </SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          <SearchSelect
+          {canActForOthers && (
+            <PersonPicker
+              id="del-delegator"
+              label="On behalf of"
+              isRequired
+              activeOnly
+              placeholder="Whose approvals are handed over"
+              value={delegator}
+              onChange={setOnBehalfOf}
+            />
+          )}
+
+          <PersonPicker
             id="del-delegate"
             label="Delegate to"
             isRequired
+            activeOnly
             placeholder="Search an active approver…"
-            options={userOptions}
+            exclude={delegator ? [delegator] : undefined}
             value={delegate}
-            onChange={(e) => setDelegate(e.target.value)}
+            onChange={setDelegate}
           />
 
           <div className="grid grid-cols-2 gap-3">
@@ -359,8 +447,8 @@ function NewDelegationSheet({
               <p className="text-sm font-medium text-black-01">Exclusive delegation</p>
               <p className="text-xs text-gray-01">
                 {exclusive
-                  ? "Only your delegate will appear in approver queues during this period."
-                  : "Both you and your delegate can act - either vote counts."}
+                  ? "Only the delegate will appear in approver queues during this period."
+                  : "Both the delegator and the delegate can act - either vote counts."}
               </p>
             </div>
             <Switch checked={exclusive} onCheckedChange={setExclusive} />
@@ -383,8 +471,13 @@ function NewDelegationSheet({
               <strong>{dates.day(startDate)}</strong> to{" "}
               <strong>{dates.day(endDate)}</strong>,{" "}
               {docType ? humanizeDocumentType(docType, docTypeLabel) : "all"} approvals route to{" "}
-              <strong>{name(delegate)}</strong>.
-              {exclusive ? " You won't appear in queues during this period." : ""}
+              <strong>{name(delegate)}</strong>
+              {forSomebodyElse ? <> on behalf of <strong>{name(delegator)}</strong></> : null}.
+              {exclusive
+                ? forSomebodyElse
+                  ? ` ${name(delegator)} won't appear in queues during this period.`
+                  : " You won't appear in queues during this period."
+                : ""}
             </div>
           )}
         </div>
