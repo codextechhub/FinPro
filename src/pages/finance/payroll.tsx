@@ -11,6 +11,13 @@
  * and no line in a breakdown. A payslip or statutory schedule prints only when every
  * figure it lists is visible, because a printed zero reads as a real one.
  *
+ * One run may pay all staff. At a school with several branches it posts one
+ * journal per branch, each branch's share is paid from that branch's own bank
+ * account, the run reads Paid only when every share is, and it cannot be voided
+ * once any share is paid (see payroll-shares.ts). A run for all staff is raised
+ * by somebody who covers the whole school; a branch officer raises her own
+ * branch's, so the new-run drawer does not offer her the other.
+ *
  * Honest adaptations: deductions route only to PAYE/pension (the two payables the GL
  * has) - other deduction types (loans/union) are a noted backend expansion.
  * PAYE/pension are remitted via Tax Remittance.
@@ -26,7 +33,9 @@ import { routesPath } from "@/routes/routes-path";
 import { useGetTrialBalanceQuery } from "@/redux/services/finance/reports-api";
 import { useGetBranchOptionsQuery, type BranchOption } from "@/redux/services/tenants-api";
 import { FinanceShell } from "./finance-shell";
-import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, useFieldAccess, fieldWriteErrors, toArray, type Column, type FieldAccess, type FieldErrors, type TabStripItem, PostingDateField,} from "@/components/finance-ui";
+import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, useFieldAccess, fieldWriteErrors, toArray, type Column, type FieldAccess, type FieldErrors, type TabStripItem, PostingDateField, BankAccountPicker, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
+import { useReaderReach } from "../../host";
+import { isPartlyPaid, mayCancelRun, sharesOf, singleJournalBranch, unassignedStaffRefusal, unpaidShares } from "./payroll-shares";
 import { EmptyState } from "@/components/finance-ui/states";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
@@ -43,7 +52,7 @@ import {
   useDeleteEmployeeSalaryMutation, useGetSalaryStructuresQuery, useCreateSalaryStructureMutation,
   useUpdateSalaryStructureMutation, useDeleteSalaryStructureMutation,
 } from "@/redux/services/finance/ops-api";
-import type { PayrollLine, PayrollRun, EmployeeSalary, SalaryStructure, SalaryComponent, PayslipComponent } from "@/redux/services/finance/ops-types";
+import type { PayrollLine, PayrollRun, PayrollRunBranchShare, EmployeeSalary, SalaryStructure, SalaryComponent, PayslipComponent } from "@/redux/services/finance/ops-types";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
@@ -56,6 +65,8 @@ const RUN_STATUS: Record<string, { label: string; cls: string }> = {
   DRAFT: { label: "Draft", cls: "bg-gray-03/60 text-gray-05" },
   POSTED: { label: "Calculated", cls: "bg-blue-50 text-blue-700" },
   PAID: { label: "Paid", cls: "bg-green-01/10 text-green-01" },
+  PART_PAID: { label: "Partly paid", cls: "bg-amber-50 text-amber-800" },
+  AWAITING: { label: "Awaiting payment", cls: "bg-blue-50 text-blue-700" },
   CANCELLED: { label: "Cancelled", cls: "bg-destructive/10 text-destructive" },
 };
 function RunPill({ status }: { status: string }) {
@@ -209,7 +220,7 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
     { header: "Total gross", align: "right", cell: (r) => <Money kobo={r.gross_total} currency={currency} align="right" /> },
     { header: "Deductions", align: "right", cell: (r) => <Money kobo={r.paye_total + r.pension_total} currency={currency} align="right" /> },
     { header: "Net pay", align: "right", cell: (r) => <Money kobo={r.net_total} currency={currency} align="right" /> },
-    { header: "Status", cell: (r) => <RunPill status={r.run_status} /> },
+    { header: "Status", cell: (r) => <RunPill status={isPartlyPaid(r) ? "PART_PAID" : r.run_status} /> },
   ];
 
   return (
@@ -246,17 +257,30 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
   const { data } = useGetPayrollRunQuery(runId != null ? { id: runId, entity } : skipToken);
   const [post, { isLoading: posting }] = usePostPayrollRunMutation();
   const [cancelRun, { isLoading: cancelling }] = useCancelPayrollRunMutation();
+  const [unassigned, setUnassigned] = useState<{ runId: number; message: string; employees: string[] } | null>(null);
   const access = useFieldAccess(PAYROLL_LINE);
   const r = data?.data;
   if (runId == null || !r) return null;
+  const shares = sharesOf(r);
+  const status = isPartlyPaid(r) ? "PART_PAID" : r.run_status;
+  const refusal = unassigned?.runId === r.id ? unassigned : null;
+  // Only when the lines name more than one branch; a branch run's all read the same.
+  const showLineBranch = new Set(r.lines.map((l) => l.branch_name ?? null)).size > 1;
   const showName = !access.isHidden("employee_name");
   const figures = visibleFigures(access);
   const payslips = canPrintPayslip(access);
 
-  const doPost = async () => { try { const res = await post({ id: r.id, entity }).unwrap(); toast.success(res.message || "Run posted."); } catch { /* central */ } };
-  // Undo a run raised in error. Only offered before it's paid (DRAFT/POSTED); the
-  // backend refuses a paid run - reverse the disbursement first.
-  const canCancel = r.run_status === "DRAFT" || r.run_status === "POSTED";
+  const doPost = async () => {
+    setUnassigned(null);
+    try { const res = await post({ id: r.id, entity }).unwrap(); toast.success(res.message || "Run posted."); }
+    catch (error) {
+      // Answered here rather than by a toast: it names the people to fix.
+      const staff = unassignedStaffRefusal(error);
+      if (staff) setUnassigned({ runId: r.id, ...staff });
+    }
+  };
+  // Undo a run raised in error; see mayCancelRun for when it is still possible.
+  const canCancel = mayCancelRun(r);
   const isPosted = r.run_status === "POSTED";
   const doCancel = async () => { try { const res = await cancelRun({ id: r.id, entity }).unwrap(); toast.success(res.message || "Run cancelled."); setCancelOpen(false); } catch { /* central */ } };
 
@@ -268,7 +292,7 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
         widthClass="sm:max-w-3xl"
         footer={
           <>
-            <RunPill status={r.run_status} />
+            <RunPill status={status} />
             <div className="flex-1" />
             {canCancel ? <Can permission={P.FIN_POST_PAYROLL}><Button variant="outline" disabled={cancelling} onClick={() => setCancelOpen(true)} className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/5"><Ban className="size-4" />{isPosted ? "Void run" : "Cancel run"}</Button></Can> : null}
             {r.run_status === "DRAFT" ? <Can permission={P.FIN_POST_PAYROLL}><Button disabled={posting} onClick={doPost} className="gap-1.5"><Banknote className="size-4" />{posting ? "Posting…" : "Calculate & post"}</Button></Can> : null}
@@ -281,8 +305,25 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
             <Metric label="PAYE" kobo={r.paye_total} currency={currency} />
             <Metric label="Pension" kobo={r.pension_total} currency={currency} />
             <Metric label="Net" kobo={r.net_total} currency={currency} />
-            <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Status</p><div className="mt-1.5"><RunPill status={r.run_status} /></div></div>
+            <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Status</p><div className="mt-1.5"><RunPill status={status} /></div></div>
           </div>
+
+          {refusal ? (
+            <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <p className="font-mont text-xs font-semibold text-amber-900">This run was not posted: some staff have no branch</p>
+              {refusal.employees.length ? (
+                <ul className="mt-1.5 list-disc space-y-0.5 pl-5 font-mont text-xs text-amber-900">
+                  {refusal.employees.map((name) => <li key={name}>{name}</li>)}
+                </ul>
+              ) : <p className="mt-1 font-mont text-xs leading-5 text-amber-900">{refusal.message}</p>}
+              <p className="mt-1.5 font-mont text-xs leading-5 text-amber-900">Give each of them a branch under Employee salaries, then post the run again.</p>
+            </div>
+          ) : null}
+
+          {shares.length ? <BranchShares shares={shares} currency={currency} /> : null}
+          {r.run_status === "POSTED" && shares.some((share) => share.status === "PAID") ? (
+            <p className="font-mont text-[11px] text-gray-05">A branch&rsquo;s share has been paid, so this run can no longer be voided.</p>
+          ) : null}
 
           {showName || figures.length ? (
             <div>
@@ -291,6 +332,7 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
                 <table className="w-full border-collapse">
                   <thead><tr>
                     {showName ? <th className={thCls}>Employee</th> : null}
+                    {showLineBranch ? <th className={thCls}>Branch</th> : null}
                     {figures.map(([name, label]) => <th key={name} className={cn(thCls, "text-right")}>{label}</th>)}
                     {payslips ? <th className={thCls} /> : null}
                   </tr></thead>
@@ -298,6 +340,7 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
                     {r.lines.map((l) => (
                       <tr key={l.id}>
                         {showName ? <td className={tdCls}>{l.employee_name || "-"}</td> : null}
+                        {showLineBranch ? <td className={cn(tdCls, "text-gray-05")}>{l.branch_name || "No branch yet"}</td> : null}
                         {figures.map(([name]) => (
                           <td key={name} className={cn(tdCls, "text-right tabular-nums", name === "net_amount" && "font-medium")}><Money kobo={l[name] ?? 0} currency={currency} align="right" /></td>
                         ))}
@@ -333,15 +376,63 @@ function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null;
   );
 }
 
+/** Each branch's share of a run posted one journal per branch, and whether it is paid. */
+function BranchShares({ shares, currency }: { shares: PayrollRunBranchShare[]; currency?: string | null }) {
+  return (
+    <div>
+      <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">By branch · {shares.length}</p>
+      <div className="overflow-x-auto rounded-md border border-white-02">
+        <table className="w-full border-collapse">
+          <thead><tr>
+            <th className={thCls}>Branch</th>
+            <th className={cn(thCls, "text-right")}>Gross</th>
+            <th className={cn(thCls, "text-right")}>Net</th>
+            <th className={thCls}>Status</th>
+          </tr></thead>
+          <tbody>
+            {shares.map((share) => (
+              <tr key={share.id}>
+                <td className={tdCls}>{share.branch_name}</td>
+                <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={share.gross_total} currency={currency} align="right" /></td>
+                <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={share.net_total} currency={currency} align="right" /></td>
+                <td className={tdCls}><RunPill status={share.status === "POSTED" ? "AWAITING" : share.status} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function Metric({ label, kobo, currency }: { label: string; kobo: number; currency?: string | null }) {
   return <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">{label}</p><p className="mt-1 font-mont text-sm font-semibold tabular-nums text-black-01">{formatMoney(kobo, currency)}</p></div>;
 }
 
-function PayDrawer({ run, entity, currency, onClose }: { run: PayrollRun; entity: string; currency?: string | null; onClose: () => void }) {
+/**
+ * Pays a posted run's net wages.
+ *
+ * A run posted as one journal is paid from one account, of the run's own branch
+ * (left blank, the server uses its default). A run posted per branch is paid
+ * branch by branch: each unpaid share gets its own account picker, narrowed to
+ * that branch's accounts, and the shares given an account are paid together;
+ * any left blank stay unpaid until a later payment names theirs.
+ */
+export function PayDrawer({ run, entity, currency, onClose }: { run: PayrollRun; entity: string; currency?: string | null; onClose: () => void }) {
   const [payDate, setPayDate] = useState(run.pay_date || "");
+  const [bank, setBank] = useState("");
+  const [shareBanks, setShareBanks] = useState<Record<number, string>>({});
   const [pay, { isLoading }] = usePayPayrollRunMutation();
+  const shares = unpaidShares(run);
+  const perBranch = sharesOf(run).length > 0;
+  const chosen = shares.filter((share) => shareBanks[share.id]);
+  const amount = perBranch ? chosen.reduce((sum, share) => sum + share.net_total, 0) : run.net_total;
+  const ready = !!payDate && (!perBranch || chosen.length > 0);
   const submit = async () => {
-    try { const res = await pay({ id: run.id, entity, pay_date: payDate }).unwrap(); toast.success(res.message || "Net pay disbursed."); onClose(); }
+    const accounts = perBranch
+      ? { bank_accounts: chosen.map((share) => Number(shareBanks[share.id])) }
+      : bank ? { bank_account: Number(bank) } : {};
+    try { const res = await pay({ id: run.id, entity, pay_date: payDate, ...accounts }).unwrap(); toast.success(res.message || "Net pay disbursed."); onClose(); }
     catch { /* central */ }
   };
   return (
@@ -349,17 +440,34 @@ function PayDrawer({ run, entity, currency, onClose }: { run: PayrollRun; entity
       title="Pay net wages" description={`${run.document_number} · ${run.period_label || "-"}`} widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !payDate} onClick={submit} className="gap-1.5"><Banknote className="size-4" />{isLoading ? "Paying…" : `Pay ${formatMoney(run.net_total, currency)}`}</Button>
+        <Button disabled={isLoading || !ready} onClick={submit} className="gap-1.5"><Banknote className="size-4" />{isLoading ? "Paying…" : `Pay ${formatMoney(amount, currency)}`}</Button>
       </>}>
       <div className="space-y-4">
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
-          Disburses net pay ({formatMoney(run.net_total, currency)}) - Dr net-wages payable, Cr bank - clearing the liability raised when the run was posted.
+          {perBranch
+            ? "Each branch's net pay is paid from that branch's own account - Dr net-wages payable, Cr bank - clearing the liability raised when the run was posted. Pay some branches now and the rest later if you need to."
+            : `Disburses net pay (${formatMoney(run.net_total, currency)}) - Dr net-wages payable, Cr bank - clearing the liability raised when the run was posted.`}
         </p>
         <PostingDateField
           label="Payment date" entity={entity} value={payDate} onChange={setPayDate}
           notBefore={run.pay_date}
           notBeforeLabel={`payroll run ${run.document_number}`}
         />
+        {perBranch ? (
+          <div className="space-y-3">
+            {shares.map((share) => (
+              <FormField key={share.id} label={`${share.branch_name} · ${formatMoney(share.net_total, currency)}`}>
+                <BankAccountPicker entity={entity} value={shareBanks[share.id] ?? ""} placeholder="Not paying this branch now"
+                  onChange={(value) => setShareBanks((current) => ({ ...current, [share.id]: value }))}
+                  documentBranchId={share.branch_id} />
+              </FormField>
+            ))}
+          </div>
+        ) : (
+          <FormField label="Pay from">
+            <BankAccountPicker entity={entity} value={bank} onChange={setBank} placeholder="Default cash/bank" documentBranchId={singleJournalBranch(run)} />
+          </FormField>
+        )}
       </div>
     </DetailDrawer>
   );
@@ -373,7 +481,18 @@ const emptyEmp = (): EmpRow => ({ employee_name: "", gross: 0, paye: 0, pension:
  *  unanswered picker and a deliberate whole-school run are different states. */
 const WHOLE_SCHOOL = "all";
 
-function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: boolean; onClose: () => void; entity: string; currency?: string | null; perBranch: boolean }) {
+/**
+ * Raises a payroll run, from the roster or by hand.
+ *
+ * A run for all staff is raised only by somebody who covers the whole school
+ * (`useReaderReach().wholeSchool`). A branch officer at a school with several
+ * branches is refused one: at a central school the roster run is always for all
+ * staff, so she is offered only the hand-typed run, filed to her branch (and
+ * asked which, if she covers several); at a per-branch school she is offered her
+ * own branches and never "the whole school".
+ */
+export function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: boolean; onClose: () => void; entity: string; currency?: string | null; perBranch: boolean }) {
+  const { wholeSchool } = useReaderReach();
   const [mode, setMode] = useState("roster");
   const [payDate, setPayDate] = useState("");
   const [periodLabel, setPeriodLabel] = useState("");
@@ -383,6 +502,11 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
   const access = useFieldAccess(PAYROLL_LINE);
   // A manual line is a name and a gross; without both there is nothing to raise by hand.
   const manualAllowed = !access.isReadOnly("employee_name", { creating: true }) && !access.isReadOnly("gross_amount", { creating: true });
+  // A central school's roster run is for all staff, which a branch officer may not raise.
+  const rosterAllowed = perBranch || wholeSchool;
+  const activeMode = rosterAllowed ? mode : "manual";
+  // A central school's hand-typed run from a branch officer names her branch.
+  const manualBranch = useRaisingBranchChoice({ unless: perBranch || wholeSchool });
   const { data: rosterData } = useGetEmployeeSalariesQuery({ entity, is_active: "true" }, { skip: !open });
   const roster = useMemo(() => toArray(rosterData?.data), [rosterData]);
   const { data: branchData } = useGetBranchOptionsQuery(undefined, { skip: !open || !perBranch });
@@ -393,23 +517,24 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
   // refuses any other - so asking her would be a question with one answer. A
   // central school is never asked at all: its runs cover everybody by design.
   const asksForScope = perBranch && branches.length > 1;
+  const offersWholeSchool = wholeSchool;
   const [generate, { isLoading: generating }] = useGeneratePayrollRunMutation();
   const [create, { isLoading: creating }] = useCreatePayrollRunMutation();
   const isLoading = generating || creating;
 
   const setRow = (i: number, patch: Partial<EmpRow>) => setLines((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   const validLines = lines.filter((l) => l.employee_name.trim() && l.gross > 0);
-  const close = () => { setMode("roster"); setPayDate(""); setPeriodLabel(""); setScopeChoice(""); setLines([emptyEmp()]); setDenied(null); onClose(); };
+  const close = () => { setMode("roster"); setPayDate(""); setPeriodLabel(""); setScopeChoice(""); setLines([emptyEmp()]); setDenied(null); manualBranch.reset(); onClose(); };
 
   // Left out for a whole-school run and for a caller who was not asked, so the
   // backend applies its own rule rather than being told an answer we guessed.
   const branchArg = asksForScope && scopeChoice && scopeChoice !== WHOLE_SCHOOL
-    ? { branch: Number(scopeChoice) } : {};
+    ? { branch: Number(scopeChoice) } : manualBranch.body();
 
   const submit = async () => {
     setDenied(null);
     try {
-      if (mode === "roster") {
+      if (activeMode === "roster") {
         const res = await generate({ entity, pay_date: payDate, period_label: periodLabel.trim() || undefined, ...branchArg }).unwrap();
         toast.success(res.message || "Run generated.");
       } else {
@@ -435,22 +560,30 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
   // No default when she is asked. A whole-school run under per-branch payroll is
   // a legitimate thing to raise - head office does it - but it should be picked,
   // not fallen into by leaving a field alone.
-  const canSubmit = !!payDate && (!asksForScope || !!scopeChoice)
-    && (mode === "roster" ? covered.length > 0 : validLines.length > 0);
+  const canSubmit = !!payDate && (!asksForScope || !!scopeChoice) && manualBranch.ready
+    && (activeMode === "roster" ? covered.length > 0 : manualAllowed && validLines.length > 0);
 
   return (
     <DetailDrawer open={open} onOpenChange={(o) => (o ? undefined : close())}
       title="New payroll run" description="Generate from the employee roster, or enter lines manually."
-      widthClass={mode === "manual" ? "sm:max-w-4xl" : "sm:max-w-lg"}
+      widthClass={activeMode === "manual" ? "sm:max-w-4xl" : "sm:max-w-lg"}
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
         <Button disabled={isLoading || !canSubmit} onClick={submit} className="gap-1.5">
-          {mode === "roster" ? <Sparkles className="size-4" /> : <Plus className="size-4" />}
-          {isLoading ? "Working…" : mode === "roster" ? "Generate run" : "Create run"}
+          {activeMode === "roster" ? <Sparkles className="size-4" /> : <Plus className="size-4" />}
+          {isLoading ? "Working…" : activeMode === "roster" ? "Generate run" : "Create run"}
         </Button>
       </>}>
       <div className="space-y-4">
-        {manualAllowed ? <Segmented value={mode} onChange={setMode} options={[["roster", "From roster"], ["manual", "Manual"]]} /> : null}
+        {manualAllowed && rosterAllowed ? <Segmented value={mode} onChange={setMode} options={[["roster", "From roster"], ["manual", "Manual"]]} /> : null}
+        {!rosterAllowed ? (
+          <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
+            {manualAllowed
+              ? "A run for all staff from the roster is raised by someone who covers the whole school. You can raise one for your branch by entering its lines."
+              : "A run for all staff is raised by someone who covers the whole school, so there is no run for you to raise here."}
+          </p>
+        ) : null}
+        {!rosterAllowed ? <RaisingBranchChoiceField choice={manualBranch} /> : null}
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Period" ><Input value={periodLabel} onChange={(e) => setPeriodLabel(e.target.value)} placeholder="e.g. June 2026" className="h-9 bg-white" /></FormField>
           <PostingDateField label="Payment date" entity={entity} value={payDate} onChange={setPayDate} />
@@ -461,17 +594,19 @@ function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: bo
             <FormField label="This run covers" required>
               <Select value={scopeChoice} onChange={setScopeChoice}>
                 <option value="">Choose…</option>
-                <option value={WHOLE_SCHOOL}>The whole school</option>
+                {offersWholeSchool ? <option value={WHOLE_SCHOOL}>The whole school</option> : null}
                 {branches.map((b) => <option key={b.id} value={String(b.id)}>{b.name} only</option>)}
               </Select>
             </FormField>
             <p className="mt-1 font-mont text-[11px] text-gray-05">
-              This school runs payroll per branch. A whole-school run pays every branch at once, and no branch run can be raised for the same period afterwards.
+              {offersWholeSchool
+                ? "This school runs payroll per branch. A whole-school run pays every branch at once, and no branch run can be raised for the same period afterwards."
+                : "This school runs payroll per branch. Choose which of your branches this run pays."}
             </p>
           </div>
         ) : null}
 
-        {mode === "roster" ? (
+        {!rosterAllowed && !manualAllowed ? null : activeMode === "roster" ? (
           <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-3 font-mont text-[11px] text-gray-05">
             {asksForScope && !scopeChoice
               ? <>Choose what this run covers to see who it would pay.</>

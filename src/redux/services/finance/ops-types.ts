@@ -226,7 +226,25 @@ export interface PayrollLine {
   net_amount?: number; // Field Access: finance.payrollrun
   components?: PayslipComponent[]; // Field Access: finance.payrollrun
   cost_center: string | null;
+  // The branch the line's pay is booked to; absent from servers that do not say.
+  branch_id?: number | null;
+  branch_name?: string | null;
   _read_only_fields?: string[];
+}
+
+/** One branch's share of a run posted one journal per branch, and its payment. */
+export interface PayrollRunBranchShare {
+  id: number;
+  branch_id: number;
+  branch_name: string;
+  status: "POSTED" | "PAID" | "CANCELLED";
+  gross_total: number;
+  paye_total: number;
+  pension_total: number;
+  net_total: number;
+  journal_id: number | null;
+  disbursement_journal_id: number | null;
+  bank_account_id: number | null;
 }
 
 export interface EmployeeSalary {
@@ -300,6 +318,8 @@ export interface PayrollRun {
   pension_payable_account_id: number | null;
   journal_id: number | null;
   disbursement_journal_id: number | null;
+  // Empty unless the run posted one journal per branch; absent from older servers.
+  branch_shares?: PayrollRunBranchShare[];
   lines: PayrollLine[];
 }
 

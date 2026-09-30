@@ -295,7 +295,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/finance/payroll-runs/${id}/cancel/${qs({ entity })}`, method: "POST" }),
       invalidatesTags: ["FinancePayroll", "FinanceJournals", "FinanceReports"],
     }),
-    payPayrollRun: b.mutation<ApiEnvelope<PayrollRun>, Act & { bank_account?: string; pay_date?: string }>({
+    payPayrollRun: b.mutation<ApiEnvelope<PayrollRun>, Act & { bank_account?: string | number; bank_accounts?: number[]; pay_date?: string }>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/payroll-runs/${id}/pay/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePayroll", "FinanceJournals", "FinanceReports"],
     }),
