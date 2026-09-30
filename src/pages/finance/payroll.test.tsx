@@ -51,6 +51,7 @@ vi.mock("@/redux/services/tenants-api", () => ({ useGetBranchOptionsQuery: () =>
 vi.mock("../../host", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: null, covers: () => true }),
+  hostBranchLens: undefined,
 }));
 
 vi.mock("@/components/finance-ui", async (importOriginal) => ({

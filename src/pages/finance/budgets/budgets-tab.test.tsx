@@ -45,6 +45,7 @@ vi.mock("@/redux/store", () => ({
 vi.mock("../../../host", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useBranches: () => ({ data: [ANNEX, MAIN], isLoading: false, isError: false }),
+  hostBranchLens: undefined,
 }));
 
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
