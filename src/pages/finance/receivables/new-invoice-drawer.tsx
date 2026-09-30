@@ -10,7 +10,7 @@ import { toKobo } from "@/utils/money";
 import { Plus, Trash2 } from "lucide-react";
 import {
   DetailDrawer, Money, CustomerPicker, AccountPicker, TaxCodePicker, toArray, PostingDateField,
-  CUSTOMER_BRANCH_HINT, RaisingBranchChoiceField, useCustomerBranch, useRaisingBranchChoice,
+  customerBranchHint, RaisingBranchChoiceField, useCustomerBranch, useRaisingBranchChoice,
 } from "@/components/finance-ui";
 import { SearchSelect } from "@/components/custom/search-select";
 import { Input } from "@/components/ui/input";
@@ -49,7 +49,8 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
   const [post, setPost] = useState(true);
   const [lines, setLines] = useState<Line[]>([blankLine()]);
   const [create, { isLoading }] = useCreateInvoiceMutation();
-  const branch = useRaisingBranchChoice({ unless: useCustomerBranch(entity, customer) != null });
+  const customerBranch = useCustomerBranch(entity, customer);
+  const branch = useRaisingBranchChoice({ unless: customerBranch != null });
 
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -127,7 +128,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
         {/* customer & dates */}
         <div className="space-y-3">
           <CustomerPicker entity={entity} value={customer} onChange={setCustomer} label="Customer" isRequired placeholder="Type a customer name…" />
-          <RaisingBranchChoiceField choice={branch} hint={CUSTOMER_BRANCH_HINT} />
+          <RaisingBranchChoiceField choice={branch} hint={customerBranchHint(customerBranch)} />
           <div className="grid grid-cols-2 gap-3">
             <PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} />
             <label className="block space-y-1">

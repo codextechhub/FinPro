@@ -29,7 +29,7 @@ export { TabStrip, type TabStripItem, type TabStripProps, type TabStripVariant }
 export { AccountPicker, ReceivableAccountPicker, CustomerPicker, VendorPicker, CurrencyPicker, TaxCodePicker, CostCenterPicker, TaxObligationPicker, PettyCashFundPicker, BankAccountPicker, useCustomerBranch } from "./pickers";
 export {
   RaisingBranchField, RaisingBranchChoiceField, useRaisingBranch, useRaisingBranchChoice, useReaderBranchLens,
-  raisedBranchBody, raisingBranchReady, CUSTOMER_BRANCH_HINT, FEE_RUN_BRANCH_HINT, type RaisingBranch, type RaisingBranchChoice,
+  raisedBranchBody, raisingBranchReady, customerBranchHint, FEE_RUN_BRANCH_HINT, type RaisingBranch, type RaisingBranchChoice,
 } from "./raising-branch";
 export { LineEditor, emptyLine, toApiLines, type DocLine } from "./line-editor";
 export { useActiveEntity, useEntityCode } from "./use-entity";

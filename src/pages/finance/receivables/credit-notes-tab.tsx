@@ -21,7 +21,7 @@ import { Plus, Printer, Check, Search, Send } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, ConfirmActionModal, DetailDrawer, FormField,
   CustomerPicker, AccountPicker, CostCenterPicker, PostingRecap, Segmented, toArray, type Column, type RecapRow,
-  PostingDateField, CUSTOMER_BRANCH_HINT, RaisingBranchChoiceField, useCustomerBranch, useRaisingBranchChoice,} from "@/components/finance-ui";
+  PostingDateField, customerBranchHint, RaisingBranchChoiceField, useCustomerBranch, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -429,7 +429,7 @@ function IssueNoteDrawer({ open, onClose, entity, currency }: {
             loading={invQ.isFetching} disabled={!customer}
             placeholder={customer ? "Optional - search this customer's invoices" : "Select a customer first"} />
         </FormField>
-        <RaisingBranchChoiceField choice={branch} hint={CUSTOMER_BRANCH_HINT} />
+        <RaisingBranchChoiceField choice={branch} hint={customerBranchHint(customerBranch)} />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} /></FormField>

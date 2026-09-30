@@ -197,9 +197,18 @@ export function RaisingBranchField({ raising, value, onChange, label = "Branch",
   );
 }
 
-/** The hint under the Branch field of a document raised against a customer. */
-export const CUSTOMER_BRANCH_HINT =
-  "Used when the customer is shared by every branch. A customer filed under a branch keeps that branch.";
+/**
+ * The hint under the Branch field of a document raised against a customer.
+ *
+ * The field is asked only for a customer every branch shares (`null`), and says
+ * so. For a customer whose branch the server does not report (`undefined`) it
+ * says nothing, since it cannot tell which kind of customer this is.
+ */
+export function customerBranchHint(customerBranch: number | null | undefined): string | undefined {
+  return customerBranch === null
+    ? "This customer is shared by every branch, so name the branch this is for."
+    : undefined;
+}
 
 /** The hint under the Branch field of a fee run, which bills many customers. */
 export const FEE_RUN_BRANCH_HINT =

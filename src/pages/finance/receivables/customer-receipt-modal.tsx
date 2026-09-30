@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-  FormModal, FormField, AccountPicker, PostingDateField, CUSTOMER_BRANCH_HINT, RaisingBranchChoiceField,
+  FormModal, FormField, AccountPicker, PostingDateField, customerBranchHint, RaisingBranchChoiceField,
   useRaisingBranchChoice,
 } from "@/components/finance-ui";
 import { toKobo } from "@/utils/money";
@@ -61,7 +61,7 @@ export function CustomerReceiptModal({ open, onOpenChange, entity, customerId, c
         </FormField>
         <PostingDateField label="Receipt date" entity={entity} value={date} onChange={setDate} />
       </div>
-      <RaisingBranchChoiceField choice={branch} hint={CUSTOMER_BRANCH_HINT} />
+      <RaisingBranchChoiceField choice={branch} hint={customerBranchHint(customerBranchId)} />
       <FormField label="Method">
         <select value={method} onChange={(e) => setMethod(e.target.value)} className={selectCls} aria-label="Payment method">
           {METHODS.map((m) => <option key={m} value={m}>{methodLabel(m)}</option>)}

@@ -24,7 +24,7 @@ vi.mock("../../host", () => ({
 
 import {
   type ReaderBranchLens, RaisingBranchField, fallbackBranchLens, raisedBranchBody, raisingBranchFor, raisingBranchReady,
-  useReaderBranchLens,
+  useReaderBranchLens, customerBranchHint,
 } from "./raising-branch";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -162,5 +162,13 @@ describe("useReaderBranchLens", () => {
 
   it("derives a lens when the host supplies none", () => {
     expect(useReaderBranchLens).toBeTypeOf("function");
+  });
+});
+
+describe("customerBranchHint", () => {
+  it("says a shared customer's document names its branch, and says nothing when the customer's branch is unknown", () => {
+    expect(customerBranchHint(null)).toContain("shared by every branch");
+    expect(customerBranchHint(undefined)).toBeUndefined();
+    expect(customerBranchHint(10)).toBeUndefined();
   });
 });
