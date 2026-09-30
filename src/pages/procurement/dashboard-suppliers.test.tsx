@@ -77,7 +77,7 @@ describe("Spend & suppliers for the proprietor", () => {
       "80% of spend with 4 of 6 vendors", "Delivered on time", "+4 pts", "Accepted on receipt",
       "Spend without a PO", "over the limit", "Vendor scorecard", "A · strong", "C · watch",
       "Open RFQs", "1 of 2 quoted", "Ready to award", "What competition saved", "18.3% below the highest quote",
-      "Spend by branch", "School-wide", "How long buying takes", "Requisition approval is the slowest step",
+      "Spend by branch", "No branch yet", "How long buying takes", "Requisition approval is the slowest step",
       "Vendor base", "Still awaiting KYC checks"]) {
       expect(text).toContain(present);
     }

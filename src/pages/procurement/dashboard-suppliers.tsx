@@ -20,6 +20,7 @@ import {
   AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, plural,
 } from "../finance/dashboard-cards";
 import { useDates } from "../../lib/display-prefs";
+import { NO_BRANCH_YET } from "../../lib/branch-labels";
 
 type S = ProcurementSuppliersDashboard;
 const R = routesPath.PROTECTED.PROCUREMENT;
@@ -162,9 +163,9 @@ function BranchesCard({ rows, windowName, currency }: { rows: NonNullable<S["by_
       {rows.length === 0 ? <AllClear>No bills posted {windowName}.</AllClear> : (
         <div className="flex flex-1 flex-col justify-around gap-3">
           {rows.map((r) => (
-            <div key={r.branch ?? "school"} className="flex flex-col gap-1.5">
+            <div key={r.branch ?? "no-branch"} className="flex flex-col gap-1.5">
               <div className="flex items-baseline justify-between gap-2 font-mont text-[13px]">
-                <span className={cn("min-w-0 truncate", r.branch ? "font-medium text-gray-01" : "text-gray-05")}>{r.branch ?? "School-wide"}</span>
+                <span className={cn("min-w-0 truncate", r.branch ? "font-medium text-gray-01" : "text-gray-05")}>{r.branch ?? NO_BRANCH_YET}</span>
                 <span className="shrink-0 font-semibold tabular-nums">{compactMoney(r.amount.kobo, currency)}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-gray-03/50">

@@ -30,7 +30,7 @@ export interface AnalyticsSliceRow {
 }
 
 export interface AnalyticsSlice {
-  /** True when the figures cover only the reader's branches and the school-wide entries. */
+  /** True when the figures cover only the entries of the reader's branches. */
   narrowed?: boolean;
   entity: string;
   period: string | null;
@@ -41,7 +41,7 @@ export interface AnalyticsSlice {
 }
 
 export interface TrialBalance {
-  /** True when the figures cover only the reader's branches and the school-wide entries. */
+  /** True when the figures cover only the entries of the reader's branches. */
   narrowed?: boolean;
   entity: string;
   period: string | null;
@@ -78,7 +78,7 @@ export interface IncomeStatementTotals {
   prior_year: ReportMoney | null;
 }
 export interface IncomeStatement {
-  /** True when the figures cover only the reader's branches and the school-wide entries. */
+  /** True when the figures cover only the entries of the reader's branches. */
   narrowed?: boolean;
   entity: string;
   period: string | null;
@@ -106,7 +106,7 @@ export interface ArAgingRow {
 }
 
 export interface ArAging {
-  /** True when the figures cover only the reader's branches and the school-wide entries. */
+  /** True when the figures cover only the entries of the reader's branches. */
   narrowed?: boolean;
   entity: string;
   as_of: string;
@@ -129,7 +129,7 @@ export interface BalanceSheetSection {
   groups: BalanceSheetGroup[];
 }
 export interface BalanceSheet {
-  /** True when the figures cover only the reader's branches and the school-wide entries. */
+  /** True when the figures cover only the entries of the reader's branches. */
   narrowed?: boolean;
   entity: string;
   as_of: string;
@@ -149,7 +149,7 @@ export interface CashFlowLine {
   amount: ReportMoney;   // credit − debit on the non-cash leg: + = cash in, − = cash out
 }
 export interface CashFlow {
-  /** True when the figures cover only the reader's branches and the school-wide entries. */
+  /** True when the figures cover only the entries of the reader's branches. */
   narrowed?: boolean;
   entity: string;
   period: string | null;
@@ -173,7 +173,7 @@ export interface EquityColumn {
 }
 
 export interface ChangesInEquity {
-  /** True when the figures cover only the reader's branches and the school-wide entries. */
+  /** True when the figures cover only the entries of the reader's branches. */
   narrowed?: boolean;
   entity: string;
   period: string | null;
@@ -238,9 +238,9 @@ export interface FiscalRunway {
  *
  * The endpoint opens to anyone working in finance and computes each block only
  * for a reader who holds the key behind it, so every block may be `null`: absent,
- * not empty. `narrowed` says every figure covers only the reader's branches and
- * the school-wide entries, ledger figures included; the budget and the period
- * close are then always `null`, because both belong to the school as a whole.
+ * not empty. `narrowed` says every figure covers only the entries of the
+ * reader's branches, ledger figures included; the budget and the period close
+ * are then always `null`, because both belong to the school as a whole.
  */
 export interface FinanceDashboard {
   entity: string;

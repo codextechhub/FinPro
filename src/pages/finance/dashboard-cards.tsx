@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import type { FinanceDashboard } from "@/redux/services/finance/reports-types";
 import { useDates } from "../../lib/display-prefs";
+import { NO_BRANCH_YET } from "../../lib/branch-labels";
 import { DEFAULT_DISPLAY_PREFS, DEFAULT_TIME_ZONE, calendarDayOf, formatMonthName } from "../../utils/dates";
 
 type D = FinanceDashboard;
@@ -404,7 +405,7 @@ function rateColor(pct: number | null) {
 }
 
 export function BranchesCard({ rows, title, currency }: { rows: NonNullable<D["branches"]>; title: string; currency?: string | null }) {
-  const name = (r: (typeof rows)[number]) => r.name ?? "School-wide";
+  const name = (r: (typeof rows)[number]) => r.name ?? NO_BRANCH_YET;
   const billed = rows.reduce((sum, r) => sum + r.billed.kobo, 0);
   const collected = rows.reduce((sum, r) => sum + r.collected.kobo, 0);
   const overdue = rows.reduce((sum, r) => sum + r.overdue.kobo, 0);
