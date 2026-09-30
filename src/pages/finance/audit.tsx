@@ -23,7 +23,8 @@ import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates, type DateFormatter } from "../../lib/display-prefs";
 import { sinceDate } from "../../utils/date-presets";
-import { useIsSchool, wholeBooksLabel } from "../../lib/reader-words";
+
+const NO_BRANCH = "No branch";
 
 // Action tone: rejections read red, reversals/cancellations amber, master-data
 // edits blue, everything else (posts/approvals/completions) green.
@@ -99,13 +100,15 @@ const tdd = "border-t border-white-02 px-3 py-2 align-top font-mont text-xs";
  * The branch an audit entry belongs to, as the trail's Branch column shows it.
  *
  * An entry takes the branch of the document it is about. One with no branch is
- * about the whole books (a setting, a year close, a payroll run for the whole
- * school), so it reads as the books' whole-scope word rather than as a missing
- * value. A branch reader is never sent such entries; only a whole-school reader
- * sees them.
+ * either about the whole books (a setting, a year close) or about a document
+ * still waiting for its branch (an old quotation or journal an administrator
+ * has not placed), and the entry cannot tell which. "No branch" is true of both,
+ * where "School-wide" would call an unplaced transaction the whole school's.
+ * A branch reader is never sent such entries; only a whole-school reader sees
+ * them.
  */
-export function auditBranchLabel(log: Pick<FinanceAuditLog, "branch_name">, wholeBooks: string): string {
-  return log.branch_name || wholeBooks;
+export function auditBranchLabel(log: Pick<FinanceAuditLog, "branch_name">): string {
+  return log.branch_name || NO_BRANCH;
 }
 
 function AuditDetail({ log }: { log: FinanceAuditLog }) {
@@ -200,7 +203,6 @@ export default function FinanceAuditPage() {
   const actorOptions = useMemo(() => [{ value: "", label: "All actors" }, ...(facets?.actors ?? []).map((a) => ({ value: String(a.id), label: a.email }))], [facets]);
 
   const showBranch = useReaderBranchLens().applies;
-  const wholeBooks = wholeBooksLabel(useIsSchool());
 
   const columns: Column<FinanceAuditLog>[] = [
     { header: "When", cell: (l) => <span className="whitespace-nowrap tabular-nums text-gray-01">{dates.dateTime(l.created_at, null, { seconds: true })}</span> },
@@ -216,7 +218,7 @@ export default function FinanceAuditPage() {
         {l.action_display || l.action}
       </span>
     ) },
-    ...(showBranch ? [{ header: "Branch", cell: (l: FinanceAuditLog) => <span className="text-gray-05">{auditBranchLabel(l, wholeBooks)}</span> }] : []),
+    ...(showBranch ? [{ header: "Branch", cell: (l: FinanceAuditLog) => <span className="text-gray-05">{auditBranchLabel(l)}</span> }] : []),
     { header: "Entity", cell: (l) => l.target_type || "-" },
     { header: "Reference", cell: (l) => (
       <span className="font-mono text-xs text-gray-01">{l.document_number || (l.target_id ? `#${l.target_id}` : "-")}</span>
