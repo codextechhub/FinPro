@@ -11,6 +11,10 @@ export interface Invoice {
   customer_id: number;
   customer_code: string;
   customer_name: string;
+  // The invoice's own branch, which a payment against it is deposited for;
+  // absent from older servers.
+  branch_id?: number | null;
+  branch_name?: string | null;
   invoice_date: string;
   due_date: string | null;
   status: InvoiceStatus;
@@ -223,6 +227,10 @@ export interface PaymentPlan {
   customer_id: number;
   customer_code: string;
   customer_name: string;
+  // The plan's own branch (its invoice's when it spreads one); absent from
+  // older servers.
+  branch_id?: number | null;
+  branch_name?: string | null;
   invoice_id: number | null;
   invoice_number: string | null;
   plan_status: string;

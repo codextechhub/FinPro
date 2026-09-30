@@ -15,7 +15,7 @@ import { Plus, Search, Receipt, Ban } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField, Segmented,
   CustomerPicker, DepositAccountPicker, toArray, type Column,
-  PostingDateField, useCustomerBranch,} from "@/components/finance-ui";
+  PostingDateField, useDocumentBranch,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -270,8 +270,8 @@ function RecordInstallmentDrawer({ plan, installment, entity, currency, onClose 
   const [method, setMethod] = useState("BANK_TRANSFER");
   const [account, setAccount] = useState("");
   const [pay, { isLoading: saving }] = useRecordPaymentMutation();
-  // The invoice's branch where its customer's says it (see RecordPaymentModal).
-  const customerBranch = useCustomerBranch(entity, plan.customer_code);
+  // The plan's branch, which is its invoice's.
+  const invoiceBranch = useDocumentBranch(entity, plan);
   const canSubmit = amount > 0 && !!account && !!date;
 
   const submit = async () => {
@@ -311,7 +311,7 @@ function RecordInstallmentDrawer({ plan, installment, entity, currency, onClose 
               {METHODS.map((m) => <option key={m} value={m}>{m.replace("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}</option>)}
             </select>
           </FormField>
-          <FormField label="Deposit account" required><DepositAccountPicker entity={entity} value={account} onChange={setAccount} placeholder="Bank / cash" documentBranchId={customerBranch ?? undefined} /></FormField>
+          <FormField label="Deposit account" required><DepositAccountPicker entity={entity} value={account} onChange={setAccount} placeholder="Bank / cash" documentBranchId={invoiceBranch} /></FormField>
         </div>
       </div>
     </DetailDrawer>

@@ -19,6 +19,12 @@
  *
  * The payments screens ask for the customers and vendors the reader may raise a
  * gateway record for (`?own=true`); every other screen lists them all.
+ *
+ * A payment against an invoice is deposited for the invoice's own branch. Ikeja
+ * raises an invoice for the Adeyemis, whom every branch shares, so the customer
+ * names no branch and the invoice names Ikeja: its payment is offered Ikeja's
+ * collection ledger and the cash tin. From a server whose invoice rows do not
+ * name their branch it falls back to the customer's, as before.
  */
 
 import { act } from "react";
@@ -32,6 +38,8 @@ const mocks = vi.hoisted(() => ({
   branches: [] as { id: number; name: string }[] | undefined,
   ledgers: [] as Record<string, unknown>[],
   customerArgs: [] as Record<string, unknown>[],
+  customerSkips: [] as boolean[],
+  customers: [] as { code: string; branch_id?: number | null }[],
   vendorArgs: [] as Record<string, unknown>[],
   banks: [] as { id: number; name: string; bank_name: string; branch_id: number | null; is_active: boolean }[],
 }));
@@ -85,13 +93,17 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
 }));
 
 vi.mock("@/redux/services/finance/ar-api", () => ({
-  useGetCustomersQuery: (args: Record<string, unknown>) => { mocks.customerArgs.push(args); return { data: undefined, isLoading: false }; },
+  useGetCustomersQuery: (args: Record<string, unknown>, opts?: { skip?: boolean }) => {
+    mocks.customerArgs.push(args);
+    mocks.customerSkips.push(!!opts?.skip);
+    return { data: opts?.skip ? undefined : { data: mocks.customers }, isLoading: false };
+  },
 }));
 vi.mock("@/redux/services/procurement/procurement-api", () => ({
   useGetVendorsQuery: (args: Record<string, unknown>) => { mocks.vendorArgs.push(args); return { data: undefined, isLoading: false }; },
 }));
 
-import { BankAccountPicker, CustomerPicker, DepositAccountPicker, ReceivableAccountPicker, VendorPicker } from "./pickers";
+import { BankAccountPicker, CustomerPicker, DepositAccountPicker, ReceivableAccountPicker, VendorPicker, useDocumentBranch } from "./pickers";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -218,5 +230,44 @@ describe("Payments pickers", () => {
     act(() => root.render(<><CustomerPicker entity="CORONA" value="" onChange={() => undefined} /><VendorPicker entity="CORONA" value="" onChange={() => undefined} /></>));
     expect(mocks.customerArgs.at(-1)).not.toHaveProperty("own");
     expect(mocks.vendorArgs.at(-1)).not.toHaveProperty("own");
+  });
+});
+
+describe("useDocumentBranch", () => {
+  const ledger = (code: string, bank_account_id: number | null, bank_branch_id: number | null) =>
+    ({ id: Number(code), code, name: code, is_active: true, bank_account_id, bank_branch_id });
+
+  /** A payment form's deposit picker, narrowed as RecordPaymentModal narrows it. */
+  function PaymentDeposit({ doc }: { doc: { branch_id?: number | null; customer_code?: string } }) {
+    const branch = useDocumentBranch("CORONA", doc);
+    return <DepositAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={branch} />;
+  }
+  const offered = () => mocks.options.map((o) => o.value);
+
+  beforeEach(() => {
+    mocks.ledgers = [ledger("1110", 1, 10), ledger("1120", 2, 20), ledger("1100", null, null)];
+    mocks.customers = [{ code: "CADEY", branch_id: null }, { code: "COKAF", branch_id: 20 }];
+    mocks.customerSkips = [];
+  });
+
+  it("offers Ikeja's invoice for a shared customer Ikeja's ledger and the cash tin", () => {
+    act(() => root.render(<PaymentDeposit doc={{ branch_id: 10, customer_code: "CADEY" }} />));
+    expect(offered()).toEqual(["1110", "1100"]);
+    expect(mocks.customerSkips.every(Boolean)).toBe(true);
+  });
+
+  it("keeps an invoice raised before its customer moved to Lekki on Ikeja", () => {
+    act(() => root.render(<PaymentDeposit doc={{ branch_id: 10, customer_code: "COKAF" }} />));
+    expect(offered()).toEqual(["1110", "1100"]);
+  });
+
+  it("falls back to the customer's branch when the server's rows do not name one", () => {
+    act(() => root.render(<PaymentDeposit doc={{ customer_code: "COKAF" }} />));
+    expect(offered()).toEqual(["1120", "1100"]);
+  });
+
+  it("narrows nothing for a shared customer's invoice from such a server", () => {
+    act(() => root.render(<PaymentDeposit doc={{ customer_code: "CADEY" }} />));
+    expect(offered()).toEqual(["1110", "1120", "1100"]);
   });
 });

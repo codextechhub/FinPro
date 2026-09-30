@@ -118,6 +118,28 @@ export function useCustomerBranch(entity: string, code: string): number | null |
   return toArray(data?.data).find((c) => c.code === code)?.branch_id;
 }
 
+/**
+ * The branch a payment against document `doc` (an invoice, or the payment plan
+ * spreading one) is deposited for, as DepositAccountPicker's `documentBranchId`.
+ *
+ * The document's own `branch_id` decides where the server reports it, because
+ * it is not always the customer's: Ikeja's invoice for a family every branch
+ * shares is Ikeja's, and its payment goes only into Ikeja's bank accounts. A
+ * server whose rows do not name their branch, or a document not yet given
+ * one, falls back to the customer's branch, which is the invoice's whenever
+ * the customer is filed under one. Undefined while neither is known, so
+ * nothing is narrowed; the customer list is not read when the document
+ * answers for itself.
+ */
+export function useDocumentBranch(
+  entity: string,
+  doc: { branch_id?: number | null; customer_code?: string } | null | undefined,
+): number | undefined {
+  const own = doc?.branch_id ?? undefined;
+  const customerBranch = useCustomerBranch(entity, own === undefined ? (doc?.customer_code ?? "") : "");
+  return own ?? customerBranch ?? undefined;
+}
+
 /** Vendor picker - entity's active vendors; reports the vendor code. Used by
  *  payouts (a payout settles a vendor's payable). List-backed → reveal-on-search.
  *  `own` narrows to the vendors the reader may pay out to, as on CustomerPicker. */
