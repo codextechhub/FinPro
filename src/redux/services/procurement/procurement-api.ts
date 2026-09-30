@@ -132,7 +132,7 @@ export const procurementApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/procurement/requisitions/budget-availability/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcRequisitions"],
     }),
-    createRequisition: b.mutation<ApiEnvelope<Requisition>, { entity: string; title?: string; request_date: string; needed_by?: string; cost_center?: string; justification?: string; lines: Record<string, unknown>[] }>({
+    createRequisition: b.mutation<ApiEnvelope<Requisition>, { entity: string; branch?: number; title?: string; request_date: string; needed_by?: string; cost_center?: string; justification?: string; lines: Record<string, unknown>[] }>({
       query: ({ entity, ...body }) => ({ url: `/procurement/requisitions/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcRequisitions"],
     }),

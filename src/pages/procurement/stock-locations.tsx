@@ -10,28 +10,26 @@
  * the stock rather than carrying its cost across. A single transfer document is a
  * recorded gap in the backend, with no endpoint behind it.
  */
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { ChevronRight, FilePenLine, Plus, Star } from "lucide-react";
 
 import {
-  DataTable, DetailDrawer, FormDrawer, FormField, LoadingState, Money, StatusPill,
-  toArray, type Column,
+  DataTable, DetailDrawer, FormDrawer, LoadingState, Money, RaisingBranchField, StatusPill,
+  toArray, useRaisingBranch, type Column, FormField,
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
 import { P } from "../../permissions";
 import {
   useCreateStockLocationMutation, useGetStockBalancesQuery, useGetStockLocationsQuery,
   useUpdateStockLocationMutation,
 } from "@/redux/services/procurement/procurement-ext-api";
 import type { StockBalance, StockLocation } from "@/redux/services/procurement/procurement-types";
-import { useBranches } from "../../host";
-import { useIsSchool, wholeBooksLabel } from "../../lib/reader-words";
+import { noBranchLabel, useIsSchool } from "../../lib/reader-words";
 import { apiFieldError } from "@/utils/api-errors";
 import { ProcurementShell } from "./procurement-shell";
 import { EmptyPanel, Field } from "./sourcing/shared";
@@ -48,7 +46,7 @@ const fmtQty = (value?: string | null) => {
 
 export function LocationsSection({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
-  const wholeBooks = wholeBooksLabel(useIsSchool());
+  const noBranch = noBranchLabel(useIsSchool());
   const { can } = useCan();
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
@@ -86,7 +84,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
       header: "Location",
       cell: (l) => <div className="min-w-40"><p className="font-semibold">{l.name}</p><p className="mt-0.5 font-mont text-xs text-gray-05">{l.code}</p></div>,
     },
-    { header: "Branch", cell: (l) => l.branch_name || <span className="text-gray-05">{wholeBooks}</span> },
+    { header: "Branch", cell: (l) => l.branch_name || <span className="text-gray-05">{noBranch}</span> },
     { header: "Default", cell: (l) => (l.is_default ? <StatusPill status="DEFAULT" /> : <span className="text-gray-05">-</span>) },
     { header: "Status", cell: (l) => <StatusPill status={l.is_active ? "ACTIVE" : "INACTIVE"} /> },
     { header: "Created", cell: (l) => dates.day(l.created_at) },
@@ -153,10 +151,20 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
 }
 
 // ── Create / edit ────────────────────────────────────────────────────────────
+/**
+ * Creates or edits a store.
+ *
+ * A store belongs to one branch, and other branches requisition from it. At a
+ * school with several branches the form asks which branch, among those the
+ * reader works in, and a new store cannot be saved without one; a reader
+ * pinned to one branch, or a school with one, is not asked and the server
+ * files the store there. An edit sends the branch only when it is changed, so
+ * a store not yet given a branch can be given one here and is otherwise left
+ * as it is.
+ */
 function LocationForm({ entity, initial, isFirst, onClose }: {
   entity: string; initial?: StockLocation; isFirst: boolean; onClose: () => void;
 }) {
-  const wholeBooks = wholeBooksLabel(useIsSchool());
   const [code, setCode] = useState(initial?.code || "");
   const [name, setName] = useState(initial?.name || "");
   const [description, setDescription] = useState(initial?.description || "");
@@ -166,20 +174,17 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
   const [create, { isLoading: creating }] = useCreateStockLocationMutation();
   const [update, { isLoading: updating }] = useUpdateStockLocationMutation();
   const saving = creating || updating;
-
-  // Branches live behind school management, which a stock manager may not hold.
-  // When we cannot read them the field is simply absent and the store is
-  // entity-wide, which is a valid answer rather than missing data.
-  const branchQ = useBranches();
-  const branches = useMemo(() => toArray(branchQ.data), [branchQ.data]);
-  const branchesReadable = !branchQ.isError && (branchQ.isLoading || branches.length > 0);
+  const raising = useRaisingBranch();
+  const branchChanged = branch !== (initial?.branch_id ? String(initial.branch_id) : "");
+  // The field starts on the working branch for a new store.
+  const branchValue = !initial && !branch ? raising.initial : branch;
 
   const dirty = !initial
     || name !== initial.name
     || description !== (initial.description || "")
-    || branch !== (initial.branch_id ? String(initial.branch_id) : "")
+    || branchChanged
     || makeDefault;
-  const canSubmit = !!name.trim() && (!!initial || !!code.trim()) && dirty;
+  const canSubmit = !!name.trim() && (!!initial || !!code.trim()) && dirty && (!!initial || !raising.ask || !!branchValue);
 
   const save = async () => {
     if (!canSubmit) return;
@@ -188,7 +193,7 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
         const r = await update({
           id: initial.id, entity,
           name: name.trim(), description: description.trim(),
-          branch: branch ? Number(branch) : null,
+          ...(raising.ask && branchChanged && branch ? { branch: Number(branch) } : {}),
           // Only ever sent as true - the flag moves, it is never cleared directly.
           ...(makeDefault ? { is_default: true } : {}),
         }).unwrap();
@@ -197,7 +202,7 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
         const r = await create({
           entity, code: code.trim().toUpperCase(), name: name.trim(),
           description: description.trim() || undefined,
-          ...(branch ? { branch: Number(branch) } : {}),
+          ...(raising.ask && branchValue ? { branch: Number(branchValue) } : {}),
           // The server forces the first location to be the default; sending it
           // explicitly for a later one is what moves the flag.
           ...(makeDefault || isFirst ? { is_default: true } : {}),
@@ -215,7 +220,7 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
     <FormDrawer
       open onOpenChange={(o) => !saving && !o && onClose()}
       title={initial ? "Edit stock location" : "New stock location"}
-      description={initial ? "Update this store. Its code cannot be changed." : `A store stock is held in. Leave the branch blank and the store is ${wholeBooks.toLowerCase()}.`}
+      description={initial ? "Update this store. Its code cannot be changed." : "A store stock is held in, at one branch."}
       widthClass="sm:max-w-lg" onSubmit={save} submitText={initial ? "Save changes" : "Create"}
       loading={saving} canSubmit={canSubmit}
     >
@@ -234,15 +239,10 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
           <Input value={name} maxLength={200} onChange={(e) => setName(e.target.value)} className="bg-white" placeholder="Annex store" />
         </FormField>
       </div>
-      {branchesReadable && (
-        <FormField label="Branch">
-          <NativeSelect value={branch} disabled={branchQ.isLoading} onChange={(e) => setBranch(e.target.value)}>
-            <option value="">{wholeBooks}</option>
-            {branches.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
-          </NativeSelect>
-          <span className="mt-1 block font-mont text-[11px] leading-5 text-gray-05">Goods received at this branch land in this store by default.</span>
-        </FormField>
-      )}
+      <RaisingBranchField
+        raising={raising} value={branchValue} onChange={setBranch}
+        hint="Goods received at this branch land in this store by default. Other branches requisition from it."
+      />
       <FormField label="Description">
         <Input value={description} maxLength={255} onChange={(e) => setDescription(e.target.value)} className="bg-white" />
       </FormField>
@@ -262,7 +262,7 @@ function LocationForm({ entity, initial, isFirst, onClose }: {
 function LocationBalancesDrawer({ location, entity, currency, onClose }: {
   location: StockLocation | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
-  const wholeBooks = wholeBooksLabel(useIsSchool());
+  const noBranch = noBranchLabel(useIsSchool());
   // skipToken rather than `skip`: the argument expression is evaluated whether or
   // not the query runs, so reading `location.id` off a closed drawer threw before
   // the skip could matter.
@@ -278,14 +278,14 @@ function LocationBalancesDrawer({ location, entity, currency, onClose }: {
     <DetailDrawer
       open={!!location} onOpenChange={(o) => !o && onClose()}
       title={location ? location.name : "Stock location"}
-      description={location ? `${location.code}${location.branch_name ? ` · ${location.branch_name}` : ` · ${wholeBooks}`}` : ""}
+      description={location ? `${location.code}${location.branch_name ? ` · ${location.branch_name}` : ` · ${noBranch}`}` : ""}
       widthClass="sm:max-w-2xl"
     >
       {!location ? null : (
         <div className="space-y-5">
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">
             <Field label="Code" value={location.code} />
-            <Field label="Branch" value={location.branch_name || wholeBooks} />
+            <Field label="Branch" value={location.branch_name || noBranch} />
             <Field label="Default" value={location.is_default ? "Yes" : "No"} />
             <Field label="Status" value={location.is_active ? "Active" : "Inactive"} />
             <Field label="Description" value={location.description || "-"} />

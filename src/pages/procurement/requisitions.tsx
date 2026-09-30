@@ -17,7 +17,7 @@ import { SearchSelect } from "@/components/custom/search-select";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LoadingState,
   MoneyInput, StatCard, StatusPill, TabStrip, toArray, useActiveEntity, type Column,
-  type TabStripItem,
+  type TabStripItem, RaisingBranchChoiceField, useRaisingBranchChoice,
 } from "@/components/finance-ui";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can } from "@/components/finance-ui/can";
@@ -402,6 +402,8 @@ function RequisitionForm({ open, onClose, entity, currency, initial, onSaved }: 
     { entity, cost_center: costCenter, date: requestDate }, { skip: !costCenter },
   );
   const saving = creating || updating || submitting;
+  // A draft keeps the branch it was raised for.
+  const branch = useRaisingBranchChoice({ unless: !!initial });
 
   const catalog = toArray(catalogData?.data);
   const costCenters = toArray(costCenterData?.data).map((center) => ({ value: center.code, label: `${center.code} - ${center.name}` }));
@@ -412,7 +414,7 @@ function RequisitionForm({ open, onClose, entity, currency, initial, onSaved }: 
     estimated_unit_price: line.unitPriceKobo,
   }));
   const estimate = apiLines.reduce((total, line) => total + Math.round(line.quantity * line.estimated_unit_price), 0);
-  const canSave = !!title.trim() && !!requestDate && apiLines.length > 0;
+  const canSave = !!title.trim() && !!requestDate && apiLines.length > 0 && branch.ready;
 
   const setLine = (index: number, patch: Partial<FormLine>) => setLines((current) => current.map((line, i) => i === index ? { ...line, ...patch } : line));
   const chooseCatalog = (index: number, id: string) => {
@@ -430,7 +432,7 @@ function RequisitionForm({ open, onClose, entity, currency, initial, onSaved }: 
       if (initial) {
         await update({ id: initial.id, entity, title: title.trim(), cost_center: costCenter || undefined, request_date: requestDate, needed_by: neededBy || undefined, justification: justification.trim(), lines: apiLines }).unwrap();
       } else {
-        const response = await create({ entity, title: title.trim(), cost_center: costCenter || undefined, request_date: requestDate, needed_by: neededBy || undefined, justification: justification.trim(), lines: apiLines }).unwrap();
+        const response = await create({ entity, title: title.trim(), cost_center: costCenter || undefined, request_date: requestDate, needed_by: neededBy || undefined, justification: justification.trim(), lines: apiLines, ...branch.body() }).unwrap();
         id = response.data.id;
       }
       if (submitAfter && id) await submitReq({ id, entity }).unwrap();
@@ -470,6 +472,7 @@ function RequisitionForm({ open, onClose, entity, currency, initial, onSaved }: 
         <section className="space-y-3">
           <p className="font-mont text-sm font-semibold">Request Details</p>
           <FormField label="Title" required><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What is being requested?" /></FormField>
+          <RaisingBranchChoiceField choice={branch} hint="The branch the goods are for; its orders and receipts follow it." />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <FormField label="Cost Centre"><SearchSelect options={costCenters} value={costCenter} onChange={(e) => setCostCenter(e.target.value)} placeholder="Select cost centre" /></FormField>
             <FormField label="Request date" required><DatePickerInput value={requestDate} onChange={(e) => setRequestDate(e.target.value)} /></FormField>

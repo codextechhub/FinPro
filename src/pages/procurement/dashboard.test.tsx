@@ -38,6 +38,7 @@ vi.mock("@/components/layout/page-shell", () => ({
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useActiveEntity: () => ({ code: "HOLYCROSS", currency: "NGN", entity: null, isLoading: false }),
+  useRaisingBranch: () => ({ ask: false, choices: [], pinned: null, initial: "", isLoading: false }),
 }));
 vi.mock("@/redux/services/procurement/procurement-ext-api", () => ({
   useGetProcurementDashboardQuery: () => ({

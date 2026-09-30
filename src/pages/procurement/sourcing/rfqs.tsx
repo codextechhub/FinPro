@@ -15,6 +15,7 @@ import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, LineEditor,
   LoadingState, Money, MoneyInput, StatCard, StatusPill, ActionButton, TabStrip, emptyLine, toArray,
   useActiveEntity, useFieldAccess, type Column, type DocLine, type TabStripItem,
+  RaisingBranchChoiceField, useRaisingBranchChoice,
 } from "@/components/finance-ui";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
@@ -394,6 +395,8 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
   const [create, { isLoading: creating }] = useCreateRfqMutation();
   const [update, { isLoading: updating }] = useUpdateRfqMutation();
   const [issue, { isLoading: issuing }] = useIssueRfqMutation();
+  // An RFQ from a requisition takes the requisition's branch; a draft keeps its own.
+  const branch = useRaisingBranchChoice({ unless: !!initial || !!requisition });
 
   // When a requisition is picked, prefill lines from its own lines (create only).
   const { data: reqData } = useGetRequisitionQuery({ id: Number(requisition), entity }, { skip: !requisition || !!initial });
@@ -422,7 +425,7 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
     });
 
   const saving = creating || updating || issuing;
-  const valid = !!title.trim() && !!issueDate && apiLines.length > 0 && (!dueDate || dueDate >= issueDate);
+  const valid = !!title.trim() && !!issueDate && apiLines.length > 0 && (!dueDate || dueDate >= issueDate) && branch.ready;
   // Backend issue rule: an RFQ needs ≥1 line AND ≥1 invited vendor before it opens.
   const canIssue = valid && invited.length > 0;
   // Edit is gated on dirty too; create just needs validity.
@@ -445,7 +448,7 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
     try {
       const res = initial
         ? await update({ id: initial.id, entity, ...body }).unwrap()
-        : await create({ entity, ...body, ...(requisition ? { requisition: Number(requisition) } : {}) }).unwrap();
+        : await create({ entity, ...body, ...(requisition ? { requisition: Number(requisition) } : branch.body()) }).unwrap();
       if (issueAfter && !initial) await issue({ id: res.data.id, entity }).unwrap();
       toast.success(
         issueAfter ? "RFQ created and issued." : res.message || (initial ? "RFQ updated." : "RFQ created."),
@@ -479,6 +482,7 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
       <div className="space-y-4">
         <FormField label="Title" required><Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-white" /></FormField>
         {!initial && <FormField label="From requisition"><RequisitionPicker entity={entity} value={requisition} onChange={setRequisition} status="APPROVED" placeholder="Optional - prefill from an approved requisition" /></FormField>}
+        <RaisingBranchChoiceField choice={branch} hint="The branch the goods are for. An RFQ from a requisition takes the requisition's branch." />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField label="Issue date" required><DatePickerInput value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="bg-white" /></FormField>
           <FormField label="Response due"><DatePickerInput min={issueDate} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" /></FormField>

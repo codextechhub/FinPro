@@ -9,13 +9,17 @@
  * "Draft a requisition for all" asks the server to draft one requisition with a
  * line per low item at its suggested quantity (the server reads what is low
  * itself), then opens it. Nothing is submitted: the draft goes through review
- * and approval like any other requisition.
+ * and approval like any other requisition. The draft is raised for one branch:
+ * at a school with several, a reader who is not pinned to one names it beside
+ * the button, which starts on the branch she is working in.
  */
 
+import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router";
 import { FilePlus2 } from "lucide-react";
-import { Donut, useActiveEntity } from "@/components/finance-ui";
+import { Donut, raisedBranchBody, raisingBranchReady, useActiveEntity, useRaisingBranch } from "@/components/finance-ui";
+import { NativeSelect } from "@/components/ui/native-select";
 import { EmptyState } from "@/components/finance-ui/states";
 import { useCan } from "@/components/finance-ui/can";
 import { cn } from "@/lib/utils";
@@ -59,10 +63,13 @@ function RunningLowCard({ rows }: { rows: NonNullable<S["running_low"]> }) {
   const { can } = useCan();
   const { code: entity } = useActiveEntity();
   const [draft, { isLoading }] = useDraftRestockRequisitionMutation();
+  const raising = useRaisingBranch();
+  const [picked, setPicked] = useState("");
+  const branch = picked || raising.initial;
   const raise = async () => {
     if (!entity) return;
     try {
-      const r = await draft({ entity }).unwrap();
+      const r = await draft({ entity, ...raisedBranchBody(raising, branch) }).unwrap();
       toast.success(`${r.data.document_number || "Requisition"} drafted. Review it, then submit.`);
       navigate(`${R.REQUISITIONS}?document=${r.data.id}`);
     } catch { /* Central API handling shows the actionable error. */ }
@@ -71,10 +78,21 @@ function RunningLowCard({ rows }: { rows: NonNullable<S["running_low"]> }) {
   return (
     <Panel title="Running low" subtitle="At or below the reorder level"
       action={rows.length > 0 && can(P.PROC_CREATE_REQUISITION) ? (
-        <button type="button" onClick={raise} disabled={isLoading}
-          className="inline-flex shrink-0 items-center gap-1 font-mont text-xs font-semibold text-primary hover:underline disabled:opacity-60">
-          <FilePlus2 className="size-3.5" /> {isLoading ? "Drafting" : "Draft a requisition for all"}
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {raising.ask ? (
+            <div className="w-40 max-w-full">
+              <NativeSelect size="sm" value={branch} onChange={(e) => setPicked(e.target.value)} aria-label="Branch to restock for"
+                className="font-mont text-xs">
+                <option value="" disabled>Choose branch</option>
+                {raising.choices.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+              </NativeSelect>
+            </div>
+          ) : null}
+          <button type="button" onClick={raise} disabled={isLoading || !raisingBranchReady(raising, branch)}
+            className="inline-flex shrink-0 items-center gap-1 font-mont text-xs font-semibold text-primary hover:underline disabled:opacity-60">
+            <FilePlus2 className="size-3.5" /> {isLoading ? "Drafting" : "Draft a requisition for all"}
+          </button>
+        </div>
       ) : <LinkAction label="Stock" to={`${R.INVENTORY}/items`} />}>
       {rows.length === 0 ? <AllClear>Everything is above its reorder level.</AllClear> : (
         <>
