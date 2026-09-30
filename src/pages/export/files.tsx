@@ -200,7 +200,7 @@ export default function ExportFilesPage() {
       </div>
 
       <div className="grid gap-5 sm:grid-cols-3" data-guide="data-export-files.summary">
-        <KpiCard label="Ready to download" value={readyNow} foot="On this page" />
+        <KpiCard label="Ready to view" value={readyNow} foot="On this page" />
         <KpiCard
           label="Expiring within 7 days"
           value={expiringSoon}
