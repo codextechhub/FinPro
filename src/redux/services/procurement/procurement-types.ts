@@ -703,8 +703,10 @@ export interface StockItem {
 }
 
 /**
- * A place stock physically sits. Optionally tied to a branch; an entity-wide store
- * leaves `branch_id` null. Exactly one location per entity carries `is_default`.
+ * A place stock physically sits. At a school it belongs to one branch, and other
+ * branches requisition from it; `branch_id` is null only for a store not yet given
+ * a branch, or in books with no branches. Exactly one location per entity carries
+ * `is_default`.
  *
  * Every entity has at least one (existing data was migrated to a location coded
  * `MAIN`), so there is no null-location state anywhere. A school with one store must

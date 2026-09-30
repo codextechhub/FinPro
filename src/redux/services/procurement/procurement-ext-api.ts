@@ -189,7 +189,8 @@ export const procurementExtApi = baseApi.injectEndpoints({
     }),
     createStockLocation: b.mutation<ApiEnvelope<StockLocation>, {
       entity: string; code: string; name: string; description?: string;
-      // Branch id or branch code; omit entirely for an entity-wide store.
+      // Branch id or branch code. Required at a school with several branches unless
+      // the reader works in one; books with no branches omit it.
       branch?: string | number; is_default?: boolean; is_active?: boolean;
     }>({
       query: ({ entity, ...body }) => ({ url: `/procurement/stock-locations/${qs({ entity })}`, method: "POST", body }),
