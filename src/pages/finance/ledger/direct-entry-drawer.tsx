@@ -15,7 +15,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, BookCheck } from "lucide-react";
-import { DetailDrawer, MoneyInput, Money, AccountPicker, CostCenterPicker, toArray, PostingDateField,} from "@/components/finance-ui";
+import { DetailDrawer, MoneyInput, Money, AccountPicker, CostCenterPicker, toArray, PostingDateField, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { P } from "../../../permissions";
@@ -39,6 +39,7 @@ export function DirectEntryDrawer({ open, onClose, entity, currency }: {
   const [rows, setRows] = useState<Row[]>([emptyRow(), emptyRow()]);
   const [post, { isLoading }] = usePostDirectEntryMutation();
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "journal entry" });
+  const branch = useRaisingBranchChoice();
   // Analytical dimensions are optional: a product that does not use them grants
   // nobody finance.dimension.view, and asking anyway answered 403 on every
   // visit to this screen - a red toast for a field the caller was never going
@@ -56,7 +57,7 @@ export function DirectEntryDrawer({ open, onClose, entity, currency }: {
 
   const setRow = (i: number, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const reset = () => { setDate(""); setNarration(""); setReference(""); setRows([emptyRow(), emptyRow()]); };
+  const reset = () => { setDate(""); setNarration(""); setReference(""); setRows([emptyRow(), emptyRow()]); branch.reset(); };
   const close = () => { reset(); onClose(); };
 
   const submit = async () => {
@@ -71,7 +72,7 @@ export function DirectEntryDrawer({ open, onClose, entity, currency }: {
           ...(Object.keys(dimensions).length ? { dimensions } : {}),
         };
       });
-      const res = await post({ entity, date: date || undefined, narration, reference, lines }).unwrap();
+      const res = await post({ entity, date: date || undefined, narration, reference, lines, ...branch.body() }).unwrap();
       const waiting = res.data?.status === "PENDING_APPROVAL";
       toast.success(res.message || (waiting ? "Journal entry sent for approval." : "Direct entry posted."));
       close();
@@ -90,7 +91,7 @@ export function DirectEntryDrawer({ open, onClose, entity, currency }: {
         footer={
           <>
             <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
-            <Button data-guide="finance-journal.post" disabled={isLoading || !balanced || hasBlankAccount} onClick={submit} className="gap-1.5">
+            <Button data-guide="finance-journal.post" disabled={isLoading || !balanced || hasBlankAccount || !branch.ready} onClick={submit} className="gap-1.5">
               <BookCheck className="size-4" />{isLoading ? "Posting…" : "Post entry"}
             </Button>
           </>
@@ -110,6 +111,7 @@ export function DirectEntryDrawer({ open, onClose, entity, currency }: {
               <span className={fieldLabel}>Narration</span>
               <Input value={narration} onChange={(e) => setNarration(e.target.value)} placeholder="What is this entry for?" className="bg-white" />
             </label>
+            <RaisingBranchChoiceField choice={branch} hint="The branch whose books this entry belongs to." />
           </div>
 
           {/* postings */}

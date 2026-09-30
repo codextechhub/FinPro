@@ -102,6 +102,9 @@ export interface RaisingBranch {
   ask: boolean;
   /** The branches it offers when it asks. */
   choices: HostBranch[];
+  /** The reader's one branch when she is pinned to it; the server files her
+   *  transactions there without being told. */
+  pinned: number | null;
   /** The branch the field starts on: the one the reader is working in, when it
    *  is one of the choices, else the only choice, else none. */
   initial: string;
@@ -111,11 +114,11 @@ export interface RaisingBranch {
 /** The rule above, as plain data so it can be tested apart from React. */
 export function raisingBranchFor(lens: ReaderBranchLens): RaisingBranch {
   const ask = lens.applies && lens.pinnedBranch == null && lens.choices.length > 0;
-  if (!ask) return { ask, choices: [], initial: "", isLoading: lens.isLoading };
+  if (!ask) return { ask, choices: [], pinned: lens.pinnedBranch, initial: "", isLoading: lens.isLoading };
   const working = lens.branch !== "all" && lens.choices.some((b) => Number(b.id) === lens.branch)
     ? String(lens.branch)
     : lens.choices.length === 1 ? String(lens.choices[0].id) : "";
-  return { ask, choices: lens.choices, initial: working, isLoading: lens.isLoading };
+  return { ask, choices: lens.choices, pinned: null, initial: working, isLoading: lens.isLoading };
 }
 
 /** The raising-branch rule for the signed-in reader. */
@@ -157,6 +160,11 @@ export function useRaisingBranchChoice() {
     setValue: (branch: string) => setPicked(branch),
     reset: () => setPicked(null),
     ready: raisingBranchReady(raising, value),
+    /** The branch the new row will belong to, where the form knows it: the
+     *  one chosen, or the reader's own when she is pinned. Undefined at a
+     *  one-branch school or before a choice, which leaves a bank picker
+     *  un-narrowed. */
+    branchId: raising.ask ? (value ? Number(value) : undefined) : raising.pinned ?? undefined,
     body: (field = "branch") => raisedBranchBody(raising, value, field),
   };
 }

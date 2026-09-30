@@ -18,7 +18,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { Plus, Search, Trash2, Upload, RefreshCw, ListChecks, FileText, History, Settings as SettingsIcon, ArrowLeftRight, ChevronDown, Rows3, FileSpreadsheet, Download, Pencil, Undo2 } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
-import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, AccessField, useFieldAccess, fieldWriteErrors, type Column, type TabStripItem, type FieldErrors } from "@/components/finance-ui";
+import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, AccessField, useFieldAccess, fieldWriteErrors, RaisingBranchChoiceField, useRaisingBranchChoice, type Column, type TabStripItem, type FieldErrors } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -1101,8 +1101,9 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
   const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [create, { isLoading }] = useCreateBankAccountMutation();
   const access = useFieldAccess(BANK_ACCOUNT);
+  const branch = useRaisingBranchChoice();
 
-  const reset = () => { setName(""); setBankName(""); setAccountNumber(""); setGlAccount(""); setCurrency(""); setActive(true); setPrimary(false); setPrimaryCollection(false); setDenied(null); };
+  const reset = () => { setName(""); setBankName(""); setAccountNumber(""); setGlAccount(""); setCurrency(""); setActive(true); setPrimary(false); setPrimaryCollection(false); setDenied(null); branch.reset(); };
   const close = () => { reset(); onClose(); };
 
   const submit = async () => {
@@ -1114,6 +1115,7 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
         gl_account: glAccount,
         currency: currency || undefined, is_active: active, is_primary: primary,
         is_primary_collection: primaryCollection,
+        ...branch.body(),
       }).unwrap();
       toast.success(res.message || "Bank account created.");
       close();
@@ -1127,7 +1129,7 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
-        <Button disabled={isLoading || !name.trim() || !glAccount} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create account"}</Button>
+        <Button disabled={isLoading || !name.trim() || !glAccount || !branch.ready} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create account"}</Button>
       </>}
     >
       <div className="space-y-4">
@@ -1135,6 +1137,7 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
           The GL cash account is the ledger's book balance for this bank account (1:1). Money still only moves through journals - this adds the banking metadata and anchors reconciliation.
         </p>
         <FormField label="Account name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. GTBank Operations" className="bg-white" /></FormField>
+        <RaisingBranchChoiceField choice={branch} hint="This account pays and receives for this branch's documents only." />
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Bank name"><Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" className="bg-white" /></FormField>
           <AccessField access={access} name="account_number" label="Account number" creating errors={denied}>

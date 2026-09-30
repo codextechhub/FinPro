@@ -49,7 +49,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/finance/bank-accounts/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["FinanceBankAccounts", "FinanceStatementLines"],
     }),
-    createBankAccount: b.mutation<ApiEnvelope<BankAccount>, { entity: string; name: string; bank_name?: string; account_number?: string; gl_account: string; currency?: string; is_active?: boolean; is_primary?: boolean; is_primary_collection?: boolean }>({
+    createBankAccount: b.mutation<ApiEnvelope<BankAccount>, { entity: string; branch?: number; name: string; bank_name?: string; account_number?: string; gl_account: string; currency?: string; is_active?: boolean; is_primary?: boolean; is_primary_collection?: boolean }>({
       query: ({ entity, ...body }) => ({ url: `/finance/bank-accounts/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceBankAccounts"],
     }),
@@ -183,7 +183,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/expense-claims/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceExpenseClaims"],
     }),
-    createExpenseClaim: b.mutation<ApiEnvelope<ExpenseClaim>, { entity: string; claimant_name?: string; claim_date: string; title?: string; narration?: string; lines: { description: string; expense_account: string; quantity: number; unit_price: number; tax_code?: string; cost_center?: string }[] }>({
+    createExpenseClaim: b.mutation<ApiEnvelope<ExpenseClaim>, { entity: string; branch?: number; claimant_name?: string; claim_date: string; title?: string; narration?: string; lines: { description: string; expense_account: string; quantity: number; unit_price: number; tax_code?: string; cost_center?: string }[] }>({
       query: ({ entity, ...body }) => ({ url: `/finance/expense-claims/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceExpenseClaims"],
     }),
@@ -233,7 +233,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/finance/petty-cash-funds/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["FinancePettyCash"],
     }),
-    createPettyCashFund: b.mutation<ApiEnvelope<PettyCashFund>, { entity: string; name: string; gl_account: string; custodian_name?: string; float_amount?: number; currency?: string }>({
+    createPettyCashFund: b.mutation<ApiEnvelope<PettyCashFund>, { entity: string; branch?: number; name: string; gl_account: string; custodian_name?: string; float_amount?: number; currency?: string }>({
       query: ({ entity, ...body }) => ({ url: `/finance/petty-cash-funds/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePettyCash"],
     }),
@@ -404,7 +404,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/fixed-assets/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceFixedAssets"],
     }),
-    createFixedAsset: b.mutation<ApiEnvelope<FixedAsset>, { entity: string; name: string; asset_code?: string; category?: string; acquisition_date: string; cost: number; salvage_value?: number; useful_life_months: number; method?: string }>({
+    createFixedAsset: b.mutation<ApiEnvelope<FixedAsset>, { entity: string; branch?: number; name: string; asset_code?: string; category?: string; acquisition_date: string; cost: number; salvage_value?: number; useful_life_months: number; method?: string }>({
       query: ({ entity, ...body }) => ({ url: `/finance/fixed-assets/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceFixedAssets"],
     }),

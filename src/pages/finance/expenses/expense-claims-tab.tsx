@@ -21,7 +21,7 @@ import {
 import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField, ConfirmActionModal,
   AccountPicker, TaxCodePicker, CostCenterPicker, BankAccountPicker, toArray, type Column,
-  PostingDateField,} from "@/components/finance-ui";
+  PostingDateField, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
@@ -450,19 +450,20 @@ function NewClaimDrawer({ open, onClose, entity, currency }: { open: boolean; on
   const [uploadReceipt] = useUploadExpenseReceiptMutation();
   const [submitClaim, { isLoading: isSubmitting }] = useSubmitExpenseClaimMutation();
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "expense claim" });
+  const branch = useRaisingBranchChoice();
 
   const setLine = (i: number, patch: Partial<EditLine>) => setLines((s) => s.map((l, idx) => idx === i ? { ...l, ...patch } : l));
   const total = lines.reduce((s, l) => s + l.unit_price, 0);
   const valid = lines.filter((l) => l.description.trim() && l.expense_account && l.unit_price > 0);
-  const canSubmit = claimant.trim() !== "" && title.trim() !== "" && valid.length > 0;
+  const canSubmit = claimant.trim() !== "" && title.trim() !== "" && valid.length > 0 && branch.ready;
 
-  const reset = () => { setClaimant(""); setClaimDate(""); setTitle(""); setLines([emptyLine()]); setReceipts([]); };
+  const reset = () => { setClaimant(""); setClaimDate(""); setTitle(""); setLines([emptyLine()]); setReceipts([]); branch.reset(); };
   const close = () => { reset(); onClose(); };
 
   const persist = async (submitAfterCreate: boolean) => {
     try {
       const res = await create({
-        entity, claimant_name: claimant.trim(), claim_date: claimDate, title: title.trim(),
+        entity, claimant_name: claimant.trim(), claim_date: claimDate, title: title.trim(), ...branch.body(),
         lines: valid.map((l) => ({ description: l.description.trim(), expense_account: l.expense_account, quantity: 1, unit_price: l.unit_price, tax_code: l.tax_code || undefined, cost_center: l.cost_center || undefined })),
       }).unwrap();
       // Attach dropped receipts to the created lines in order.
@@ -520,6 +521,7 @@ function NewClaimDrawer({ open, onClose, entity, currency }: { open: boolean; on
           <PostingDateField label="Date" entity={entity} value={claimDate} onChange={setClaimDate} />
           <FormField label="Purpose" required><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Travel to workshop" className="bg-white" /></FormField>
         </div>
+        <RaisingBranchChoiceField choice={branch} hint="The branch whose spending this is; it is reimbursed from that branch's account." />
         <div>
           <div className="mb-2 flex items-center justify-between">
             <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Expense lines</p>

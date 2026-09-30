@@ -81,6 +81,8 @@ export interface DirectEntryLine {
 
 export interface DirectEntryPayload {
   entity: string;
+  /** The branch the entry is for, where the reader must name one. */
+  branch?: number;
   date?: string;
   narration?: string;
   reference?: string;

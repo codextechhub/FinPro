@@ -13,7 +13,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus, Sparkles, Banknote, PackageX } from "lucide-react";
-import { DataTable, Money, MoneyInput, DetailDrawer, FormField, BankAccountPicker, AccountPicker, PostingRecap, KpiCard, toArray, type Column, type RecapRow, PostingDateField,} from "@/components/finance-ui";
+import { DataTable, Money, MoneyInput, DetailDrawer, FormField, BankAccountPicker, AccountPicker, PostingRecap, KpiCard, toArray, type Column, type RecapRow, PostingDateField, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -312,14 +312,15 @@ function NewAssetDrawer({ open, onClose, entity, currency }: { open: boolean; on
   const [salvage, setSalvage] = useState(0);
   const [life, setLife] = useState("");
   const [create, { isLoading }] = useCreateFixedAssetMutation();
-  const close = () => { setName(""); setCode(""); setCategory("OTHER"); setMethod("STRAIGHT_LINE"); setAcqDate(""); setCost(0); setSalvage(0); setLife(""); onClose(); };
+  const branch = useRaisingBranchChoice();
+  const close = () => { setName(""); setCode(""); setCategory("OTHER"); setMethod("STRAIGHT_LINE"); setAcqDate(""); setCost(0); setSalvage(0); setLife(""); branch.reset(); onClose(); };
   const submit = async () => {
     try {
-      const r = await create({ entity, name: name.trim(), asset_code: code.trim() || undefined, category, method, acquisition_date: acqDate, cost, salvage_value: salvage, useful_life_months: Number(life) }).unwrap();
+      const r = await create({ entity, name: name.trim(), asset_code: code.trim() || undefined, category, method, acquisition_date: acqDate, cost, salvage_value: salvage, useful_life_months: Number(life), ...branch.body() }).unwrap();
       toast.success(r.message || "Asset created."); close();
     } catch { /* central */ }
   };
-  const canSubmit = !!name.trim() && cost > 0 && Number(life) >= 1;
+  const canSubmit = !!name.trim() && cost > 0 && Number(life) >= 1 && branch.ready;
   return (
     <DetailDrawer open={open} onOpenChange={(o) => (o ? undefined : close())}
       title="Add asset" description="Register a capital asset. Acquire it next to capitalise & schedule depreciation." widthClass="sm:max-w-lg"
@@ -329,6 +330,7 @@ function NewAssetDrawer({ open, onClose, entity, currency }: { open: boolean; on
       </>}>
       <div className="space-y-4">
         <FormField label="Asset name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Toyota Coaster 30-seat bus" className="h-9 bg-white" /></FormField>
+        <RaisingBranchChoiceField choice={branch} hint="The branch that holds the asset; it is bought and sold through that branch's accounts." />
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Tag / serial"><Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Optional" className="h-9 bg-white" /></FormField>
           <div>

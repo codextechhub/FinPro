@@ -15,7 +15,7 @@ import { Plus, Coins, ArrowDownToLine, RefreshCw, FileText, ListChecks, Ban, Sen
 import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField, ConfirmActionModal,
   AccountPicker, TaxCodePicker, BankAccountPicker, StatusPill, TabStrip, toArray, type Column,
-  type TabStripItem, PostingDateField,} from "@/components/finance-ui";
+  type TabStripItem, PostingDateField, RaisingBranchField, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -362,18 +362,20 @@ function EstablishFloatDrawer({ open, onClose, entity, currency, onCreated }: {
   const [create, { isLoading: creating }] = useCreatePettyCashFundMutation();
   const [establish, { isLoading: funding }] = useEstablishPettyCashMutation();
   const isLoading = creating || funding;
+  const branch = useRaisingBranchChoice();
 
   // The opening cash defaults to the ceiling (establish the full float) until the
   // user diverges it.
   const onCeiling = (v: number) => { setCeiling(v); setOpening((o) => (o === 0 || o === ceiling ? v : o)); };
 
-  const reset = () => { setName(""); setGlAccount(""); setCustodian(""); setCeiling(0); setOpening(0); setBank(""); setDate(""); };
+  const reset = () => { setName(""); setGlAccount(""); setCustodian(""); setCeiling(0); setOpening(0); setBank(""); setDate(""); branch.reset(); };
   const close = () => { reset(); onClose(); };
-  const canSubmit = name.trim() !== "" && glAccount !== "" && ceiling > 0 && opening > 0;
+  const canSubmit = name.trim() !== "" && glAccount !== "" && ceiling > 0 && opening > 0 && branch.ready;
+  const pickBranch = (next: string) => { branch.setValue(next); setBank(""); };
 
   const submit = async () => {
     try {
-      const res = await create({ entity, name: name.trim(), gl_account: glAccount, custodian_name: custodian.trim() || undefined, float_amount: ceiling }).unwrap();
+      const res = await create({ entity, name: name.trim(), gl_account: glAccount, custodian_name: custodian.trim() || undefined, float_amount: ceiling, ...branch.body() }).unwrap();
       const fund = res.data;
       if (fund) {
         await establish({ id: fund.id, entity, bank_account: bank || undefined, amount: opening, date }).unwrap();
@@ -399,6 +401,7 @@ function EstablishFloatDrawer({ open, onClose, entity, currency, onCreated }: {
           Creates the float (mapped 1:1 to its petty-cash GL account) at its <span className="font-medium">ceiling</span> - the imprest level Replenish restores it to - and moves the opening cash from the bank into the tin (Dr petty cash, Cr bank).
         </p>
         <FormField label="Float name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Front-desk float" className="h-9 bg-white" /></FormField>
+        <RaisingBranchField raising={branch.raising} value={branch.value} onChange={pickBranch} hint="The float is this branch's, and is topped up from this branch's accounts." />
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Petty-cash GL account" required><AccountPicker entity={entity} value={glAccount} onChange={setGlAccount} accountType="ASSET" postableOnly placeholder="Petty cash account" /></FormField>
           <FormField label="Custodian"><Input value={custodian} onChange={(e) => setCustodian(e.target.value)} placeholder="Who holds the tin" className="h-9 bg-white" /></FormField>
@@ -409,7 +412,7 @@ function EstablishFloatDrawer({ open, onClose, entity, currency, onCreated }: {
           <FormField label="Opening cash" required><MoneyInput valueKobo={opening} onChangeKobo={setOpening} currency={currency} className="[&_input]:h-9" /></FormField>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="From bank"><BankAccountPicker entity={entity} value={bank} onChange={setBank} placeholder="Default cash/bank" /></FormField>
+          <FormField label="From bank"><BankAccountPicker entity={entity} value={bank} onChange={setBank} placeholder="Default cash/bank" documentBranchId={branch.branchId} /></FormField>
           <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
         </div>
       </div>
