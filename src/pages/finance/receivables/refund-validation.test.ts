@@ -32,7 +32,7 @@ describe("refund credit rows", () => {
     expect(refundCreditSpansBranches([ikeja])).toBe(false);
     expect(refundCreditSpansBranches([ikeja, lekki])).toBe(true);
     expect(refundCreditBranchLabel(lekki)).toBe("Lekki Branch");
-    expect(refundCreditBranchLabel(unbranched)).toBe("School-wide");
+    expect(refundCreditBranchLabel(unbranched)).toBe("No branch yet");
   });
 
   it("sends the row's branch with the refund, and none for unbranched credit", () => {

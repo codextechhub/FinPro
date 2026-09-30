@@ -1,3 +1,5 @@
+import { NO_BRANCH_YET } from "../../../lib/branch-labels";
+
 export function refundAmountIsWithinAvailableCredit(
   amountKobo: number,
   availableKobo: number,
@@ -39,14 +41,16 @@ export function refundCreditSpansBranches(rows: RefundCreditRow[]): boolean {
 
 /** The branch a row's credit is held by, for a label. */
 export function refundCreditBranchLabel(row: RefundCreditRow): string {
-  return row.branch_name ?? "School-wide";
+  return row.branch_name ?? NO_BRANCH_YET;
 }
 
 /**
  * The `branch` a refund raised from this row sends.
  *
- * Omitted for unbranched credit, where the backend takes the customer's own branch,
- * which is school-wide for the school-wide customer such credit belongs to.
+ * A refund pays out only its own branch's credit, so a row's branch is the
+ * refund's. Omitted for credit with no branch: at a school with one branch the
+ * server files the refund under it; at a school with several, such credit is
+ * not yet given a branch and matches no branch's refund until it is.
  */
 export function refundRequestBranch(row: RefundCreditRow | null | undefined): number | undefined {
   return row?.branch_id ?? undefined;

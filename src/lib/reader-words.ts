@@ -1,4 +1,5 @@
 import { useAppSelector } from "@/redux/store";
+import { NO_BRANCH_YET } from "./branch-labels";
 
 /**
  * Whether the reader is working inside a school's books.
@@ -23,4 +24,16 @@ export function useIsSchool(): boolean {
  */
 export function wholeBooksLabel(isSchool: boolean): string {
   return isSchool ? "School-wide" : "Entity-wide";
+}
+
+/**
+ * The word for a transaction, or a store, that carries no branch.
+ *
+ * In a school's books every such row names a branch, so a blank one is a row
+ * not yet given one (`NO_BRANCH_YET`), never "School-wide". Books that have no
+ * branches at all (the platform's own) keep "Entity-wide", which is simply true
+ * there.
+ */
+export function noBranchLabel(isSchool: boolean): string {
+  return isSchool ? NO_BRANCH_YET : wholeBooksLabel(false);
 }
