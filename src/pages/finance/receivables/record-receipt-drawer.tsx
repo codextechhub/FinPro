@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { toKobo } from "@/utils/money";
 import { ArrowRight } from "lucide-react";
 import {
-  DetailDrawer, FormField, Money, CustomerPicker, AccountPicker, PostingDateField, toArray,
+  DetailDrawer, FormField, Money, CustomerPicker, DepositAccountPicker, PostingDateField, toArray,
   customerBranchHint, RaisingBranchChoiceField, useCustomerBranch, useRaisingBranchChoice,
 } from "@/components/finance-ui";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,8 @@ export function RecordReceiptDrawer({ open, onOpenChange, entity, currency, onCr
   const [record, { isLoading }] = useRecordCustomerReceiptMutation();
   const customerBranch = useCustomerBranch(entity, customer);
   const branch = useRaisingBranchChoice({ unless: customerBranch != null });
+  // The receipt's branch: the customer's, else the one named for it.
+  const receiptBranch = customerBranch != null ? customerBranch : branch.branchId;
 
   // Resolve account names for the posting preview (Dr bank, Cr AR control).
   const { data: coaData } = useGetTaggedAccountsQuery({ entity }, { skip: !open });
@@ -99,7 +101,7 @@ export function RecordReceiptDrawer({ open, onOpenChange, entity, currency, onCr
             <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-white" />
           </FormField>
           <FormField label="Bank account" required>
-            <AccountPicker entity={entity} value={account} onChange={setAccount} postableOnly accountType="ASSET" placeholder="Type a bank / cash account…" />
+            <DepositAccountPicker entity={entity} value={account} onChange={setAccount} documentBranchId={receiptBranch} />
           </FormField>
         </div>
         <FormField label="Reference">

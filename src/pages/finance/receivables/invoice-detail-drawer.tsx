@@ -286,6 +286,7 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
             entity={entity}
             invoiceId={inv.id}
             docNumber={inv.document_number}
+            customerCode={inv.customer_code}
             balanceKobo={s?.balance.kobo ?? inv.balance_due}
           />
           <RequestPaymentModal

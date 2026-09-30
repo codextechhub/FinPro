@@ -11,6 +11,11 @@
  * Mrs Okafor covers Ikeja and Lekki, and the server refuses to pay an Ikeja
  * claim from Lekki's account or from an account not yet given a branch. At a
  * school with one branch every account is that branch's, so all are offered.
+ *
+ * The deposit picker on a receipt does the same with ledger accounts: Ikeja's
+ * receipt is offered Ikeja's collection ledger and the cash tin, never Lekki's
+ * collection ledger, and a server whose rows do not name their bank narrows
+ * nothing.
  */
 
 import { act } from "react";
@@ -22,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   taggedCalls: 0,
   chartCalls: 0,
   branches: [] as { id: number; name: string }[] | undefined,
+  ledgers: [] as Record<string, unknown>[],
   banks: [] as { id: number; name: string; bank_name: string; branch_id: number | null; is_active: boolean }[],
 }));
 
@@ -40,7 +46,7 @@ const account = (code: string, name: string, account_type: string, tag: string |
   ({ id: Number(code), code, name, account_type, tag, is_postable, is_active: true, balance: null });
 
 vi.mock("@/redux/services/finance/setup-api", () => ({
-  useGetAccountsQuery: () => ({ data: undefined, isLoading: false }),
+  useGetAccountsQuery: () => ({ data: { data: mocks.ledgers }, isLoading: false }),
   useGetCurrenciesQuery: () => ({ data: undefined, isLoading: false }),
   useGetTaxCodesQuery: () => ({ data: undefined, isLoading: false }),
   useGetCostCentersQuery: () => ({ data: undefined, isLoading: false }),
@@ -73,7 +79,7 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetBankAccountsQuery: () => ({ isLoading: false, data: { data: mocks.banks } }),
 }));
 
-import { BankAccountPicker, ReceivableAccountPicker } from "./pickers";
+import { BankAccountPicker, DepositAccountPicker, ReceivableAccountPicker } from "./pickers";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -160,5 +166,31 @@ describe("BankAccountPicker for a batch", () => {
     act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchIds={[10, 20]} />));
 
     expect(offered()).toEqual([]);
+  });
+});
+
+describe("DepositAccountPicker", () => {
+  const offered = () => mocks.options.map((o) => o.value);
+  const ledger = (code: string, bank_account_id: number | null | undefined, bank_branch_id: number | null | undefined) =>
+    ({ id: Number(code), code, name: code, is_active: true, bank_account_id, bank_branch_id });
+
+  beforeEach(() => {
+    mocks.ledgers = [ledger("1110", 1, 10), ledger("1120", 2, 20), ledger("1100", null, null)];
+  });
+
+  it("offers an Ikeja receipt Ikeja's ledger and the cash tin, not Lekki's", () => {
+    act(() => root.render(<DepositAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={10} />));
+    expect(offered()).toEqual(["1110", "1100"]);
+  });
+
+  it("offers every account while the receipt's branch is not known", () => {
+    act(() => root.render(<DepositAccountPicker entity="CORONA" value="" onChange={() => undefined} />));
+    expect(offered()).toEqual(["1110", "1120", "1100"]);
+  });
+
+  it("narrows nothing when the server's rows do not name their bank", () => {
+    mocks.ledgers = [ledger("1110", undefined, undefined), ledger("1120", undefined, undefined)];
+    act(() => root.render(<DepositAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={10} />));
+    expect(offered()).toEqual(["1110", "1120"]);
   });
 });

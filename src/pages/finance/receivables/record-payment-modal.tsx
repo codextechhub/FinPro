@@ -1,9 +1,16 @@
-// Record payment - post a customer receipt against an invoice (Dr bank/cash, Cr AR)
-// and allocate it. Amount is entered in naira → sent as integer kobo. Prefilled with
-// the outstanding balance; the deposit account is the bank/cash GL account debited.
+/**
+ * Record payment - post a customer receipt against an invoice (Dr bank/cash, Cr AR)
+ * and allocate it. Amount is entered in naira → sent as integer kobo. Prefilled with
+ * the outstanding balance; the deposit account is the bank/cash GL account debited.
+ *
+ * The receipt takes the invoice's branch, and is deposited only into that branch's
+ * accounts. Invoice rows do not name their branch, but an invoice raised against a
+ * customer filed under a branch has that branch, so the deposit list narrows to it
+ * (`customerCode`); for a customer every branch shares it is not narrowed.
+ */
 import { useState } from "react";
 import { toast } from "sonner";
-import { FormModal, FormField, AccountPicker, PostingDateField,} from "@/components/finance-ui";
+import { FormModal, FormField, DepositAccountPicker, PostingDateField, useCustomerBranch,} from "@/components/finance-ui";
 import { toKobo } from "@/utils/money";
 import { Input } from "@/components/ui/input";
 import { useRecordPaymentMutation } from "@/redux/services/finance/ar-api";
@@ -12,10 +19,11 @@ const selectCls = "h-9 w-full rounded-md border border-white-02 bg-white px-2 fo
 const METHODS = ["BANK_TRANSFER", "CASH", "CARD", "CHEQUE", "ONLINE", "OTHER"] as const;
 const methodLabel = (m: string) => m.replace("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
-export function RecordPaymentModal({ open, onOpenChange, entity, invoiceId, docNumber, balanceKobo }: {
+export function RecordPaymentModal({ open, onOpenChange, entity, invoiceId, docNumber, balanceKobo, customerCode }: {
   open: boolean; onOpenChange: (o: boolean) => void; entity: string;
-  invoiceId: number; docNumber: string; balanceKobo: number;
+  invoiceId: number; docNumber: string; balanceKobo: number; customerCode?: string;
 }) {
+  const customerBranch = useCustomerBranch(entity, customerCode ?? "");
   // State initialises from props on mount; the parent remounts (via `key`) on each
   // open so the amount prefills with the current outstanding balance.
   const [amount, setAmount] = useState((balanceKobo / 100).toFixed(2));
@@ -62,7 +70,7 @@ export function RecordPaymentModal({ open, onOpenChange, entity, invoiceId, docN
         </select>
       </FormField>
       <FormField label="Deposit account (bank / cash)" required>
-        <AccountPicker entity={entity} value={account} onChange={setAccount} postableOnly accountType="ASSET" placeholder="Type a bank / cash account…" />
+        <DepositAccountPicker entity={entity} value={account} onChange={setAccount} documentBranchId={customerBranch ?? undefined} />
       </FormField>
       <FormField label="Reference">
         <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. txn ref / cheque no" className="bg-white" />

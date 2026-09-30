@@ -15,6 +15,10 @@ export interface Account {
   // Present only on the chart-of-accounts (?with_balance=true) response.
   balance?: { kobo: number; naira: string } | null;
   tag?: "CONTROL" | "CASH" | null;
+  // The bank account behind this ledger account, and that account's branch;
+  // null for a ledger account no bank account backs. Absent from older servers.
+  bank_account_id?: number | null;
+  bank_branch_id?: number | null;
 }
 
 export interface AccountActivityLine {

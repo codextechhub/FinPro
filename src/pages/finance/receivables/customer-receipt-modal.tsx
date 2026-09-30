@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-  FormModal, FormField, AccountPicker, PostingDateField, customerBranchHint, RaisingBranchChoiceField,
+  FormModal, FormField, DepositAccountPicker, PostingDateField, customerBranchHint, RaisingBranchChoiceField,
   useRaisingBranchChoice,
 } from "@/components/finance-ui";
 import { toKobo } from "@/utils/money";
@@ -29,6 +29,8 @@ export function CustomerReceiptModal({ open, onOpenChange, entity, customerId, c
   const [reference, setReference] = useState("");
   const [record, { isLoading }] = useRecordCustomerReceiptMutation();
   const branch = useRaisingBranchChoice({ unless: customerBranchId != null });
+  // The receipt's branch: the customer's, else the one named for it.
+  const receiptBranch = customerBranchId != null ? customerBranchId : branch.branchId;
 
   const kobo = toKobo(amount);
   const canSubmit = kobo > 0 && !!date && !!account && branch.ready;
@@ -68,7 +70,7 @@ export function CustomerReceiptModal({ open, onOpenChange, entity, customerId, c
         </select>
       </FormField>
       <FormField label="Deposit account (bank / cash)" required>
-        <AccountPicker entity={entity} value={account} onChange={setAccount} postableOnly accountType="ASSET" placeholder="Type a bank / cash account…" />
+        <DepositAccountPicker entity={entity} value={account} onChange={setAccount} documentBranchId={receiptBranch} />
       </FormField>
       <FormField label="Reference">
         <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. txn ref / cheque no" className="bg-white" />

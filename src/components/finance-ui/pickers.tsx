@@ -37,6 +37,44 @@ export function AccountPicker({ entity, value, onChange, label, placeholder = "S
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
 }
 
+/**
+ * Whether ledger account `account` may receive money for a document of branch
+ * `documentBranch`.
+ *
+ * A receipt is deposited only into a ledger account whose bank account belongs
+ * to the receipt's own branch. At a school with several branches a bank-backed
+ * account must match exactly (an account whose bank has no branch matches only
+ * a document with none); a ledger account no bank account backs, such as cash
+ * on hand, is not narrowed. At a school with one branch, or while the
+ * document's branch is not known (undefined), every account is offered, and so
+ * is every account from a server whose rows do not name their bank.
+ */
+export function depositAccountFits(
+  account: { bank_account_id?: number | null; bank_branch_id?: number | null },
+  documentBranch: number | null | undefined,
+  multiBranch: boolean,
+): boolean {
+  if (!multiBranch || documentBranch === undefined || account.bank_account_id == null) return true;
+  return (account.bank_branch_id ?? null) === documentBranch;
+}
+
+/**
+ * The deposit account for a receipt or an invoice payment: a postable asset
+ * account, narrowed to those that may receive a document of `documentBranchId`
+ * (see `depositAccountFits`). Reports the account code, as AccountPicker does.
+ */
+export function DepositAccountPicker({ entity, value, onChange, label, placeholder = "Type a bank / cash account…", isRequired, disabled, documentBranchId }: PickerProps & { documentBranchId?: number | null }) {
+  const { data, isLoading } = useGetAccountsQuery({ entity, is_postable: true, account_type: "ASSET" });
+  const { data: branchRows } = useBranches();
+  const accounts = toArray(data?.data);
+  const bankBranches = new Set(accounts.map((a) => a.bank_branch_id).filter((b) => b != null));
+  const multiBranch = (branchRows?.length ?? 0) > 1 || bankBranches.size > 1;
+  const options = accounts
+    .filter((a) => depositAccountFits(a, documentBranchId, multiBranch))
+    .map((a) => ({ value: a.code, label: `${a.code} · ${a.name}${a.is_active ? "" : " (Inactive)"}` }));
+  return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
+}
+
 /** Receivable control account picker - postable ASSET accounts tagged CONTROL
  *  (the AR control accounts a customer posts to), shown as a populated, searchable
  *  list. Sourced from the tagged chart, which computes the CONTROL tag without
