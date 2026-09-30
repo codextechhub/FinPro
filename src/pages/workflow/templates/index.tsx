@@ -3,6 +3,7 @@ import { createsWorkflowTemplates, platformName } from "@xvs/finance/host";
 import { useNavigate } from "react-router";
 import { Info, Plus, RefreshCw } from "lucide-react";
 import CustomTable from "@/components/custom/custom-table";
+import { listEmptyText } from "../list-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PermissionGate from "@/components/custom/permission-gate";
@@ -25,7 +26,7 @@ export default function WorkflowTemplates() {
 
   const isPlatformTenant = useAppSelector(selectIsPlatformTenant);
 
-  const { data, isLoading, isFetching, refetch } = useGetWorkflowTemplatesQuery(
+  const { data, error, isLoading, isFetching, refetch } = useGetWorkflowTemplatesQuery(
     { page },
     { refetchOnMountOrArgChange: true },
   );
@@ -120,7 +121,7 @@ export default function WorkflowTemplates() {
           tableHeaderList={TABLE_HEADERS}
           tableBodyList={tableData}
           loading={isLoading}
-          emptyText="No workflow templates published yet."
+          emptyText={listEmptyText(error, "No workflow templates published yet.", "view approval steps")}
           onRowClick={(row) => navigate(routesPath.PROTECTED.WORKFLOW.TEMPLATE_DETAIL(row._id))}
           perPage={data?.pagination?.pageSize}
           totalPage={data?.pagination?.totalPages}

@@ -42,6 +42,7 @@ import { BAND_SURFACE } from "../templates/components/template-builder-bits";
 import { DynamicRoleEditor } from "./dynamic-role-editor";
 import { draftFromDynamicRole, rulesPayload } from "./dynamic-role-form";
 import { DYNAMIC_ROLES_READ_ONLY } from "../workflow-reach";
+import { listEmptyText, listLoadedEmpty } from "../list-state";
 
 type EditorState = { role: DynamicRole | null } | null;
 
@@ -79,7 +80,7 @@ export default function DynamicRolesTab() {
 
   useActionParam("new", canCreate, () => setEditor({ role: null }));
 
-  const { data, isLoading, isFetching, refetch } = useGetDynamicRolesQuery(
+  const { data, error, isLoading, isFetching, refetch } = useGetDynamicRolesQuery(
     { page: 1, page_size: 100 },
     { refetchOnMountOrArgChange: true },
   );
@@ -156,7 +157,9 @@ export default function DynamicRolesTab() {
                 ))}
               </div>
             ) : roles.length === 0 ? (
-              <p className="px-1 py-8 text-center text-xs text-gray-01">No Dynamic Roles yet.</p>
+              <p className="px-1 py-8 text-center text-xs text-gray-01">
+                {listEmptyText(error, "No Dynamic Roles yet.", "view Dynamic Roles")}
+              </p>
             ) : (
               <ul className="space-y-1">
                 {roles.map((r) => {
@@ -208,10 +211,13 @@ export default function DynamicRolesTab() {
                   <Workflow className="size-6" />
                 </span>
                 <p className="mx-auto mt-3 max-w-md text-sm text-gray-01">
-                  No Dynamic Roles yet. Build one to send big purchases to the principal and
-                  the rest to the bursar, then pick it in any stage.
+                  {listEmptyText(
+                    error,
+                    "No Dynamic Roles yet. Build one to send big purchases to the principal and the rest to the bursar, then pick it in any stage.",
+                    "view Dynamic Roles",
+                  )}
                 </p>
-                {canCreate && (
+                {canCreate && listLoadedEmpty(error) && (
                   <Button className="mt-4" onClick={() => setEditor({ role: null })}>
                     <Plus /> New Dynamic Role
                   </Button>

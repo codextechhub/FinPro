@@ -12,6 +12,7 @@ import { useFilterParam } from "@/hooks/use-filter-param";
 import { useUserDirectory } from "@/pages/protected/workflow/components/use-user-directory";
 import { DocumentRef, InstanceStatusBadge } from "@/pages/protected/workflow/components/workflow-ui";
 import { PageShell } from "@/components/layout/page-shell";
+import { listEmptyText } from "../list-state";
 
 const TABLE_HEADERS = ["Document", "Template", "Status", "Current Stage", "Updated"];
 
@@ -30,7 +31,7 @@ export default function MySubmissions() {
   // Dashboard deep-link: "Returned submissions" lands here as ?status=RETURNED.
   useFilterParam("status", ["IN_PROGRESS", "RETURNED", "APPROVED", "REJECTED"] as const, setStatus);
 
-  const { data, isLoading, isFetching, refetch } = useGetMySubmissionsQuery(
+  const { data, error, isLoading, isFetching, refetch } = useGetMySubmissionsQuery(
     status === "all" ? undefined : { status },
     { refetchOnMountOrArgChange: true },
   );
@@ -108,7 +109,7 @@ export default function MySubmissions() {
           tableBodyList={tableData}
           loading={isLoading}
           hidePagination
-          emptyText="You haven't submitted any documents for approval yet."
+          emptyText={listEmptyText(error, "You haven't submitted any documents for approval yet.", "view your submissions")}
           onRowClick={(row) =>
             navigate(routesPath.PROTECTED.WORKFLOW.SUBMISSION_DETAIL(row._id))
           }

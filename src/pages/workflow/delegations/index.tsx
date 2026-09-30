@@ -40,6 +40,7 @@ import { InitialsAvatar } from "@/pages/protected/workflow/components/workflow-u
 import { humanizeDocumentType, sameId } from "@/pages/protected/workflow/components/workflow-format";
 import { PageShell } from "@/components/layout/page-shell";
 import { useDates } from "../../../lib/display-prefs";
+import { listEmptyText } from "../list-state";
 
 type DelegationState = "Active" | "Scheduled" | "Expired" | "Revoked";
 
@@ -68,7 +69,7 @@ export default function Delegations() {
   const [newOpen, setNewOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<ApprovalDelegation | null>(null);
 
-  const { data, isLoading, isFetching, refetch } = useGetDelegationsQuery(
+  const { data, error, isLoading, isFetching, refetch } = useGetDelegationsQuery(
     { page: 1, page_size: 100 },
     { refetchOnMountOrArgChange: true },
   );
@@ -143,9 +144,13 @@ export default function Delegations() {
                 <Users className="size-6" />
               </span>
               <p className="mt-3 text-sm text-gray-01">
-                {tab === "mine"
-                  ? "You haven't delegated your approvals to anyone."
-                  : "No one has delegated their approvals to you."}
+                {listEmptyText(
+                  error,
+                  tab === "mine"
+                    ? "You haven't delegated your approvals to anyone."
+                    : "No one has delegated their approvals to you.",
+                  "view delegations",
+                )}
               </p>
             </div>
           ) : (

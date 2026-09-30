@@ -56,6 +56,7 @@ import type {
 import { humanizeDocumentType } from "@/pages/protected/workflow/components/workflow-format";
 import AddMemberSheet from "./add-member-sheet";
 import { groupBranchIds, groupReadOnlySentence } from "../workflow-reach";
+import { listEmptyText, listLoadedEmpty } from "../list-state";
 
 const KIND_LABEL: Record<GroupMemberKind, string> = {
   USER: "Person",
@@ -104,7 +105,7 @@ export default function GroupsTab() {
   const [deleteTarget, setDeleteTarget] = useState<ApproverGroup | null>(null);
   const [inUse, setInUse] = useState("");
 
-  const { data, isLoading, isFetching, refetch } = useGetApproverGroupsQuery(
+  const { data, error, isLoading, isFetching, refetch } = useGetApproverGroupsQuery(
     { page: 1, page_size: 100 },
     { refetchOnMountOrArgChange: true },
   );
@@ -275,7 +276,7 @@ export default function GroupsTab() {
               </div>
             ) : shown.length === 0 ? (
               <p className="px-1 py-8 text-center text-xs text-gray-01">
-                {query ? `No group matches “${query}”.` : "No approver groups yet."}
+                {query ? `No group matches “${query}”.` : listEmptyText(error, "No approver groups yet.", "view approver groups")}
               </p>
             ) : (
               <ul className="space-y-1">
@@ -337,13 +338,17 @@ export default function GroupsTab() {
                   <Users className="size-6" />
                 </span>
                 <p className="mt-3 text-sm text-gray-01">
-                  No approver groups yet. Create one to route a workflow step at a named pool.
+                  {listEmptyText(
+                    error,
+                    "No approver groups yet. Create one to route a workflow step at a named pool.",
+                    "view approver groups",
+                  )}
                 </p>
-                <PermissionGate permission={P.CREATE_APPROVER_GROUP}>
+                {listLoadedEmpty(error) && <PermissionGate permission={P.CREATE_APPROVER_GROUP}>
                   <Button className="mt-4" onClick={() => setNewOpen(true)}>
                     <Plus /> New group
                   </Button>
-                </PermissionGate>
+                </PermissionGate>}
               </div>
             ) : (
               <>
