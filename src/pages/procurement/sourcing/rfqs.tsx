@@ -445,7 +445,7 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
     try {
       const res = initial
         ? await update({ id: initial.id, entity, ...body }).unwrap()
-        : await create({ entity, ...body }).unwrap();
+        : await create({ entity, ...body, ...(requisition ? { requisition: Number(requisition) } : {}) }).unwrap();
       if (issueAfter && !initial) await issue({ id: res.data.id, entity }).unwrap();
       toast.success(
         issueAfter ? "RFQ created and issued." : res.message || (initial ? "RFQ updated." : "RFQ created."),

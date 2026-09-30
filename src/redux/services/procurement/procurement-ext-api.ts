@@ -119,7 +119,7 @@ export const procurementExtApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/procurement/rfqs/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcRfqs"],
     }),
-    createRfq: b.mutation<ApiEnvelope<RfqDetail>, { entity: string; title?: string; issue_date: string; response_due_date?: string; budget_estimate?: number | null; invited_vendors?: string[]; notes?: string; lines: Record<string, unknown>[] }>({
+    createRfq: b.mutation<ApiEnvelope<RfqDetail>, { entity: string; branch?: number; requisition?: number; title?: string; issue_date: string; response_due_date?: string; budget_estimate?: number | null; invited_vendors?: string[]; notes?: string; lines: Record<string, unknown>[] }>({
       query: ({ entity, ...body }) => ({ url: `/procurement/rfqs/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcRfqs"],
     }),
@@ -279,7 +279,7 @@ export const procurementExtApi = baseApi.injectEndpoints({
         "WorkflowPending",
       ],
     }),
-    draftRestockRequisition: b.mutation<ApiEnvelope<{ id: number; document_number: string }>, { entity: string; item_ids?: number[] }>({
+    draftRestockRequisition: b.mutation<ApiEnvelope<{ id: number; document_number: string }>, { entity: string; item_ids?: number[]; branch?: number }>({
       query: ({ entity, ...body }) => ({ url: `/procurement/stock-items/restock-requisition/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcRequisitions"],
     }),
