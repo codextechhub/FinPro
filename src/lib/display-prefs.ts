@@ -80,6 +80,8 @@ export interface DateFormatter {
   time: (value: Value, branchId?: BranchId, options?: TimeOptions) => string;
   /** Today in the school's zone, or in a branch's own, `YYYY-MM-DD`. */
   today: (branchId?: BranchId) => string;
+  /** The zone a branch's times are read in: its own, else the school's. */
+  zoneFor: (branchId?: BranchId) => string;
 }
 
 /** Formatters for the signed-in school; see {@link DateFormatter}. */
@@ -101,6 +103,7 @@ export function useDates(): DateFormatter {
       dateTime: (value, branchId, options) => formatDateTime(value, forBranch(branchId), options),
       time: (value, branchId, options) => formatTime(value, forBranch(branchId), options),
       today: (branchId) => todayIn(forBranch(branchId).timeZone),
+      zoneFor: (branchId) => forBranch(branchId).timeZone,
     };
   }, [display]);
 }
