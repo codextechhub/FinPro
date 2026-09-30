@@ -224,7 +224,7 @@ export interface ProcurementSuppliersDashboard {
     }[];
   } | null;
   savings: { saved: ReportMoney; pct: number | null; rfqs: number; items: { name: string; saved: ReportMoney }[] } | null;
-  /** `branch` is null for school-wide bills. */
+  /** `branch` is null for bills not yet given a branch. */
   by_branch: { branch: string | null; amount: ReportMoney }[] | null;
   cycle_times: {
     steps: { key: "approval" | "ordering" | "delivery" | "payment"; median_days: number | null; samples: number }[];
@@ -237,8 +237,8 @@ export interface ProcurementSuppliersDashboard {
 /**
  * The Stock & receiving tab of the Procurement dashboard.
  *
- * Stock blocks answer for the reader's stores (their branches' and the
- * school-wide ones) and need stock view; `receipts` and `unbilled` need goods
+ * Stock blocks answer for the reader's stores (each store belongs to one
+ * branch) and need stock view; `receipts` and `unbilled` need goods
  * receipts; `expected` needs purchase orders. A block the reader may not see is
  * `null`.
  */

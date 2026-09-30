@@ -14,7 +14,7 @@ import { sameId } from "../../components/workflow/workflow-format";
 import {
   BankAccountPicker, DataTable, DetailDrawer, EmptyState, ErrorState, FormField,
   InfoHint, LoadingState, MoneyInput, PostingRecap, StatusPill, TabStrip, TaxCodePicker,
-  toArray, useActiveEntity, type Column, type TabStripItem,
+  toArray, useActiveEntity, useReaderBranchLens, type Column, type TabStripItem,
   PostingDateField,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -241,12 +241,13 @@ function PaymentForm({ entity, currency, initial, onClose }: { entity: string; c
   const [submit, { isLoading: submitting }] = useSubmitVendorPaymentMutation();
   const gross = Object.values(amounts).reduce((sum, amount) => sum + (amount || 0), 0);
   const allocations = Object.entries(amounts).filter(([, amount]) => amount > 0).map(([id, amount]) => ({ vendor_invoice: Number(id), amount }));
-  // The payment takes the chosen bills' branch when they share one, and is
-  // school-wide otherwise; that decides which accounts may pay it.
-  const billBranches = new Set(allocations.map((row) => invoices.find((invoice) => invoice.id === row.vendor_invoice)?.branch_id ?? null));
-  const paymentBranch = billBranches.size === 1 ? [...billBranches][0] : null;
+  const { applies: multiBranch } = useReaderBranchLens();
+  const { branch: paymentBranch, mixed: mixedBranches } = paymentBranchOf(
+    allocations.map((row) => invoices.find((invoice) => invoice.id === row.vendor_invoice)?.branch_id ?? null),
+    multiBranch,
+  );
   const loading = creating || updating || submitting;
-  const canSave = !!vendor && !!paymentDate && !!bank && allocations.length > 0 && gross > 0 && wht <= gross;
+  const canSave = !!vendor && !!paymentDate && !!bank && allocations.length > 0 && gross > 0 && wht <= gross && !mixedBranches;
   const save = async (andSubmit: boolean) => {
     if (!canSave) return;
     const body = { entity, vendor, payment_date: paymentDate, method, bank_account: Number(bank), wht_amount: wht, wht_tax_code: whtCode || undefined, reference: reference.trim() || undefined, narration: narration.trim() || undefined, allocations };
@@ -260,13 +261,31 @@ function PaymentForm({ entity, currency, initial, onClose }: { entity: string; c
   const setVendorAndReset = (value: string) => { setVendor(value); setAmounts({}); };
   return <DetailDrawer open onOpenChange={(open) => !open && onClose()} title={initial ? `Edit ${initial.document_number}` : "New Payment"} description="Disburse against approved and posted invoices" widthClass="sm:max-w-[720px]" footer={<><Button variant="outline" disabled={loading} onClick={onClose}>Cancel</Button><Button variant="outline" loading={loading} disabled={!canSave} onClick={() => save(false)}>Save Draft</Button><Button loading={loading} disabled={!canSave} onClick={() => save(true)}>{initial ? "Save & Submit" : "Create & Submit"}</Button></>}>
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={setVendorAndReset} /></FormField><FormField label="Method" required><select value={method} onChange={(event) => setMethod(event.target.value)} className="h-9 w-full rounded-md border bg-white px-3 font-mont text-sm">{["BANK_TRANSFER", "CHEQUE", "CASH", "CARD"].map((value) => <option key={value} value={value}>{value.replaceAll("_", " ")}</option>)}</select></FormField><PostingDateField label="Payment date" entity={entity} value={paymentDate} onChange={setPaymentDate} /><FormField label="Pay from" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={paymentBranch} /></FormField><FormField label="Reference"><Input value={reference} onChange={(event) => setReference(event.target.value)} className="bg-white" /></FormField><FormField label="WHT code"><TaxCodePicker entity={entity} value={whtCode} onChange={setWhtCode} placeholder="No WHT code" /></FormField></div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={setVendorAndReset} /></FormField><FormField label="Method" required><select value={method} onChange={(event) => setMethod(event.target.value)} className="h-9 w-full rounded-md border bg-white px-3 font-mont text-sm">{["BANK_TRANSFER", "CHEQUE", "CASH", "CARD"].map((value) => <option key={value} value={value}>{value.replaceAll("_", " ")}</option>)}</select></FormField><PostingDateField label="Payment date" entity={entity} value={paymentDate} onChange={setPaymentDate} /><FormField label="Pay from" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={paymentBranch} disabled={mixedBranches} /></FormField><FormField label="Reference"><Input value={reference} onChange={(event) => setReference(event.target.value)} className="bg-white" /></FormField><FormField label="WHT code"><TaxCodePicker entity={entity} value={whtCode} onChange={setWhtCode} placeholder="No WHT code" /></FormField></div>
       <FormField label="Narration"><Textarea value={narration} onChange={(event) => setNarration(event.target.value)} className="min-h-20 bg-white" /></FormField>
-      <section><div className="mb-2 flex items-center justify-between gap-3"><div><p className="font-mont text-xs font-semibold text-gray-01">Outstanding invoices</p><p className="mt-0.5 font-mont text-[11px] text-gray-05">Select the exact liability amounts the approver should review.</p></div><span className="font-mont text-sm font-semibold tabular-nums">{formatMoney(gross, currency)}</span></div>{!vendor ? <EmptyPanel>Select a vendor to load posted unpaid invoices.</EmptyPanel> : invoicesLoading ? <LoadingState rows={4} /> : invoices.length ? <div className="space-y-2">{invoices.map((invoice) => <InvoiceAllocationRow key={invoice.id} invoice={invoice} amount={amounts[invoice.id] || 0} currency={currency} onChange={(amount) => setAmounts((current) => ({ ...current, [invoice.id]: Math.min(amount, invoice.balance_due) }))} />)}</div> : <EmptyPanel>This vendor has no posted invoices with an outstanding balance.</EmptyPanel>}</section>
+      <section><div className="mb-2 flex items-center justify-between gap-3"><div><p className="font-mont text-xs font-semibold text-gray-01">Outstanding invoices</p><p className="mt-0.5 font-mont text-[11px] text-gray-05">Select the exact liability amounts the approver should review.</p></div><span className="font-mont text-sm font-semibold tabular-nums">{formatMoney(gross, currency)}</span></div>{mixedBranches ? <p role="alert" className="mb-2 font-mont text-[11px] leading-5 text-destructive">These bills belong to different branches. A payment settles one branch&rsquo;s bills from that branch&rsquo;s account, so pay each branch&rsquo;s bills separately.</p> : null}{!vendor ? <EmptyPanel>Select a vendor to load posted unpaid invoices.</EmptyPanel> : invoicesLoading ? <LoadingState rows={4} /> : invoices.length ? <div className="space-y-2">{invoices.map((invoice) => <InvoiceAllocationRow key={invoice.id} invoice={invoice} amount={amounts[invoice.id] || 0} currency={currency} onChange={(amount) => setAmounts((current) => ({ ...current, [invoice.id]: Math.min(amount, invoice.balance_due) }))} />)}</div> : <EmptyPanel>This vendor has no posted invoices with an outstanding balance.</EmptyPanel>}</section>
       <div className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-3"><Field label="Gross settled" value={formatMoney(gross, currency)} /><div><p className="font-mont text-[11px] text-gray-05">WHT withheld</p><MoneyInput valueKobo={wht} onChangeKobo={setWht} currency={currency} /></div><Field label="Net cash paid" value={formatMoney(Math.max(0, gross - wht), currency)} /></div>
       <PostingRecap title="Live posting preview" currency={currency} dr={[{ code: "AP", name: "Accounts payable", amount: gross }]} cr={[{ code: "BANK", name: "Selected bank account", amount: Math.max(0, gross - wht) }, ...(wht ? [{ code: "WHT", name: "Withholding tax payable", amount: wht }] : [])]} helper="No invoice balance changes until the approved payment is posted." />
     </div>
   </DetailDrawer>;
+}
+
+/**
+ * The branch a vendor payment takes from the bills it settles.
+ *
+ * A payment belongs to its bills' branch and is paid from that branch's
+ * account, so bills from two branches cannot share one (`mixed`). At a school
+ * with one branch a bill with no branch is that branch's, so it never mixes.
+ * `branch` is undefined until a bill is picked: the account list is then not
+ * narrowed.
+ */
+function paymentBranchOf(billBranches: (number | null)[], multiBranch: boolean): { branch: number | null | undefined; mixed: boolean } {
+  if (billBranches.length === 0) return { branch: undefined, mixed: false };
+  const distinct = new Set(billBranches);
+  const named = [...distinct].filter((b): b is number => b != null);
+  if (!multiBranch) return { branch: named[0] ?? null, mixed: named.length > 1 };
+  if (distinct.size > 1) return { branch: undefined, mixed: true };
+  return { branch: [...distinct][0], mixed: false };
 }
 
 function InvoiceAllocationRow({ invoice, amount, currency, onChange }: { invoice: VendorPaymentEligibleInvoice; amount: number; currency?: string | null; onChange: (amount: number) => void }) {

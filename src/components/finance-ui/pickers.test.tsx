@@ -7,9 +7,10 @@
  * is readable on any finance key; the picker must use it and offer only the
  * postable asset accounts tagged CONTROL.
  *
- * The bank account picker offers, for a document of a branch, only that
- * branch's accounts and the school-wide ones: Mrs Okafor covers Ikeja and Lekki,
- * and paying an Ikeja claim from Lekki's account is refused by the server.
+ * The bank account picker offers a document only its own branch's accounts:
+ * Mrs Okafor covers Ikeja and Lekki, and the server refuses to pay an Ikeja
+ * claim from Lekki's account or from an account not yet given a branch. At a
+ * school with one branch every account is that branch's, so all are offered.
  */
 
 import { act } from "react";
@@ -20,6 +21,12 @@ const mocks = vi.hoisted(() => ({
   options: [] as { value: string; label: string }[],
   taggedCalls: 0,
   chartCalls: 0,
+  branches: [] as { id: number; name: string }[] | undefined,
+  banks: [] as { id: number; name: string; bank_name: string; branch_id: number | null; is_active: boolean }[],
+}));
+
+vi.mock("../../host", () => ({
+  useBranches: () => ({ data: mocks.branches, isLoading: false, isError: mocks.branches === undefined }),
 }));
 
 vi.mock("@/components/custom/search-select", () => ({
@@ -63,10 +70,7 @@ const bank = (id: number, name: string, branch_id: number | null) =>
 vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetTaxObligationsQuery: () => ({ data: undefined, isLoading: false }),
   useGetPettyCashFundsQuery: () => ({ data: undefined, isLoading: false }),
-  useGetBankAccountsQuery: () => ({
-    isLoading: false,
-    data: { data: [bank(1, "Ikeja Collections", 10), bank(2, "Lekki Collections", 20), bank(3, "GTBank Operations", null)] },
-  }),
+  useGetBankAccountsQuery: () => ({ isLoading: false, data: { data: mocks.banks } }),
 }));
 
 import { BankAccountPicker, ReceivableAccountPicker } from "./pickers";
@@ -79,6 +83,8 @@ let root: Root;
 beforeEach(() => {
   mocks.taggedCalls = 0;
   mocks.chartCalls = 0;
+  mocks.branches = [{ id: 10, name: "Ikeja Branch" }, { id: 20, name: "Lekki Branch" }];
+  mocks.banks = [bank(1, "Ikeja Collections", 10), bank(2, "Lekki Collections", 20), bank(3, "GTBank Operations", null)];
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -107,31 +113,52 @@ describe("ReceivableAccountPicker", () => {
 describe("BankAccountPicker", () => {
   const offered = () => mocks.options.map((o) => o.label);
 
-  it("offers a branch's document its own branch's accounts and the school-wide ones", () => {
+  it("offers a branch's document only its own branch's accounts", () => {
     act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={10} />));
 
-    expect(offered()).toEqual(["Ikeja Collections", "GTBank Operations"]);
+    expect(offered()).toEqual(["Ikeja Collections"]);
   });
 
-  it("offers a school-wide document every account", () => {
+  it("offers a document not yet given a branch only the accounts not yet given one", () => {
     act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={null} />));
 
+    expect(offered()).toEqual(["GTBank Operations"]);
+  });
+
+  it("offers every account while the document's branch is not known", () => {
+    act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} />));
+
     expect(offered()).toEqual(["Ikeja Collections", "Lekki Collections", "GTBank Operations"]);
+  });
+
+  it("offers every account at a school with one branch", () => {
+    mocks.branches = [{ id: 10, name: "Main Branch" }];
+    mocks.banks = [bank(1, "Main Collections", 10), bank(3, "GTBank Operations", null)];
+    act(() => root.render(<BankAccountPicker entity="HARBOUR" value="" onChange={() => undefined} documentBranchId={10} />));
+
+    expect(offered()).toEqual(["Main Collections", "GTBank Operations"]);
+  });
+
+  it("still narrows when the branch list cannot be read but the accounts span two branches", () => {
+    mocks.branches = undefined;
+    act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={20} />));
+
+    expect(offered()).toEqual(["Lekki Collections"]);
   });
 });
 
 describe("BankAccountPicker for a batch", () => {
   const offered = () => mocks.options.map((o) => o.label);
 
-  it("offers lines of one branch that branch's accounts and the school-wide ones", () => {
-    act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchIds={[10, null, 10]} />));
+  it("offers lines of one branch that branch's accounts", () => {
+    act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchIds={[10, undefined, 10]} />));
 
-    expect(offered()).toEqual(["Ikeja Collections", "GTBank Operations"]);
+    expect(offered()).toEqual(["Ikeja Collections"]);
   });
 
-  it("offers lines of two branches only the school-wide accounts", () => {
+  it("offers lines of two branches no account at all", () => {
     act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchIds={[10, 20]} />));
 
-    expect(offered()).toEqual(["GTBank Operations"]);
+    expect(offered()).toEqual([]);
   });
 });

@@ -13,6 +13,7 @@ import { useGetCustomersQuery } from "@/redux/services/finance/ar-api";
 import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
 import { toArray } from "@/redux/services/finance/api-types";
 import { taxCodeSupportsUsage, type TaxCodeUsage } from "./tax-code-usage";
+import { useBranches } from "../../host";
 
 interface PickerProps {
   entity: string;
@@ -101,23 +102,51 @@ export function PettyCashFundPicker({ entity, value, onChange, label, placeholde
 }
 
 /**
+ * Whether bank account `account` may pay documents of every branch in
+ * `documentBranches`.
+ *
+ * A document is paid only from an account of its own branch: "This refund
+ * belongs to Lekki Branch. Pay it from a Lekki Branch account." At a school
+ * with several branches that is an exact match, and a row not yet given a
+ * branch (an account or a document from before rows carried one) matches only
+ * another such row. At a school with one branch every row is that branch's, so
+ * every account pays every document. An empty `documentBranches` means the
+ * document's branch is not known yet, and every account is offered.
+ */
+export function bankAccountPays(
+  account: { branch_id?: number | null },
+  documentBranches: (number | null)[],
+  multiBranch: boolean,
+): boolean {
+  if (!multiBranch) return true;
+  return documentBranches.every((b) => (account.branch_id ?? null) === b);
+}
+
+/**
  * Bank account picker - entity's named bank accounts; reports the account id.
  *
- * `documentBranchId` is the branch of the document being paid. A branch's
- * document is paid from that branch's account or a school-wide one, and the
- * server refuses any other, so with a branch given only those are offered.
- * Null (a school-wide document) or absent offers every account in the list.
+ * `documentBranchId` is the branch of the document being paid, and only the
+ * accounts that may pay it are offered (see `bankAccountPays`), so nobody picks
+ * an account only to be refused. Null is a document not yet given a branch;
+ * absent (undefined) is a document whose branch is not known yet.
  *
  * `documentBranchIds` is the same rule for one account shared by several
  * documents, as a batch of refunds is: an account is offered only when every
- * document may use it, so lines from two branches leave the school-wide ones.
+ * document may use it. Undefined entries are ignored.
+ *
+ * Whether the school runs several branches is read from the app's branch list,
+ * and also from the accounts themselves: accounts filed under two different
+ * branches prove it even where the branch list cannot be read.
  */
 export function BankAccountPicker({ entity, value, onChange, label, placeholder = "Select bank account", isRequired, disabled, documentBranchId, documentBranchIds }: PickerProps & { documentBranchId?: number | null; documentBranchIds?: (number | null | undefined)[] }) {
   const { data, isLoading } = useGetBankAccountsQuery({ entity, page: 1 });
-  const branches = [documentBranchId, ...(documentBranchIds ?? [])].filter((b): b is number => b != null);
-  const options = toArray(data?.data)
-    .filter((a) => a.is_active)
-    .filter((a) => a.branch_id == null || branches.every((b) => b === a.branch_id))
+  const { data: branchRows } = useBranches();
+  const accounts = toArray(data?.data).filter((a) => a.is_active);
+  const accountBranches = new Set(accounts.map((a) => a.branch_id).filter((b) => b != null));
+  const multiBranch = (branchRows?.length ?? 0) > 1 || accountBranches.size > 1;
+  const documents = [documentBranchId, ...(documentBranchIds ?? [])].filter((b): b is number | null => b !== undefined);
+  const options = accounts
+    .filter((a) => bankAccountPays(a, documents, multiBranch))
     .map((a) => ({ value: String(a.id), label: a.bank_name ? `${a.name} · ${a.bank_name}` : a.name }));
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} />;
 }

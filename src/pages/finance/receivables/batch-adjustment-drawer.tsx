@@ -32,7 +32,7 @@ import type {
   ArAdjustmentBatchKind,
 } from "@/redux/services/finance/ar-types";
 import { formatMoney } from "@/utils/money";
-import { batchAdjustmentLinesAreValid } from "./batch-adjustment-validation";
+import { batchAdjustmentLinesAreValid, refundBatchBranches } from "./batch-adjustment-validation";
 import {
   refundCreditBranchLabel,
   refundCreditKey,
@@ -51,6 +51,10 @@ import {
  * number the backend no longer agrees with. It is derived on every render instead.
  */
 type Line = { id: number; target: string; amount: number };
+
+/** "A", "A and B", "A, B and C". */
+const joinNames = (names: string[]) =>
+  names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 let lineSequence = 1;
 const newLine = (): Line => ({ id: lineSequence++, target: "", amount: 0 });
 
@@ -170,7 +174,10 @@ export function BatchAdjustmentDrawer({
       .map((line) => line.target),
   );
   const canCreateKind = writeOff ? canCreateWriteOff : canCreateRefund;
-  const canSubmit = canCreateKind && valid && !!date && (writeOff || !!bankAccount);
+  // A batch pays one branch's refunds; see refundBatchBranches.
+  const lineBranches = writeOff ? [] : refundBatchBranches(lines.map((line) => refundTargetFor(line.target)));
+  const spansBranches = lineBranches.length > 1;
+  const canSubmit = canCreateKind && valid && !!date && (writeOff || (!!bankAccount && !spansBranches));
 
   const recap = useMemo<{ dr: RecapRow[]; cr: RecapRow[] }>(() => writeOff
     ? {
@@ -332,8 +339,15 @@ export function BatchAdjustmentDrawer({
             <FormField label="Refund bank account" required>
               <BankAccountPicker
                 entity={entity} value={bankAccount} onChange={setBankAccount}
-                documentBranchIds={lines.map((line) => refundTargetFor(line.target)?.branch_id)}
+                documentBranchIds={lineBranches.map((branch) => branch.id)}
+                disabled={spansBranches}
               />
+              {spansBranches ? (
+                <p role="alert" className="font-mont text-[11px] leading-5 text-destructive">
+                  These lines belong to {joinNames(lineBranches.map((branch) => branch.name ?? "credit not yet given a branch"))}.
+                  A batch pays one branch&rsquo;s refunds from that branch&rsquo;s account, so run each branch as its own batch.
+                </p>
+              ) : null}
             </FormField>
           )}
         </div>

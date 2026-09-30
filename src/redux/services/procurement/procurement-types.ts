@@ -433,7 +433,7 @@ export interface VendorPaymentEligibleInvoice {
   document_number: string;
   vendor_id: number;
   vendor_code: string;
-  // The bill's branch, which a payment settling it inherits; null is school-wide.
+  // The bill's branch, which a payment settling it inherits; null for a bill not yet given one.
   branch_id?: number | null;
   invoice_date: string;
   due_date: string | null;
