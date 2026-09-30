@@ -13,8 +13,8 @@ import type { SpendAnalysis } from "@/redux/services/procurement/procurement-ext
 import { formatMoney } from "@/utils/money";
 import { isForbidden } from "../sourcing/helpers";
 import { Field } from "../sourcing/shared";
-import { Card, ChartEmpty, DateFilter, HBars, Meter, ScopeNote, SectionHeader } from "./shared";
-import { DONUT_COLORS, TD, TDR, TH, THR, excludedScopeNote, kobo, type SectionProps } from "./helpers";
+import { Card, ChartEmpty, DateFilter, HBars, Meter, SectionHeader } from "./shared";
+import { DONUT_COLORS, TD, TDR, TH, THR, kobo, type SectionProps } from "./helpers";
 import { PageShell } from "@/components/layout/page-shell";
 
 export default function SpendScreen({ entity, currency }: SectionProps) {
@@ -68,10 +68,6 @@ function SpendBody({ d, currency, entity, start, end }: {
         <StatCard label="Tax" value={formatMoney(kobo(d.total_tax), currency)} icon={Receipt} tone="amber" sub="input tax" />
         <StatCard label="Invoices" value={String(d.invoice_count)} icon={FileText} tone="primary" sub="posted in window" />
       </div>
-
-      {/* Spend read under one branch is a subset: name the bills left outside it so the
-          total is not mistaken for what the whole entity spent. */}
-      <ScopeNote>{excludedScopeNote(d.unassigned_excluded_count, "vendor bill")}</ScopeNote>
 
       <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Spend by category" subtitle="Gross across vendor categories">

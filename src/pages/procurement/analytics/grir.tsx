@@ -24,7 +24,7 @@ import { Field, EmptyPanel } from "../sourcing/shared";
 import { Card, ChartEmpty, ScopeNote, StatusDotPill, SectionHeader, type PillTone } from "./shared";
 import { PageShell } from "@/components/layout/page-shell";
 import {
-  BUCKET_LABEL, TD, TDR, TH, THR, ageColor, excludedScopeNote, kobo, type SectionProps,
+  BUCKET_LABEL, TD, TDR, TH, THR, ageColor, kobo, type SectionProps,
 } from "./helpers";
 import { useDates } from "../../../lib/display-prefs";
 
@@ -82,7 +82,6 @@ function GrirBody({ d, currency, entity }: { d: GrirAging; currency?: string | n
   const controlWithheld = d.control_balance == null;
   const control = d.control_balance == null ? null : kobo(d.control_balance);
   const diff = d.difference == null ? null : kobo(d.difference);
-  const excluded = excludedScopeNote(d.unassigned_excluded_count, "goods receipt");
 
   // Aging stack over the received-not-invoiced composition (positive buckets only -
   // a negative bucket has no meaningful width, its real amount still shows in the row).
@@ -115,12 +114,7 @@ function GrirBody({ d, currency, entity }: { d: GrirAging; currency?: string | n
         />
       </div>
 
-      {(controlWithheld || excluded) && (
-        <div className="space-y-2">
-          <ScopeNote>{controlWithheld ? CONTROL_WITHHELD_NOTE : null}</ScopeNote>
-          <ScopeNote>{excluded}</ScopeNote>
-        </div>
-      )}
+      <ScopeNote>{controlWithheld ? CONTROL_WITHHELD_NOTE : null}</ScopeNote>
 
       <Card title="Open GR/IR by age" subtitle="Received-not-invoiced positions by goods-receipt age">
         {totalOpen > 0 && stack.length > 0 ? (

@@ -6,8 +6,7 @@
  * Reading both through `kobo()` turns null into 0, and 0 in the Difference card
  * renders a green "Reconciled": a branch reader shown a clean bill of health on a
  * number nobody computed, which is exactly the failure the backend withholds them
- * to avoid. These tests hold that shut, and cover the excluded-documents count
- * that says the figures beside it are a subset.
+ * to avoid. These tests hold that shut.
  */
 
 import { act } from "react";
@@ -112,15 +111,8 @@ describe("GR/IR control figures a branch reader is not shown", () => {
     expect(text).toContain("Variance to investigate");
   });
 
-  it("names the entity-level receipts a branch reader's figures leave out", () => {
-    const text = render(aging({ unassigned_excluded_count: 2 }));
-    expect(text).toContain("2 goods receipts");
-    expect(text).toContain("not included in these figures");
-  });
-
   it("carries no scope caveat for an unbound reader", () => {
     const text = render(aging());
-    expect(text).not.toContain("goods receipts sit at entity level");
     expect(text).not.toContain("You are viewing one branch");
   });
 });

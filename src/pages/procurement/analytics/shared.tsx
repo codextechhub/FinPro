@@ -131,8 +131,8 @@ export function Card({ title, subtitle, children, className }: {
 }
 
 /**
- * A quiet line beneath a KPI strip saying what the reader is NOT seeing: a figure the
- * backend withheld, or documents its branch scope excludes. Renders nothing for empty
+ * A quiet line beneath a KPI strip saying what the reader is NOT seeing, such as a
+ * figure the backend withheld. Renders nothing for empty
  * children, so a screen can hand it a null note without guarding at every call site.
  */
 export function ScopeNote({ children }: { children?: React.ReactNode }) {

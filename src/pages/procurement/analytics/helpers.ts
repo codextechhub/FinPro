@@ -28,28 +28,6 @@ export const TFOOTR = `${TFOOT} text-right tabular-nums`;
 /** Read `.kobo` off a `{kobo, naira}` pair, tolerating a missing bucket. */
 export const kobo = (m?: ReportMoney | null): number => m?.kobo ?? 0;
 
-/**
- * The advisory line for documents a branch-bound reader's report leaves out.
- *
- * The backend sends `unassigned_excluded_count` only when the caller is narrowed to a
- * branch, so `undefined` means the reader is seeing everything and gets no line at all.
- * Zero means narrowed with nothing left out, which is equally the whole story, so it
- * also gets no line. A bare "3 excluded" would tell a bursar nothing, so the sentence
- * names what those documents are and why they are not in the totals beside it. It stays
- * a count: the backend withholds the amount so one branch cannot read another's spend.
- */
-export function excludedScopeNote(
-  count: number | undefined,
-  noun: string,
-  plural = `${noun}s`,
-): string | null {
-  if (!count || count < 0) return null;
-  const subject = count === 1 ? `1 ${noun}` : `${count} ${plural}`;
-  return count === 1
-    ? `${subject} sits at entity level rather than in a branch, so it is outside your branch view and not included in these figures.`
-    : `${subject} sit at entity level rather than in a branch, so they are outside your branch view and not included in these figures.`;
-}
-
 /** Human labels for the standard aging buckets. */
 export const BUCKET_LABEL: Record<string, string> = {
   current: "Current",

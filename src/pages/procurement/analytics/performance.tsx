@@ -22,8 +22,8 @@ import { formatMoney } from "@/utils/money";
 import { isForbidden } from "../sourcing/helpers";
 import { Field, EmptyPanel } from "../sourcing/shared";
 import { AssessmentFormDrawer } from "./assessment-form";
-import { DateFilter, GradeBadge, GradePill, Meter, Pill, ScopeNote, SectionHeader } from "./shared";
-import { TD, TH, excludedScopeNote, meanOrNull, meterScoreColor, type SectionProps } from "./helpers";
+import { DateFilter, GradeBadge, GradePill, Meter, Pill, SectionHeader } from "./shared";
+import { TD, TH, meanOrNull, meterScoreColor, type SectionProps } from "./helpers";
 import { PageShell } from "@/components/layout/page-shell";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
@@ -70,7 +70,7 @@ export default function PerformanceScreen({ entity, currency }: SectionProps) {
       ) : isError || !d ? (
         <div className={cn(INFORMATION_CARD_SURFACE, "rounded-md")}><ErrorState onRetry={refetch} /></div>
       ) : (
-        <PerformanceBody rows={rows} excluded={d.unassigned_excluded_count} onSelect={setSelected} />
+        <PerformanceBody rows={rows} onSelect={setSelected} />
       )}
 
       <VendorPerformanceDrawer row={selected} entity={entity} currency={currency} onClose={() => setSelected(null)} />
@@ -81,10 +81,8 @@ export default function PerformanceScreen({ entity, currency }: SectionProps) {
   );
 }
 
-function PerformanceBody({ rows, excluded, onSelect }: {
+function PerformanceBody({ rows, onSelect }: {
   rows: VendorPerformanceRow[];
-  // Documents excluded by the reader's branch scope; undefined when they are unbound.
-  excluded?: number;
   onSelect: (row: VendorPerformanceRow) => void;
 }) {
   const ratedCount = rows.filter((r) => r.on_time_rate != null).length;
@@ -107,10 +105,6 @@ function PerformanceBody({ rows, excluded, onSelect }: {
         <StatCard label="Avg days to pay" value={avgPay == null ? "-" : `${avgPay.toFixed(1)} days`} icon={CalendarClock} tone="primary" sub="invoice date → settlement" />
         <StatCard label="Assessed vendors" value={`${assessed}/${rows.length}`} icon={ClipboardCheck} tone="primary" sub="with a recorded scorecard" />
       </div>
-
-      {/* The excluded population is the bill population the report ranks vendors by, so
-          a branch reader knows their vendor picture is drawn from a subset of billing. */}
-      <ScopeNote>{excludedScopeNote(excluded, "vendor bill")}</ScopeNote>
 
       <section className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
         {rows.length === 0 ? (
