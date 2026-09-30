@@ -37,7 +37,7 @@ import type { Rfq, RfqDetail, RfqInvitation } from "@/redux/services/procurement
 import { formatQuantity } from "@/utils/quantity";
 import { ActivityFeed, EmptyPanel, Field, ExpiredPill } from "./shared";
 import { RFQ_TABS, isForbidden } from "./helpers";
-import { zonedInstantFromInput } from "../../../utils/dates";
+import { NO_DEADLINE, deadlineInstant, type DeadlineValue } from "./deadline";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../../lib/display-prefs";
@@ -286,23 +286,27 @@ function RfqAmendmentForm({ rfq, entity, onClose }: { rfq: RfqDetail; entity: st
   const dates = useDates();
   const [summary, setSummary] = useState("");
   const [responseRequired, setResponseRequired] = useState(true);
-  const [deadline, setDeadline] = useState("");
+  const [deadline, setDeadline] = useState<DeadlineValue>(NO_DEADLINE);
   const [changeLines, setChangeLines] = useState(false);
   const [lines, setLines] = useState<DocLine[]>(rfq.lines.map((line) => ({ ...emptyLine(), description: line.description, quantity: Number(line.quantity), account: line.expense_code || "", taxCode: line.tax_code_id ? String(line.tax_code_id) : "" })));
   const [create, { isLoading }] = useCreateRfqAmendmentMutation();
   const apiLines = lines.filter((line) => line.description.trim()).map((line) => ({ description: line.description.trim(), quantity: line.quantity || 1, ...(line.account ? { expense_account: line.account } : {}), ...(line.taxCode ? { tax_code: line.taxCode } : {}) }));
+  const deadlineAt = deadlineInstant(deadline, dates.zoneFor(rfq.branch_id));
+  const deadlinePartial = Boolean(deadline.date || deadline.time) && !deadlineAt;
   const publish = async () => {
-    const deadlineAt = zonedInstantFromInput(deadline, dates.prefs.timeZone);
     try {
       await create({ id: rfq.id, entity, summary: summary.trim(), response_required: responseRequired, ...(deadlineAt ? { deadline: deadlineAt } : {}), ...(changeLines ? { lines: apiLines } : {}) }).unwrap();
       toast.success(`RFQ version ${rfq.version + 1} published.`);
       onClose();
     } catch { /* central */ }
   };
-  return <DetailDrawer open onOpenChange={(open) => !open && !isLoading && onClose()} title="Publish RFQ amendment" description="Preserves earlier submissions and emails every invited vendor." widthClass="sm:max-w-2xl" footer={<><Button variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button><Button onClick={publish} disabled={!summary.trim() || (changeLines && apiLines.length === 0)} loading={isLoading}>Publish amendment</Button></>}>
+  return <DetailDrawer open onOpenChange={(open) => !open && !isLoading && onClose()} title="Publish RFQ amendment" description="Preserves earlier submissions and emails every invited vendor." widthClass="sm:max-w-2xl" footer={<><Button variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button><Button onClick={publish} disabled={!summary.trim() || deadlinePartial || (changeLines && apiLines.length === 0)} loading={isLoading}>Publish amendment</Button></>}>
     <div className="space-y-4">
       <FormField label="Change summary" required><Textarea value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={500} placeholder="Explain what changed and what vendors should review." /></FormField>
-      <FormField label="New deadline (optional)"><Input type="datetime-local" value={deadline} onChange={(event) => setDeadline(event.target.value)} /></FormField>
+      <FormField label="New deadline (optional)">
+        <DeadlineInput value={deadline} onChange={setDeadline} zoneName={rfq.branch_name} />
+        {deadlinePartial && <p role="alert" className="mt-1 font-mont text-[11px] text-destructive">Give the new deadline both a day and a time, or leave both empty.</p>}
+      </FormField>
       <label className="flex items-start gap-2 rounded-md border border-white-02 p-3 font-mont text-xs"><input type="checkbox" className="mt-0.5" checked={responseRequired} onChange={(event) => setResponseRequired(event.target.checked)} /><span><strong className="block text-gray-01">Require a new response</strong><span className="mt-1 block leading-5 text-gray-05">Submitted quotations reopen as drafts. Their earlier receipts remain unchanged.</span></span></label>
       <label className="flex items-start gap-2 rounded-md border border-white-02 p-3 font-mont text-xs"><input type="checkbox" className="mt-0.5" checked={changeLines} onChange={(event) => setChangeLines(event.target.checked)} /><span><strong className="block text-gray-01">Change requested items or quantities</strong><span className="mt-1 block leading-5 text-gray-05">The current specification remains preserved in earlier quotation receipts.</span></span></label>
       {changeLines && <div><p className="mb-2 font-mont text-xs font-semibold text-gray-05">Replacement specification</p><LineEditor entity={entity} lines={lines} onChange={setLines} accountLabel="Expense account (optional)" accountType="EXPENSE" showTax showCostCenter={false} taxUsage="purchase" /></div>}
@@ -312,10 +316,10 @@ function RfqAmendmentForm({ rfq, entity, onClose }: { rfq: RfqDetail; entity: st
 
 function RfqExtensionForm({ rfq, invitation, entity, onClose }: { rfq: RfqDetail; invitation: RfqInvitation; entity: string; onClose: () => void }) {
   const dates = useDates();
-  const [deadline, setDeadline] = useState("");
+  const [deadline, setDeadline] = useState<DeadlineValue>(NO_DEADLINE);
   const [extend, { isLoading }] = useExtendRfqInvitationMutation();
+  const deadlineAt = deadlineInstant(deadline, dates.zoneFor(rfq.branch_id));
   const save = async () => {
-    const deadlineAt = zonedInstantFromInput(deadline, dates.prefs.timeZone);
     if (!deadlineAt) return;
     try {
       await extend({ id: rfq.id, invitationId: invitation.id, entity, deadline: deadlineAt }).unwrap();
@@ -323,9 +327,49 @@ function RfqExtensionForm({ rfq, invitation, entity, onClose }: { rfq: RfqDetail
       onClose();
     } catch { /* central */ }
   };
-  return <DetailDrawer open onOpenChange={(open) => !open && !isLoading && onClose()} title="Extend vendor deadline" description={`Only ${invitation.vendor_name} receives this extension.`} widthClass="sm:max-w-md" footer={<><Button variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button><Button onClick={save} disabled={!deadline} loading={isLoading}>Extend and notify</Button></>}>
-    <FormField label="New deadline" required><Input type="datetime-local" value={deadline} onChange={(event) => setDeadline(event.target.value)} /></FormField>
+  return <DetailDrawer open onOpenChange={(open) => !open && !isLoading && onClose()} title="Extend vendor deadline" description={`Only ${invitation.vendor_name} receives this extension.`} widthClass="sm:max-w-md" footer={<><Button variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button><Button onClick={save} disabled={!deadlineAt} loading={isLoading}>Extend and notify</Button></>}>
+    <FormField label="New deadline" required><DeadlineInput value={deadline} onChange={setDeadline} zoneName={rfq.branch_name} /></FormField>
   </DetailDrawer>;
+}
+
+/**
+ * A deadline as a day and a time, each in the house control.
+ *
+ * The browser's own date-and-time box draws its clock the way the typist's
+ * device is set; these follow the school's date style and 12- or 24-hour
+ * clock instead. The moment is read in the RFQ's branch zone (its own, else
+ * the school's), which is the zone vendors are told the deadline in.
+ */
+function DeadlineInput({
+  value,
+  onChange,
+  zoneName,
+}: {
+  value: DeadlineValue;
+  onChange: (next: DeadlineValue) => void;
+  zoneName?: string | null;
+}) {
+  return (
+    <div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+        <DatePickerInput
+          aria-label="Deadline day"
+          value={value.date}
+          onChange={(event) => onChange({ ...value, date: event.target.value })}
+          className="bg-white"
+        />
+        <Input
+          type="time"
+          aria-label="Deadline time"
+          value={value.time}
+          onChange={(event) => onChange({ ...value, time: event.target.value })}
+        />
+      </div>
+      {zoneName ? (
+        <p className="mt-1 font-mont text-[11px] text-gray-05">In {zoneName}&apos;s time.</p>
+      ) : null}
+    </div>
+  );
 }
 
 // requisition_line linkage is carried only when the prefilled line is unchanged

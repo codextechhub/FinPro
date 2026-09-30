@@ -611,6 +611,9 @@ export interface Rfq {
   line_count: number;
   response_count: number;
   invited_count: number;
+  /** The branch the RFQ is raised for; its deadlines are read in that branch's zone. */
+  branch_id?: number | null;
+  branch_name?: string | null;
 }
 
 // Detail record (superset of the list row).
