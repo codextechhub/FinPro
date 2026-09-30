@@ -15,6 +15,7 @@ import { TabStrip, type TabStripItem } from "@/components/finance-ui/tab-strip";
 import { cn } from "@/lib/utils";
 import { useDirectory, usePositions, useRoles } from "@xvs/finance/host";
 import { useAddApproverGroupMemberMutation } from "@/redux/services/dashboard/workflow-api";
+import { errorStatus } from "@/utils/api-errors";
 import type {
   ApproverGroup,
   ApproverGroupMemberPayload,
@@ -183,9 +184,11 @@ export default function AddMemberSheet({
       try {
         await addMember({ id: group.id, body: payloadFor(c) }).unwrap();
         added += 1;
-      } catch {
-        // The interceptor has already surfaced the reason; keep going so one
-        // rejected target does not discard the rest of the selection.
+      } catch (err) {
+        // The interceptor has already surfaced the reason. One rejected target
+        // does not discard the rest, but a refusal of the group itself (403)
+        // answers every target the same way, so it is said once.
+        if (errorStatus(err) === 403) break;
       }
     }
     if (added) {

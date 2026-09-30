@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SearchSelect } from "@/components/custom/search-select";
-import PermissionGate from "@/components/custom/permission-gate";
 import { MoneyInput } from "@/components/finance-ui";
 import {
   Dialog,
@@ -21,7 +20,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useActionParam } from "@/hooks/use-action-param";
 import { useAppSelector } from "@/redux/store";
 import { apiErrorMessage, errorStatus } from "@/utils/api-errors";
-import { useBranches, useDirectory } from "@xvs/finance/host";
+import { useBranches, useDirectory, useReaderReach } from "@xvs/finance/host";
 import {
   useDeleteDynamicRoleMutation,
   useGetDynamicRoleFieldsQuery,
@@ -42,6 +41,7 @@ import { humanizeDocumentType } from "@/pages/protected/workflow/components/work
 import { BAND_SURFACE } from "../templates/components/template-builder-bits";
 import { DynamicRoleEditor } from "./dynamic-role-editor";
 import { draftFromDynamicRole, rulesPayload } from "./dynamic-role-form";
+import { DYNAMIC_ROLES_READ_ONLY } from "../workflow-reach";
 
 type EditorState = { role: DynamicRole | null } | null;
 
@@ -57,14 +57,20 @@ const EVERY_DOCUMENT: string[] = [];
  * not - so its rules are shown numbered and in words, beside a tester that runs
  * the engine's own matching for a requester and an amount.
  *
- * Creating and editing follow their respective approver-group permissions.
- * The create permission also gates `?action=new`.
+ * Creating and editing follow their respective approver-group permissions,
+ * and only for a reader who covers the whole school: a Dynamic Role serves
+ * every branch, so a branch administrator reads the tab with the reason and
+ * changes nothing. The same create gate covers `?action=new`.
  */
 export default function DynamicRolesTab() {
   const { hasPermission } = usePermissions();
-  const canCreate = hasPermission(P.CREATE_APPROVER_GROUP);
-  const canUpdate = hasPermission(P.UPDATE_APPROVER_GROUP);
-  const canDelete = hasPermission(P.DELETE_APPROVER_GROUP);
+  const { wholeSchool } = useReaderReach();
+  const canCreate = hasPermission(P.CREATE_APPROVER_GROUP) && wholeSchool;
+  const canUpdate = hasPermission(P.UPDATE_APPROVER_GROUP) && wholeSchool;
+  const canDelete = hasPermission(P.DELETE_APPROVER_GROUP) && wholeSchool;
+  const readOnly =
+    !wholeSchool &&
+    [P.CREATE_APPROVER_GROUP, P.UPDATE_APPROVER_GROUP, P.DELETE_APPROVER_GROUP].some((code) => hasPermission(code));
 
   const [selectedId, setSelectedId] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);
@@ -129,13 +135,14 @@ export default function DynamicRolesTab() {
             <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
               <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
             </Button>
-            <PermissionGate permission={P.CREATE_APPROVER_GROUP}>
+            {canCreate && (
               <Button size="lg" onClick={() => setEditor({ role: null })}>
                 <Plus /> New Dynamic Role
               </Button>
-            </PermissionGate>
+            )}
           </div>
         </div>
+        {readOnly && <p className="text-xs text-gray-01">{DYNAMIC_ROLES_READ_ONLY}</p>}
 
         <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[280px_1fr]">
           <aside className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md p-3")}>
@@ -204,11 +211,11 @@ export default function DynamicRolesTab() {
                   No Dynamic Roles yet. Build one to send big purchases to the principal and
                   the rest to the bursar, then pick it in any stage.
                 </p>
-                <PermissionGate permission={P.CREATE_APPROVER_GROUP}>
+                {canCreate && (
                   <Button className="mt-4" onClick={() => setEditor({ role: null })}>
                     <Plus /> New Dynamic Role
                   </Button>
-                </PermissionGate>
+                )}
               </div>
             ) : (
               <DynamicRoleDetail

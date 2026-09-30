@@ -15,7 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CustomInput } from "@/components/custom/custom-input";
-import { UserAvatar } from "@xvs/finance/host";
+import { UserAvatar, useBranches, useReaderReach } from "@xvs/finance/host";
+import { SearchSelect } from "@/components/custom/search-select";
 import PermissionGate from "@/components/custom/permission-gate";
 import {
   Dialog,
@@ -54,6 +55,7 @@ import type {
 } from "@/redux/services/dashboard/workflow-types";
 import { humanizeDocumentType } from "@/pages/protected/workflow/components/workflow-format";
 import AddMemberSheet from "./add-member-sheet";
+import { groupBranchIds, groupReadOnlySentence } from "../workflow-reach";
 
 const KIND_LABEL: Record<GroupMemberKind, string> = {
   USER: "Person",
@@ -81,9 +83,17 @@ function errorMessage(err: unknown, fallback: string): string {
   return data?.message ?? fallback;
 }
 
+/**
+ * Approver groups, one selected at a time, with its members and who they reach.
+ *
+ * A group is changeable only where the reader covers every branch it decides
+ * approvals for (see groupBranchIds): a branch administrator changes their own
+ * branch's group, and reads the school's, or one the school's ladder names,
+ * with the reason beside it. A group they create belongs to their branch.
+ */
 export default function GroupsTab() {
   const { hasPermission } = usePermissions();
-  const canUpdate = hasPermission(P.UPDATE_APPROVER_GROUP);
+  const reach = useReaderReach();
 
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string>("");
@@ -123,6 +133,20 @@ export default function GroupsTab() {
     { page: 1, page_size: 100 },
     { skip: !canSeeTemplates },
   );
+
+  // The branches the selected group decides for, and whether the reader covers them.
+  const selectedReach = useMemo(
+    () => (selected ? groupBranchIds(selected, templates?.data) : []),
+    [selected, templates],
+  );
+  const mayChange = !!selected && reach.covers(selectedReach);
+  const canUpdate = hasPermission(P.UPDATE_APPROVER_GROUP) && mayChange;
+  const canDelete = hasPermission(P.DELETE_APPROVER_GROUP) && mayChange;
+  const readOnlyNote =
+    selected && !mayChange &&
+    (hasPermission(P.UPDATE_APPROVER_GROUP) || hasPermission(P.DELETE_APPROVER_GROUP))
+      ? groupReadOnlySentence(selectedReach)
+      : null;
 
   const usedBy = useMemo(() => {
     if (!selected || !templates?.data) return [];
@@ -364,12 +388,12 @@ export default function GroupsTab() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <PermissionGate permission={P.UPDATE_APPROVER_GROUP}>
+                      {canUpdate && (
                         <Button variant="outline" size="sm" onClick={toggleActive} disabled={isUpdating}>
                           {selected.is_active ? "Deactivate" : "Reactivate"}
                         </Button>
-                      </PermissionGate>
-                      <PermissionGate permission={P.DELETE_APPROVER_GROUP}>
+                      )}
+                      {canDelete && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -380,9 +404,10 @@ export default function GroupsTab() {
                         >
                           <Trash2 /> Delete
                         </Button>
-                      </PermissionGate>
+                      )}
                     </div>
                   </div>
+                  {readOnlyNote && <p className="mt-3 text-xs text-gray-01">{readOnlyNote}</p>}
                 </div>
 
                 {stalling ? (
@@ -462,11 +487,11 @@ export default function GroupsTab() {
                         {selected.member_count}
                       </span>
                     </p>
-                    <PermissionGate permission={P.UPDATE_APPROVER_GROUP}>
+                    {canUpdate && (
                       <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
                         <Plus /> Add member
                       </Button>
-                    </PermissionGate>
+                    )}
                   </div>
 
                   {selected.members.length === 0 ? (
@@ -634,7 +659,7 @@ export default function GroupsTab() {
         </div>
       </section>
 
-      {selected && (
+      {selected && canUpdate && (
         <AddMemberSheet open={addOpen} onClose={() => setAddOpen(false)} group={selected} />
       )}
 
@@ -709,6 +734,14 @@ function slugify(value: string): string {
     .slice(0, 100);
 }
 
+/**
+ * Creates one approver group.
+ *
+ * A whole-school reader's group belongs to the school. A branch-bound reader's
+ * belongs to a branch of theirs: the one they work in, or the one they pick
+ * when they work in several, because the server reads "no branch" from them
+ * as the whole school and refuses it.
+ */
 function NewGroupSheet({
   open,
   onClose,
@@ -723,15 +756,23 @@ function NewGroupSheet({
   const [code, setCode] = useState("");
   const [codeTouched, setCodeTouched] = useState(false);
   const [description, setDescription] = useState("");
+  const reach = useReaderReach();
+  const { data: branchList } = useBranches();
+  const [branch, setBranch] = useState("");
+  const choices = reach.wholeSchool ? [] : reach.branchIds ?? [];
+  const chosenBranch = choices.length === 1 ? String(choices[0]) : branch;
+  const branchName = (id: number) =>
+    branchList?.find((b) => Number(b.id) === id)?.name ?? `Branch ${id}`;
 
   const effectiveCode = codeTouched ? code : slugify(name);
-  const isValid = !!name.trim() && !!effectiveCode;
+  const isValid = !!name.trim() && !!effectiveCode && (reach.wholeSchool || !!chosenBranch);
 
   const close = () => {
     setName("");
     setCode("");
     setCodeTouched(false);
     setDescription("");
+    setBranch("");
     onClose();
   };
 
@@ -741,6 +782,7 @@ function NewGroupSheet({
       name: name.trim(),
       code: effectiveCode,
       description: description.trim(),
+      ...(reach.wholeSchool ? {} : { branch: Number(chosenBranch) }),
     })
       .unwrap()
       .then((group) => {
@@ -784,6 +826,21 @@ function NewGroupSheet({
           <p className="-mt-3 text-xs text-gray-01">
             Templates reference this code, so it cannot be changed once the group exists.
           </p>
+
+          {choices.length > 1 && (
+            <SearchSelect
+              id="group-branch"
+              label="Branch"
+              isRequired
+              placeholder="Which branch is this group for?"
+              options={choices.map((id) => ({ value: String(id), label: branchName(id) }))}
+              value={branch}
+              onChange={(e) => setBranch(e.target.value)}
+            />
+          )}
+          {choices.length === 1 && (
+            <p className="text-xs text-gray-01">This group belongs to {branchName(choices[0])}.</p>
+          )}
 
           <div className="space-y-1.5">
             <label htmlFor="group-desc" className="text-xs font-medium text-black-01">

@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import PermissionGate from "@/components/custom/permission-gate";
 import { P } from "@/permissions";
-import { platformName } from "@xvs/finance/host";
+import { usePermissions } from "@/hooks/use-permissions";
+import { platformName, useReaderReach } from "@xvs/finance/host";
 import { routesPath } from "../paths";
 import { formatRelativeDate } from "@/utils/helpers";
 import { useAppSelector } from "@/redux/store";
@@ -37,12 +38,15 @@ import { ConditionView } from "@/pages/protected/workflow/components/condition-v
 import { DynamicRoleRuleList } from "@/pages/protected/workflow/components/dynamic-role-rule-list";
 import { PageShell } from "@/components/layout/page-shell";
 import { useRoles } from "@xvs/finance/host";
+import { TEMPLATE_RESET_READ_ONLY, rowBranchIds } from "../workflow-reach";
 
 export default function TemplateDetail() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const isPlatformTenant = useAppSelector(selectIsPlatformTenant);
   const [resetOpen, setResetOpen] = useState(false);
+  const reach = useReaderReach();
+  const { hasPermission } = usePermissions();
   // A shared template names its roles by key; the host knows what they are called.
   const { data: roles } = useRoles();
   const roleName = useMemo(() => {
@@ -69,6 +73,9 @@ export default function TemplateDetail() {
         : null,
     [all, template, isPlatformTenant],
   );
+
+  // Switching back is judged by the steps' own branch, like publishing them.
+  const mayReset = !!template && reach.covers(rowBranchIds(template.branch));
 
   const doReset = () => {
     if (!template) return;
@@ -137,7 +144,7 @@ export default function TemplateDetail() {
               </div>
               <PermissionGate permission={P.UPDATE_WORKFLOW_TEMPLATE}>
                 <div className="flex flex-wrap items-center gap-2">
-                  {!template.is_platform && !isPlatformTenant && (
+                  {!template.is_platform && !isPlatformTenant && mayReset && (
                     <Button variant="outline" onClick={() => setResetOpen(true)}>
                       <Undo2 className="size-4" /> Use {platformName}'s version
                     </Button>
@@ -168,12 +175,17 @@ export default function TemplateDetail() {
                     {template.platform_updated_at
                       ? formatRelativeDate(template.platform_updated_at)
                       : "recently"}
-                    . Nothing changed here on its own - "Use {platformName}'s version" switches
-                    to their current one.
+                    . Nothing changed here on its own
+                    {mayReset
+                      ? <> - "Use {platformName}'s version" switches to their current one.</>
+                      : "."}
                   </>
-                ) : (
+                ) : mayReset ? (
                   <>"Use {platformName}'s version" puts this school back on whatever{" "}
                     {platformName} has at that moment.</>
+                ) : null}
+                {!mayReset && hasPermission(P.UPDATE_WORKFLOW_TEMPLATE) && (
+                  <> {TEMPLATE_RESET_READ_ONLY}</>
                 )}
               </p>
             )}
