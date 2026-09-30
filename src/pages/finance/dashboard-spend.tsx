@@ -18,6 +18,8 @@ import { EmptyState } from "@/components/finance-ui/states";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import type { CashFlowKey, SpendDashboard } from "@/redux/services/finance/reports-types";
+import type { BudgetRollup } from "@/redux/services/finance/ops-types";
+import { useGetBudgetRollupQuery } from "@/redux/services/finance/ops-api";
 import { routesPath } from "@/routes/routes-path";
 import {
   AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, fmtShortDate, plural,
@@ -203,17 +205,47 @@ function ReconciliationCard({ accounts, unmatched, currency }: { accounts: NonNu
 // ── budgets and spending ─────────────────────────────────────────────────────
 
 /**
- * Each of this year's plans in the reader's reach and how much of its spending is
- * used, against how much of the year has gone (the thin mark on each bar).
+ * The spending half of the school's budget total, for the budgets card's total
+ * line, or null when there is no total worth a line.
  *
- * Every budget belongs to a branch. A plan with no branch is measured against
- * every branch, so it reads "All branches", the school's total. A server that
+ * The card measures each plan by its expense lines, so the total does too. A
+ * total of one plan repeats that plan's row and is left out, as is a total from
+ * a server without the roll-up (`rollup` undefined). `narrowed` totals only the
+ * reader's own branches, and is named for them.
+ */
+export function budgetTotalLine(rollup: BudgetRollup | undefined) {
+  if (!rollup || rollup.budgets.length < 2) return null;
+  let plan = 0;
+  let used = 0;
+  for (const row of rollup.rows) {
+    if (row.account_type !== "EXPENSE") continue;
+    plan += row.budget.kobo;
+    used += row.actual?.kobo ?? 0;
+  }
+  return {
+    label: rollup.narrowed ? "All my branches" : "All branches",
+    count: rollup.budgets.length,
+    plan,
+    used,
+    pct: plan > 0 ? (used * 100) / plan : null,
+  };
+}
+
+/**
+ * Each of this year's plans in the reader's reach and how much of its spending is
+ * used, against how much of the year has gone (the thin mark on each bar), with
+ * the school's total beneath them (see `budgetTotalLine`).
+ *
+ * Every budget belongs to a branch. A plan with no branch predates that rule and
+ * is measured against every branch, so it reads "All branches". A server that
  * still keeps such plans sends a branch bursar one without figures: her
  * branches' spending against the whole plan would read as a shortfall that is
  * only the other branches' share.
  */
-function BudgetsCard({ budgets, currency }: { budgets: NonNullable<S["budgets"]>; currency?: string | null }) {
+function BudgetsCard({ budgets, entity, currency }: { budgets: NonNullable<S["budgets"]>; entity: string; currency?: string | null }) {
   const elapsed = budgets.year_elapsed_pct;
+  const { data: rollupData } = useGetBudgetRollupQuery({ entity });
+  const total = budgetTotalLine(rollupData?.data);
   return (
     <Panel title="Budgets in use" subtitle={`Spending against plan · ${elapsed}% of the year gone`}
       action={<LinkAction label="Budgets" to={`${F.BUDGETS}/budgets`} />}>
@@ -253,6 +285,24 @@ function BudgetsCard({ budgets, currency }: { budgets: NonNullable<S["budgets"]>
               </div>
             );
           })}
+          {total ? (
+            <div className="flex flex-col gap-1.5 border-t border-white-02 pt-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 font-mont text-[13px]">
+                <span className="min-w-0 truncate">
+                  <span className="font-semibold text-gray-01">{total.label}</span>
+                  <span className="text-gray-05"> · {total.count} budgets</span>
+                </span>
+                <span className="tabular-nums"><span className="font-semibold text-black-01">{compactMoney(total.used, currency)}</span>
+                  <span className="text-gray-05">{total.pct != null ? ` of ${compactMoney(total.plan, currency)}` : " spent"}</span></span>
+              </div>
+              {total.pct != null ? (
+                <div className="relative h-2 overflow-hidden rounded-full bg-gray-03/50">
+                  <span className="block h-full rounded-full" style={{ width: `${Math.min(total.pct, 100)}%`, background: total.pct > elapsed + 10 ? DASH_COLORS.orange : DASH_COLORS.primary }} />
+                  <span className="absolute inset-y-0 w-0.5 bg-gray-01/40" style={{ left: `${elapsed}%` }} aria-hidden="true" />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       )}
     </Panel>
@@ -493,7 +543,7 @@ export function SpendTab({ d, words, currency }: { d: S; words: DashboardWords; 
 
       {row3 > 0 && (
         <div className={cn("grid grid-cols-1 gap-5", row3 === 2 && "xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]")}>
-          {d.budgets && <BudgetsCard budgets={d.budgets} currency={currency} />}
+          {d.budgets && <BudgetsCard budgets={d.budgets} entity={d.entity} currency={currency} />}
           {d.spending && <SpendingCard spending={d.spending} windowName={windowName} currency={currency} />}
         </div>
       )}

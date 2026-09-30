@@ -7,6 +7,10 @@
  * three staff claims wait for approval; PAYE is due in 14 days and VAT is a nil
  * return. Chukwuemeka, the Main Branch bursar, is sent no cash, bank, payroll or
  * tax block, and his tab leaves those cards out rather than drawing them empty.
+ *
+ * The budgets card closes with the school's total from the roll-up: Ngozi's
+ * Main and Annex plans add up to one "All branches" line. A server without the
+ * roll-up sends nothing, and the card draws no total rather than a wrong one.
  */
 
 import { act } from "react";
@@ -19,7 +23,13 @@ vi.mock("react-router", async (importOriginal) => ({
   useNavigate: () => vi.fn(),
 }));
 
-import { SpendTab, cashBars, runwayLabel } from "./dashboard-spend";
+const mocks = vi.hoisted(() => ({ rollup: undefined as unknown }));
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetBudgetRollupQuery: () => ({ data: mocks.rollup }),
+}));
+
+import { SpendTab, budgetTotalLine, cashBars, runwayLabel } from "./dashboard-spend";
+import type { BudgetRollup } from "@/redux/services/finance/ops-types";
 import { dashboardWords } from "./dashboard-words";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -147,10 +157,50 @@ describe("Cash, spend & compliance for a branch bursar", () => {
     expect(text).toContain("The school's plan, measured against every branch");
   });
 
+  it("closes the budgets with the school's total across branches", () => {
+    mocks.rollup = { data: ROLLUP };
+    const text = render(FULL);
+    mocks.rollup = undefined;
+    expect(text).toContain("All branches");
+    expect(text).toContain("2 budgets");
+  });
+
+  it("draws no total when the server has no roll-up", () => {
+    const text = render(FULL);
+    expect(text).not.toContain("2 budgets");
+  });
+
   it("says so when nothing is in the reader's access", () => {
     const text = render({ ...FULL, runway: null, cash_movement: null, spend: null, spending: null, reconciliation: null,
       unmatched: null, budgets: null, payroll: null, claims: null, petty_cash: null, tax_owed: null, tax_calendar: null, assets: null });
     expect(text).toContain("Nothing to show here yet");
+  });
+});
+
+const row = (account_type: string, budget: number, actual: number | null) => ({
+  account_id: budget, code: String(budget), name: account_type, account_type,
+  budget: money(budget), actual: actual == null ? null : money(actual), variance: null,
+});
+const plan = (id: number, branch: string) => ({ id, code: `BUD-${id}`, name: `${branch} plan`, status: "APPROVED", branch_id: id, branch_name: branch });
+const ROLLUP: BudgetRollup = {
+  fiscal_year: 2026, fiscal_year_id: 1, period_no: null, narrowed: false,
+  rows: [row("EXPENSE", 600_000, 300_000), row("EXPENSE", 400_000, 100_000), row("INCOME", 9_000_000, 1_000)],
+  total_budget: money(10_000_000), total_actual: money(401_000), total_variance: null,
+  budgets: [plan(10, "Main Branch"), plan(20, "Annex")],
+};
+
+describe("budgetTotalLine", () => {
+  it("adds up the expense lines of every branch's plan", () => {
+    expect(budgetTotalLine(ROLLUP)).toEqual({ label: "All branches", count: 2, plan: 1_000_000, used: 400_000, pct: 40 });
+  });
+
+  it("names a branch reader's total for her own branches", () => {
+    expect(budgetTotalLine({ ...ROLLUP, narrowed: true })?.label).toBe("All my branches");
+  });
+
+  it("draws nothing for one plan, or for a server without the roll-up", () => {
+    expect(budgetTotalLine({ ...ROLLUP, budgets: [plan(10, "Main Branch")] })).toBeNull();
+    expect(budgetTotalLine(undefined)).toBeNull();
   });
 });
 

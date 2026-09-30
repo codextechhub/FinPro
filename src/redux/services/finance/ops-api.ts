@@ -30,6 +30,7 @@ import type {
   TaxFiling,
   TaxObligation,
   BudgetFiling,
+  BudgetRollup,
 } from "./ops-types";
 import type { ImportBatch } from "@/redux/services/dashboard/import-types";
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
@@ -349,7 +350,7 @@ export const opsApi = baseApi.injectEndpoints({
     }),
 
     // Budgets
-    getBudgets: b.query<PaginatedEnvelope<Budget> & { narrowed?: boolean; filing?: BudgetFiling }, { entity: string; page?: number; page_size?: number; status?: string }>({
+    getBudgets: b.query<PaginatedEnvelope<Budget> & { filing?: BudgetFiling }, { entity: string; page?: number; page_size?: number; status?: string }>({
       query: (p) => ({ url: `/finance/budgets/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceBudgets"],
     }),
@@ -363,6 +364,13 @@ export const opsApi = baseApi.injectEndpoints({
     }),
     getBudgetHeatmap: b.query<ApiEnvelope<BudgetHeatmap>, Act>({
       query: ({ id, entity }) => ({ url: `/finance/budgets/${id}/heatmap/${qs({ entity })}`, method: "GET" }),
+      providesTags: ["FinanceBudgets"],
+    }),
+    // The school total. A server without the route answers 404, which the
+    // screens read as "no total" rather than as an error, so it is asked quietly.
+    getBudgetRollup: b.query<ApiEnvelope<BudgetRollup>, { entity: string; fiscal_year?: number; period_no?: number }>({
+      query: (p) => ({ url: `/finance/budgets/rollup/${qs(p)}`, method: "GET" }),
+      extraOptions: { silent: true },
       providesTags: ["FinanceBudgets"],
     }),
     getFiscalYears: b.query<ApiEnvelope<FiscalYear[]>, { entity: string; status?: string }>({
@@ -528,6 +536,7 @@ export const {
   useGetBudgetQuery,
   useGetBudgetVarianceQuery,
   useGetBudgetHeatmapQuery,
+  useGetBudgetRollupQuery,
   useGetFiscalYearsQuery,
   useCreateBudgetMutation,
   useUpdateBudgetMutation,

@@ -7,23 +7,24 @@
  * income/expense GLs only.
  *
  * Every budget belongs to one branch and is measured against that branch's own
- * postings; the school's total is the roll-up of its branches' plans. A new
+ * postings. The school's total is the roll-up of its branches' plans, from
+ * `budgets/rollup/`, and sits under the list as one "All branches" line. A new
  * budget names its branch through the shared Branch field (see
  * raising-branch.tsx). Whether the reader may file one at all comes from the
  * list response (`filing`).
  *
  * A budget with no branch predates that rule. It is measured against every
- * branch, so it reads "All branches". Only a whole-school reader reaches one on
- * a server that enforces the rule; on one that does not yet, a branch-bound
- * reader still sees it as a plan only, without the actuals that would show her
- * other branches' money, and cannot change it (`can_manage`).
+ * branch, so it reads "All branches", and only a whole-school reader reaches it.
+ * An actual the server sends as null (a server that still withholds a
+ * whole-school plan's actuals from a branch reader) reads as a dash, never as
+ * zero, and such a plan stays out of the heatmap.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
-import { Plus, Trash2, CheckCircle2, Lock } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, Lock, Sigma } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField, AccountPicker, CostCenterPicker, InfoHint, ConfirmActionModal,
   RaisingBranchChoiceField, toArray, useRaisingBranchChoice, type Column,
@@ -36,9 +37,11 @@ import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
 import {
   useGetBudgetsQuery, useGetBudgetQuery, useGetBudgetVarianceQuery, useGetBudgetHeatmapQuery, useGetFiscalYearsQuery,
+  useGetBudgetRollupQuery,
   useCreateBudgetMutation, useUpdateBudgetMutation, useSetBudgetLinesMutation, useApproveBudgetMutation, useDeleteBudgetMutation,
 } from "@/redux/services/finance/ops-api";
-import type { Budget, BudgetLineInput } from "@/redux/services/finance/ops-types";
+import type { Budget, BudgetLineInput, BudgetRollup } from "@/redux/services/finance/ops-types";
+import { useBranches } from "../../../host";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -104,15 +107,18 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
   const { data, isLoading, isFetching, isError, refetch } = useGetBudgetsQuery({ entity, page });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
-  const narrowed = data?.narrowed === true;
   const filing = data?.filing;
-  // A branch-bound reader sees the school's plan without its actuals.
-  const planOnly = (b: Budget) => narrowed && b.branch_id == null;
-  const measured = rows.filter((b) => !planOnly(b));
-  const allPlanOnly = rows.length > 0 && measured.length === 0;
+  const { data: branchRows } = useBranches();
+  const { data: rollupData } = useGetBudgetRollupQuery({ entity });
+  const total = schoolTotal(rollupData?.data);
+  // A null actual is one the server withheld; see the file's doc block.
+  const withheld = (b: Budget) => b.actual_ytd === null;
+  const measured = rows.filter((b) => !withheld(b));
+  const allWithheld = rows.length > 0 && measured.length === 0;
   const activeHeatmapId = measured.some((b) => b.id === heatmapId) ? heatmapId : measured[0]?.id ?? null;
   const showBranch = rows.some((b) => b.branch_id != null);
-  const mayFile = !filing || !!filing.school || filing.branches.length > 0;
+  // Books with no branches file a budget under none, so an empty list is no refusal there.
+  const mayFile = !filing || filing.branches.length > 0 || (branchRows?.length ?? 0) === 0;
 
   const columns: Column<Budget>[] = [
     { header: "Code", cell: (b) => <span className="font-semibold tabular-nums text-gray-01">{b.code || "-"}</span> },
@@ -120,9 +126,9 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
     ...(showBranch ? [{ header: "Branch", cell: (b: Budget) => <span className="text-gray-05">{b.branch_name ?? ALL_BRANCHES}</span> }] : []),
     { header: "Fiscal year", cell: (b) => <span className="tabular-nums text-gray-05">{b.fiscal_year}</span> },
     { header: "Budgeted", align: "right", cell: (b) => <Money kobo={b.budgeted_total ?? 0} currency={currency} align="right" /> },
-    ...(allPlanOnly ? [] : [
-      { header: "Actual YTD", align: "right" as const, cell: (b: Budget) => planOnly(b) ? <span className="text-gray-05">-</span> : <Money kobo={b.actual_ytd ?? 0} currency={currency} align="right" /> },
-      { header: "Consumed", align: "right" as const, cell: (b: Budget) => planOnly(b) ? <span className="block text-right text-gray-05">-</span> : <ConsumedBar pct={b.consumed_pct ?? null} /> },
+    ...(allWithheld ? [] : [
+      { header: "Actual YTD", align: "right" as const, cell: (b: Budget) => withheld(b) ? <span className="text-gray-05">-</span> : <Money kobo={b.actual_ytd ?? 0} currency={currency} align="right" /> },
+      { header: "Consumed", align: "right" as const, cell: (b: Budget) => withheld(b) ? <span className="block text-right text-gray-05">-</span> : <ConsumedBar pct={b.consumed_pct ?? null} /> },
     ]),
     { header: "Status", cell: (b) => <StatusPill status={b.status} /> },
   ];
@@ -132,7 +138,7 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
       <div className="flex flex-wrap items-center justify-between gap-3" data-guide="finance-budgets.controls">
         <p className="max-w-2xl font-mont text-xs text-gray-05">
           A budget is a plan in the same shape as your chart of accounts - one line per income/expense GL × cost centre × period.
-          {allPlanOnly ? null : " The system compares it to live postings; red cells in the heatmap are overruns."}
+          {allWithheld ? null : " The system compares it to live postings; red cells in the heatmap are overruns."}
         </p>
         {mayFile ? (
           <Can permission={P.FIN_CREATE_BUDGET}>
@@ -146,7 +152,9 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
         page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
         emptyTitle="No budgets" emptyMessage="Create a budget for a fiscal year and add its lines." />
 
-      {allPlanOnly ? <PlanOnlyNote /> : activeHeatmapId != null ? (
+      {total ? <SchoolTotalLine total={total} currency={currency} /> : null}
+
+      {activeHeatmapId != null ? (
         <div className="rounded-md border border-white-02 bg-white p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
@@ -169,22 +177,41 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
 }
 
 /**
- * What a branch-bound reader sees where the school's plan would show actuals.
- *
- * Setting the school's actuals against its plan would show them other branches'
- * money, and their own branch's actuals against the whole plan would read as a
- * shortfall; so they get the plan, and are pointed at their branch's own plan
- * and income statement for what was actually earned and spent.
+ * The school's total for the year, from the roll-up, or null when there is no
+ * total worth a line: one plan's total repeats that plan's row, and a server
+ * without the roll-up sends nothing. `narrowed` totals only the reader's own
+ * branches and is named for them. Actuals come as null only where withheld.
  */
-function PlanOnlyNote() {
+export function schoolTotal(rollup: BudgetRollup | undefined) {
+  if (!rollup || rollup.budgets.length < 2) return null;
+  const budgeted = rollup.total_budget.kobo;
+  const actual = rollup.total_actual?.kobo ?? null;
+  return {
+    label: rollup.narrowed ? "All my branches" : "All branches",
+    year: rollup.fiscal_year,
+    count: rollup.budgets.length,
+    budgeted,
+    actual,
+    pct: actual != null && budgeted ? Math.round((actual * 1000) / budgeted) / 10 : null,
+  };
+}
+
+/** The school-total line under the budgets list. */
+function SchoolTotalLine({ total, currency }: { total: NonNullable<ReturnType<typeof schoolTotal>>; currency?: string | null }) {
   return (
-    <div role="note" className="flex min-w-0 items-start gap-2.5 rounded-md bg-primary/5 px-4 py-3 ring-1 ring-primary/15">
-      <Lock className="mt-0.5 size-4 shrink-0 text-primary" />
-      <p className="min-w-0 font-mont text-xs text-gray-01 text-pretty">
-        <span className="font-semibold">The school’s plan only.</span> It is measured against every branch, so its
-        actuals and variance are shown to whole-school readers. A budget for your branch is measured against your
-        branch’s own postings, and your branch’s income and spending are also on the Income Statement.
-      </p>
+    <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2 rounded-md border border-white-02 bg-white px-4 py-3" data-guide="finance-budgets.total">
+      <div className="flex min-w-0 items-center gap-2">
+        <Sigma className="size-4 shrink-0 text-primary" />
+        <div className="min-w-0">
+          <p className="font-mont text-sm font-semibold text-gray-01">{total.label}</p>
+          <p className="font-mont text-[11px] text-gray-05">FY {total.year} · {total.count} budgets added together</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 font-mont text-xs">
+        <span><span className="text-gray-05">Budgeted </span><span className="font-semibold tabular-nums text-black-01">{formatMoney(total.budgeted, currency)}</span></span>
+        {total.actual != null ? <span><span className="text-gray-05">Actual YTD </span><span className="font-semibold tabular-nums text-black-01">{formatMoney(total.actual, currency)}</span></span> : null}
+        {total.pct != null ? <span className="w-32"><ConsumedBar pct={total.pct} /></span> : null}
+      </div>
     </div>
   );
 }
@@ -433,7 +460,8 @@ function DraftEditor({ budget, entity, currency, onClose }: { budget: Budget; en
 function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; entity: string; currency?: string | null; onClose: () => void }) {
   const { data: vd } = useGetBudgetVarianceQuery({ id: budget.id, entity });
   const v = vd?.data;
-  const narrowed = v?.narrowed === true;
+  // Withheld actuals come as null; see the file's doc block.
+  const actualsWithheld = v != null && v.total_actual == null;
   const budgeted = v?.total_budget.kobo ?? 0;
   const actual = v?.total_actual?.kobo ?? 0;
   const remaining = budgeted - actual;
@@ -446,15 +474,15 @@ function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; e
         <StatusPill status={budget.status} />
         <div className="flex-1" />
         <span className="inline-flex items-center gap-1.5 font-mont text-[11px] text-gray-05"><Lock className="size-3.5" />
-          {budget.is_locked ? " Locked - figures frozen against the actuals" : " The school’s budget - read-only for your branch"}</span>
+          {budget.is_locked ? " Locked - figures frozen against the actuals" : " Read-only for you"}</span>
       </>}>
       <div className="space-y-5">
-        {narrowed ? (
+        {actualsWithheld ? (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Metric label="Budgeted" kobo={budgeted} currency={currency} />
             </div>
-            <PlanOnlyNote />
+            <p className="font-mont text-xs text-gray-05">This budget's actuals are not shown to you.</p>
           </>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -469,13 +497,13 @@ function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; e
         )}
 
         <div>
-          <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">{narrowed ? "Lines · budget" : "Lines · actual vs budget"}</p>
+          <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">{actualsWithheld ? "Lines · budget" : "Lines · actual vs budget"}</p>
           <div className="overflow-hidden rounded-md border border-white-02">
             <table className="w-full border-collapse">
               <thead><tr>
                 <th className={thCls}>GL · Account</th>
                 <th className={cn(thCls, "text-right")}>Budget</th>
-                {narrowed ? null : <>
+                {actualsWithheld ? null : <>
                   <th className={cn(thCls, "text-right")}>Actual YTD</th>
                   <th className={cn(thCls, "text-right")}>Variance</th><th className={cn(thCls, "text-right")}>Consumed</th>
                 </>}
@@ -489,7 +517,7 @@ function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; e
                     <tr key={r.account_id}>
                       <td className={tdCls}><span className="tabular-nums text-gray-05">{r.code}</span> {r.name}</td>
                       <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(r.budget.kobo, currency)}</td>
-                      {narrowed ? null : <>
+                      {actualsWithheld ? null : <>
                         <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(rowActual, currency)}</td>
                         <td className={cn(tdCls, "text-right tabular-nums", rem < 0 ? "text-destructive" : "text-green-01")}>{formatMoney(rem, currency)}</td>
                         <td className={cn(tdCls)}><ConsumedBar pct={pct} /></td>
@@ -497,7 +525,7 @@ function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; e
                     </tr>
                   );
                 })}
-                {(v?.rows ?? []).length === 0 ? <tr><td className={cn(tdCls, "text-center text-gray-05")} colSpan={narrowed ? 2 : 5}>No activity yet.</td></tr> : null}
+                {(v?.rows ?? []).length === 0 ? <tr><td className={cn(tdCls, "text-center text-gray-05")} colSpan={actualsWithheld ? 2 : 5}>No activity yet.</td></tr> : null}
               </tbody>
             </table>
           </div>

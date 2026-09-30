@@ -1,26 +1,27 @@
 /**
  * The Budgets list and the New budget drawer, for a branch bursar and for the school.
  *
- * Chukwuemeka is the bursar at Holy Cross College Main Branch. He sees two plans:
- * one with no branch, measured against every branch, which a server that still
- * keeps such plans sends without actuals because they would cover the Annex too,
- * and his branch's own, which comes with its actuals. The list must show the
- * branch plan's figures and a dash for the other, offer only the branch plan in
- * the heatmap, and file anything he creates to his branch without asking. The
- * proprietor sees every figure and must name a branch for a new plan: every
- * budget belongs to one.
+ * Chukwuemeka is the bursar at Holy Cross College Main Branch. He sees his
+ * branch's plan with its actuals, and files anything he creates to his branch
+ * without being asked. A server that still keeps a plan for the whole school
+ * sends him that one too, without actuals: it reads "All branches", its actual
+ * is a dash rather than a zero, and it stays out of the heatmap. The proprietor
+ * sees every figure, must name a branch for a new plan (every budget belongs to
+ * one), and sees the school's total across Main and Annex as one line; a server
+ * without the roll-up draws no total at all.
  */
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Budget, BudgetFiling } from "@/redux/services/finance/ops-types";
+import type { Budget, BudgetFiling, BudgetRollup } from "@/redux/services/finance/ops-types";
 import { FINANCE_PERMISSION_REGISTRY, type PermissionCode } from "../../../permissions";
 
 const mocks = vi.hoisted(() => ({
   state: { auth: {} } as { auth: Record<string, unknown> },
   held: new Set<string>(),
   list: null as unknown,
+  rollup: undefined as unknown,
   mutation: () => [() => undefined, { isLoading: false }],
 }));
 
@@ -58,6 +59,7 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetBudgetVarianceQuery: () => ({ data: undefined }),
   useGetBudgetHeatmapQuery: () => ({ data: { data: { periods: [], rows: [] } }, isFetching: false, isError: false }),
   useGetFiscalYearsQuery: () => ({ data: { data: [{ id: 1, year: 2026, status: "OPEN" }] } }),
+  useGetBudgetRollupQuery: () => ({ data: mocks.rollup }),
   useCreateBudgetMutation: mocks.mutation,
   useUpdateBudgetMutation: mocks.mutation,
   useSetBudgetLinesMutation: mocks.mutation,
@@ -65,7 +67,7 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useDeleteBudgetMutation: mocks.mutation,
 }));
 
-import { BudgetsTab } from "./budgets-tab";
+import { BudgetsTab, schoolTotal } from "./budgets-tab";
 
 const { MAIN, ANNEX } = vi.hoisted(() => ({
   MAIN: { id: 19, name: "Holy Cross College Main Branch" },
@@ -103,11 +105,12 @@ afterEach(() => {
 });
 
 const render = (rows: Budget[], filing: BudgetFiling, narrowed: boolean, ...keys: string[]) => {
+  mocks.rollup = undefined;
   mocks.state = {
     auth: { tenant: {}, branch_reach: narrowed ? { whole_tenant: false, branch_ids: [MAIN.id] } : { whole_tenant: true, branch_ids: [] } },
   };
   mocks.held = new Set(["finance.budget.view", ...keys]);
-  mocks.list = { data: rows, narrowed, filing, pagination: { currentPage: 1, totalPages: 1 } };
+  mocks.list = { data: rows, filing, pagination: { currentPage: 1, totalPages: 1 } };
   act(() => root.render(<BudgetsTab entity="HOLYCROSS" currency="NGN" />));
   return container.textContent ?? "";
 };
@@ -121,7 +124,7 @@ const openNewBudget = () => {
 const optionLabels = (scope: ParentNode) => [...scope.querySelectorAll("option")].map((o) => o.textContent);
 
 describe("Budgets for a branch bursar", () => {
-  const filing = { school: false, branches: [MAIN] };
+  const filing = { branches: [MAIN] };
 
   it("names each plan's branch and shows actuals only for his branch's plan", () => {
     const text = render([MAIN_PLAN, SCHOOL_PLAN_TO_BRANCH], filing, true);
@@ -130,7 +133,6 @@ describe("Budgets for a branch bursar", () => {
     expect(text).toContain("All branches");
     expect(text).toContain(MAIN.name);
     expect(text).toContain("Actual YTD");
-    expect(text).not.toContain("The school’s plan only");
   });
 
   it("offers only his branch's plan in the variance heatmap", () => {
@@ -141,11 +143,11 @@ describe("Budgets for a branch bursar", () => {
     expect(optionLabels(heatmapPicker!)).toEqual(["BUD-2 · Main plan"]);
   });
 
-  it("shows the school's plan alone as a plan, with no actual columns", () => {
+  it("shows a plan whose actuals were withheld with no actual columns, never a zero", () => {
     const text = render([SCHOOL_PLAN_TO_BRANCH], filing, true);
 
-    expect(text).toContain("The school’s plan only");
     expect(text).not.toContain("Actual YTD");
+    expect(text).not.toContain("₦0.00");
     expect(text).not.toContain("Variance heatmap");
   });
 
@@ -159,7 +161,7 @@ describe("Budgets for a branch bursar", () => {
   });
 
   it("offers no New budget to a reader who may file for nobody", () => {
-    const text = render([SCHOOL_PLAN_TO_BRANCH], { school: false, branches: [] }, true, "finance.budget.create");
+    const text = render([SCHOOL_PLAN_TO_BRANCH], { branches: [] }, true, "finance.budget.create");
     expect(text).not.toContain("New budget");
   });
 });
@@ -167,9 +169,8 @@ describe("Budgets for a branch bursar", () => {
 describe("Budgets for the proprietor", () => {
   it("shows every plan's actuals and asks which branch a new one is for, with no School-wide choice", () => {
     const text = render(
-      [MAIN_PLAN, budget({})], { school: true, branches: [ANNEX, MAIN] }, false, "finance.budget.create",
+      [MAIN_PLAN, budget({})], { branches: [ANNEX, MAIN] }, false, "finance.budget.create",
     );
-    expect(text).not.toContain("The school’s plan only");
     expect(text).toContain("Actual YTD");
 
     openNewBudget();
@@ -180,5 +181,36 @@ describe("Budgets for the proprietor", () => {
     expect(labels).toContain(MAIN.name);
     const create = [...document.body.querySelectorAll("button")].find((b) => b.textContent?.includes("Create budget"));
     expect(create?.disabled).toBe(true);
+  });
+});
+
+describe("The school's total", () => {
+  const plan = (id: number, name: string) => ({ id, code: `BUD-${id}`, name, status: "APPROVED", branch_id: id, branch_name: name });
+  const ROLLUP: BudgetRollup = {
+    fiscal_year: 2026, fiscal_year_id: 1, period_no: null, narrowed: false, rows: [],
+    total_budget: { kobo: 700_000, naira: "" }, total_actual: { kobo: 350_000, naira: "" }, total_variance: null,
+    budgets: [plan(MAIN.id, MAIN.name), plan(ANNEX.id, ANNEX.name)],
+  };
+
+  it("adds every branch's plan into one All branches line", () => {
+    render([MAIN_PLAN], { branches: [ANNEX, MAIN] }, false);
+    mocks.rollup = { data: ROLLUP };
+    act(() => root.render(<BudgetsTab entity="HOLYCROSS" currency="NGN" />));
+
+    const text = container.textContent ?? "";
+    expect(text).toContain("All branches");
+    expect(text).toContain("2 budgets added together");
+    expect(schoolTotal(ROLLUP)).toMatchObject({ budgeted: 700_000, actual: 350_000, pct: 50 });
+  });
+
+  it("names a branch reader's total for her branches, and leaves out a total of one plan", () => {
+    expect(schoolTotal({ ...ROLLUP, narrowed: true })?.label).toBe("All my branches");
+    expect(schoolTotal({ ...ROLLUP, budgets: [plan(MAIN.id, MAIN.name)] })).toBeNull();
+  });
+
+  it("draws no total from a server without the roll-up", () => {
+    const text = render([MAIN_PLAN], { branches: [ANNEX, MAIN] }, false);
+    expect(text).not.toContain("added together");
+    expect(schoolTotal(undefined)).toBeNull();
   });
 });

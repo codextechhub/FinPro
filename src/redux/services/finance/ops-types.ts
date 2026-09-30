@@ -345,11 +345,28 @@ export interface Budget {
   consumed_pct?: number | null;
 }
 
-/** The branches the reader may file a budget for. `school` is sent only by a
- *  server that still accepts a budget with no branch. */
+/** The branches the reader may file a budget for. Empty in books with no branches. */
 export interface BudgetFiling {
-  school?: boolean;
   branches: { id: number; name: string }[];
+}
+
+/**
+ * The school's total for a fiscal year: one plan per branch in the reader's
+ * reach (its approved budget, else its latest draft) added together and set
+ * against the same reader's journals. A whole-school reader gets every branch;
+ * a branch-bound one her own branches (`narrowed`). `budgets` lists the plans
+ * summed.
+ */
+export interface BudgetRollup {
+  fiscal_year: number;
+  fiscal_year_id: number;
+  period_no: number | null;
+  narrowed: boolean;
+  rows: BudgetVarianceRow[];
+  total_budget: KoboNaira;
+  total_actual: KoboNaira | null;
+  total_variance: KoboNaira | null;
+  budgets: { id: number; code: string; name: string; status: string; branch_id: number | null; branch_name: string | null }[];
 }
 
 // Payload for creating/replacing budget cells (account × cost-centre × period).
@@ -372,21 +389,17 @@ export interface BudgetVarianceRow {
   variance: KoboNaira | null;
 }
 /**
- * A budget set against the ledger.
+ * A budget set against the ledger: a branch's plan against that branch's own
+ * journals.
  *
- * A branch's plan is measured against that branch's own journals and comes with
- * its actuals. The school's plan is measured against the whole ledger, so a
- * branch-bound reader of it (`narrowed`) gets the plan with every actual and
- * variance `null`: the school's actuals would show them other branches' money,
- * and their own against the whole plan would read as a shortfall that is only
- * the other branches' share. Rows for accounts the plan does not cover are left
- * out too.
+ * Actuals and variance are `null` only from a server that still keeps a plan
+ * for the whole school and withholds its actuals from a branch-bound reader; a
+ * screen shows them as not shown, never as zero.
  */
 export interface BudgetVariance {
   budget_id: number;
   fiscal_year_id: number;
   period_no: number | null;
-  narrowed?: boolean;
   rows: BudgetVarianceRow[];
   total_budget: KoboNaira;
   total_actual: KoboNaira | null;
@@ -403,12 +416,11 @@ export interface BudgetHeatmapRow {
   budget_total: number;
   actual_total: number | null;
 }
-/** The plan per account and period; actuals are `null` when `narrowed` (see BudgetVariance). */
+/** The plan per account and period; actuals are `null` where withheld (see BudgetVariance). */
 export interface BudgetHeatmap {
   budget_id: number;
   fiscal_year_id: number;
   periods: { period_no: number; label: string }[];
-  narrowed?: boolean;
   rows: BudgetHeatmapRow[];
   total_budget: number;
   total_actual: number | null;
