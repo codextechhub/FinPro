@@ -289,7 +289,7 @@ export function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boo
         <Button disabled={isLoading || !valid} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Sending…" : "Send payout"}</Button>
       </>}>
       <div className="space-y-4">
-        <FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={setVendor} /></FormField>
+        <FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={setVendor} own /></FormField>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <AccessField access={access} name="beneficiary_name" label="Recipient name" creating errors={denied}><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="From the vendor's bank details" className="h-9 bg-white" /></AccessField>

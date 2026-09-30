@@ -50,7 +50,7 @@ export const procurementApi = baseApi.injectEndpoints({
       invalidatesTags: ["ProcSettings", "FinanceAuditLog"],
     }),
     // Master data
-    getVendors: b.query<PaginatedEnvelope<Vendor>, E & { q?: string; is_active?: boolean; on_hold?: boolean; kyc_status?: string; purchase_eligible?: boolean }>({
+    getVendors: b.query<PaginatedEnvelope<Vendor>, E & { q?: string; is_active?: boolean; on_hold?: boolean; kyc_status?: string; purchase_eligible?: boolean; own?: boolean }>({
       query: (p) => ({ url: `/procurement/vendors/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcVendors"],
     }),

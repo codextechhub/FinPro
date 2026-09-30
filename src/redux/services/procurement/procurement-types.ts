@@ -30,6 +30,10 @@ export interface Vendor {
   id: number;
   code: string;
   name: string;
+  // The branch the vendor is filed under; null for one every branch shares.
+  // Absent from servers that do not report it.
+  branch_id?: number | null;
+  branch_name?: string | null;
   category_id: number | null;
   category_code: string | null;
   email?: string;

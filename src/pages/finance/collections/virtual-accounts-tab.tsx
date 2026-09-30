@@ -265,7 +265,7 @@ function ProvisionDrawer({ open, onClose, entity }: { open: boolean; onClose: ()
           The gateway mints a unique account number for this customer. Transfers to it arrive as collections that reconcile to the customer's invoices.
         </p>
         <FormField label="Customer" required>
-          <CustomerPicker entity={entity} value={customer} onChange={setCustomer} placeholder="Select customer" />
+          <CustomerPicker entity={entity} value={customer} onChange={setCustomer} placeholder="Select customer" own />
         </FormField>
         <FormField label="Provider" required>
           <select value={provider} onChange={(e) => setProvider(e.target.value)} className="h-9 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01">

@@ -90,9 +90,17 @@ export function ReceivableAccountPicker({ entity, value, onChange, label, placeh
 /** The list CustomerPicker reads; `useCustomerBranch` reads the same cache. */
 const customerListArgs = (entity: string) => ({ entity, is_active: "true", page_size: 100 });
 
-/** Customer / payer picker. List-backed (grows per entity) → reveal-on-search. */
-export function CustomerPicker({ entity, value, onChange, label, placeholder = "Select customer", isRequired, disabled }: PickerProps) {
-  const { data, isLoading } = useGetCustomersQuery(customerListArgs(entity));
+/**
+ * Customer / payer picker. List-backed (grows per entity) → reveal-on-search.
+ *
+ * `own` lists only the customers the reader may raise a gateway record for:
+ * those filed under her branches, or every customer for a whole-school reader.
+ * The payments screens pass it, because a branch clerk is refused a virtual
+ * account or payment request for a customer every branch shares. A server
+ * that does not know `?own=` lists every customer, as before.
+ */
+export function CustomerPicker({ entity, value, onChange, label, placeholder = "Select customer", isRequired, disabled, own }: PickerProps & { own?: boolean }) {
+  const { data, isLoading } = useGetCustomersQuery({ ...customerListArgs(entity), ...(own ? { own: "true" } : {}) });
   const options = toArray(data?.data).map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }));
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
 }
@@ -111,9 +119,10 @@ export function useCustomerBranch(entity: string, code: string): number | null |
 }
 
 /** Vendor picker - entity's active vendors; reports the vendor code. Used by
- *  payouts (a payout settles a vendor's payable). List-backed → reveal-on-search. */
-export function VendorPicker({ entity, value, onChange, label, placeholder = "Select vendor", isRequired, disabled }: PickerProps) {
-  const { data, isLoading } = useGetVendorsQuery({ entity, page_size: 100 });
+ *  payouts (a payout settles a vendor's payable). List-backed → reveal-on-search.
+ *  `own` narrows to the vendors the reader may pay out to, as on CustomerPicker. */
+export function VendorPicker({ entity, value, onChange, label, placeholder = "Select vendor", isRequired, disabled, own }: PickerProps & { own?: boolean }) {
+  const { data, isLoading } = useGetVendorsQuery({ entity, page_size: 100, ...(own ? { own: true } : {}) });
   const options = toArray(data?.data)
     .filter((v) => v.is_active)
     .map((v) => ({ value: v.code, label: `${v.code} - ${v.name}` }));

@@ -307,7 +307,7 @@ function NewCheckoutDrawer({ open, onClose, entity, currency }: { open: boolean;
         <Button disabled={isLoading || amount <= 0 || (!customer && !invoice)} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create checkout link"}</Button>
       </>}>
       <div className="space-y-4">
-        <FormField label="Customer"><CustomerPicker entity={entity} value={customer} onChange={(value) => { setCustomer(value); setInvoice(""); setPicked(null); setAmount(0); }} placeholder="Select customer, or pick an invoice below" /></FormField>
+        <FormField label="Customer"><CustomerPicker entity={entity} value={customer} onChange={(value) => { setCustomer(value); setInvoice(""); setPicked(null); setAmount(0); }} placeholder="Select customer, or pick an invoice below" own /></FormField>
         <FormField label={customer ? "Invoice (optional)" : "Invoice"}>
           <SearchSelect
             options={invoiceOptions}

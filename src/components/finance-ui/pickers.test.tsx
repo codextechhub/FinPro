@@ -16,6 +16,9 @@
  * receipt is offered Ikeja's collection ledger and the cash tin, never Lekki's
  * collection ledger, and a server whose rows do not name their bank narrows
  * nothing.
+ *
+ * The payments screens ask for the customers and vendors the reader may raise a
+ * gateway record for (`?own=true`); every other screen lists them all.
  */
 
 import { act } from "react";
@@ -28,6 +31,8 @@ const mocks = vi.hoisted(() => ({
   chartCalls: 0,
   branches: [] as { id: number; name: string }[] | undefined,
   ledgers: [] as Record<string, unknown>[],
+  customerArgs: [] as Record<string, unknown>[],
+  vendorArgs: [] as Record<string, unknown>[],
   banks: [] as { id: number; name: string; bank_name: string; branch_id: number | null; is_active: boolean }[],
 }));
 
@@ -79,7 +84,14 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetBankAccountsQuery: () => ({ isLoading: false, data: { data: mocks.banks } }),
 }));
 
-import { BankAccountPicker, DepositAccountPicker, ReceivableAccountPicker } from "./pickers";
+vi.mock("@/redux/services/finance/ar-api", () => ({
+  useGetCustomersQuery: (args: Record<string, unknown>) => { mocks.customerArgs.push(args); return { data: undefined, isLoading: false }; },
+}));
+vi.mock("@/redux/services/procurement/procurement-api", () => ({
+  useGetVendorsQuery: (args: Record<string, unknown>) => { mocks.vendorArgs.push(args); return { data: undefined, isLoading: false }; },
+}));
+
+import { BankAccountPicker, CustomerPicker, DepositAccountPicker, ReceivableAccountPicker, VendorPicker } from "./pickers";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -192,5 +204,19 @@ describe("DepositAccountPicker", () => {
     mocks.ledgers = [ledger("1110", undefined, undefined), ledger("1120", undefined, undefined)];
     act(() => root.render(<DepositAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={10} />));
     expect(offered()).toEqual(["1110", "1120"]);
+  });
+});
+
+describe("Payments pickers", () => {
+  it("ask for the reader's own customers and vendors only when told to", () => {
+    mocks.customerArgs = [];
+    mocks.vendorArgs = [];
+    act(() => root.render(<><CustomerPicker entity="CORONA" value="" onChange={() => undefined} own /><VendorPicker entity="CORONA" value="" onChange={() => undefined} own /></>));
+    expect(mocks.customerArgs.at(-1)).toMatchObject({ own: "true" });
+    expect(mocks.vendorArgs.at(-1)).toMatchObject({ own: true });
+
+    act(() => root.render(<><CustomerPicker entity="CORONA" value="" onChange={() => undefined} /><VendorPicker entity="CORONA" value="" onChange={() => undefined} /></>));
+    expect(mocks.customerArgs.at(-1)).not.toHaveProperty("own");
+    expect(mocks.vendorArgs.at(-1)).not.toHaveProperty("own");
   });
 });
