@@ -3,10 +3,16 @@
  * control account uses the app's type-to-search AccountPicker; opening balance is
  * entered in naira and sent as integer kobo. Defaults the AR control to 1200.
  *
- * A customer is shared by every branch when a whole-school reader adds one, but
- * the opening balance is a transaction and belongs to one branch. At a school
- * with several branches the form therefore asks which branch the opening
- * balance is for, once one is entered, and sends it as `opening_branch`.
+ * A customer is master data: it may be filed under one branch or shared by every
+ * branch. Who decides is the reader's reach (see `customerBranchChoice`): a
+ * reader covering several branches names one of hers, a whole-school reader may
+ * name one or leave the customer shared, and a reader pinned to one branch, or a
+ * school with one, is not asked.
+ *
+ * The opening balance is a transaction and belongs to one branch. For a shared
+ * customer at a school with several branches the form therefore asks which
+ * branch the opening balance is for, once one is entered, and sends it as
+ * `opening_branch`; a customer filed under a branch takes that branch.
  */
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,12 +20,28 @@ import { toKobo } from "@/utils/money";
 import { Plus } from "lucide-react";
 import {
   DetailDrawer, FormField, ReceivableAccountPicker, PostingDateField, RaisingBranchChoiceField,
-  useRaisingBranchChoice,
+  useRaisingBranchChoice, useReaderBranchLens,
 } from "@/components/finance-ui";
+import { NativeSelect } from "@/components/ui/native-select";
+import type { ReaderBranchLens } from "@/components/finance-ui/raising-branch";
+import { useReaderReach } from "../../../host";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useCreateCustomerMutation } from "@/redux/services/finance/ar-api";
 
+
+/**
+ * Whether a new customer's branch is asked, whether it must be named, and what
+ * it starts on. Asked at a school with several branches of a reader not pinned
+ * to one. A whole-school reader may leave it blank, which files the customer as
+ * shared by every branch; one covering several branches must name one of hers,
+ * as the server requires. It starts on the branch the reader is working in.
+ */
+export function customerBranchChoice(lens: ReaderBranchLens, wholeSchool: boolean) {
+  const ask = lens.applies && lens.pinnedBranch == null && lens.choices.length > 0;
+  const working = lens.branch !== "all" && lens.choices.some((b) => Number(b.id) === lens.branch) ? String(lens.branch) : "";
+  return { ask, required: ask && !wholeSchool, choices: ask ? lens.choices : [], initial: ask ? working : "" };
+}
 
 export function NewCustomerDrawer({ open, onOpenChange, entity }: {
   open: boolean; onOpenChange: (o: boolean) => void; entity: string;
@@ -33,17 +55,23 @@ export function NewCustomerDrawer({ open, onOpenChange, entity }: {
   const [openingDate, setOpeningDate] = useState("");
   const [active, setActive] = useState(true);
   const [create, { isLoading }] = useCreateCustomerMutation();
+  const filing = customerBranchChoice(useReaderBranchLens(), useReaderReach().wholeSchool);
+  const [picked, setPicked] = useState<string | null>(null);
+  const customerBranch = picked ?? filing.initial;
   const hasOpening = toKobo(opening) > 0;
-  const openingBranch = useRaisingBranchChoice({ unless: !hasOpening });
+  // A customer filed under a branch gives its opening balance that branch.
+  const openingBranch = useRaisingBranchChoice({ unless: !hasOpening || !!customerBranch });
 
-  const canSubmit = name.trim() !== "" && email.trim() !== "" && phone.trim() !== "" && openingBranch.ready;
-  const reset = () => { setName(""); setEmail(""); setPhone(""); setAddress(""); setAccount(""); setOpening(""); setOpeningDate(""); setActive(true); openingBranch.reset(); };
+  const canSubmit = name.trim() !== "" && email.trim() !== "" && phone.trim() !== "" && openingBranch.ready
+    && (!filing.required || !!customerBranch);
+  const reset = () => { setName(""); setEmail(""); setPhone(""); setAddress(""); setAccount(""); setOpening(""); setOpeningDate(""); setActive(true); setPicked(null); openingBranch.reset(); };
   const close = () => { reset(); onOpenChange(false); };
 
   const submit = async () => {
     try {
       const res = await create({
         entity, name: name.trim(),
+        ...(filing.ask && customerBranch ? { branch: Number(customerBranch) } : {}),
         billing_email: email.trim(), billing_phone: phone.trim(),
         billing_address: address || undefined,
         receivable_account: account || undefined,
@@ -79,6 +107,17 @@ export function NewCustomerDrawer({ open, onOpenChange, entity }: {
           <FormField label="Billing email" required><Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="billing@acme.com" className="bg-white" /></FormField>
           <FormField label="Billing phone" required><Input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+234…" className="bg-white" /></FormField>
         </div>
+        {filing.ask ? (
+          <FormField label="Branch" required={filing.required}>
+            <NativeSelect value={customerBranch} onChange={(e) => setPicked(e.target.value)} aria-label="Customer branch">
+              {filing.required ? <option value="" disabled>Select branch</option> : <option value="">Shared by every branch</option>}
+              {filing.choices.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+            </NativeSelect>
+            <span className="mt-1 block font-mont text-[11px] leading-5 text-gray-05">
+              {filing.required ? "The branch this customer belongs to." : "The branch this customer belongs to, or shared so every branch can bill them."}
+            </span>
+          </FormField>
+        ) : null}
         <FormField label="Billing address"><Input value={address} onChange={(e) => setAddress(e.target.value)} className="bg-white" /></FormField>
         <FormField label="Receivable account">
           <ReceivableAccountPicker entity={entity} value={account} onChange={setAccount} placeholder="Defaults to 1200 Accounts Receivable" />

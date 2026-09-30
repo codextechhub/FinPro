@@ -356,7 +356,7 @@ export const arApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/customers/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceCustomers"],
     }),
-    createCustomer: builder.mutation<ApiEnvelope<Customer>, { entity: string; opening_branch?: number; name: string; billing_email: string; billing_phone: string; billing_address?: string; receivable_account?: string; opening_balance?: number; opening_date?: string; is_active?: boolean }>({
+    createCustomer: builder.mutation<ApiEnvelope<Customer>, { entity: string; branch?: number; opening_branch?: number; name: string; billing_email: string; billing_phone: string; billing_address?: string; receivable_account?: string; opening_balance?: number; opening_date?: string; is_active?: boolean }>({
       query: ({ entity, ...body }) => ({ url: `/finance/customers/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceCustomers"],
     }),
