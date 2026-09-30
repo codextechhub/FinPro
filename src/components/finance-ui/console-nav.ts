@@ -106,8 +106,13 @@ export function consoleOffersScreens(nav: ConsoleNavGroup[], gate: ConsoleNavGat
 /**
  * Title of the nav item (leaf or child) whose URL best matches `pathname` -
  * used to drive the console header so it reflects the current screen, not the
- * console name. Most-specific (longest URL) wins, so the console root only
- * matches on its exact path. Returns null when nothing matches.
+ * console name. Most-specific (longest URL) wins.
+ *
+ * An item with other items beneath its URL (the console root, `/finance`)
+ * matches only its exact path. Without that it claimed every screen no leaf
+ * matched: a section's bare address (`/finance/receivables`, which shows its
+ * default screen) was headed "Dashboard". Returns null when nothing matches,
+ * and the shell falls back to the console name.
  */
 export function activeNavTitle(nav: ConsoleNavGroup[], pathname: string): string | null {
   const candidates: { url: string; title: string }[] = [];
@@ -120,9 +125,10 @@ export function activeNavTitle(nav: ConsoleNavGroup[], pathname: string): string
       }
     }
   }
+  const hasItemsBeneath = (url: string) => candidates.some((c) => c.url.startsWith(url + "/"));
   let best: { url: string; title: string } | null = null;
   for (const c of candidates) {
-    if (pathname === c.url || pathname.startsWith(c.url + "/")) {
+    if (pathname === c.url || (pathname.startsWith(c.url + "/") && !hasItemsBeneath(c.url))) {
       if (!best || c.url.length > best.url.length) best = c;
     }
   }

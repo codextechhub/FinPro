@@ -13,6 +13,7 @@ import { FINANCE_PERMISSION_REGISTRY, type PermissionCode } from "../../permissi
 import { financeNav } from "../../pages/finance/finance-nav";
 import { procurementNav } from "../../pages/procurement/procurement-nav";
 import {
+  activeNavTitle,
   consoleOffersScreens,
   visibleConsoleNav,
   type ConsoleNavChild,
@@ -144,5 +145,27 @@ describe("what a reader is offered", () => {
   it("drops a group whose every screen is closed rather than showing an empty heading", () => {
     const labels = visibleConsoleNav(financeNav, reader("finance.invoice.view")).map((g) => g.label);
     expect(labels).toEqual([undefined, "Receivables"]);
+  });
+});
+
+/**
+ * The header names the screen the reader is on. A bursar at Holy Cross who
+ * opens Customer Invoices from the dashboard lands on the section's bare
+ * address, /finance/receivables, which no menu item names; the header must not
+ * call that screen "Dashboard" because the dashboard's address is a prefix of it.
+ */
+describe("the console header's title", () => {
+  const leaves = financeNav.flatMap((group) => group.items.flatMap((item) => item.children?.length ? item.children : [item]));
+  const url = (title: string) => leaves.find((item) => item.title === title)!.url;
+  const section = (title: string) => url(title).slice(0, url(title).lastIndexOf("/"));
+
+  it("names the menu item whose address the reader is on", () => {
+    expect(activeNavTitle(financeNav, url("AR Invoices"))).toBe("AR Invoices");
+    expect(activeNavTitle(financeNav, url("Dashboard"))).toBe("Dashboard");
+  });
+
+  it("does not let the console root claim a section's bare address", () => {
+    expect(activeNavTitle(financeNav, section("AR Invoices"))).toBeNull();
+    expect(activeNavTitle(financeNav, section("Budgets & Forecasts"))).toBeNull();
   });
 });
