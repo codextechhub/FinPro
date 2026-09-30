@@ -19,7 +19,8 @@ import {
   usePublishWorkflowTemplateMutation,
 } from "@/redux/services/dashboard/workflow-api";
 import {
-  createsWorkflowTemplates, platformName, useBranches, useCanUseOrganogram, useDirectory, usePositions, useRoles,
+  createsWorkflowTemplates, platformName, useBranches, useCanUseOrganogram, useDirectory, usePositions,
+  useReaderReach, useRoles,
 } from "@xvs/finance/host";
 import {
   type ConditionCatalogue,
@@ -56,6 +57,7 @@ import {
 } from "./components/template-builder-bits";
 import { stageRulesPayload } from "./components/template-payload";
 import { TemplateReachChip, TemplateReachNotice } from "./components/template-reach";
+import { TEMPLATE_SHARED_NOTE, publishTarget, rowBranchIds } from "../workflow-reach";
 import { PageShell } from "@/components/layout/page-shell";
 
 const SOURCE_OPTIONS = [
@@ -313,6 +315,19 @@ export default function TemplateBuilder() {
   // wherever this app authors no templates, and the steps are what is edited.
   const canEditDetails = createsWorkflowTemplates;
   const [publish, { isLoading: isPublishing }] = usePublishWorkflowTemplateMutation();
+  // Where the steps are saved: see publishTarget. A branch-bound reader never
+  // saves the steps every branch follows, so opening those saves their branch's own.
+  const reach = useReaderReach();
+  const target = publishTarget(isEdit ? existing : null, reach);
+  const [pickedBranch, setPickedBranch] = useState("");
+  const publishBranch =
+    target.kind === "branch" ? target.branch
+      : target.kind === "choose" && pickedBranch ? Number(pickedBranch)
+        : null;
+  const mustPickBranch = !editingShared && target.kind === "choose" && !pickedBranch;
+  const savesBranchCopy =
+    !reach.wholeSchool && isEdit && !!existing &&
+    !reach.covers(existing.is_platform ? [] : rowBranchIds(existing.branch));
 
   // The seats a SPECIFIC_POSITION stage can name.
   const { data: positions } = usePositions();
@@ -410,6 +425,11 @@ export default function TemplateBuilder() {
     people: directoryOptions,
     branches: (branchList ?? []).map((b) => ({ value: String(b.id), label: b.name })),
   }), [rolesRes, directoryOptions, branchList]);
+  const branchName = (id: number | null) =>
+    (id != null && branchList?.find((b) => Number(b.id) === id)?.name) || null;
+  const branchChoices = target.kind === "choose"
+    ? target.choices.map((b) => ({ value: String(b), label: branchName(b) ?? `Branch ${b}` }))
+    : [];
 
   // Prefill once when editing an existing template.
   useEffect(() => {
@@ -482,6 +502,14 @@ export default function TemplateBuilder() {
     });
 
   const handlePublish = () => {
+    if (mustPickBranch) {
+      toast.error(
+        branchChoices.length
+          ? "Choose the branch these steps are for."
+          : "You do not work in any branch, so there is nowhere to save these steps.",
+      );
+      return;
+    }
     if (!name.trim() || !documentType.trim() || !code.trim()) {
       toast.error("Name, document type, and code are required.");
       return;
@@ -581,6 +609,8 @@ export default function TemplateBuilder() {
       notification_events: notifEvents,
       stages: stagePayloads,
       routes,
+      // A shared template belongs to no branch; this school's steps belong to one or to all.
+      ...(editingShared ? {} : { branch: publishBranch }),
     };
 
     publish(payload)
@@ -590,7 +620,9 @@ export default function TemplateBuilder() {
         // something else moves.
         setSavedSignature(signature);
         toast.success(
-          willFork
+          savesBranchCopy
+            ? `Saved. ${branchName(publishBranch) ?? "Your branch"} now runs your version.`
+            : willFork
             ? "Saved. This school now runs your version."
             : isEdit
               ? "Template updated."
@@ -659,12 +691,18 @@ export default function TemplateBuilder() {
             <Button
               size="lg"
               onClick={handlePublish}
-              disabled={isPublishing || !hasChanges}
-              title={hasChanges ? undefined : "Nothing has changed yet"}
+              disabled={isPublishing || !hasChanges || mustPickBranch}
+              title={
+                mustPickBranch
+                  ? "Choose the branch these steps are for"
+                  : hasChanges ? undefined : "Nothing has changed yet"
+              }
             >
               {isPublishing
                 ? "Publishing…"
-                : willFork
+                : savesBranchCopy
+                  ? "Save for this branch"
+                  : willFork
                   ? "Save for this school"
                   : isEdit
                     ? "Update template"
@@ -743,10 +781,27 @@ export default function TemplateBuilder() {
             )}
             {willFork && (
               <p className="rounded-md border border-white-02 bg-pry-01/40 px-3 py-2 text-xs text-gray-01">
-                This is the {platformName} version. Saving keeps theirs as it is and gives this
-                school its own version of this path, which it runs from then on. You can go back
-                to {platformName}'s version at any time from the template page.
+                This is the {platformName} version. Saving keeps theirs as it is and gives{" "}
+                {reach.wholeSchool ? "this school" : "your branch"} its own version of this path,
+                which it runs from then on. You can go back to {platformName}'s version at any
+                time from the template page.
               </p>
+            )}
+            {savesBranchCopy && !willFork && (
+              <p className="rounded-md border border-white-02 bg-pry-01/40 px-3 py-2 text-xs text-gray-01">
+                {TEMPLATE_SHARED_NOTE}
+              </p>
+            )}
+            {!editingShared && target.kind === "choose" && (
+              <SearchSelect
+                id="tpl-branch"
+                label="Branch"
+                isRequired
+                placeholder="Which branch are these steps for?"
+                options={branchChoices}
+                value={pickedBranch}
+                onChange={(e) => setPickedBranch(e.target.value)}
+              />
             )}
             {editingShared && (
               isEdit && id

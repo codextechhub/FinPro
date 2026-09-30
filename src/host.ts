@@ -87,6 +87,29 @@ export interface HostRole {
   assigned_users_count: number;
 }
 
+/** What the signed-in reader may change, measured in branches.
+ *
+ *  Reading and changing are different questions. A branch administrator reads
+ *  the school's approval path, its approver groups and its Dynamic Roles,
+ *  because their branch's documents run through them; changing one of those
+ *  changes what every branch follows, so the server keeps it for somebody who
+ *  covers the whole school and answers anyone else with a 403 and a sentence.
+ *  A screen asks this to draw such a thing read-only before that happens, and
+ *  to file what a branch administrator does build under their own branch.
+ *
+ *  ``wholeSchool`` follows the server's rule, which counts a reader pinned to
+ *  the only branch of a one-branch school as whole-school. ``branchIds`` is
+ *  ``null`` for a whole-school reader and otherwise exactly the branches they
+ *  work in. ``covers([])`` asks about a school-wide row, which only a
+ *  whole-school reader covers. */
+export interface HostReaderReach {
+  wholeSchool: boolean;
+  branchIds: number[] | null;
+  /** Whether every branch in ``ids`` is one the reader works in; empty is the
+   *  whole school. */
+  covers(ids: number[]): boolean;
+}
+
 /** One thing a reader opened, for a host that keeps a trail of them. */
 export interface HostRecentEntry {
   kind: string;
@@ -202,6 +225,12 @@ export interface HostContract {
    *  school.organogram.view in the school app. A package that asked either key
    *  itself would hide the option in the other app for everybody. */
   useCanUseOrganogram(): boolean;
+  /** How far the reader's changes may reach; see :type:`HostReaderReach`.
+   *
+   *  In the contract because each application knows its reader differently: the
+   *  school app reads the branch reach its session carries, and the console's
+   *  platform operators act for the whole of the tenant they work in. */
+  useReaderReach(): HostReaderReach;
   /** Note that the reader opened something, for the app's own "recently
    *  opened" trail. The console keeps one; an app that does not supplies a hook
    *  that ignores the call, which is a real answer rather than a gap. */
@@ -291,7 +320,8 @@ const _satisfies: HostContract = host;
 void _satisfies;
 
 export const {
-  useBranches, useDirectory, useRoles, usePositions, useCanUseOrganogram, AppLogo, QuickExportButton, UserAvatar,
+  useBranches, useDirectory, useRoles, usePositions, useCanUseOrganogram, useReaderReach, AppLogo,
+  QuickExportButton, UserAvatar,
   useDashboardTitle, PlatformLedgerInventory, useLogRecentOpen,
   financeSettingsSections, setupSections, FeeDuePolicyPanel, createsWorkflowTemplates,
   platformName,
