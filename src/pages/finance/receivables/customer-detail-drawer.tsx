@@ -201,6 +201,7 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
 
 /** Outstanding AR items - open invoices and open DEBIT notes (both settleable). */
 function OpenItemsTab({ d, currency }: { d: CustomerDetail; currency?: string | null }) {
+  const dates = useDates();
   const rows = [
     ...d.open_invoices.map((i) => ({ kind: "INVOICE" as const, reference: i.document_number, date: i.due_date, total: i.total.kobo, balance: i.balance.kobo, status: i.status })),
     ...d.open_debit_notes.map((n) => ({ kind: "DEBIT_NOTE" as const, reference: n.document_number, date: n.note_date, total: n.total.kobo, balance: n.balance.kobo, status: n.status })),
@@ -218,7 +219,7 @@ function OpenItemsTab({ d, currency }: { d: CustomerDetail; currency?: string | 
             <tr key={`${r.reference}-${i}`}>
               <td className={td}><span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", TXN_META[r.kind]?.cls)}>{TXN_META[r.kind]?.label}</span></td>
               <td className={cn(td, "font-semibold")}>{r.reference}</td>
-              <td className={cn(td, "tabular-nums text-gray-05")}>{r.date ?? "-"}</td>
+              <td className={cn(td, "tabular-nums text-gray-05")}>{dates.day(r.date)}</td>
               <td className={cn(td, "text-right tabular-nums")}><Money kobo={r.total} currency={currency} align="right" /></td>
               <td className={cn(td, "text-right font-medium tabular-nums")}><Money kobo={r.balance} currency={currency} align="right" /></td>
             </tr>

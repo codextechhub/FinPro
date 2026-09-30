@@ -128,7 +128,7 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
       </span>
     ) },
     { header: "Invoice date", cell: (r) => <span className="tabular-nums">{dates.day(r.invoice_date)}</span> },
-    { header: "Due date", cell: (r) => <span className="tabular-nums">{r.due_date ?? "-"}</span> },
+    { header: "Due date", cell: (r) => <span className="tabular-nums">{dates.day(r.due_date)}</span> },
     { header: "Total", align: "right", cell: (r) => <Money kobo={r.total} currency={currency} align="right" /> },
     { header: "Paid", align: "right", cell: (r) => r.amount_paid ? <Money kobo={r.amount_paid} currency={currency} align="right" /> : <span className="text-gray-05">-</span> },
     { header: "Balance", align: "right", cell: (r) => <Money kobo={r.balance_due} currency={currency} align="right" /> },
