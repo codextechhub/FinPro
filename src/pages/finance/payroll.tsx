@@ -35,7 +35,7 @@ import { routesPath } from "@/routes/routes-path";
 import { useGetTrialBalanceQuery } from "@/redux/services/finance/reports-api";
 import { useGetBranchOptionsQuery, type BranchOption } from "@/redux/services/tenants-api";
 import { FinanceShell } from "./finance-shell";
-import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, useFieldAccess, fieldWriteErrors, toArray, type Column, type FieldAccess, type FieldErrors, type TabStripItem, PostingDateField, BankAccountPicker, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
+import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, useFieldAccess, fieldWriteErrors, toArray, type Column, type FieldAccess, type FieldErrors, type ReadOnlyOptions, type TabStripItem, PostingDateField, BankAccountPicker, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { useReaderReach } from "../../host";
 import { isBranchPartOfWholeSchoolRun, isPartlyPaid, mayCancelRun, sharesOf, singleJournalBranch, unassignedStaffRefusal, unpaidShares } from "./payroll-shares";
 import { EmptyState } from "@/components/finance-ui/states";
@@ -767,7 +767,33 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
   );
 }
 
-export function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }: { open: boolean; salary: EmployeeSalary | null; entity: string; currency?: string | null; branches: BranchOption[]; onClose: () => void }) {
+/**
+ * The body an edit to a roster row sends: only the fields that changed, and
+ * only those the reader may change.
+ *
+ * The server judges a pay write by the fields a body carries, so echoing the
+ * record back would ask to change pay the reader may only read. A bursar whose
+ * role shows Tunde's pay but cannot change it corrects his name and sends the
+ * name alone; the structure, gross and statutory figures stay out of the body.
+ */
+export function salaryChanges(
+  salary: EmployeeSalary,
+  fields: { name: string; cost_center?: string; structure: number | null; gross_amount: number; paye_amount?: number; pension_amount?: number },
+  active: boolean,
+  access: Pick<FieldAccess, "writableOnly">,
+  mode: ReadOnlyOptions,
+) {
+  const stored: Record<string, unknown> = {
+    name: salary.name, cost_center: salary.cost_center || undefined, structure: salary.structure_id ?? null,
+    gross_amount: salary.gross_amount, paye_amount: salary.paye_amount, pension_amount: salary.pension_amount,
+  };
+  const changed = Object.fromEntries(
+    Object.entries(fields).filter(([key, value]) => value !== undefined && value !== stored[key]),
+  ) as Partial<typeof fields>;
+  return { ...access.writableOnly(changed, mode), ...(active !== salary.is_active ? { is_active: active } : {}) };
+}
+
+export function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }:{ open: boolean; salary: EmployeeSalary | null; entity: string; currency?: string | null; branches: BranchOption[]; onClose: () => void }) {
   const isEdit = !!salary;
   const [name, setName] = useState("");
   const [branchId, setBranchId] = useState("");
@@ -814,11 +840,21 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
     setDenied(null);
     try {
       // In flat mode the manual figures are sent; with a structure they're derived server-side.
-      const figures = access.writableOnly({ gross_amount: gross, ...(structure ? {} : { paye_amount: paye, pension_amount: pension }) }, mode);
-      const base = { name: name.trim(), cost_center: costCenter || undefined,
-        structure: structure ? structure.id : (null as number | null), ...figures };
-      if (isEdit && salary) { const r = await update({ id: salary.id, entity, is_active: active, ...base, ...branchPatch }).unwrap(); toast.success(r.message || "Updated."); }
-      else { const r = await create({ entity, ...base, structure: structure ? structure.id : undefined, ...(branchId ? { branch: Number(branchId) } : {}) }).unwrap(); toast.success(r.message || "Employee added."); }
+      const fields = {
+        name: name.trim(), cost_center: costCenter || undefined,
+        structure: structure ? structure.id : (null as number | null), gross_amount: gross,
+        ...(structure ? {} : { paye_amount: paye, pension_amount: pension }),
+      };
+      if (isEdit && salary) {
+        const r = await update({
+          id: salary.id, entity, ...salaryChanges(salary, fields, active, access, mode), ...branchPatch,
+        }).unwrap();
+        toast.success(r.message || "Updated.");
+      } else {
+        const sent = access.writableOnly({ ...fields, structure: structure ? structure.id : undefined }, mode);
+        const r = await create({ entity, ...sent, name: fields.name, ...(branchId ? { branch: Number(branchId) } : {}) }).unwrap();
+        toast.success(r.message || "Employee added.");
+      }
       onClose();
     } catch (error) { setDenied(fieldWriteErrors(error)); }
   };

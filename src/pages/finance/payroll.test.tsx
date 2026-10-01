@@ -76,7 +76,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { EmployeeDrawer, NewRunDrawer, PayDrawer, RunDrawer } from "./payroll";
+import { EmployeeDrawer, NewRunDrawer, PayDrawer, RunDrawer, salaryChanges } from "./payroll";
 import type { EmployeeSalary, PayrollRun } from "@/redux/services/finance/ops-types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -128,10 +128,8 @@ describe("EmployeeDrawer under Field Access", () => {
     expect(save.disabled).toBe(false);
     await act(async () => { save.click(); });
 
-    const body = mocks.update.mock.calls[0][0];
-    expect(body).toMatchObject({ id: 12, name: "Ngozi Okafor", pension_amount: 3_600_000 });
-    expect(body).not.toHaveProperty("gross_amount");
-    expect(body).not.toHaveProperty("paye_amount");
+    // Nothing was changed, so nothing is echoed back: not even the figures she may change.
+    expect(mocks.update.mock.calls[0][0]).toEqual({ id: 12, entity: "COD" });
   });
 
   it("offers every figure to a role with full access", () => {
@@ -241,5 +239,49 @@ describe("Opening a run for the whole school", () => {
     const labels = buttonLabels();
     expect(labels.some((label) => label.includes("Pay net"))).toBe(true);
     expect(labels.some((label) => label.includes("Void run"))).toBe(true);
+  });
+});
+
+/**
+ * Tunde is on the Ikeja roster at N300,000 on the Standard structure. Mrs Bello
+ * may read his pay but not change it, and corrects a misspelt name: the body
+ * carries the name alone, never the structure or gross she cannot change. A
+ * bursar who may change pay and raises his gross sends the gross; saving with
+ * nothing changed sends nothing.
+ */
+const tunde: EmployeeSalary = {
+  id: 7, name: "Tunde Adeymi", structure_id: 3, structure_name: "Standard",
+  branch_id: 19, branch_name: "Ikeja Branch", gross_amount: 30_000_000, paye_amount: 2_500_000,
+  pension_amount: 2_400_000, net_amount: 25_100_000, cost_center: null, is_active: true,
+} as EmployeeSalary;
+
+const readOnlyPay = { writableOnly: <T extends object>(body: T) => Object.fromEntries(
+  Object.entries(body).filter(([name]) => !["structure", "gross_amount", "paye_amount", "pension_amount"].includes(name)),
+) as T };
+const mayChangePay = { writableOnly: <T extends object>(body: T) => body };
+const editing = { creating: false };
+
+const fields = (over: Partial<Parameters<typeof salaryChanges>[1]> = {}) => ({
+  name: "Tunde Adeymi", cost_center: undefined, structure: 3, gross_amount: 30_000_000, ...over,
+});
+
+describe("what a roster edit sends", () => {
+  it("sends only the corrected name when pay is read-only", () => {
+    expect(salaryChanges(tunde, fields({ name: "Tunde Adeyemi" }), true, readOnlyPay, editing))
+      .toEqual({ name: "Tunde Adeyemi" });
+  });
+
+  it("never sends a pay field the reader may not change, even when it differs", () => {
+    expect(salaryChanges(tunde, fields({ gross_amount: 35_000_000 }), true, readOnlyPay, editing)).toEqual({});
+  });
+
+  it("sends a changed gross for a reader who may change pay", () => {
+    expect(salaryChanges(tunde, fields({ gross_amount: 35_000_000 }), true, mayChangePay, editing))
+      .toEqual({ gross_amount: 35_000_000 });
+  });
+
+  it("sends nothing when nothing changed, and the active flag only when it did", () => {
+    expect(salaryChanges(tunde, fields(), true, mayChangePay, editing)).toEqual({});
+    expect(salaryChanges(tunde, fields(), false, mayChangePay, editing)).toEqual({ is_active: false });
   });
 });
