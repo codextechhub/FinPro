@@ -768,6 +768,32 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
 }
 
 /**
+ * A structure's lines with the order numbers they are saved under.
+ *
+ * Lines still in their stored order keep their stored numbers, so saving a
+ * structure whose lines were numbered 1, 2, 3 elsewhere does not rewrite them
+ * as 0, 1, 2 and read as a change to a reader who may not change pay. Once a
+ * line is added, removed or moved, the order no longer matches and every line
+ * is renumbered from 0 in the order shown.
+ */
+export function withSequences<T extends { sequence: number }>(lines: T[]): T[] {
+  const kept = lines.every((line, i) => i === 0 || line.sequence > lines[i - 1].sequence);
+  return kept ? lines : lines.map((line, i) => ({ ...line, sequence: i }));
+}
+
+/**
+ * The salary structures a roster row's drawer offers: the active ones, plus the
+ * one the row is already on when that has been retired.
+ *
+ * A person keeps a retired structure until someone moves them off it. Offering
+ * active ones only made Tunde's retired "2025 Scale" vanish from his drawer, so
+ * the drawer read him as flat and a save by a pay writer stripped his structure.
+ */
+export function offeredStructures(all: SalaryStructure[], currentId: string): SalaryStructure[] {
+  return all.filter((s) => s.is_active || String(s.id) === currentId);
+}
+
+/**
  * The body an edit to a roster row sends: only the fields that changed, and
  * only those the reader may change.
  *
@@ -803,8 +829,9 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
   const [pension, setPension] = useState(0);
   const [costCenter, setCostCenter] = useState("");
   const [active, setActive] = useState(true);
-  const { data: structData } = useGetSalaryStructuresQuery({ entity, is_active: "true" }, { skip: !open });
-  const structures = useMemo(() => toArray(structData?.data), [structData]);
+  // Every structure, so a person on a retired one keeps it; only active ones are offered.
+  const { data: structData } = useGetSalaryStructuresQuery({ entity }, { skip: !open });
+  const structures = useMemo(() => offeredStructures(toArray(structData?.data), structureId), [structData, structureId]);
   const [create, { isLoading: creating }] = useCreateEmployeeSalaryMutation();
   const [update, { isLoading: updating }] = useUpdateEmployeeSalaryMutation();
   const isLoading = creating || updating;
@@ -888,7 +915,7 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
           <FormField label="Salary structure">
             <Select value={structureId} onChange={setStructureId}>
               <option value="">Flat (manual PAYE / pension)</option>
-              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {structures.map((s) => <option key={s.id} value={s.id}>{s.is_active ? s.name : `${s.name} (retired)`}</option>)}
             </Select>
           </FormField>
           {showBreakdown ? <p className="mt-1 font-mont text-[11px] text-gray-05">{structure ? "PAYE, pension and net are derived from the structure applied to gross." : "Flat - enter PAYE and pension manually below."}</p> : null}
@@ -1013,7 +1040,7 @@ function StructureDrawer({ open, structure, entity, currency, onClose }: { open:
   const preview = useMemo(() => deriveFromStructure(previewGross, comps), [previewGross, comps]);
 
   const submit = async () => {
-    const payload = comps.map((c, i) => ({ ...c, name: c.name.trim(), sequence: i }));
+    const payload = withSequences(comps).map((c) => ({ ...c, name: c.name.trim() }));
     try {
       if (isEdit && structure) { const r = await update({ id: structure.id, entity, name: name.trim(), description: description.trim(), is_active: active, components: payload }).unwrap(); toast.success(r.message || "Structure updated."); }
       else { const r = await create({ entity, name: name.trim(), description: description.trim(), is_active: active, components: payload }).unwrap(); toast.success(r.message || "Structure created."); }

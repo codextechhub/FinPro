@@ -76,7 +76,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { EmployeeDrawer, NewRunDrawer, PayDrawer, RunDrawer, salaryChanges } from "./payroll";
+import { EmployeeDrawer, NewRunDrawer, PayDrawer, RunDrawer, offeredStructures, salaryChanges, withSequences } from "./payroll";
 import type { EmployeeSalary, PayrollRun } from "@/redux/services/finance/ops-types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -283,5 +283,47 @@ describe("what a roster edit sends", () => {
   it("sends nothing when nothing changed, and the active flag only when it did", () => {
     expect(salaryChanges(tunde, fields(), true, mayChangePay, editing)).toEqual({});
     expect(salaryChanges(tunde, fields(), false, mayChangePay, editing)).toEqual({ is_active: false });
+  });
+});
+
+/**
+ * Tunde is still on "2025 Scale", which the school has since retired; "2026
+ * Scale" is active. His drawer offers 2026 Scale and keeps 2025 Scale for him,
+ * so a save that changes nothing leaves his structure alone. Ada, on no
+ * structure, is offered 2026 Scale only.
+ */
+describe("the structures a roster drawer offers", () => {
+  const scale2025 = { id: 4, name: "2025 Scale", description: "", is_active: false, components: [], employee_count: 1 };
+  const scale2026 = { id: 5, name: "2026 Scale", description: "", is_active: true, components: [], employee_count: 9 };
+
+  it("keeps a retired structure for the person already on it", () => {
+    expect(offeredStructures([scale2025, scale2026], "4").map((s) => s.id)).toEqual([4, 5]);
+  });
+
+  it("offers only active structures to everyone else", () => {
+    expect(offeredStructures([scale2025, scale2026], "").map((s) => s.id)).toEqual([5]);
+  });
+
+  it("sends no structure change when a person on a retired structure is saved unchanged", () => {
+    const onRetired = { ...tunde, structure_id: 4 } as EmployeeSalary;
+    expect(salaryChanges(onRetired, fields({ structure: 4 }), true, mayChangePay, editing)).toEqual({});
+  });
+});
+
+/**
+ * The Standard structure was saved with its lines numbered 1, 2, 3. Saving it
+ * again unchanged keeps those numbers; adding a line renumbers from 0 in the
+ * order shown.
+ */
+describe("the order numbers a structure is saved with", () => {
+  const line = (sequence: number) => ({ sequence });
+
+  it("keeps the stored numbers while the order is unchanged", () => {
+    expect(withSequences([line(1), line(2), line(3)]).map((l) => l.sequence)).toEqual([1, 2, 3]);
+  });
+
+  it("renumbers from 0 once a line is added or moved", () => {
+    expect(withSequences([line(1), line(2), line(0)]).map((l) => l.sequence)).toEqual([0, 1, 2]);
+    expect(withSequences([line(2), line(1)]).map((l) => l.sequence)).toEqual([0, 1]);
   });
 });
