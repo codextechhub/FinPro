@@ -22,6 +22,7 @@ const SUBPATHS = [
   "./components/finance-ui",
   "./components/finance-ui/nav-main",
   "./components/finance-ui/sidebar-navigation",
+  "./lib/api-errors",
 ];
 
 const candidatesFor = (subpath) => {

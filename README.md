@@ -39,6 +39,16 @@ which is how this list was written.
 
 5. **Implement `HostContract`** in a module aliased to `@xvs-host`. See below.
 
+6. **Word the engines' refusals through the package.** Screens here end a
+   failed request with `catch { /* central */ }` and leave the toast to your
+   request interceptor. Before it falls back to the server's message, it asks
+   `refusalMessage(error, state.auth.tenant.display)` from
+   `@xvs/finance/lib/api-errors` and uses a non-null answer. That is how a
+   refused delete of a kept record (409 `RECORD_RETAINED`) reads "This record
+   is kept until 31 Dec 2032 and can't be deleted." in the school's own date
+   format, in both applications. The interceptor must toast 409s at all: a
+   conflict it drops is a click that does nothing.
+
 ## Host contract
 
 This package is consumed **as TypeScript source**, and resolves `@/*` against
