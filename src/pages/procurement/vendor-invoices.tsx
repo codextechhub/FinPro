@@ -54,7 +54,7 @@ import { apiErrorMessage, apiFieldError } from "@/utils/api-errors";
 import { InvoiceVarianceOverrideAction } from "./procurement-action-gates";
 import { blockingMatchReason, isBlockingInvoiceVariance } from "./invoice-action-model";
 import { ActivityFeed } from "./activity-feed";
-import { DocumentAttachments } from "./document-attachments";
+import { DocumentAttachments, useDocumentAttachmentRows } from "./document-attachments";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
@@ -173,6 +173,7 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
   const [post, { isLoading: posting }] = usePostVendorInvoiceMutation();
   const [attachFile, { isLoading: attaching }] = useAttachVendorInvoiceFileMutation();
   const [removeFile, { isLoading: removingFile }] = useDeleteVendorInvoiceFileMutation();
+  const attachmentRows = useDocumentAttachmentRows("vendor-invoice", invoice, entity, tab === "attachments");
   const activeStage = useMemo(() => (workflow?.stage_instances || []).filter((stage) => stage.status === "ACTIVE").at(-1), [workflow]);
   const canVote = !!activeStage && workflow?.status === "IN_PROGRESS" && activeStage.eligible_approvers.some((approver) => sameId(approver.user, uid) && approver.attempt === activeStage.attempt) && !activeStage.actions.some((action) => sameId(action.actor, uid) && !action.reversed_at && !action.is_reversal_of && action.attempt === activeStage.attempt);
   const vote = async (action: VoteAction) => {
@@ -224,7 +225,8 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
         {tab === "match" && <MatchPanel invoice={invoice} currency={currency} />}
         {tab === "payments" && (invoice.payments?.length ? <div className="space-y-2">{invoice.payments.map((payment) => <div key={payment.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 rounded-md border border-white-02 p-3"><div><p className="font-mont text-sm font-semibold">{payment.document_number}</p><p className="mt-1 font-mont text-xs text-gray-05">{dates.day(payment.payment_date)} · {payment.status}</p></div><p className="font-mont text-sm font-semibold tabular-nums">{formatMoney(payment.amount, currency)}</p></div>)}</div> : <EmptyPanel>No payment has been allocated to this invoice.</EmptyPanel>)}
         {tab === "attachments" && <DocumentAttachments
-          attachments={invoice.attachments || []}
+          attachments={attachmentRows}
+          documentIsDraft={invoice.status === "DRAFT"}
           attachPermission={P.PROC_ATTACH_VENDOR_INVOICE_FILE}
           uploading={attaching}
           deleting={removingFile}
@@ -232,9 +234,7 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
           onUpload={async (file, caption) => {
             try { await attachFile({ id: invoice.id, entity, file, caption }).unwrap(); toast.success("Attachment uploaded."); } catch { /* central */ }
           }}
-          onDelete={async (attachmentId) => {
-            try { await removeFile({ id: invoice.id, entity, attachmentId }).unwrap(); toast.success("Attachment removed."); } catch { /* central */ }
-          }}
+          onDelete={(attachmentId, reason) => removeFile({ id: invoice.id, entity, attachmentId, reason }).unwrap()}
         />}
         {tab === "activity" && <ActivityPanel invoice={invoice} workflow={workflow} name={name} />}
       </div>}

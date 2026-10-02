@@ -39,6 +39,14 @@ const qs = (p: object) => generateQueryString(p as Record<string, string | numbe
 type E = { entity: string; page?: number; page_size?: number; status?: string; search?: string };
 type Act = { id: number; entity: string };
 
+/**
+ * Taking one file off a vendor bill or payment. On a draft the file is deleted
+ * and no reason is needed. Once the document has left draft the file is
+ * superseded instead and the backend refuses the removal without a reason, which
+ * travels as `?reason=` because some clients send no body with a DELETE.
+ */
+type AttachmentRemoval = Act & { attachmentId: number; reason?: string };
+
 export const procurementApi = baseApi.injectEndpoints({
   endpoints: (b) => ({
     getProcurementSettings: b.query<ApiEnvelope<ProcurementSettingsPayload>, { entity: string }>({
@@ -263,9 +271,17 @@ export const procurementApi = baseApi.injectEndpoints({
       extraOptions: { inlineValidation: true },
       invalidatesTags: ["ProcVendorInvoices"],
     }),
-    deleteVendorInvoiceFile: b.mutation<ApiEnvelope<{ attachments: DocumentAttachment[] }>, Act & { attachmentId: number }>({
-      query: ({ id, entity, attachmentId }) => ({
-        url: `/procurement/vendor-invoices/${id}/attachments/${attachmentId}/${qs({ entity })}`,
+    getVendorInvoiceAttachments: b.query<ApiEnvelope<{ attachments: DocumentAttachment[] }>, Act & { include_superseded?: boolean }>({
+      query: ({ id, entity, include_superseded }) => ({
+        url: `/procurement/vendor-invoices/${id}/attachments/${qs({ entity, include_superseded })}`,
+        method: "GET",
+      }),
+      providesTags: ["ProcVendorInvoices"],
+    }),
+    /** See {@link AttachmentRemoval}. */
+    deleteVendorInvoiceFile: b.mutation<ApiEnvelope<{ attachments: DocumentAttachment[] }>, AttachmentRemoval>({
+      query: ({ id, entity, attachmentId, reason }) => ({
+        url: `/procurement/vendor-invoices/${id}/attachments/${attachmentId}/${qs({ entity, reason })}`,
         method: "DELETE",
       }),
       invalidatesTags: ["ProcVendorInvoices"],
@@ -327,9 +343,17 @@ export const procurementApi = baseApi.injectEndpoints({
       extraOptions: { inlineValidation: true },
       invalidatesTags: ["ProcVendorPayments"],
     }),
-    deleteVendorPaymentFile: b.mutation<ApiEnvelope<{ attachments: DocumentAttachment[] }>, Act & { attachmentId: number }>({
-      query: ({ id, entity, attachmentId }) => ({
-        url: `/procurement/vendor-payments/${id}/attachments/${attachmentId}/${qs({ entity })}`,
+    getVendorPaymentAttachments: b.query<ApiEnvelope<{ attachments: DocumentAttachment[] }>, Act & { include_superseded?: boolean }>({
+      query: ({ id, entity, include_superseded }) => ({
+        url: `/procurement/vendor-payments/${id}/attachments/${qs({ entity, include_superseded })}`,
+        method: "GET",
+      }),
+      providesTags: ["ProcVendorPayments"],
+    }),
+    /** See {@link AttachmentRemoval}. */
+    deleteVendorPaymentFile: b.mutation<ApiEnvelope<{ attachments: DocumentAttachment[] }>, AttachmentRemoval>({
+      query: ({ id, entity, attachmentId, reason }) => ({
+        url: `/procurement/vendor-payments/${id}/attachments/${attachmentId}/${qs({ entity, reason })}`,
         method: "DELETE",
       }),
       invalidatesTags: ["ProcVendorPayments"],
@@ -388,6 +412,7 @@ export const {
   usePostVendorInvoiceMutation,
   useAttachVendorInvoiceFileMutation,
   useDeleteVendorInvoiceFileMutation,
+  useGetVendorInvoiceAttachmentsQuery,
   useGetVendorPaymentsQuery,
   useGetVendorPaymentQuery,
   useGetVendorPaymentEligibleInvoicesQuery,
@@ -399,5 +424,6 @@ export const {
   useReverseVendorPaymentMutation,
   useAttachVendorPaymentFileMutation,
   useDeleteVendorPaymentFileMutation,
+  useGetVendorPaymentAttachmentsQuery,
   useAllocateVendorAdvanceMutation,
 } = procurementApi;

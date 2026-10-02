@@ -41,7 +41,7 @@ import type { VoteAction } from "@/redux/services/dashboard/workflow-types";
 import { useAppSelector } from "@/redux/store";
 import { formatMoney } from "@/utils/money";
 import { ActivityFeed } from "./activity-feed";
-import { DocumentAttachments } from "./document-attachments";
+import { DocumentAttachments, useDocumentAttachmentRows } from "./document-attachments";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
@@ -122,6 +122,7 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
   const [post, { isLoading: posting }] = usePostVendorPaymentMutation();
   const [attachFile, { isLoading: attaching }] = useAttachVendorPaymentFileMutation();
   const [removeFile, { isLoading: removingFile }] = useDeleteVendorPaymentFileMutation();
+  const attachmentRows = useDocumentAttachmentRows("vendor-payment", payment, entity, tab === "attachments");
   const [cancel, { isLoading: cancelling }] = useCancelVendorPaymentMutation();
   const [reverse, { isLoading: reversing }] = useReverseVendorPaymentMutation();
   const [applyAdvance, { isLoading: applying }] = useAllocateVendorAdvanceMutation();
@@ -186,7 +187,8 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
         {tab === "invoices" && <AllocationTable payment={payment} currency={currency} />}
         {tab === "posting" && <PaymentPosting payment={payment} currency={currency} />}
         {tab === "attachments" && <DocumentAttachments
-          attachments={payment.attachments || []}
+          attachments={attachmentRows}
+          documentIsDraft={payment.status === "DRAFT"}
           attachPermission={P.PROC_ATTACH_VENDOR_PAYMENT_FILE}
           uploading={attaching}
           deleting={removingFile}
@@ -194,9 +196,7 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
           onUpload={async (file, caption) => {
             try { await attachFile({ id: payment.id, entity, file, caption }).unwrap(); toast.success("Attachment uploaded."); } catch { /* central */ }
           }}
-          onDelete={async (attachmentId) => {
-            try { await removeFile({ id: payment.id, entity, attachmentId }).unwrap(); toast.success("Attachment removed."); } catch { /* central */ }
-          }}
+          onDelete={(attachmentId, reason) => removeFile({ id: payment.id, entity, attachmentId, reason }).unwrap()}
         />}
         {tab === "activity" && <PaymentActivity payment={payment} workflow={workflow} name={name} />}
       </div>}

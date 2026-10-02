@@ -351,6 +351,11 @@ export interface VendorInvoicePaymentHistory {
  * straight from the API rather than rebuilt on the client.
  *
  * Present on the detail payload only. List rows deliberately omit it.
+ *
+ * A file removed from a document that has left draft is superseded rather than
+ * deleted: it stays, with who removed it, when and why. The detail payload and
+ * the default attachment list carry current files only; the list read with
+ * `include_superseded=true` adds the superseded ones.
  */
 export interface DocumentAttachment {
   id: number;
@@ -361,6 +366,10 @@ export interface DocumentAttachment {
   url: string;
   uploaded_by_name: string;
   uploaded_at: string;
+  superseded: boolean;
+  superseded_at: string | null;
+  superseded_by_name: string | null;
+  superseded_reason: string | null;
 }
 
 export interface VendorInvoice {
