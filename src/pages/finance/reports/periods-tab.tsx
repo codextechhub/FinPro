@@ -1,6 +1,7 @@
-// Fiscal-period close workbench. The route, Redux services and lifecycle remain
-// unchanged; this view presents one bounded fiscal year at a time and makes every
-// available close action explicit.
+/**
+ * Fiscal-period close workbench. It presents one bounded fiscal year at a time
+ * and makes every available close action explicit.
+ */
 
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -25,8 +26,10 @@ import {
   FormField,
   FormModal,
   InfoHint,
+  ReasonField,
   StatCard,
   StatusPill,
+  hasReason,
 } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { EmptyState, ErrorState, ForbiddenState, LoadingState } from "@/components/finance-ui/states";
@@ -139,6 +142,9 @@ export function PeriodsTab({ entity, headerSlot }: {
   const finalPeriodOfOpenYear = !!selectedPeriod
     && selectedPeriod.id === finalPeriod?.id
     && activeFiscalYear?.status === "OPEN";
+  const yearShut = activeFiscalYear?.status === "CLOSED" || activeFiscalYear?.status === "LOCKED"
+    ? { year: activeFiscalYear.year, status: activeFiscalYear.status }
+    : null;
 
   const chooseYear = (year: number) => {
     setChosenYear(year);
@@ -249,6 +255,7 @@ export function PeriodsTab({ entity, headerSlot }: {
         id={selected}
         entity={entity}
         finalPeriodOfOpenYear={finalPeriodOfOpenYear}
+        yearShut={yearShut}
         onClose={() => setSelected(null)}
       />
 
@@ -497,15 +504,27 @@ function StartFiscalYearModal({
 
 type PeriodAction = "soft-close" | "close" | "reopen" | "lock";
 
-function PeriodCloseDrawer({
+/**
+ * One period's checklist and its lifecycle actions.
+ *
+ * Re-opening a month undoes a control, so it asks for a reason the backend
+ * stores on the audit row, and its confirm stays disabled until one is typed.
+ * A month of a CLOSED or LOCKED fiscal year cannot be re-opened at all: the
+ * year's result already sits in Retained Earnings, so the year is reopened
+ * first. `yearShut` names that year, and Re-open is then disabled with the
+ * reason beside it rather than offered and refused.
+ */
+export function PeriodCloseDrawer({
   id,
   entity,
   finalPeriodOfOpenYear,
+  yearShut = null,
   onClose,
 }: {
   id: number | null;
   entity: string;
   finalPeriodOfOpenYear: boolean;
+  yearShut?: { year: number; status: string } | null;
   onClose: () => void;
 }) {
   const dates = useDates();
@@ -517,13 +536,18 @@ function PeriodCloseDrawer({
   const period = detail?.period;
   const items = Array.isArray(detail?.items) ? detail.items : [];
   const [action, setAction] = useState<PeriodAction | null>(null);
+  const [reason, setReason] = useState("");
   const busy = closing || reopening || locking;
   const canClose = !!period && (period.status === "OPEN" || period.status === "SOFT_CLOSED");
   const canReopen = !!period && (period.status === "CLOSED" || period.status === "SOFT_CLOSED");
   const canLock = !!period && period.status === "CLOSED";
 
+  const chooseAction = (next: PeriodAction | null) => {
+    setAction(next);
+    setReason("");
+  };
   const closeDrawer = () => {
-    setAction(null);
+    chooseAction(null);
     onClose();
   };
   const doClose = async (soft: boolean) => {
@@ -535,7 +559,7 @@ function PeriodCloseDrawer({
   };
   const doReopen = async () => {
     try {
-      const response = await reopen({ id: id!, entity }).unwrap();
+      const response = await reopen({ id: id!, entity, reason: reason.trim() }).unwrap();
       toast.success(response.message || `Re-opened ${period?.name}.`);
       closeDrawer();
     } catch { /* central */ }
@@ -566,7 +590,7 @@ function PeriodCloseDrawer({
     },
     reopen: {
       title: `Re-open ${period?.name ?? "period"}?`,
-      description: "Allows ordinary journals and source documents to post into this period again. The action is recorded in the audit trail.",
+      description: "Allows ordinary journals and source documents to post into this period again. The re-open and your reason are recorded in the audit trail.",
       text: "Re-open period",
     },
     lock: {
@@ -590,14 +614,20 @@ function PeriodCloseDrawer({
           <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
             {canReopen ? (
               <Can permission={P.FIN_REOPEN_PERIOD}>
-                <Button variant="outline" onClick={() => setAction("reopen")} disabled={busy} className="w-full sm:w-auto">Re-open</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => chooseAction("reopen")}
+                  disabled={busy || !!yearShut}
+                  title={yearShut ? `Reopen FY ${yearShut.year} before re-opening one of its months.` : undefined}
+                  className="w-full sm:w-auto"
+                >Re-open</Button>
               </Can>
             ) : null}
             {canLock ? (
               <Can permission={P.FIN_LOCK_PERIOD}>
                 <Button
                   variant="outline"
-                  onClick={() => setAction("lock")}
+                  onClick={() => chooseAction("lock")}
                   disabled={busy || finalPeriodOfOpenYear}
                   title={finalPeriodOfOpenYear ? "Close the fiscal year before locking its final period." : undefined}
                   className="w-full border-destructive/40 text-destructive hover:bg-destructive/5 sm:w-auto"
@@ -607,9 +637,9 @@ function PeriodCloseDrawer({
             {canClose ? (
               <Can permission={P.FIN_CLOSE_PERIOD}>
                 {period?.status === "OPEN" ? (
-                  <Button variant="outline" onClick={() => setAction("soft-close")} disabled={busy} className="w-full sm:w-auto">Soft close</Button>
+                  <Button variant="outline" onClick={() => chooseAction("soft-close")} disabled={busy} className="w-full sm:w-auto">Soft close</Button>
                 ) : null}
-                <Button onClick={() => setAction("close")} disabled={busy} className="w-full sm:w-auto">Run close steps</Button>
+                <Button onClick={() => chooseAction("close")} disabled={busy} className="w-full sm:w-auto">Run close steps</Button>
               </Can>
             ) : null}
           </div>
@@ -632,6 +662,18 @@ function PeriodCloseDrawer({
                 <div className="h-full rounded-full bg-primary" style={{ width: `${detail.total ? (detail.done / detail.total) * 100 : 0}%` }} />
               </div>
             </div>
+
+            {yearShut && canReopen ? (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-700" />
+                <p className="font-mont text-xs leading-5 text-gray-05">
+                  FY {yearShut.year} is {yearShut.status === "LOCKED" ? "locked" : "closed"}, so its months stay shut.
+                  {yearShut.status === "LOCKED"
+                    ? " A locked year cannot be reopened."
+                    : " Reopen the fiscal year before re-opening one of its months."}
+                </p>
+              </div>
+            ) : null}
 
             {finalPeriodOfOpenYear && canLock ? (
               <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
@@ -711,14 +753,25 @@ function PeriodCloseDrawer({
       </DetailDrawer>
       <ConfirmActionModal
         open={action != null}
-        onOpenChange={(open) => !open && setAction(null)}
+        onOpenChange={(open) => !open && chooseAction(null)}
         title={activeCopy?.title ?? "Confirm period action"}
         description={activeCopy?.description}
         confirmText={activeCopy?.text}
         destructive={activeCopy?.destructive}
         loading={busy}
+        confirmDisabled={action === "reopen" && !hasReason(reason)}
         onConfirm={confirm}
-      />
+      >
+        {action === "reopen" ? (
+          <ReasonField
+            value={reason}
+            onChange={setReason}
+            disabled={busy}
+            placeholder="For example: a supplier bill dated in this month arrived after the close"
+            hint="Kept on the audit trail with your name."
+          />
+        ) : null}
+      </ConfirmActionModal>
     </>
   );
 }

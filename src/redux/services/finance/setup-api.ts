@@ -2,7 +2,9 @@
  * Setup / master-data reads + month-end close + audit log (vs_finance).
  *   GET  /finance/accounts/         finance.account.view
  *   GET  /finance/periods/          finance.period.view
- *   POST /finance/periods/{id}/close/  finance.period.close
+ *   POST /finance/periods/{id}/close/  finance.period.close (force: finance.period.force_close)
+ *   POST /finance/periods/{id}/reopen/ finance.period.reopen
+ *   POST /finance/fiscal-years/{id}/close/ finance.period.close (force: finance.period.force_close)
  *   GET  /finance/audit-logs/        finance.audit.view
  *   GET  /finance/currencies|tax-codes|cost-centers  (reference)
  */
@@ -33,6 +35,13 @@ import type {
 } from "./setup-types";
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
+
+/**
+ * A close either keeps its checks or forces past them. Forcing needs a reason,
+ * which the backend stores on the audit row and refuses blank, so the two
+ * shapes are typed apart and a forced close without one does not compile.
+ */
+type CloseOverride = { force?: false; reason?: never } | { force: true; reason: string };
 
 export const setupApi = baseApi.injectEndpoints({
   endpoints: (b) => ({
@@ -106,13 +115,17 @@ export const setupApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/finance/periods/${id}/checklist/${qs({ entity })}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),
-    closePeriod: b.mutation<ApiEnvelope<PeriodCloseResult>, { id: number; entity: string; soft?: boolean; force?: boolean; run_depreciation?: boolean }>({
+    closePeriod: b.mutation<ApiEnvelope<PeriodCloseResult>, { id: number; entity: string; soft?: boolean; run_depreciation?: boolean } & CloseOverride>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/periods/${id}/close/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePeriods", "FinanceReports"],
     }),
-    // Re-open a CLOSED/SOFT_CLOSED period (a LOCKED one can't be reopened).
-    reopenPeriod: b.mutation<ApiEnvelope<FiscalPeriod>, { id: number; entity: string }>({
-      query: ({ id, entity }) => ({ url: `/finance/periods/${id}/reopen/${qs({ entity })}`, method: "POST" }),
+    /**
+     * Re-open a CLOSED or SOFT_CLOSED period. The reason is required and lands
+     * on the audit row. Refused for a LOCKED or already OPEN period, and for any
+     * period of a CLOSED or LOCKED fiscal year, whose year must be reopened first.
+     */
+    reopenPeriod: b.mutation<ApiEnvelope<FiscalPeriod>, { id: number; entity: string; reason: string }>({
+      query: ({ id, entity, reason }) => ({ url: `/finance/periods/${id}/reopen/${qs({ entity })}`, method: "POST", body: { reason } }),
       invalidatesTags: ["FinancePeriods", "FinanceReports"],
     }),
     // Permanently seal a CLOSED period - irreversible.
@@ -120,10 +133,13 @@ export const setupApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/finance/periods/${id}/lock/${qs({ entity })}`, method: "POST" }),
       invalidatesTags: ["FinancePeriods", "FinanceReports"],
     }),
-    // Year-end close: post the closing entry (zero every P&L account, roll net profit/loss
-    // into Retained Earnings 3200) and seal the fiscal year. The formal entry may use the
-    // final OPEN, SOFT_CLOSED or CLOSED period, but never a permanently LOCKED one.
-    closeFiscalYear: b.mutation<ApiEnvelope<{ fiscal_year: { id: number; year: number; status: string }; closing_journal: { id: number } | null; net_income: { kobo: number; naira: string } }>, { id: number; entity: string; force?: boolean; closing_date?: string }>({
+    /**
+     * Year-end close: post the closing entry (zero every P&L account, roll net
+     * profit or loss into Retained Earnings 3200) and seal the fiscal year. The
+     * formal entry may use the final OPEN, SOFT_CLOSED or CLOSED period, but never
+     * a permanently LOCKED one. Forcing it over OPEN months needs a reason.
+     */
+    closeFiscalYear: b.mutation<ApiEnvelope<{ fiscal_year: { id: number; year: number; status: string }; closing_journal: { id: number } | null; net_income: { kobo: number; naira: string } }>, { id: number; entity: string; closing_date?: string } & CloseOverride>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/fiscal-years/${id}/close/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePeriods", "FinanceReports", "FinanceJournals"],
     }),

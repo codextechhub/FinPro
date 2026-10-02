@@ -11,6 +11,7 @@ export { PostingRecap, type RecapRow } from "./posting-recap";
 export { DataTable, headCls, cellCls, type Column } from "./data-table";
 export { DetailDrawer } from "./detail-drawer";
 export { ConfirmActionModal } from "./confirm-action-modal";
+export { ReasonField, hasReason, REASON_MAX_LENGTH } from "./reason-field";
 export { DocumentEmailAction, type DocumentEmailActionProps } from "./document-email-action";
 export { ActionButton } from "./action-button";
 export { EntitySelect } from "./entity-select";
