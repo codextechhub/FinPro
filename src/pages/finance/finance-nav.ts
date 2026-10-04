@@ -27,7 +27,7 @@ export const financeNav: ConsoleNavGroup[] = [
       { title: "Chart of Accounts", url: `${F.SETUP}/accounts`, icon: ListTree, permissions: [P.FIN_VIEW_ACCOUNTS] },
       { title: "General Ledger", url: F.LEDGER, icon: BookOpen, permissions: [P.FIN_VIEW_JOURNALS], resources: ["finance.directentry"] },
       { title: "Entities", url: `${F.SETUP}/entities`, icon: Building2, permissions: [P.FIN_VIEW_ENTITIES] },
-      { title: "Fiscal Periods", url: `${F.SETUP}/periods`, icon: CalendarDays, permissions: [P.FIN_VIEW_PERIODS] },
+      { title: "Fiscal Periods", url: `${F.SETUP}/periods`, icon: CalendarDays, permissions: [P.FIN_VIEW_PERIODS], resources: ["finance.fiscalyear"] },
       { title: "Currencies & FX", url: `${F.SETUP}/currencies`, icon: Coins, permissions: [P.FIN_VIEW_CURRENCIES, P.FIN_VIEW_FX_RATES] },
       { title: "Tax Codes", url: `${F.SETUP}/tax-codes`, icon: Percent, permissions: [P.FIN_VIEW_TAX_CODES] },
       { title: "Cost Centres", url: `${F.SETUP}/cost-centers`, icon: Layers, permissions: [P.FIN_VIEW_COST_CENTERS] },

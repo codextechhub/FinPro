@@ -373,7 +373,8 @@ export const opsApi = baseApi.injectEndpoints({
       extraOptions: { silent: true },
       providesTags: ["FinanceBudgets"],
     }),
-    getFiscalYears: b.query<ApiEnvelope<FiscalYear[]>, { entity: string; status?: string }>({
+    // With `branch`, each year carries that branch's own status; without it, the school's.
+    getFiscalYears: b.query<ApiEnvelope<FiscalYear[]>, { entity: string; status?: string; branch?: number }>({
       query: (p) => ({ url: `/finance/fiscal-years/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),

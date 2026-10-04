@@ -122,12 +122,27 @@ export interface ChecklistItem {
   detail: string;
 }
 
+/**
+ * A period's close checklist. Asked with a branch, the items are run against
+ * that branch's entries and `branch` names it; `period.status` is still the
+ * school's own state, so a screen reading one branch takes the status from the
+ * branch-read period list instead.
+ */
 export interface PeriodChecklist {
   period: FiscalPeriod;
   passed: boolean;
   done: number;
   total: number;
   items: ChecklistItem[];
+  branch?: number | null;
+}
+
+/** One branch's own state for a period, as a multi-branch close reports it. */
+export interface BranchPeriodState {
+  id: number;
+  branch: number;
+  status: FiscalPeriod["status"];
+  closed_at: string | null;
 }
 
 export interface Currency {

@@ -60,6 +60,7 @@ export const BACKEND_KEY_CATALOGUE: readonly string[] = [
   "finance.feestructure.edit",
   "finance.feestructure.generate",
   "finance.feestructure.view",
+  "finance.fiscalyear.reopen",
   "finance.fixedasset.acquire",
   "finance.fixedasset.create",
   "finance.fixedasset.depreciate",

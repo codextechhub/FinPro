@@ -63,3 +63,44 @@ describe("forcing a month closed", () => {
     expect(sent.body).toEqual({ force: true, reason: "Bank feed is down" });
   });
 });
+
+/**
+ * The fiscal calendar is kept per branch. At a school with several branches each
+ * write names its branch in the body and each read asks for one in the address;
+ * at a school with one branch both leave it out and the server takes that branch.
+ */
+describe("a branch's fiscal calendar", () => {
+  it("re-opens a year for one branch with exactly the branch and the reason", () => {
+    const sent = request("reopenFiscalYear", { id: 7, entity: "BRIGHTSTAR", branch: 2, reason: "June bill arrived late" });
+
+    expect(sent.method).toBe("POST");
+    expect(sent.url).toBe("/finance/fiscal-years/7/reopen/?entity=BRIGHTSTAR");
+    expect(sent.body).toEqual({ branch: 2, reason: "June bill arrived late" });
+  });
+
+  it("re-opens a year at a one-branch school with the reason alone", () => {
+    expect(request("reopenFiscalYear", { id: 7, entity: "HARBOUR", reason: "June bill arrived late" }).body)
+      .toEqual({ reason: "June bill arrived late" });
+  });
+
+  it("names the branch in the body of every other calendar write", () => {
+    expect(request("closePeriod", { id: 41, entity: "BRIGHTSTAR", soft: false, branch: 1 }).body).toEqual({ soft: false, branch: 1 });
+    expect(request("reopenPeriod", { id: 41, entity: "BRIGHTSTAR", branch: 1, reason: "Late bill" }).body).toEqual({ branch: 1, reason: "Late bill" });
+    expect(request("lockPeriod", { id: 41, entity: "BRIGHTSTAR", branch: 1 }).body).toEqual({ branch: 1 });
+    expect(request("closeFiscalYear", { id: 7, entity: "BRIGHTSTAR", branch: 1 }).body).toEqual({ branch: 1 });
+  });
+
+  it("sends no branch on a write at a one-branch school", () => {
+    expect(request("lockPeriod", { id: 41, entity: "HARBOUR" }).body).toEqual({});
+    expect(request("reopenPeriod", { id: 41, entity: "HARBOUR", reason: "Late bill" }).body).toEqual({ reason: "Late bill" });
+  });
+
+  it("reads one branch's months and checklist with ?branch=", () => {
+    expect(request("getFiscalYearPeriods", { entity: "BRIGHTSTAR", year: 2026, branch: 2 }).url)
+      .toBe("/finance/periods/?entity=BRIGHTSTAR&year=2026&branch=2&all=true");
+    expect(request("getPeriodChecklist", { id: 41, entity: "BRIGHTSTAR", branch: 2 }).url)
+      .toBe("/finance/periods/41/checklist/?entity=BRIGHTSTAR&branch=2");
+    expect(request("getPeriodChecklist", { id: 41, entity: "HARBOUR" }).url)
+      .toBe("/finance/periods/41/checklist/?entity=HARBOUR");
+  });
+});

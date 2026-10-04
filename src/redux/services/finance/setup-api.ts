@@ -1,10 +1,18 @@
 /**
  * Setup / master-data reads + month-end close + audit log (vs_finance).
+ *
+ * The fiscal calendar is kept per branch. Every calendar write takes the branch
+ * whose calendar changes in its body (`branch`); a school with one branch may
+ * leave it out and the server uses that branch, while a school with several is
+ * refused without one. The calendar reads take `?branch=` and then report that
+ * branch's own state; without it they report the school's.
  *   GET  /finance/accounts/         finance.account.view
  *   GET  /finance/periods/          finance.period.view
  *   POST /finance/periods/{id}/close/  finance.period.close (force: finance.period.force_close)
  *   POST /finance/periods/{id}/reopen/ finance.period.reopen
+ *   POST /finance/periods/{id}/lock/   finance.period.lock
  *   POST /finance/fiscal-years/{id}/close/ finance.period.close (force: finance.period.force_close)
+ *   POST /finance/fiscal-years/{id}/reopen/ finance.fiscalyear.reopen
  *   GET  /finance/audit-logs/        finance.audit.view
  *   GET  /finance/currencies|tax-codes|cost-centers  (reference)
  */
@@ -26,6 +34,7 @@ import type {
   FinanceAccountSettings,
   FinanceBankingSettingsPayload,
   FinanceDocumentSettingsPayload,
+  BranchPeriodState,
   FiscalPeriod,
   StartedFiscalYear,
   PeriodChecklist,
@@ -42,6 +51,19 @@ const qs = (p: object) => generateQueryString(p as Record<string, string | numbe
  * shapes are typed apart and a forced close without one does not compile.
  */
 type CloseOverride = { force?: false; reason?: never } | { force: true; reason: string };
+
+/**
+ * The branch whose fiscal calendar an action changes or a read reports. Left
+ * out at a school with one branch, where the server takes that branch.
+ */
+type CalendarBranchArg = { branch?: number };
+
+/** The body fields that name the branch: none when no branch is given. */
+const branchBody = (branch: number | undefined) => (branch != null ? { branch } : {});
+
+/** What a period re-open or lock returns: the period alone at a school with one
+ *  branch, the period beside the branch's own state at a school with several. */
+type PeriodTransition = FiscalPeriod | { period: FiscalPeriod; branch_period: BranchPeriodState };
 
 export const setupApi = baseApi.injectEndpoints({
   endpoints: (b) => ({
@@ -95,7 +117,7 @@ export const setupApi = baseApi.injectEndpoints({
     }),
     // The close workbench reads exactly one complete fiscal calendar (4 or 12
     // rows), never the entity's unbounded lifetime history.
-    getFiscalYearPeriods: b.query<ApiEnvelope<FiscalPeriod[]>, { entity: string; year: number }>({
+    getFiscalYearPeriods: b.query<ApiEnvelope<FiscalPeriod[]>, { entity: string; year: number } & CalendarBranchArg>({
       query: (p) => ({ url: `/finance/periods/${qs({ ...p, all: "true" })}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),
@@ -111,11 +133,11 @@ export const setupApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/posting-window/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),
-    getPeriodChecklist: b.query<ApiEnvelope<PeriodChecklist>, { id: number; entity: string }>({
-      query: ({ id, entity }) => ({ url: `/finance/periods/${id}/checklist/${qs({ entity })}`, method: "GET" }),
+    getPeriodChecklist: b.query<ApiEnvelope<PeriodChecklist>, { id: number; entity: string } & CalendarBranchArg>({
+      query: ({ id, entity, branch }) => ({ url: `/finance/periods/${id}/checklist/${qs({ entity, branch })}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),
-    closePeriod: b.mutation<ApiEnvelope<PeriodCloseResult>, { id: number; entity: string; soft?: boolean; run_depreciation?: boolean } & CloseOverride>({
+    closePeriod: b.mutation<ApiEnvelope<PeriodCloseResult>, { id: number; entity: string; soft?: boolean; run_depreciation?: boolean } & CalendarBranchArg & CloseOverride>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/periods/${id}/close/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePeriods", "FinanceReports"],
     }),
@@ -123,14 +145,15 @@ export const setupApi = baseApi.injectEndpoints({
      * Re-open a CLOSED or SOFT_CLOSED period. The reason is required and lands
      * on the audit row. Refused for a LOCKED or already OPEN period, and for any
      * period of a CLOSED or LOCKED fiscal year, whose year must be reopened first.
+     * Re-opening one branch's month also re-opens the school's month.
      */
-    reopenPeriod: b.mutation<ApiEnvelope<FiscalPeriod>, { id: number; entity: string; reason: string }>({
-      query: ({ id, entity, reason }) => ({ url: `/finance/periods/${id}/reopen/${qs({ entity })}`, method: "POST", body: { reason } }),
+    reopenPeriod: b.mutation<ApiEnvelope<PeriodTransition>, { id: number; entity: string; reason: string } & CalendarBranchArg>({
+      query: ({ id, entity, reason, branch }) => ({ url: `/finance/periods/${id}/reopen/${qs({ entity })}`, method: "POST", body: { ...branchBody(branch), reason } }),
       invalidatesTags: ["FinancePeriods", "FinanceReports"],
     }),
     // Permanently seal a CLOSED period - irreversible.
-    lockPeriod: b.mutation<ApiEnvelope<FiscalPeriod>, { id: number; entity: string }>({
-      query: ({ id, entity }) => ({ url: `/finance/periods/${id}/lock/${qs({ entity })}`, method: "POST" }),
+    lockPeriod: b.mutation<ApiEnvelope<PeriodTransition>, { id: number; entity: string } & CalendarBranchArg>({
+      query: ({ id, entity, branch }) => ({ url: `/finance/periods/${id}/lock/${qs({ entity })}`, method: "POST", body: branchBody(branch) }),
       invalidatesTags: ["FinancePeriods", "FinanceReports"],
     }),
     /**
@@ -138,9 +161,22 @@ export const setupApi = baseApi.injectEndpoints({
      * profit or loss into Retained Earnings 3200) and seal the fiscal year. The
      * formal entry may use the final OPEN, SOFT_CLOSED or CLOSED period, but never
      * a permanently LOCKED one. Forcing it over OPEN months needs a reason.
+     * Closing one branch's year closes the school's year once every branch's
+     * year is closed.
      */
-    closeFiscalYear: b.mutation<ApiEnvelope<{ fiscal_year: { id: number; year: number; status: string }; closing_journal: { id: number } | null; net_income: { kobo: number; naira: string } }>, { id: number; entity: string; closing_date?: string } & CloseOverride>({
+    closeFiscalYear: b.mutation<ApiEnvelope<{ fiscal_year: { id: number; year: number; status: string }; closing_journal: { id: number } | null; net_income: { kobo: number; naira: string } }>, { id: number; entity: string; closing_date?: string } & CalendarBranchArg & CloseOverride>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/fiscal-years/${id}/close/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["FinancePeriods", "FinanceReports", "FinanceJournals"],
+    }),
+    /**
+     * Re-open a CLOSED fiscal year for one branch: reverse that branch's
+     * year-end closing journal inside the year and set its year back to OPEN,
+     * so a month can be corrected and the year closed again. The school's year
+     * re-opens with it. The reason is required and lands on the audit row. A
+     * LOCKED or archived year is refused.
+     */
+    reopenFiscalYear: b.mutation<ApiEnvelope<{ fiscal_year: { id: number; year: number; status: string }; reversals: { id: number }[] }>, { id: number; entity: string; reason: string } & CalendarBranchArg>({
+      query: ({ id, entity, branch, reason }) => ({ url: `/finance/fiscal-years/${id}/reopen/${qs({ entity })}`, method: "POST", body: { ...branchBody(branch), reason } }),
       invalidatesTags: ["FinancePeriods", "FinanceReports", "FinanceJournals"],
     }),
     getCurrencies: b.query<PaginatedEnvelope<Currency>, void>({
@@ -236,6 +272,7 @@ export const {
   useReopenPeriodMutation,
   useLockPeriodMutation,
   useCloseFiscalYearMutation,
+  useReopenFiscalYearMutation,
   useGetCurrenciesQuery,
   useCreateFxRateMutation,
   useGetTaxCodesQuery,

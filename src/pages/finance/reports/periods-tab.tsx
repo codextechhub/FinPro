@@ -1,6 +1,9 @@
 /**
  * Fiscal-period close workbench. It presents one bounded fiscal year at a time
  * and makes every available close action explicit.
+ *
+ * The calendar is kept per branch; `calendar-branch.ts` says whose calendar the
+ * workbench reads and which branch each action sends.
  */
 
 import { useMemo, useState } from "react";
@@ -9,6 +12,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import {
   ArrowRight,
+  Building2,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -26,6 +30,7 @@ import {
   FormField,
   FormModal,
   InfoHint,
+  RaisingBranchField,
   ReasonField,
   StatCard,
   StatusPill,
@@ -44,6 +49,7 @@ import {
   useGetFiscalYearPeriodsQuery,
   useGetPeriodChecklistQuery,
   useLockPeriodMutation,
+  useReopenFiscalYearMutation,
   useReopenPeriodMutation,
   useStartFiscalYearMutation,
 } from "@/redux/services/finance/setup-api";
@@ -56,6 +62,15 @@ import {
   yearCloseState,
   type YearCloseState,
 } from "./periods-model";
+import {
+  actionBranch,
+  actionBranchReady,
+  calendarBranchFor,
+  calendarBranchName,
+  useCalendarBranch,
+  type CalendarBranch,
+} from "./calendar-branch";
+import { useReaderReach } from "../../../host";
 import { useDates } from "../../../lib/display-prefs";
 import { isForbidden } from "../../../lib/api-errors";
 
@@ -76,28 +91,69 @@ const humanize = (value: string) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
+/** The calendar of a school with one branch: no branch is read, asked or sent. */
+const ONE_BRANCH_CALENDAR: CalendarBranch = calendarBranchFor(
+  { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false },
+  null,
+);
+
+/**
+ * " for Ikeja" where the school runs several branches and the branch is known,
+ * nothing otherwise, so a title reads the same at a school with one branch.
+ */
+function forBranch(calendar: CalendarBranch, branch: number | undefined): string {
+  return calendar.applies && branch != null ? ` for ${calendarBranchName(calendar, branch)}` : "";
+}
+
+/**
+ * The branch question inside a confirm dialog, asked only under All branches at
+ * a school with several (see `calendar-branch.ts`). It offers the branches the
+ * reader may act for and starts on none.
+ */
+function CalendarBranchQuestion({ calendar, value, onChange, hint }: {
+  calendar: CalendarBranch;
+  value: string;
+  onChange: (branch: string) => void;
+  hint: string;
+}) {
+  if (!calendar.mustAsk) return null;
+  return (
+    <RaisingBranchField
+      raising={{ ask: true, choices: calendar.choices, pinned: null, initial: "", isLoading: calendar.isLoading }}
+      value={value}
+      onChange={onChange}
+      hint={hint}
+    />
+  );
+}
+
+type YearAction = { kind: "close" | "reopen"; id: number; year: number };
+
 /**
  * Fiscal close workbench for one ledger entity.
  *
- * The calendar controls (fiscal year picker and the new-year action) read as part
- * of the page heading rather than as the first row of the body, so a host that
- * exposes a `headerSlot` node receives them through a portal and gets them on the
- * title line; a host that does not passes nothing and they render inline above the
- * workbench. The picker owns the selected year that drives every query below it,
- * which is why the controls stay part of this component instead of being lifted
- * into the host.
+ * The calendar controls (branch and fiscal year pickers and the new-year action)
+ * read as part of the page heading rather than as the first row of the body, so
+ * a host that exposes a `headerSlot` node receives them through a portal and
+ * gets them on the title line; a host that does not passes nothing and they
+ * render inline above the workbench. The pickers own the selection that drives
+ * every query below them, which is why the controls stay part of this component
+ * instead of being lifted into the host.
  */
 export function PeriodsTab({ entity, headerSlot }: {
   entity: string;
   headerSlot?: HTMLElement | null;
 }) {
+  const calendar = useCalendarBranch();
+  const { wholeSchool } = useReaderReach();
+  const readArg = calendar.readBranch != null ? { branch: calendar.readBranch } : {};
   const {
     data: fiscalYearData,
     isLoading: fiscalYearsLoading,
     isError: fiscalYearsFailed,
     error: fiscalYearsError,
     refetch: refetchFiscalYears,
-  } = useGetFiscalYearsQuery({ entity });
+  } = useGetFiscalYearsQuery({ entity, ...readArg }, { skip: calendar.isLoading });
   const fiscalYears = useMemo(
     () => [...toArray(fiscalYearData?.data)].sort((a, b) => b.year - a.year),
     [fiscalYearData],
@@ -112,7 +168,7 @@ export function PeriodsTab({ entity, headerSlot }: {
     isError: periodsFailed,
     error: periodsError,
     refetch: refetchPeriods,
-  } = useGetFiscalYearPeriodsQuery(activeYear ? { entity, year: activeYear } : skipToken);
+  } = useGetFiscalYearPeriodsQuery(activeYear && !calendar.isLoading ? { entity, year: activeYear, ...readArg } : skipToken);
   const periods = useMemo(
     () => [...(Array.isArray(periodData?.data) ? periodData.data : [])]
       .sort((a, b) => a.start_date.localeCompare(b.start_date)),
@@ -123,8 +179,12 @@ export function PeriodsTab({ entity, headerSlot }: {
   const finalPeriod = periods.at(-1);
   const [selected, setSelected] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  const [closing, setClosing] = useState<{ id: number; year: number } | null>(null);
+  const [yearAction, setYearAction] = useState<YearAction | null>(null);
+  const [yearBranch, setYearBranch] = useState("");
+  const [yearReason, setYearReason] = useState("");
   const [closeYear, { isLoading: closingYear }] = useCloseFiscalYearMutation();
+  const [reopenYear, { isLoading: reopeningYear }] = useReopenFiscalYearMutation();
+  const yearBusy = closingYear || reopeningYear;
 
   const latestFiscalYear = fiscalYears[0] ?? null;
   const latestStart = latestFiscalYear?.start_date
@@ -150,20 +210,37 @@ export function PeriodsTab({ entity, headerSlot }: {
     setChosenYear(year);
     setSelected(null);
   };
-  const doCloseYear = async () => {
-    if (!closing) return;
+  const chooseBranch = (value: string) => {
+    calendar.choose(value === "all" ? "all" : Number(value));
+    setSelected(null);
+  };
+  const openYearAction = (next: YearAction | null) => {
+    setYearAction(next);
+    setYearBranch("");
+    setYearReason("");
+  };
+  const yearTarget = actionBranch(calendar, yearBranch);
+  const yearScope = forBranch(calendar, yearTarget);
+  const doYearAction = async () => {
+    if (!yearAction) return;
+    const branchArg = yearTarget != null ? { branch: yearTarget } : {};
     try {
-      const response = await closeYear({ id: closing.id, entity }).unwrap();
-      const netIncome = response.data?.net_income?.naira;
-      toast.success(
-        `${response.message || `Fiscal year ${closing.year} closed.`}`
-        + `${netIncome ? ` · Net ${netIncome} → Retained Earnings` : ""}`,
-      );
-      setClosing(null);
+      if (yearAction.kind === "close") {
+        const response = await closeYear({ id: yearAction.id, entity, ...branchArg }).unwrap();
+        const netIncome = response.data?.net_income?.naira;
+        toast.success(
+          `${response.message || `Fiscal year ${yearAction.year} closed.`}`
+          + `${netIncome ? ` · Net ${netIncome} → Retained Earnings` : ""}`,
+        );
+      } else {
+        const response = await reopenYear({ id: yearAction.id, entity, ...branchArg, reason: yearReason.trim() }).unwrap();
+        toast.success(response.message || `Fiscal year ${yearAction.year} re-opened.`);
+      }
+      openYearAction(null);
     } catch { /* central */ }
   };
 
-  if (fiscalYearsLoading) return <LoadingState rows={6} label="Loading fiscal years…" />;
+  if (calendar.isLoading || fiscalYearsLoading) return <LoadingState rows={6} label="Loading fiscal years…" />;
   if (fiscalYearsFailed) {
     return isForbidden(fiscalYearsError)
       ? <ForbiddenState message="You do not have permission to view fiscal periods." />
@@ -172,6 +249,28 @@ export function PeriodsTab({ entity, headerSlot }: {
 
   const calendarControls = (
     <div data-guide="finance-periods.calendar-controls" className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+      {calendar.canChoose ? (
+        <label className="w-full min-w-0 sm:w-56 sm:flex-none">
+          <span className="sr-only">Branch</span>
+          <select
+            aria-label="Branch"
+            value={String(calendar.selected)}
+            onChange={(event) => chooseBranch(event.target.value)}
+            disabled={periodsFetching}
+            className={selectCls}
+          >
+            <option value="all">All branches</option>
+            {calendar.choices.map((branch) => (
+              <option key={branch.id} value={branch.id}>{branch.name}</option>
+            ))}
+          </select>
+        </label>
+      ) : calendar.applies && calendar.readBranch != null ? (
+        <span className="flex h-9 w-full min-w-0 items-center gap-1.5 rounded-md sm:w-auto sm:max-w-56 border border-white-02 bg-white px-2.5 font-mont text-sm text-black-01">
+          <Building2 className="size-3.5 shrink-0 text-gray-05" />
+          <span className="truncate">{calendarBranchName(calendar, calendar.readBranch)}</span>
+        </span>
+      ) : null}
       {fiscalYears.length > 0 ? (
         <label className="min-w-0 flex-1 sm:w-40 sm:flex-none">
           <span className="sr-only">Fiscal year</span>
@@ -194,6 +293,22 @@ export function PeriodsTab({ entity, headerSlot }: {
       </Can>
     </div>
   );
+
+  const yearCopy = yearAction?.kind === "reopen"
+    ? {
+      title: `Re-open fiscal year ${yearAction.year}${yearScope}?`,
+      description: calendar.applies
+        ? `Reverses ${yearTarget != null ? `${calendarBranchName(calendar, yearTarget)}'s` : "the branch's"} year-end closing entry so a month can be corrected, and the year must be closed again for that branch afterwards.`
+        : "Reverses the year-end closing entry so a month can be corrected, and the year must be closed again afterwards.",
+      text: "Re-open fiscal year",
+    }
+    : {
+      title: `Close fiscal year ${yearAction?.year ?? ""}${yearScope}?`,
+      description: calendar.applies
+        ? `Posts the branch's year-end journal, clears its income and expense balances into Retained Earnings, and seals FY ${yearAction?.year ?? ""} for that branch. The school's year closes once every branch has closed its year. Period locks remain unchanged.`
+        : `Posts the formal year-end journal, clears income and expense balances into Retained Earnings, and seals FY ${yearAction?.year ?? ""}. Period locks remain unchanged.`,
+      text: "Close fiscal year",
+    };
 
   return (
     <div data-guide="finance-periods.workbench" className="min-w-0 space-y-5">
@@ -219,14 +334,30 @@ export function PeriodsTab({ entity, headerSlot }: {
             fiscalYear={activeFiscalYear}
             periods={periods}
             summary={summary}
+            branchName={calendar.applies && calendar.readBranch != null ? calendarBranchName(calendar, calendar.readBranch) : null}
           />
+
+          {calendar.applies && calendar.selected === "all" ? (
+            <div role="note" className="flex min-w-0 items-start gap-2.5 rounded-md bg-primary/5 px-3 py-2.5 ring-1 ring-primary/15">
+              <Building2 className="mt-0.5 size-4 shrink-0 text-primary" />
+              <p className="min-w-0 font-mont text-xs leading-5 text-gray-01 text-pretty">
+                <span className="font-semibold">The school's calendar.</span> Each branch closes its own months and year.
+                A month here reads closed once every branch has closed it, and the year once every branch has closed
+                its year. Choose a branch to see where it stands; each action here asks which branch it is for.
+              </p>
+            </div>
+          ) : null}
 
           <YearCloseReadiness
             state={closeState}
+            status={activeFiscalYear.status}
             year={activeFiscalYear.year}
             fiscalYearId={activeFiscalYear.id}
             openCount={summary.open}
-            onCloseYear={() => setClosing({ id: activeFiscalYear.id, year: activeFiscalYear.year })}
+            mayReopenYear={wholeSchool}
+            branchName={calendar.applies && calendar.readBranch != null ? calendarBranchName(calendar, calendar.readBranch) : null}
+            onCloseYear={() => openYearAction({ kind: "close", id: activeFiscalYear.id, year: activeFiscalYear.year })}
+            onReopenYear={() => openYearAction({ kind: "reopen", id: activeFiscalYear.id, year: activeFiscalYear.year })}
           />
 
           <section data-guide="finance-periods.periods">
@@ -256,6 +387,8 @@ export function PeriodsTab({ entity, headerSlot }: {
         entity={entity}
         finalPeriodOfOpenYear={finalPeriodOfOpenYear}
         yearShut={yearShut}
+        calendar={calendar}
+        status={selectedPeriod?.status}
         onClose={() => setSelected(null)}
       />
 
@@ -269,15 +402,38 @@ export function PeriodsTab({ entity, headerSlot }: {
       ) : null}
 
       <ConfirmActionModal
-        open={closing != null}
-        onOpenChange={(open) => !open && setClosing(null)}
-        title={closing ? `Close fiscal year ${closing.year}?` : "Close fiscal year?"}
-        description={`Posts the formal year-end journal, clears income and expense balances into Retained Earnings, and seals FY ${closing?.year ?? ""}. Period locks remain unchanged. This cannot be undone.`}
-        confirmText="Close fiscal year"
-        destructive
-        loading={closingYear}
-        onConfirm={doCloseYear}
-      />
+        open={yearAction != null}
+        onOpenChange={(open) => !open && openYearAction(null)}
+        title={yearCopy.title}
+        description={yearCopy.description}
+        confirmText={yearCopy.text}
+        destructive={yearAction?.kind === "close"}
+        loading={yearBusy}
+        confirmDisabled={!actionBranchReady(calendar, yearBranch) || (yearAction?.kind === "reopen" && !hasReason(yearReason))}
+        onConfirm={doYearAction}
+      >
+        {calendar.mustAsk || yearAction?.kind === "reopen" ? (
+          <div className="space-y-4">
+            <CalendarBranchQuestion
+              calendar={calendar}
+              value={yearBranch}
+              onChange={setYearBranch}
+              hint={yearAction?.kind === "reopen"
+                ? "Only this branch's year re-opens. The school's year re-opens with it."
+                : "Only this branch's year closes. The school's year closes once every branch has closed its year."}
+            />
+            {yearAction?.kind === "reopen" ? (
+              <ReasonField
+                value={yearReason}
+                onChange={setYearReason}
+                disabled={yearBusy}
+                placeholder="For example: a supplier bill dated in June arrived after the year was closed"
+                hint="Kept on the audit trail with your name."
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </ConfirmActionModal>
     </div>
   );
 }
@@ -286,10 +442,13 @@ function FiscalYearOverview({
   fiscalYear,
   periods,
   summary,
+  branchName,
 }: {
   fiscalYear: { year: number; start_date: string; end_date: string; status: string };
   periods: FiscalPeriod[];
   summary: ReturnType<typeof summarizePeriods>;
+  /** The branch whose calendar this is, at a school with several; null for the school's own. */
+  branchName: string | null;
 }) {
   const dates = useDates();
   const progress = summary.total ? Math.round((summary.progressed / summary.total) * 100) : 0;
@@ -298,7 +457,7 @@ function FiscalYearOverview({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-mont text-lg font-semibold text-black-01">Fiscal year {fiscalYear.year}</h2>
+            <h2 className="font-mont text-lg font-semibold text-black-01">Fiscal year {fiscalYear.year}{branchName ? ` · ${branchName}` : ""}</h2>
             <StatusPill status={fiscalYear.status} />
           </div>
           <p className="mt-1 font-mont text-xs text-gray-05">
@@ -326,27 +485,58 @@ function FiscalYearOverview({
   );
 }
 
+/**
+ * Where the year stands and its year-end action.
+ *
+ * An open year offers Close fiscal year once every month is restricted. A
+ * CLOSED year offers Re-open fiscal year to a holder of its own key who also
+ * covers the whole school (`mayReopenYear`): re-opening a year moves a whole
+ * year's result out of Retained Earnings, so the server keeps it for a
+ * school-wide administrator and refuses a branch's own bursar with a 403. A
+ * reader pinned to the only branch of a one-branch school counts as
+ * school-wide, as the server counts them. A LOCKED year offers nothing,
+ * because it cannot be re-opened. `status` is the year as
+ * the workbench reads it: one branch's year when a branch is chosen, the
+ * school's under All branches.
+ */
 function YearCloseReadiness({
   state,
+  status,
   year,
   fiscalYearId,
   openCount,
+  mayReopenYear,
+  branchName,
   onCloseYear,
+  onReopenYear,
 }: {
   state: YearCloseState;
+  status: string;
   year: number;
   fiscalYearId: number;
   openCount: number;
+  mayReopenYear: boolean;
+  branchName: string | null;
   onCloseYear: () => void;
+  onReopenYear: () => void;
 }) {
   if (state === "SEALED") {
     return (
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-green-01/25 bg-green-01/5 p-4">
         <CheckCircle2 className="size-5 shrink-0 text-green-01" />
         <div className="min-w-0 flex-1">
-          <p className="font-mont text-sm font-semibold text-gray-01">Fiscal year {year} is sealed</p>
-          <p className="mt-0.5 font-mont text-xs text-gray-05">The year-end journal has been posted. Individual closed periods may now be locked when required.</p>
+          <p className="font-mont text-sm font-semibold text-gray-01">Fiscal year {year} is sealed{branchName ? ` for ${branchName}` : ""}</p>
+          <p className="mt-0.5 font-mont text-xs text-gray-05">
+            {status === "LOCKED"
+              ? "The year is locked and cannot be re-opened."
+              : "The year-end journal has been posted. Individual closed periods may now be locked when required."}
+          </p>
         </div>
+        {status === "CLOSED" && mayReopenYear ? (
+          <Can permission={P.FIN_REOPEN_FISCAL_YEAR}>
+            <Button variant="outline" onClick={onReopenYear} disabled={!fiscalYearId} className="w-full sm:w-auto">Re-open year</Button>
+          </Can>
+        ) : null}
       </div>
     );
   }
@@ -513,22 +703,34 @@ type PeriodAction = "soft-close" | "close" | "reopen" | "lock";
  * year's result already sits in Retained Earnings, so the year is reopened
  * first. `yearShut` names that year, and Re-open is then disabled with the
  * reason beside it rather than offered and refused.
+ *
+ * `calendar` says whose month this is (see `calendar-branch.ts`): with a branch
+ * chosen, the checklist runs against that branch and every action sends it;
+ * under All branches each action asks which branch in its confirm dialog. The
+ * checklist reports the school's status for the month, so a branch's own
+ * status arrives as `status`, read from the branch's period list.
  */
 export function PeriodCloseDrawer({
   id,
   entity,
   finalPeriodOfOpenYear,
   yearShut = null,
+  calendar = ONE_BRANCH_CALENDAR,
+  status: listedStatus,
   onClose,
 }: {
   id: number | null;
   entity: string;
   finalPeriodOfOpenYear: boolean;
   yearShut?: { year: number; status: string } | null;
+  calendar?: CalendarBranch;
+  status?: FiscalPeriod["status"];
   onClose: () => void;
 }) {
   const dates = useDates();
-  const { data, isLoading, isError, error, refetch } = useGetPeriodChecklistQuery(id ? { id, entity } : skipToken);
+  const { data, isLoading, isError, error, refetch } = useGetPeriodChecklistQuery(
+    id ? { id, entity, ...(calendar.readBranch != null ? { branch: calendar.readBranch } : {}) } : skipToken,
+  );
   const [close, { isLoading: closing }] = useClosePeriodMutation();
   const [reopen, { isLoading: reopening }] = useReopenPeriodMutation();
   const [lock, { isLoading: locking }] = useLockPeriodMutation();
@@ -537,14 +739,20 @@ export function PeriodCloseDrawer({
   const items = Array.isArray(detail?.items) ? detail.items : [];
   const [action, setAction] = useState<PeriodAction | null>(null);
   const [reason, setReason] = useState("");
+  const [branchChoice, setBranchChoice] = useState("");
   const busy = closing || reopening || locking;
-  const canClose = !!period && (period.status === "OPEN" || period.status === "SOFT_CLOSED");
-  const canReopen = !!period && (period.status === "CLOSED" || period.status === "SOFT_CLOSED");
-  const canLock = !!period && period.status === "CLOSED";
+  const status = period ? (listedStatus ?? period.status) : undefined;
+  const canClose = status === "OPEN" || status === "SOFT_CLOSED";
+  const canReopen = status === "CLOSED" || status === "SOFT_CLOSED";
+  const canLock = status === "CLOSED";
+  const target = actionBranch(calendar, branchChoice);
+  const branchArg = target != null ? { branch: target } : {};
+  const scope = forBranch(calendar, target);
 
   const chooseAction = (next: PeriodAction | null) => {
     setAction(next);
     setReason("");
+    setBranchChoice("");
   };
   const closeDrawer = () => {
     chooseAction(null);
@@ -552,21 +760,21 @@ export function PeriodCloseDrawer({
   };
   const doClose = async (soft: boolean) => {
     try {
-      const response = await close({ id: id!, entity, soft }).unwrap();
+      const response = await close({ id: id!, entity, soft, ...branchArg }).unwrap();
       toast.success(closeOutcomeMessage(period?.name, response.data?.checklist?.items));
       closeDrawer();
     } catch { /* central */ }
   };
   const doReopen = async () => {
     try {
-      const response = await reopen({ id: id!, entity, reason: reason.trim() }).unwrap();
+      const response = await reopen({ id: id!, entity, ...branchArg, reason: reason.trim() }).unwrap();
       toast.success(response.message || `Re-opened ${period?.name}.`);
       closeDrawer();
     } catch { /* central */ }
   };
   const doLock = async () => {
     try {
-      const response = await lock({ id: id!, entity }).unwrap();
+      const response = await lock({ id: id!, entity, ...branchArg }).unwrap();
       toast.success(response.message || `Locked ${period?.name}.`);
       closeDrawer();
     } catch { /* central */ }
@@ -577,27 +785,35 @@ export function PeriodCloseDrawer({
     else if (action === "reopen") void doReopen();
     else if (action === "lock") void doLock();
   };
-  const confirmCopy: Record<PeriodAction, { title: string; description: string; text: string; destructive?: boolean }> = {
+  const several = calendar.applies;
+  const confirmCopy: Record<PeriodAction, { title: string; description: string; text: string; destructive?: boolean; branchHint: string }> = {
     "soft-close": {
-      title: `Soft-close ${period?.name ?? "period"}?`,
+      title: `Soft-close ${period?.name ?? "period"}${scope}?`,
       description: "Blocks ordinary postings while still allowing controlled close-process entries. Authorised users can re-open it later.",
       text: "Soft-close period",
+      branchHint: "Only this branch's month is soft-closed.",
     },
     close: {
-      title: `Run close for ${period?.name ?? "period"}?`,
-      description: "Runs the close steps and blocks further postings. The period remains re-openable until it is permanently locked.",
+      title: `Run close for ${period?.name ?? "period"}${scope}?`,
+      description: "Runs the close steps and blocks further postings. The period remains re-openable until it is permanently locked."
+        + (several ? " The school's month closes once every branch has closed it." : ""),
       text: "Run period close",
+      branchHint: "The close steps run against this branch's entries.",
     },
     reopen: {
-      title: `Re-open ${period?.name ?? "period"}?`,
-      description: "Allows ordinary journals and source documents to post into this period again. The re-open and your reason are recorded in the audit trail.",
+      title: `Re-open ${period?.name ?? "period"}${scope}?`,
+      description: "Allows ordinary journals and source documents to post into this period again. The re-open and your reason are recorded in the audit trail."
+        + (several ? " The school's month re-opens with it." : ""),
       text: "Re-open period",
+      branchHint: "Only this branch's month re-opens.",
     },
     lock: {
-      title: `Permanently lock ${period?.name ?? "period"}?`,
-      description: "This cannot be reversed. Any correction must be posted in a later open period.",
+      title: `Permanently lock ${period?.name ?? "period"}${scope}?`,
+      description: "This cannot be reversed. Any correction must be posted in a later open period."
+        + (several ? " The school's month locks once every branch has locked it." : ""),
       text: "Lock period",
       destructive: true,
+      branchHint: "Only this branch's month is locked.",
     },
   };
   const activeCopy = action ? confirmCopy[action] : null;
@@ -608,7 +824,10 @@ export function PeriodCloseDrawer({
         open={id != null}
         onOpenChange={(open) => !open && closeDrawer()}
         title={period ? `Manage ${period.name}` : "Period close"}
-        description={period ? `Period ${period.period_no} · ${dates.day(period.start_date)} - ${dates.day(period.end_date)}` : undefined}
+        description={period
+          ? `Period ${period.period_no} · ${dates.day(period.start_date)} - ${dates.day(period.end_date)}`
+            + (several && calendar.readBranch != null ? ` · ${calendarBranchName(calendar, calendar.readBranch)}` : "")
+          : undefined}
         widthClass="w-full sm:max-w-2xl"
         footer={(canClose || canReopen || canLock) ? (
           <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
@@ -636,7 +855,7 @@ export function PeriodCloseDrawer({
             ) : null}
             {canClose ? (
               <Can permission={P.FIN_CLOSE_PERIOD}>
-                {period?.status === "OPEN" ? (
+                {status === "OPEN" ? (
                   <Button variant="outline" onClick={() => chooseAction("soft-close")} disabled={busy} className="w-full sm:w-auto">Soft close</Button>
                 ) : null}
                 <Button onClick={() => chooseAction("close")} disabled={busy} className="w-full sm:w-auto">Run close steps</Button>
@@ -655,7 +874,7 @@ export function PeriodCloseDrawer({
           <div data-guide="finance-periods.checklist" className="space-y-5">
             <div className="rounded-lg border border-white-02 bg-[#F7F8FA] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3 font-mont text-sm">
-                <span className="flex items-center gap-2 text-gray-05">Current status <StatusPill status={period.status} /></span>
+                <span className="flex items-center gap-2 text-gray-05">Current status <StatusPill status={status ?? period.status} /></span>
                 <span className="text-gray-05">Checklist <span className="font-semibold tabular-nums text-black-01">{detail.done} / {detail.total}</span></span>
               </div>
               <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-03/60">
@@ -759,17 +978,27 @@ export function PeriodCloseDrawer({
         confirmText={activeCopy?.text}
         destructive={activeCopy?.destructive}
         loading={busy}
-        confirmDisabled={action === "reopen" && !hasReason(reason)}
+        confirmDisabled={!actionBranchReady(calendar, branchChoice) || (action === "reopen" && !hasReason(reason))}
         onConfirm={confirm}
       >
-        {action === "reopen" ? (
-          <ReasonField
-            value={reason}
-            onChange={setReason}
-            disabled={busy}
-            placeholder="For example: a supplier bill dated in this month arrived after the close"
-            hint="Kept on the audit trail with your name."
-          />
+        {calendar.mustAsk || action === "reopen" ? (
+          <div className="space-y-4">
+            <CalendarBranchQuestion
+              calendar={calendar}
+              value={branchChoice}
+              onChange={setBranchChoice}
+              hint={activeCopy?.branchHint ?? ""}
+            />
+            {action === "reopen" ? (
+              <ReasonField
+                value={reason}
+                onChange={setReason}
+                disabled={busy}
+                placeholder="For example: a supplier bill dated in this month arrived after the close"
+                hint="Kept on the audit trail with your name."
+              />
+            ) : null}
+          </div>
         ) : null}
       </ConfirmActionModal>
     </>
