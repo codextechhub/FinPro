@@ -57,6 +57,7 @@ import { routesPath } from "@/routes/routes-path";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
+import { BankDocumentsSection } from "./bank-documents";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -164,6 +165,8 @@ export default function BankingPage() {
           emptyTitle={search ? "No matching accounts" : "No bank accounts"}
           emptyMessage={search ? "Try a different search." : "Add a bank account to import statements and reconcile."}
         />
+
+        <BankDocumentsSection entity={entity} currency={currency} />
       </PageShell>
 
       <BankAccountDrawer account={selected} entity={entity} currency={currency} onClose={() => setSelected(null)} />

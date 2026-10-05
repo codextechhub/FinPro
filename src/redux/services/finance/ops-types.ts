@@ -535,4 +535,49 @@ export interface TaxFiling {
   filing_reference: string;
   filed_at: string | null;
   narration: string;
+  /**
+   * The return split by branch: each branch's share of what is due, paid from
+   * that branch's own bank account. A branch-bound reader is sent only her
+   * branches' shares, and the totals above are summed over them. Absent from
+   * servers that do not report it.
+   */
+  branch_breakdown?: TaxFilingShare[];
+  /** Each payment against the return, with the share it settled. */
+  remittances?: TaxRemittance[];
+}
+
+export interface TaxFilingShare {
+  id: number;
+  branch_id: number | null;
+  branch_name: string | null;
+  /** A share of lines not yet given a branch, which only a whole-school reader sees. */
+  branch_pending: boolean;
+  label: string;
+  gross_liability: number;
+  recoverable_amount: number;
+  brought_forward_credit: number;
+  adjustment_amount: number;
+  amount_due: number;
+  amount_paid: number;
+  balance_due: number;
+  carried_forward_credit: number;
+  payment_status: string;
+  line_count: number;
+  filing_journal_id: number | null;
+}
+
+export interface TaxRemittance {
+  id: number;
+  share_id: number | null;
+  branch_id: number | null;
+  branch_name: string | null;
+  bank_account_id: number;
+  bank_account_name: string;
+  pay_date: string;
+  amount: number;
+  journal_id: number | null;
+  is_reversed: boolean;
+  reversed_at: string | null;
+  reversal_journal_id: number | null;
+  reversal_reason: string;
 }

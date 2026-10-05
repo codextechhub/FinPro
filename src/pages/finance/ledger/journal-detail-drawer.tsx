@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
 import { useGetJournalQuery, useReverseJournalMutation, useSubmitJournalMutation } from "@/redux/services/finance/gl-api";
 import { DocumentVoidAction } from "../receivables/document-void-action";
+import { isVoidableDocument } from "../receivables/document-void-config";
+import { DocumentCorrectionAction } from "./document-correction-action";
+import { isCorrectableDocument } from "./document-correction";
 import { useDates } from "../../../lib/display-prefs";
 
 const cap = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
@@ -87,7 +90,16 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
                   <Button variant="outline" onClick={() => setConfirmReverse(true)} className="border-destructive/40 text-destructive hover:bg-destructive/5">Reverse</Button>
                 </Can>
               )}
-              {j?.status === "POSTED" && reversalAction?.kind === "VOID_DOCUMENT" && (
+              {j?.status === "POSTED" && reversalAction?.kind === "VOID_DOCUMENT" && isCorrectableDocument(reversalAction.document_type) && (
+                <DocumentCorrectionAction
+                  documentType={reversalAction.document_type}
+                  documentId={reversalAction.document_id}
+                  documentNumber={reversalAction.document_number}
+                  entity={entity}
+                  onDone={onClose}
+                />
+              )}
+              {j?.status === "POSTED" && reversalAction?.kind === "VOID_DOCUMENT" && isVoidableDocument(reversalAction.document_type) && (
                 <DocumentVoidAction
                   documentType={reversalAction.document_type}
                   documentId={reversalAction.document_id}

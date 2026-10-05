@@ -54,7 +54,13 @@ export interface JournalDetail extends JournalListItem {
   reverses_id: number | null;
   reversal_action:
     | { kind: "REVERSE_JOURNAL" }
-    | { kind: "VOID_DOCUMENT"; document_type: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "CONCESSION"; document_id: number; document_number: string }
+    /**
+     * The document that owns the journal and is undone on its own screen. The
+     * server names more kinds than any one screen handles (customer documents,
+     * supplier documents, bank documents, inter-branch and petty-cash ones), so
+     * a reader of this field must treat an unknown kind as "no button".
+     */
+    | { kind: "VOID_DOCUMENT"; document_type: string; document_id: number; document_number: string }
     | { kind: "SOURCE_DOCUMENT_ACTION"; document_type: string; document_number: string };
 }
 

@@ -52,6 +52,15 @@ export const DOCUMENT_VOID_CONFIG: Record<VoidableDocumentType, VoidConfig> = {
   },
 };
 
+/**
+ * Whether `type` is a customer document this action voids. The journal screen is
+ * told about every kind of document that owns a journal, so it asks before
+ * reaching for a configuration that may not exist.
+ */
+export function isVoidableDocument(type: string): type is VoidableDocumentType {
+  return Object.prototype.hasOwnProperty.call(DOCUMENT_VOID_CONFIG, type);
+}
+
 /** Name the document that is actually open, falling back to the family name. */
 export function voidDocumentLabel(
   documentType: VoidableDocumentType,
