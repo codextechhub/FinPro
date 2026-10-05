@@ -11,7 +11,6 @@ import {
   buildBankReconciliationPrintDocument,
   buildExpenseClaimPrintDocument,
   buildPayrollSchedulePrintDocument,
-  buildPayslipPrintDocument,
   buildTaxFilingPackPrintDocument,
   openFinancePrintDocument,
   renderFinancePrintHtml,
@@ -81,10 +80,6 @@ afterEach(() => {
 describe("finance print document rendering", () => {
   it("keeps malicious payroll schedule values as text", () => {
     expectAttackIsText(renderFinancePrintHtml(buildPayrollSchedulePrintDocument(payrollRun(payrollLine), "PAYE", "NGN", PREFS)));
-  });
-
-  it("keeps malicious payslip values as text", () => {
-    expectAttackIsText(renderFinancePrintHtml(buildPayslipPrintDocument(payrollRun(payrollLine), payrollLine, "NGN", PREFS)));
   });
 
   it("keeps malicious bank reconciliation values as text", () => {
@@ -209,7 +204,7 @@ describe("finance print document rendering", () => {
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:safe-print");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
 
-    openFinancePrintDocument(buildPayslipPrintDocument(payrollRun(payrollLine), payrollLine, "NGN", PREFS));
+    openFinancePrintDocument(buildPayrollSchedulePrintDocument(payrollRun(payrollLine), "PAYE", "NGN", PREFS));
 
     expect(openSpy).toHaveBeenCalledWith(
       "blob:safe-print",
@@ -229,8 +224,8 @@ describe("finance print dates", () => {
   it("prints a pay date on its own day in the school's format, whatever the zone", () => {
     // `new Date("2026-09-01")` is UTC midnight: 31 Aug west of Greenwich.
     const slashed: DisplayPrefs = { ...PREFS, dateFormat: "DD_MM_YYYY", timeZone: "America/Los_Angeles" };
-    expect(textOf(renderFinancePrintHtml(buildPayslipPrintDocument(plainRun, plainLine, "NGN", PREFS)))).toContain("paid 1 Sep 2026");
-    expect(textOf(renderFinancePrintHtml(buildPayslipPrintDocument(plainRun, plainLine, "NGN", slashed)))).toContain("paid 01/09/2026");
+    expect(textOf(renderFinancePrintHtml(buildPayrollSchedulePrintDocument(plainRun, "PAYE", "NGN", PREFS)))).toContain("pay date 1 Sep 2026");
+    expect(textOf(renderFinancePrintHtml(buildPayrollSchedulePrintDocument(plainRun, "PAYE", "NGN", slashed)))).toContain("pay date 01/09/2026");
   });
 
   it("dates a reconciliation report by the school's day, not the UTC one", () => {

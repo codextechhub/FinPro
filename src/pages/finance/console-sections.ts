@@ -115,6 +115,7 @@ export const FINANCE_SETTINGS_SECTIONS = [
   "banking-cash",
   "reference-data",
   "approvals",
+  "payroll",
   // School-only. The rule for when fee bills fall due is the FAL's, and the
   // console does not bill school fees, so the host supplies the panel or the
   // section is not offered at all; see HostContract.FeeDuePolicyPanel.

@@ -5,6 +5,7 @@
 // change in `_read_only_fields`.
 
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
+import type { PayeSource, PayeWorking, PayrollLineItem } from "./payroll-types";
 
 // ── Banking ──────────────────────────────────────────────────────────────────
 export interface BankAccount {
@@ -296,6 +297,7 @@ export interface PettyCashVoucher {
 }
 
 // ── Payroll (Field Access on per-employee figures) ───────────────────────────
+
 // A computed payslip line item (snapshot copied from the salary structure).
 export interface PayslipComponent {
   name: string;
@@ -318,6 +320,24 @@ export interface PayrollLine {
   // The branch the line's pay is booked to; absent from servers that do not say.
   branch_id?: number | null;
   branch_name?: string | null;
+  /** The roster row the line pays; null on a line typed by hand. */
+  salary_id?: number | null;
+  // Statutory figures. Taxable pay travels with Gross, the PAYE working with
+  // PAYE, the items and the two totals with Pay breakdown, and the tax ID and
+  // pension PIN with the employee's name.
+  taxable_pay?: number;
+  other_deductions_amount?: number;
+  employer_contributions_amount?: number;
+  paye_source?: PayeSource;
+  tax_table_id?: number | null;
+  tax_basis?: PayeWorking;
+  items?: PayrollLineItem[];
+  tax_state?: string | null;
+  tax_state_name?: string | null;
+  pfa_id?: number | null;
+  pfa_name?: string | null;
+  tax_id?: string;
+  pension_pin?: string;
   _read_only_fields?: string[];
 }
 
@@ -330,6 +350,10 @@ export interface PayrollRunBranchShare {
   gross_total: number;
   paye_total: number;
   pension_total: number;
+  /** NHF and voluntary deductions; absent from older servers. */
+  other_deductions_total?: number;
+  /** Employer pension, NSITF and ITF accrued for this branch; absent from older servers. */
+  employer_contributions_total?: number;
   net_total: number;
   journal_id: number | null;
   disbursement_journal_id: number | null;
@@ -354,6 +378,19 @@ export interface EmployeeSalary {
   components?: PayslipComponent[]; // Field Access: finance.salary
   cost_center: string | null;
   is_active: boolean;
+  /** The account the row pays, where one is linked; null for a contractor or an older row. */
+  employee_id?: number | null;
+  // Where PAYE and pension go. Readable by anyone who reads the row; a change
+  // to the state follows the PAYE write switch and a change of PFA the Pension one.
+  residence_state?: string | null;
+  residence_state_name?: string | null;
+  pfa_id?: number | null;
+  pfa_name?: string | null;
+  tax_id?: string; // Field Access: finance.salary PAYE
+  annual_rent?: number; // Field Access: finance.salary PAYE
+  paye_override?: number | null; // Field Access: finance.salary PAYE
+  paye_override_reason?: string; // Field Access: finance.salary PAYE
+  pension_pin?: string; // Field Access: finance.salary Pension
   _read_only_fields?: string[];
 }
 
@@ -398,6 +435,10 @@ export interface PayrollRun {
   gross_total: number;
   paye_total: number;
   pension_total: number;
+  /** NHF and voluntary deductions; absent from older servers. */
+  other_deductions_total?: number;
+  /** Employer pension, NSITF and ITF; absent from older servers. */
+  employer_contributions_total?: number;
   net_total: number;
   net_total_naira: string;
   bank_account_id: number | null;
