@@ -198,7 +198,7 @@ export default function PayrollPage() {
           buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
         />
 
-        {tab === "runs" ? <RunsTab entity={entity} currency={currency} />
+        {tab === "runs" ? <RunsTab entity={entity} currency={currency} onShowRoster={() => setTab("employees")} />
           : tab === "employees" ? <EmployeesTab entity={entity} currency={currency} />
           : tab === "structures" ? <StructuresTab entity={entity} currency={currency} />
           : tab === "payslips" ? <PayslipsTab entity={entity} currency={currency} />
@@ -208,8 +208,9 @@ export default function PayrollPage() {
   );
 }
 
-function RunsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+function RunsTab({ entity, currency, onShowRoster }: { entity: string; currency?: string | null; onShowRoster: () => void }) {
   const dates = useDates();
+  const missing = useGetPreviousPayMissingQuery({ entity, year: Number(dates.today().slice(0, 4)) }).data?.data;
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const [generated, setGenerated] = useState<GeneratedPayrollRun | null>(null);
@@ -266,6 +267,16 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
           <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New payroll run</Button>
         </Can>
       </div>
+
+      {missing?.people.length ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+          <p className="font-mont text-[13px] text-amber-900">
+            {`${missing.people.length} ${missing.people.length === 1 ? "person" : "people"} joined after January with no earlier pay recorded for ${missing.tax_year}.`}
+            {missing.required ? " A run that includes them is refused until it is." : " Their PAYE counts nothing they earned before joining until it is."}
+          </p>
+          <button type="button" onClick={onShowRoster} className="font-mont text-[13px] font-semibold text-amber-900 underline underline-offset-2">Earlier pay still to record</button>
+        </div>
+      ) : null}
 
       {generated ? <GeneratedRunNotice run={generated} onOpen={() => setSelectedId(generated.id)} onDismiss={() => setGenerated(null)} /> : null}
 
