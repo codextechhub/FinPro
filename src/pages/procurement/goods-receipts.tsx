@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
-import { ClipboardCheck, FilePenLine, FileText, PackageCheck, Plus, Printer, Send } from "lucide-react";
+import { ClipboardCheck, FilePenLine, FileText, PackageCheck, Plus, Printer, Send, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
@@ -28,6 +28,9 @@ import { canReceiveRemaining, completeReceiptSave } from "./goods-receipt-fulfil
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
+import { GoodsReturnDrawer } from "./goods-return-drawer";
+import { useSourceDocumentParam } from "@/lib/source-document-route";
+import { returnableQuantity } from "./goods-return";
 
 const DETAIL_TABS = [
   { value: "overview", label: "Overview", icon: FileText },
@@ -50,6 +53,8 @@ export default function GoodsReceiptsPage() {
   // opened on 403s and a red toast.
   const canPROC_VIEW_GOODS_RECEIPTS = useCan().can(P.PROC_VIEW_GOODS_RECEIPTS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // A link from an order or an approval names the receipt to open; it opens here.
+  useSourceDocumentParam(setSelectedId);
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
   useActionParam("new", can(P.PROC_CREATE_GOODS_RECEIPT), () => setCreating(true));
@@ -118,6 +123,7 @@ function ReceiptDrawer({ id, entity, currency, onClose, onSelectReceipt }: {
   const [tab, setTab] = useState<DetailTab>("overview");
   const [editing, setEditing] = useState(false);
   const [receivingRemaining, setReceivingRemaining] = useState(false);
+  const [returning, setReturning] = useState(false);
   // The list ships only summary columns; the drawer fetches its own line-level detail.
   const { data, isLoading: loadingReceipt, isError, refetch } = useGetGoodsReceiptQuery(
     { id: id!, entity }, { skip: id == null },
@@ -125,6 +131,7 @@ function ReceiptDrawer({ id, entity, currency, onClose, onSelectReceipt }: {
   const receipt = data?.data;
   const [post, { isLoading: posting }] = usePostGoodsReceiptMutation();
   const total = receipt?.total_value ?? 0;
+  const anyReturned = !!receipt?.lines.some((line) => Number(line.returned_qty || 0) > 0);
 
   const postReceipt = async () => {
     if (!receipt) return;
@@ -145,6 +152,7 @@ function ReceiptDrawer({ id, entity, currency, onClose, onSelectReceipt }: {
         {receipt.status === "DRAFT" && <Can permission={P.PROC_UPDATE_GOODS_RECEIPT}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
         {canReceiveRemaining(receipt) && <Can permission={P.PROC_CREATE_GOODS_RECEIPT}><Button variant="outline" onClick={() => setReceivingRemaining(true)}><PackageCheck className="size-4" /> Receive Remaining</Button></Can>}
         {receipt.status === "DRAFT" && <Can permission={P.PROC_POST_GOODS_RECEIPT}><Button loading={posting} onClick={postReceipt}><Send className="size-4" /> Post Receipt</Button></Can>}
+        {receipt.status === "POSTED" && receipt.lines.some((line) => returnableQuantity(line) > 0) && <Can permission={P.PROC_RETURN_GOODS_RECEIPT}><Button variant="outline-dest" onClick={() => setReturning(true)}><Undo2 className="size-4" /> Return</Button></Can>}
       </>}
     >
       {loadingReceipt ? <LoadingState rows={7} /> : isError || !receipt ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
@@ -191,17 +199,19 @@ function ReceiptDrawer({ id, entity, currency, onClose, onSelectReceipt }: {
         </div>}
 
         {tab === "items" && (receipt.lines.length ? <div className="overflow-x-auto rounded-md border border-white-02">
-          <div className="grid min-w-[580px] grid-cols-[minmax(220px,1fr)_90px_90px_140px] font-mont text-xs">
+          <div className={cn("grid min-w-[580px] font-mont text-xs", anyReturned ? "grid-cols-[minmax(220px,1fr)_90px_90px_90px_140px]" : "grid-cols-[minmax(220px,1fr)_90px_90px_140px]")}>
             <div className="contents bg-[#F1F1F1] font-semibold text-gray-01">
               <span className="bg-[#F1F1F1] px-3 py-2 text-[11px]">Item</span>
               <span className="bg-[#F1F1F1] px-3 py-2 text-right text-[11px]">Accepted</span>
               <span className="bg-[#F1F1F1] px-3 py-2 text-right text-[11px]">Rejected</span>
+              {anyReturned && <span className="bg-[#F1F1F1] px-3 py-2 text-right text-[11px]">Returned</span>}
               <span className="bg-[#F1F1F1] px-3 py-2 text-right text-[11px]">Value</span>
             </div>
             {receipt.lines.map((line) => <div key={line.id} className="contents">
               <span className="min-w-0 truncate border-t border-white-02 px-3 py-3 font-semibold">{line.description}</span>
               <span className="border-t border-white-02 px-3 py-3 text-right tabular-nums">{formatQuantity(line.accepted_qty)}</span>
               <span className="border-t border-white-02 px-3 py-3 text-right tabular-nums">{formatQuantity(line.rejected_qty)}</span>
+              {anyReturned && <span className="border-t border-white-02 px-3 py-3 text-right tabular-nums">{formatQuantity(line.returned_qty || "0")}</span>}
               <span className="border-t border-white-02 px-3 py-3 text-right font-semibold tabular-nums">{formatMoney(line.value_amount, currency)}</span>
             </div>)}
           </div>
@@ -213,6 +223,7 @@ function ReceiptDrawer({ id, entity, currency, onClose, onSelectReceipt }: {
         </section>}
       </div>}
       {receipt && editing && <ReceiptForm entity={entity} currency={currency} initial={receipt} onClose={() => setEditing(false)} />}
+      {receipt && returning && <GoodsReturnDrawer receipt={receipt} entity={entity} currency={currency} onClose={() => setReturning(false)} />}
       {receipt && receivingRemaining && <ReceiptForm entity={entity} currency={currency}
         sourcePurchaseOrderId={receipt.purchase_order_id || undefined} sourceVendorCode={receipt.vendor_code}
         onClose={() => setReceivingRemaining(false)}

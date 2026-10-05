@@ -80,9 +80,10 @@ function ApAgingBody({ d, cash, currency, entity, asOf }: {
   const [sel, setSel] = useState<{ code: string; name: string } | null>(null);
   const rows = toArray(d.rows);
   const buckets = d.buckets;
-  // What we owe is the open bills. Money paid ahead of a bill is not a smaller
-  // payable, it is a separate asset (vendor advances), so it gets its own card
-  // instead of being quietly netted off the headline.
+  // What we owe is the open bills, net of the credit notes applied to them.
+  // Money paid ahead of a bill, and a credit note's credit not yet applied, is
+  // not a smaller payable: it is a separate asset (vendor advances), so it gets
+  // its own card instead of being quietly netted off the headline.
   const outstanding = kobo(d.total_outstanding);
   const advances = kobo(d.total_unallocated_credit);
   const totalNet = kobo(d.total_net);
@@ -96,7 +97,7 @@ function ApAgingBody({ d, cash, currency, entity, asOf }: {
         <StatCard label="Total payable" value={formatMoney(outstanding, currency)} icon={Banknote} tone="primary" sub="open vendor bills" />
         <StatCard label="Overdue" value={formatMoney(overdue, currency)} icon={AlertTriangle} tone="red" sub="past due" />
         <StatCard label="Due this week" value={formatMoney(dueThisWeek, currency)} icon={Clock} tone="amber" sub="next 7 days" />
-        <StatCard label="Paid in advance" value={formatMoney(advances, currency)} icon={HandCoins} tone="primary" sub="held in vendor advances" />
+        <StatCard label="Paid ahead or credited" value={formatMoney(advances, currency)} icon={HandCoins} tone="primary" sub="held for later bills" />
       </div>
 
       <Card title="Payables by age bucket" subtitle="Outstanding bills across aging windows">
@@ -216,7 +217,7 @@ function ApVendorBody({ d, currency }: { d: ApVendorDetail; currency?: string | 
 
       <dl className="grid grid-cols-2 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-3">
         <Field label="Outstanding" value={formatMoney(outstanding, currency)} />
-        <Field label="Paid in advance" value={formatMoney(kobo(d.unallocated_credit), currency)} />
+        <Field label="Paid ahead or credited" value={formatMoney(kobo(d.unallocated_credit), currency)} />
         <Field label="Net payable" value={formatMoney(kobo(d.net), currency)} />
       </dl>
 

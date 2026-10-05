@@ -8,9 +8,15 @@ import { SOURCE_DOCUMENT_ID_PARAM } from "@/lib/source-document-route";
 const F = routesPath.PROTECTED.FINANCE;
 const P = routesPath.PROTECTED.PROCUREMENT;
 
+/**
+ * Where each approval's source document opens. `section` names the part of a
+ * screen that holds the document when the screen shows more than one kind:
+ * supplier credit notes sit beside the bills on Vendor Invoices, and bank
+ * transactions and transfers beside the accounts on Bank Accounts.
+ */
 const SOURCE_DOCUMENT_ROUTES: Record<
   string,
-  { route: string; lookup: "reference" | "id" }
+  { route: string; lookup: "reference" | "id"; section?: string }
 > = {
   "finance.journal": { route: F.LEDGER, lookup: "reference" },
   "finance.refund": { route: `${F.RECEIVABLES}/refunds`, lookup: "reference" },
@@ -23,6 +29,9 @@ const SOURCE_DOCUMENT_ROUTES: Record<
   "procurement.purchase_order": { route: P.PURCHASE_ORDERS, lookup: "id" },
   "procurement.vendor_invoice": { route: P.VENDOR_INVOICES, lookup: "id" },
   "procurement.vendor_payment": { route: P.VENDOR_PAYMENTS, lookup: "id" },
+  "procurement.vendor_credit_note": { route: P.VENDOR_INVOICES, lookup: "id", section: "view=credit-notes" },
+  "finance.bank_transaction": { route: F.BANKING, lookup: "id", section: "bank_document=transaction" },
+  "finance.bank_transfer": { route: F.BANKING, lookup: "id", section: "bank_document=transfer" },
 };
 
 const SOURCE_DOCUMENT_PROMPTS: Record<
@@ -96,14 +105,14 @@ export function sourceDocumentLink(instance: WorkflowInstanceDetail): string | n
     const scopedLink = currentScopedLink(providedLink, config.route);
     if (scopedLink) return scopedLink;
 
+    const query = (param: string) => `${config.route}?${[config.section, param].filter(Boolean).join("&")}`;
+    const bare = config.section ? `${config.route}?${config.section}` : config.route;
     if (config.lookup === "id") {
       const id = String(instance.document_object_id ?? "").trim();
-      return id
-        ? `${config.route}?${SOURCE_DOCUMENT_ID_PARAM}=${encodeURIComponent(id)}`
-        : config.route;
+      return id ? query(`${SOURCE_DOCUMENT_ID_PARAM}=${encodeURIComponent(id)}`) : bare;
     }
     const reference = instance.document_summary?.title?.trim();
-    return reference ? `${config.route}?search=${encodeURIComponent(reference)}` : config.route;
+    return reference ? query(`search=${encodeURIComponent(reference)}`) : bare;
   }
 
   return providedLink || null;
