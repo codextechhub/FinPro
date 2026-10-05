@@ -42,6 +42,11 @@ export const RECEIVABLES_SECTIONS = [
   "customers",
   "fee-structures",
   "receipts",
+  "payer-payments",
+  "credit-transfers",
+  "deferred-income",
+  "provisions",
+  "deposits",
 ] as const;
 export type ReceivablesSection = (typeof RECEIVABLES_SECTIONS)[number];
 export const DEFAULT_RECEIVABLES_SECTION: ReceivablesSection = "invoices";
@@ -114,6 +119,9 @@ export const FINANCE_SETTINGS_SECTIONS = [
   // console does not bill school fees, so the host supplies the panel or the
   // section is not offered at all; see HostContract.FeeDuePolicyPanel.
   "fees",
+  // The receivables policy: credit applied to new bills, the concession limit,
+  // deferred income, the provision bands, deposits and payer payments.
+  "receivables",
 ] as const;
 export type FinanceSettingsSection = (typeof FINANCE_SETTINGS_SECTIONS)[number];
 export const DEFAULT_FINANCE_SETTINGS_SECTION: FinanceSettingsSection = "overview";

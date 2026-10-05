@@ -57,6 +57,7 @@ import { FeeDuePolicyPanel, financeSettingsSections, setupSections } from "@xvs/
 import { FinanceShell } from "./finance-shell";
 import { EntitiesTab } from "./setup/entities-tab";
 import { OnlinePaymentsPanel } from "./online-payments";
+import { ReceivablesSettings } from "./receivables-settings";
 
 const F = routesPath.PROTECTED.FINANCE;
 
@@ -75,6 +76,7 @@ const SECTIONS: (ConsoleSettingsSection & { key: FinanceSettingsSection })[] = [
   { key: "documents", title: "Documents", description: "Collections and policies", icon: FileCog, group: "billing" },
   { key: "fees", title: "Fee due dates", description: "When fee bills fall due", icon: CalendarClock, group: "billing" },
   { key: "banking-cash", title: "Banking and cash", description: "Matching, allocation, online payments", icon: Banknote, group: "billing" },
+  { key: "receivables", title: "Receivables", description: "Credit, deferred income, deposits", icon: ReceiptText, group: "billing" },
   { key: "approvals", title: "Approvals", description: "Finance workflows", icon: Workflow },
 ];
 
@@ -143,6 +145,7 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
         {activeSection === "reference-data" ? <ReferenceData /> : null}
         {activeSection === "approvals" ? <Approvals /> : null}
         {activeSection === "fees" ? <FeeDuePolicyPanel /> : null}
+        {activeSection === "receivables" ? <ReceivablesSettings key={active.code ?? "no-entity"} entityCode={active.code} /> : null}
       </ConsoleSettingsLayout>
     </FinanceShell>
   );
@@ -166,6 +169,7 @@ const OVERVIEW_CARDS: Record<Exclude<FinanceSettingsSection, "overview">, {
   "reference-data": { description: "Maintain the chart of accounts, tax codes and the other shared reference data.", status: "Available", tone: "ready" },
   approvals: { description: "Review approval templates for journals, refunds and write-offs.", status: "Shared workflow" },
   fees: { description: "Choose when fee bills fall due once they are raised.", status: "Configurable", tone: "ready" },
+  receivables: { description: "Credit on new bills, the concession limit, fees billed ahead, doubtful debts, deposits and payer payments.", status: "Configurable", tone: "ready" },
 };
 
 function Overview({ entity, sections }: {

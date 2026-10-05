@@ -3,6 +3,12 @@
  * sectioned body · pinned footer). Customer/account/tax use the app's SearchSelect
  * (type the name → the list populates). Unit price is entered in naira and sent as
  * integer kobo; "Issue now" posts the AR journal, else it saves a priced draft.
+ *
+ * "On behalf of" bills a sponsor or employer for a customer: Zenith Scholarship
+ * Trust owes Ada's term invoice, and the trust's statement names Ada on it. A
+ * school's own scholarship is a concession, not this. Each line may name the
+ * period it pays for (a line billed before its period starts is deferred
+ * income) or be a refundable deposit, which is held and never earned.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -23,8 +29,10 @@ import type { TaxCode } from "@/redux/services/finance/setup-types";
 
 const fieldLabel = "font-mont text-xs text-gray-05";
 
-type Line = { account: string; description: string; qty: string; price: string; tax: string };
-const blankLine = (): Line => ({ account: "", description: "", qty: "1", price: "", tax: "" });
+type Line = { account: string; description: string; qty: string; price: string; tax: string; deposit: boolean; start: string; end: string };
+const blankLine = (): Line => ({ account: "", description: "", qty: "1", price: "", tax: "", deposit: false, start: "", end: "" });
+/** A line's service period is both dates or neither, and never ends before it starts. */
+const periodOk = (l: Line) => (!l.start && !l.end) || (!!l.start && !!l.end && l.end >= l.start);
 
 export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
   open: boolean; onOpenChange: (o: boolean) => void; entity: string; currency?: string | null;
@@ -42,6 +50,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
 
   const [structure, setStructure] = useState("");
   const [customer, setCustomer] = useState("");
+  const [beneficiary, setBeneficiary] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [reference, setReference] = useState("");
@@ -65,6 +74,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
       setLines(fs.items.map((it) => ({
         account: it.revenue_account_code, description: it.description,
         qty: "1", price: (it.amount / 100).toFixed(2), tax: it.tax_code_value || "",
+        deposit: it.kind === "DEPOSIT", start: "", end: "",
       })));
     }
   };
@@ -81,10 +91,11 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
   }, [lines, taxByCode]);
 
   const validLines = lines.filter((l) => l.account && toKobo(l.price) > 0);
-  const canSubmit = !!customer && !!invoiceDate && validLines.length > 0 && branch.ready;
+  const canSubmit = !!customer && !!invoiceDate && validLines.length > 0 && branch.ready
+    && lines.every(periodOk) && beneficiary !== customer;
 
   const reset = () => {
-    setStructure(""); setCustomer(""); setDueDate(""); setReference(""); setNarration("");
+    setStructure(""); setCustomer(""); setBeneficiary(""); setDueDate(""); setReference(""); setNarration("");
     setPost(true); setLines([blankLine()]); setInvoiceDate(""); branch.reset();
   };
   const close = () => { reset(); onOpenChange(false); };
@@ -95,12 +106,15 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
         entity, customer, invoice_date: invoiceDate,
         due_date: dueDate || undefined, reference: reference || undefined,
         narration: narration || undefined, post, ...branch.body(),
+        ...(beneficiary ? { beneficiary } : {}),
         lines: validLines.map((l) => ({
           revenue_account: l.account,
           description: l.description || undefined,
           quantity: parseFloat(l.qty) || 1,
           unit_price: toKobo(l.price),
           tax_code: l.tax || null,
+          ...(l.deposit ? { kind: "DEPOSIT" as const } : {}),
+          ...(!l.deposit && l.start && l.end ? { service_start: l.start, service_end: l.end } : {}),
         })),
       }).unwrap();
       toast.success(res.message || "Invoice created.");
@@ -128,6 +142,10 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
         {/* customer & dates */}
         <div className="space-y-3">
           <CustomerPicker entity={entity} value={customer} onChange={setCustomer} label="Customer" isRequired placeholder="Type a customer name…" />
+          <CustomerPicker entity={entity} value={beneficiary} onChange={setBeneficiary} label="On behalf of (optional)" placeholder="The customer this payer is billed for" />
+          {beneficiary && beneficiary === customer
+            ? <p className="font-mont text-[11px] text-destructive">A customer cannot be billed on its own behalf.</p>
+            : beneficiary ? <p className="font-mont text-[11px] text-gray-05">The customer above owes this invoice, and their statement names this customer on it.</p> : null}
           <RaisingBranchChoiceField choice={branch} hint={customerBranchHint(customerBranch)} />
           <div className="grid grid-cols-2 gap-3">
             <PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} />
@@ -183,6 +201,21 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
                     <TaxCodePicker entity={entity} value={l.tax} onChange={(v) => setLine(i, { tax: v })} placeholder="No tax" usage="sales" />
                   </div>
                 </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-1.5 font-mont text-xs text-gray-01">
+                    <input type="checkbox" checked={l.deposit} onChange={(e) => setLine(i, { deposit: e.target.checked, start: "", end: "" })} className="size-3.5 accent-primary" />
+                    Refundable deposit
+                  </label>
+                  {!l.deposit ? (
+                    <div className="flex flex-wrap items-center gap-1.5 font-mont text-[11px] text-gray-05">
+                      <span>Pays for</span>
+                      <DatePickerInput value={l.start} onChange={(e) => setLine(i, { start: e.target.value })} className="h-8 w-36 bg-white" aria-label="Pays for, from" />
+                      <span>to</span>
+                      <DatePickerInput value={l.end} onChange={(e) => setLine(i, { end: e.target.value })} className="h-8 w-36 bg-white" aria-label="Pays for, to" />
+                    </div>
+                  ) : <span className="font-mont text-[11px] text-gray-05">Held for the customer, never income.</span>}
+                </div>
+                {!periodOk(l) ? <p className="font-mont text-[11px] text-destructive">Give both dates, with the end on or after the start.</p> : null}
                 <div className="text-right font-mont text-[11px] text-gray-05">Net <Money kobo={net} currency={currency} /></div>
               </div>
             );

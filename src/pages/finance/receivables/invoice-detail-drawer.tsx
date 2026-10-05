@@ -3,6 +3,12 @@
  * stat cards (Total / Paid / Balance / Aging), tabbed body (Lines · Payments · GL
  * postings · Reminders · Activity, each with an icon) and a footer (Print PDF · Email
  * invoice · Send reminder · Record payment · Write off).
+ *
+ * The billing period a fee run stamped (the term) is shown and cannot be edited:
+ * the server fixes it once the invoice posts, because it is what stops a second
+ * run billing the same term twice. Each line names the period it pays for and
+ * its VAT treatment, and a bill for a period not yet started shows how much of
+ * it is still deferred income.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -15,6 +21,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
 import { useGetInvoiceDetailQuery, useRemindInvoiceMutation } from "@/redux/services/finance/ar-api";
+import { useGetTaxCodesQuery } from "@/redux/services/finance/setup-api";
+import { toArray } from "@/redux/services/finance/api-types";
+import { lineTreatment } from "../../../utils/tax-treatment";
 import { openInvoiceDocument } from "@/utils/finance-documents";
 import { RecordPaymentModal } from "./record-payment-modal";
 import { RequestPaymentModal } from "./request-payment-modal";
@@ -64,6 +73,8 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
   const [requestOpen, setRequestOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
   const [remind, { isLoading: reminding }] = useRemindInvoiceMutation();
+  const { data: taxData } = useGetTaxCodesQuery({ entity }, { skip: id == null });
+  const taxCodes = toArray(taxData?.data);
   const d = data?.data;
   const inv = d?.invoice;
   const s = d?.summary;
@@ -161,6 +172,22 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
         <div className="space-y-4">
           <div><StatusPill status={inv.status} /> <span className="ml-1"><StatusPill status={inv.payment_status} /></span></div>
 
+          {inv.billing_period_label || inv.billing_period || inv.beneficiary_name ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {inv.billing_period_label || inv.billing_period ? (
+                <Stat label="Billing period">
+                  {inv.billing_period_label || inv.billing_period}
+                  {inv.status !== "DRAFT" ? <span className="block font-normal text-[11px] text-gray-05">Fixed once the invoice is posted</span> : null}
+                </Stat>
+              ) : null}
+              {inv.beneficiary_name ? (
+                <Stat label="Billed on behalf of">
+                  {inv.beneficiary_name} <span className="font-normal text-gray-05">{inv.beneficiary_code}</span>
+                </Stat>
+              ) : null}
+            </div>
+          ) : null}
+
           {/* stat cards - Paid (cash) and Credited (notes/concessions/write-offs) are
               distinct legs of Settled; Balance is the real outstanding. */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -184,6 +211,13 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
             buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
           />
 
+          {tab === "lines" && d.deferred_income && (d.deferred_income.pending.kobo > 0 || d.deferred_income.released.kobo > 0) ? (
+            <p className="rounded-md border border-white-02 bg-gray-01/5 px-3 py-2 font-mont text-xs text-gray-05">
+              Deferred income: <span className="font-semibold text-gray-01"><Money kobo={d.deferred_income.pending.kobo} currency={currency} /></span> still to be released,
+              {" "}<span className="font-semibold text-gray-01"><Money kobo={d.deferred_income.released.kobo} currency={currency} /></span> released to revenue.
+            </p>
+          ) : null}
+
           {tab === "lines" && (
             d.lines.length === 0 ? <EmptyState title="No lines" /> : (
               <div className="overflow-x-auto rounded-md border border-white-02">
@@ -196,11 +230,20 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
                   <tbody>
                     {d.lines.map((l, i) => (
                       <tr key={i}>
-                        <td className={td}>{l.description}</td>
+                        <td className={td}>
+                          {l.description}
+                          {l.kind === "DEPOSIT" ? <span className="ml-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">Refundable deposit</span> : null}
+                          {l.service_start && l.service_end ? (
+                            <span className="block text-[11px] text-gray-05">Pays for {dates.day(l.service_start)} to {dates.day(l.service_end)}</span>
+                          ) : null}
+                        </td>
                         <td className={cn(td, "text-gray-05")}><span className="font-semibold tabular-nums text-gray-01">{l.account_code}</span> {l.account_name}</td>
                         <td className={cn(td, "text-right tabular-nums")}>{Number(l.quantity)}</td>
                         <td className={cn(td, "text-right tabular-nums")}><Money kobo={l.unit_price.kobo} currency={currency} align="right" /></td>
-                        <td className={cn(td, "text-right tabular-nums")}>{l.tax_amount.kobo ? <Money kobo={l.tax_amount.kobo} currency={currency} align="right" /> : "-"}</td>
+                        <td className={cn(td, "text-right tabular-nums")}>
+                          {l.tax_amount.kobo ? <Money kobo={l.tax_amount.kobo} currency={currency} align="right" /> : "-"}
+                          <span className="block text-[11px] text-gray-05">{lineTreatment(l.tax_code, taxCodes)}</span>
+                        </td>
                         <td className={cn(td, "text-right font-medium tabular-nums")}><Money kobo={l.line_total.kobo} currency={currency} align="right" /></td>
                       </tr>
                     ))}

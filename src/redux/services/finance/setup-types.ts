@@ -162,11 +162,16 @@ export interface FxRate {
   source: string;
 }
 
+/** VAT treatment carried on a tax code. Zero rated and exempt codes charge nothing. */
+export type TaxTreatment = "STANDARD" | "ZERO_RATED" | "EXEMPT";
+
 export interface TaxCode {
   id: number;
   code: string;
   name: string;
   rate_bps: number;
+  /** How the supply is taxed. Only a STANDARD code carries a rate. */
+  treatment?: TaxTreatment;
   is_recoverable: boolean;
   collected_account: string | null;
   paid_account: string | null;
@@ -248,6 +253,10 @@ export interface FinanceDocumentSettingsValues {
   allow_customer_opening_balances: boolean;
   /** Share of a term's fees the school aims to collect by its end (1 to 100). */
   term_collection_target_pct: number;
+  /** Whether a customer's unused credit settles each new bill of theirs as it posts. */
+  auto_apply_customer_credit?: boolean;
+  /** Kobo. Above this running total per bill, a concession needs a second person. */
+  concession_second_person_threshold?: number;
   primary_collection_bank_account: FinanceDocumentBankOption | null;
   bank_account_options: FinanceDocumentBankOption[];
   updated_at: string | null;

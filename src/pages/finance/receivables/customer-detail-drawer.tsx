@@ -10,7 +10,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { ArrowLeftRight, ScrollText, User, BellRing, CreditCard, Printer, Receipt, Users } from "lucide-react";
+import { ArrowLeftRight, ScrollText, User, BellRing, CreditCard, Printer, Receipt, Users, Link2 } from "lucide-react";
 import { DetailDrawer, DocumentEmailAction, Money, ConfirmActionModal, FormField, TabStrip, useActiveEntity, type TabStripItem } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState, EmptyState } from "@/components/finance-ui/states";
@@ -27,6 +27,7 @@ import type { Customer, CustomerDetail } from "@/redux/services/finance/ar-types
 import { CustomerReceiptModal } from "./customer-receipt-modal";
 import { MoveBalanceDrawer } from "../inter-branch/move-balance-drawer";
 import { useInterBranchReader } from "../inter-branch/use-inter-branch";
+import { PayerLinksPanel } from "./payer-links-panel";
 import { useDates } from "../../../lib/display-prefs";
 
 const TABS = [
@@ -34,6 +35,7 @@ const TABS = [
   { key: "transactions", label: "Transactions", icon: ArrowLeftRight },
   { key: "statement", label: "Statement", icon: ScrollText },
   { key: "contact", label: "Contact", icon: User },
+  { key: "payers", label: "Payers", icon: Link2 },
 ] as const;
 
 const ACCOUNT_PILL: Record<string, string> = {
@@ -182,6 +184,8 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
           )}
 
           {tab === "contact" && <ContactPanel key={c.id} entity={entity} customer={c} currency={currency} />}
+
+          {tab === "payers" && <PayerLinksPanel key={c.id} entity={entity} customer={c} />}
         </div>
       )}
 

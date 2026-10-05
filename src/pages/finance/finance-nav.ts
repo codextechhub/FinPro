@@ -13,7 +13,7 @@ import {
   CalendarClock, BadgePercent, BellRing, ListChecks, Landmark, Wallet,
   PiggyBank, Boxes, Scale, TrendingUp, ArrowLeftRight, GitBranch, ScrollText,
   CircleDollarSign, Send, Settings, AlertTriangle, ArrowRightLeft, HandCoins, Split, Handshake,
-  Gavel, ShieldCheck,
+  Gavel, ShieldCheck, Hourglass, ShieldAlert, Lock,
 } from "lucide-react";
 import type { ConsoleNavGroup } from "@/components/finance-ui/console-nav";
 import { routesPath } from "@/routes/routes-path";
@@ -56,6 +56,11 @@ export const financeNav: ConsoleNavGroup[] = [
       { title: "Concessions", url: `${F.RECEIVABLES}/concessions`, icon: BadgePercent, permissions: [P.FIN_VIEW_CONCESSIONS] },
       { title: "Dunning", url: `${F.RECEIVABLES}/dunning`, icon: BellRing, permissions: [P.FIN_VIEW_DUNNING] },
       { title: "Fee Structures", url: `${F.RECEIVABLES}/fee-structures`, icon: ListChecks, permissions: [P.FIN_VIEW_FEE_STRUCTURES] },
+      { title: "Payer Payments", url: `${F.RECEIVABLES}/payer-payments`, icon: HandCoins, permissions: [P.FIN_VIEW_PAYMENTS] },
+      { title: "Credit Transfers", url: `${F.RECEIVABLES}/credit-transfers`, icon: ArrowRightLeft, permissions: [P.FIN_VIEW_CREDIT_TRANSFERS] },
+      { title: "Deferred Income", url: `${F.RECEIVABLES}/deferred-income`, icon: Hourglass, permissions: [P.FIN_VIEW_DEFERRED_INCOME] },
+      { title: "Doubtful Debts", url: `${F.RECEIVABLES}/provisions`, icon: ShieldAlert, permissions: [P.FIN_VIEW_PROVISIONS] },
+      { title: "Deposits", url: `${F.RECEIVABLES}/deposits`, icon: Lock, permissions: [P.FIN_VIEW_DEPOSITS] },
     ],
   },
 

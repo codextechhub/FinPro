@@ -17,7 +17,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
-import { Plus, Search, Printer, Check, Send, Layers } from "lucide-react";
+import { Plus, Search, Printer, Check, Send, Layers, HandCoins } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField, Segmented,
   CustomerPicker, AccountPicker, BankAccountPicker, PostingRecap, toArray,
@@ -49,6 +49,7 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { ArAdjustment, RefundAvailabilityCustomer } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
+import { WriteOffRecoverModal } from "./write-off-recover-modal";
 import { useDates } from "../../../lib/display-prefs";
 
 type Mode = "REFUND" | "WRITEOFF";
@@ -204,6 +205,7 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
   const [submitRefund, { isLoading: submittingRefund }] = useSubmitRefundMutation();
   const [postWriteOff, { isLoading: postingWriteOff }] = usePostWriteOffRequestMutation();
   const [submitWriteOff, { isLoading: submittingWriteOff }] = useSubmitWriteOffRequestMutation();
+  const [recovering, setRecovering] = useState(false);
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({
     documentLabel: row?.kind === "WRITEOFF" ? "write-off" : "refund",
   });
@@ -270,6 +272,9 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
               onVoided={onClose}
             />
           ) : null}
+          {wo && posted && row.write_off_id && can(P.FIN_RECOVER_WRITE_OFF) ? (
+            <Button variant="outline" onClick={() => setRecovering(true)} className="gap-1.5"><HandCoins className="size-4" /> Recover</Button>
+          ) : null}
           {isDraft && gated && can(wo ? P.FIN_SUBMIT_WRITE_OFF : P.FIN_SUBMIT_REFUND) ? (
             <Button onClick={doSubmit} disabled={submittingRefund || submittingWriteOff} className="gap-1.5">
               <Send className="size-4" />{submittingRefund || submittingWriteOff ? "Submitting…" : "Submit for approval"}
@@ -304,6 +309,12 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
         </div>
       </div>
       {noApproverDialog}
+      {wo && row.write_off_id ? (
+        <WriteOffRecoverModal
+          open={recovering} onClose={() => setRecovering(false)} entity={entity}
+          writeOffId={row.write_off_id} customerCode={row.customer_code} currency={currency}
+        />
+      ) : null}
     </DetailDrawer>
   );
 }

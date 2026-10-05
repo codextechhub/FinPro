@@ -7,7 +7,9 @@
  */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
-import { Search, Plus, Printer } from "lucide-react";
+import { Search, Plus, Printer, HandCoins } from "lucide-react";
+import { Link } from "react-router";
+import { routesPath } from "@/routes/routes-path";
 import { toast } from "sonner";
 import { DataTable, TabStrip, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
@@ -165,6 +167,9 @@ export function ReceiptsAllocationTab({ entity, currency }: { entity: string; cu
             defaultName="Customer receipts"
           />
           <Can permission={P.FIN_RECORD_PAYMENT}>
+            <Button asChild variant="outline" className="gap-1.5">
+              <Link to={`${routesPath.PROTECTED.FINANCE.RECEIVABLES}/payer-payments`}><HandCoins className="size-4" /> Payment from a payer</Link>
+            </Button>
             <Button onClick={() => setNewOpen(true)} className="gap-1.5" data-guide="finance-receipts.record"><Plus className="size-4" /> Record receipt</Button>
           </Can>
         </div>

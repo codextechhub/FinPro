@@ -29,6 +29,13 @@ export interface Invoice {
   balance_due: number;
   reference: string;
   narration: string;
+  /** Set when the customer billed pays for somebody else (a sponsor or employer). */
+  beneficiary_id?: number | null;
+  beneficiary_code?: string | null;
+  beneficiary_name?: string | null;
+  /** The billing period a fee run stamped (a term), fixed once the invoice posts. */
+  billing_period?: string;
+  billing_period_label?: string;
 }
 
 export interface CreditNoteLine {
@@ -129,6 +136,10 @@ export interface WriteOffRequest {
   journal_id: number | null;
   /** See {@link Concession.approval_required} - same rule, same caveat. */
   approval_required?: boolean;
+  /** Of the amount, what the allowance for doubtful debts absorbed. */
+  allowance_used?: number;
+  /** What later receipts have recovered of it. */
+  recovered_amount?: number;
 }
 
 export type InvoiceWriteOffResult = Invoice | WriteOffRequest;
@@ -326,7 +337,17 @@ export interface InvoiceGlJournal {
 export interface InvoiceDetail {
   invoice: Invoice;
   summary: { subtotal: ArMoney; tax: ArMoney; total: ArMoney; paid: ArMoney; credited: ArMoney; settled: ArMoney; balance: ArMoney; due_date: string | null };
-  lines: { description: string; account_code: string; account_name: string; quantity: string; unit_price: ArMoney; tax_code: string | null; tax_amount: ArMoney; line_total: ArMoney }[];
+  lines: {
+    description: string; account_code: string; account_name: string; quantity: string; unit_price: ArMoney;
+    tax_code: string | null; tax_amount: ArMoney; line_total: ArMoney;
+    /** CHARGE is income; DEPOSIT is a refundable deposit held for the customer. */
+    kind?: ChargeKind;
+    /** The period the line pays for; income billed before it starts is deferred. */
+    service_start?: string | null;
+    service_end?: string | null;
+  }[];
+  /** This invoice's deferred income: still waiting, and released to revenue. */
+  deferred_income?: { pending: ArMoney; released: ArMoney };
   // Cash receipts only - kept for back-compat; use `settlements` for the full picture.
   payments: { date: string; reference: string; method: string; amount: ArMoney }[];
   settlements: InvoiceSettlement[];
@@ -479,7 +500,11 @@ export interface FeeItem {
   amount_naira: string;
   tax_code_value: string | null;
   is_optional: boolean;
+  kind?: ChargeKind;
 }
+
+/** CHARGE is income; DEPOSIT is a refundable deposit, held and never revenue. */
+export type ChargeKind = "CHARGE" | "DEPOSIT";
 
 export type FeeAppliesTo = "CUSTOMER" | "VENDOR" | "STAFF" | "GENERAL";
 

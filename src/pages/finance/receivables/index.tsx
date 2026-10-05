@@ -13,6 +13,11 @@ import { DunningTab } from "./dunning-tab";
 import { CustomersTab } from "./customers-tab";
 import { FeeStructuresTab } from "./fee-structures-tab";
 import { ReceiptsAllocationTab } from "./receipts-allocation-tab";
+import { PayerPaymentsTab } from "./payer-payments-tab";
+import { CreditTransfersTab } from "./credit-transfers-tab";
+import { DeferredIncomeTab } from "./deferred-income-tab";
+import { ProvisionsTab } from "./provisions-tab";
+import { DepositsTab } from "./deposits-tab";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
@@ -20,6 +25,8 @@ const LABELS: Record<string, string> = {
   invoices: "Customer Invoices", "credit-notes": "Credit / Debit Notes", refunds: "Refunds & Write-offs",
   concessions: "Concessions / Fee Waivers", "payment-plans": "Payment Plans", dunning: "Dunning / Reminders",
   customers: "Customers", "fee-structures": "Fee Structures", receipts: "Receipts & Allocation",
+  "payer-payments": "Payer Payments", "credit-transfers": "Credit Transfers",
+  "deferred-income": "Deferred Income", provisions: "Doubtful Debts", deposits: "Deposits",
 };
 const SUBTITLES: Record<string, string> = {
   receipts: "Record money received and apply it to open invoices.",
@@ -29,6 +36,11 @@ const SUBTITLES: Record<string, string> = {
   concessions: "Waivers, discounts and scholarships that reduce customer balances.",
   dunning: "Overdue follow-up - aging buckets, reminder queue and policies.",
   "fee-structures": "Billing templates that drive invoice generation.",
+  "payer-payments": "One payment from a parent or sponsor, shared across the customers they pay for.",
+  "credit-transfers": "Move one customer's unused credit to another, with a second person's approval.",
+  "deferred-income": "Fees billed before the period they pay for, released to income month by month.",
+  provisions: "The allowance for debts that may not be paid, worked out from how old they are.",
+  deposits: "Refundable deposits held for customers, returned when they leave or forfeited when unclaimed.",
 };
 const HINTS: Record<string, string> = {
   "fee-structures": "A fee structure is a billing template. When you generate invoices, each line builds an invoice line from its GL account, amount and tax - so revenue posts to the right place automatically. Only customer structures generate AR invoices.",
@@ -70,6 +82,16 @@ export default function ReceivablesPage({ section = DEFAULT_RECEIVABLES_SECTION 
           <FeeStructuresTab entity={entity} currency={currency} />
         ) : section === "receipts" ? (
           <ReceiptsAllocationTab entity={entity} currency={currency} />
+        ) : section === "payer-payments" ? (
+          <PayerPaymentsTab entity={entity} currency={currency} />
+        ) : section === "credit-transfers" ? (
+          <CreditTransfersTab entity={entity} currency={currency} />
+        ) : section === "deferred-income" ? (
+          <DeferredIncomeTab entity={entity} currency={currency} />
+        ) : section === "provisions" ? (
+          <ProvisionsTab entity={entity} currency={currency} />
+        ) : section === "deposits" ? (
+          <DepositsTab entity={entity} currency={currency} />
         ) : (
           <InvoicesTab entity={entity} currency={currency} />
         )}
