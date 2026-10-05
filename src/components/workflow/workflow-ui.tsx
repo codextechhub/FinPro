@@ -10,6 +10,7 @@ import {
   INSTANCE_STATUS_META,
   STAGE_STATUS_META,
 } from "./workflow-format";
+import { exitedOutline, exitedTitle } from "../finance-ui/exited-person";
 
 export function InstanceStatusBadge({ status }: { status: WorkflowInstanceStatus }) {
   const meta = INSTANCE_STATUS_META[status] ?? { label: status, variant: "default" as const };
@@ -56,25 +57,33 @@ export function DocumentRef({
   );
 }
 
-/** Small initials avatar; deterministic color from the seed (user id/name). */
+/**
+ * Small initials avatar; deterministic color from the seed (user id/name).
+ * `exited` is the server's flag that the person has left, which draws the
+ * dashed outline; nothing else does.
+ */
 export function InitialsAvatar({
   initials,
   seed,
   size = 26,
   className,
+  exited,
 }: {
   initials: string;
   seed: string | number;
   size?: number;
   className?: string;
+  exited?: boolean | null;
 }) {
   return (
     <span
       className={cn(
         "inline-grid place-content-center rounded-full text-white font-semibold shrink-0",
         avatarColor(String(seed)),
+        exitedOutline(exited),
         className,
       )}
+      title={exitedTitle(exited)}
       style={{ width: size, height: size, fontSize: size * 0.4 }}
     >
       {initials}
@@ -89,16 +98,18 @@ export function UserChip({
   initials,
   role,
   size = 26,
+  exited,
 }: {
   id: string;
   name: string;
   initials: string;
   role?: string;
   size?: number;
+  exited?: boolean | null;
 }) {
   return (
     <span className="inline-flex max-w-full items-center gap-2 min-w-0">
-      <InitialsAvatar initials={initials} seed={id} size={size} />
+      <InitialsAvatar initials={initials} seed={id} size={size} exited={exited} />
       <span className="min-w-0">
         <span className="block truncate text-sm font-medium text-black-01">{name}</span>
         {role ? <span className="block truncate text-xs text-gray-01">{role}</span> : null}

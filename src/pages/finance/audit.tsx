@@ -23,6 +23,8 @@ import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates, type DateFormatter } from "../../lib/display-prefs";
 import { sinceDate } from "../../utils/date-presets";
+import { exitedOutline, exitedTitle } from "@/components/finance-ui/exited-person";
+import { proxyLabel } from "../../components/workflow/person-flags";
 
 const NO_BRANCH = "No branch";
 
@@ -111,6 +113,17 @@ export function auditBranchLabel(log: Pick<FinanceAuditLog, "branch_name">): str
   return log.branch_name || NO_BRANCH;
 }
 
+/**
+ * Who did it, as the Actor column says it. An act done through a proxy names
+ * both people, "Mrs Bello for Mrs Adeyemi", in the server's own words;
+ * anything else is the actor's email, or System for an automatic posting.
+ */
+export function auditActorLabel(
+  log: Pick<FinanceAuditLog, "actor" | "acted_label" | "proxied_user_name" | "real_actor_name">,
+): string {
+  return proxyLabel(log) ?? log.actor ?? "System";
+}
+
 function AuditDetail({ log }: { log: FinanceAuditLog }) {
   const dates = useDates();
   const rows = diffRows(log.before, log.after);
@@ -118,7 +131,10 @@ function AuditDetail({ log }: { log: FinanceAuditLog }) {
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <Stat label="When">{dates.dateTime(log.created_at, null, { seconds: true })}</Stat>
-        <Stat label="Actor">{log.actor ?? "System"}</Stat>
+        <Stat label="Actor">
+          {auditActorLabel(log)}
+          {proxyLabel(log) && log.actor ? <span className="block font-normal text-gray-05">{log.actor}</span> : null}
+        </Stat>
         <Stat label="Action">
           <span className={cn("inline-flex rounded px-2 py-0.5 font-mont text-xs font-medium", actionTone(log.action, log.status))}>
             {log.action_display || log.action}
@@ -208,9 +224,9 @@ export default function FinanceAuditPage() {
     { header: "When", cell: (l) => <span className="whitespace-nowrap tabular-nums text-gray-01">{dates.dateTime(l.created_at, null, { seconds: true })}</span> },
     { header: "Actor", cell: (l) => (
       <span className="flex items-center gap-2">
-        <span className={cn("grid size-6 shrink-0 place-content-center rounded-full text-[10px] font-semibold",
-          l.actor ? "bg-primary/10 text-primary" : "bg-gray-03 text-gray-05")}>{initials(l.actor)}</span>
-        <span className="truncate">{l.actor ?? "System"}</span>
+        <span title={exitedTitle(l.actor_is_exited)} className={cn("grid size-6 shrink-0 place-content-center rounded-full text-[10px] font-semibold",
+          l.actor ? "bg-primary/10 text-primary" : "bg-gray-03 text-gray-05", exitedOutline(l.actor_is_exited))}>{initials(l.actor)}</span>
+        <span className="truncate">{auditActorLabel(l)}</span>
       </span>
     ) },
     { header: "Action", cell: (l) => (

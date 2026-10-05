@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditBranchLabel } from "./audit";
+import { auditActorLabel, auditBranchLabel } from "./audit";
 
 /**
  * Holy Cross's trail, read by the proprietor. A journal posted at the Annex
@@ -14,5 +14,24 @@ describe("the audit trail's Branch column", () => {
 
   it("says an entry names no branch, never that it is the whole school's", () => {
     expect(auditBranchLabel({ branch_name: null })).toBe("No branch");
+  });
+});
+
+/**
+ * Mrs Bello posts a receipt while acting as Mrs Adeyemi. The trail names both,
+ * in the server's words; an ordinary entry names the actor; an automatic one
+ * says System.
+ */
+describe("the audit trail's Actor column", () => {
+  const base = { actor: "bello@brightstar.example.com", real_actor_name: null, proxied_user_name: null, acted_label: "Mrs Bello" };
+
+  it("names both people for an act done through a proxy", () => {
+    expect(auditActorLabel({ ...base, real_actor_name: "Mrs Bello", proxied_user_name: "Mrs Adeyemi", acted_label: "Mrs Bello for Mrs Adeyemi" }))
+      .toBe("Mrs Bello for Mrs Adeyemi");
+  });
+
+  it("names the actor for an ordinary act, and System for an automatic one", () => {
+    expect(auditActorLabel(base)).toBe("bello@brightstar.example.com");
+    expect(auditActorLabel({ ...base, actor: null, acted_label: null })).toBe("System");
   });
 });

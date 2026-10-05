@@ -57,6 +57,7 @@ import { humanizeDocumentType } from "@/pages/protected/workflow/components/work
 import AddMemberSheet from "./add-member-sheet";
 import { groupBranchIds, groupReadOnlySentence } from "../workflow-reach";
 import { listEmptyText, listLoadedEmpty } from "../list-state";
+import { exitedOutline } from "@/components/finance-ui/exited-person";
 
 const KIND_LABEL: Record<GroupMemberKind, string> = {
   USER: "Person",
@@ -468,7 +469,7 @@ export default function GroupsTab() {
                             <UserAvatar
                               userId={u.id}
                               name={u.name}
-                              className="size-8"
+                              className={cn("size-8", exitedOutline((u as { is_exited?: boolean | null }).is_exited))}
                               fallbackClassName="text-[10px]"
                             />
                             <div className="min-w-0">
@@ -622,7 +623,7 @@ export default function GroupsTab() {
                                       <UserAvatar
                                         userId={u.id}
                                         name={u.name}
-                                        className="size-7"
+                                        className={cn("size-7", exitedOutline((u as { is_exited?: boolean | null }).is_exited))}
                                         fallbackClassName="text-[10px]"
                                       />
                                       <span className="truncate text-xs font-medium text-black-01">

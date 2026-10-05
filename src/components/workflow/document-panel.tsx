@@ -91,6 +91,7 @@ export function DocumentPanel({
                 initials={initials(instance.requested_by)}
                 role={role(instance.requested_by)}
                 size={22}
+                exited={(instance as { requested_by_is_exited?: boolean | null }).requested_by_is_exited}
               />
             </Field>
             <Field label="Submitted">
