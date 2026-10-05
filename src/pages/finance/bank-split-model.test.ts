@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { DIFFERENCE_TREATMENTS, branchDifferences, splitProblems, splitTotals, type SplitRow } from "./bank-split-model";
+import { DIFFERENCE_TREATMENTS, branchDifferences, differenceNote, splitProblems, splitTotals, type SplitRow } from "./bank-split-model";
 
 const row = (over: Partial<SplitRow>): SplitRow => ({
   branch: "1", opening_balance: 0, bank_account_name: "GTBank - Ikeja", ledger_account_code: "1111",
@@ -75,6 +75,22 @@ describe("each branch's difference from its share", () => {
     expect(lines.map((l) => [l.branch_name, l.share, l.difference])).toEqual([
       ["Ikeja", 500_000_000, 100_000_000], ["Lekki", 0, -100_000_000], ["Ajah", null, 0],
     ]);
+  });
+
+  it("says the branch under its share owes the branch over its share, as the split books it", () => {
+    const lines = branchDifferences(preview, [
+      { branch: "1", opening_balance: 500_000_000 }, { branch: "2", opening_balance: 0 },
+    ]);
+    expect(differenceNote(lines, "DEBT")).toBe(
+      "A branch under its share owes the branches over theirs; the split books each debt as a transfer between branches.",
+    );
+    expect(differenceNote(lines, "PERMANENT_MOVE")).toBe("Each difference moves through retained earnings, so nothing is owed between branches.");
+    expect(differenceNote([{ difference: 0 }], "DEBT")).toBe("Every branch's entries match its share, so nothing is owed between branches.");
+  });
+
+  it("explains a debt the same way round on the treatment choice", () => {
+    const debt = DIFFERENCE_TREATMENTS.find((t) => t.value === "DEBT")?.help ?? "";
+    expect(debt).toContain("A branch whose entries came to less than its share takes cash another branch brought in, so it owes that branch");
   });
 
   it("blocks the split while money sits in journals no branch holds", () => {

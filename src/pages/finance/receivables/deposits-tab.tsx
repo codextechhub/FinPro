@@ -31,8 +31,17 @@ import type { CustomerDeposit, DepositStatus } from "@/redux/services/finance/fe
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
 import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
 
+/**
+ * The one word for each state a deposit takes (vs_finance DepositStatus), read
+ * by the status filter, the row pill and the drawer alike. RELEASED is
+ * "Returned", after the Return deposits action that puts it there, whether the
+ * deposit became credit to refund or was set against bills.
+ */
+export const DEPOSIT_STATUS: Record<DepositStatus, string> = {
+  HELD: "Held", RELEASED: "Returned", FORFEITED: "Forfeited", CANCELLED: "Cancelled",
+};
 const STATUSES: [DepositStatus | "", string][] = [
-  ["", "All"], ["HELD", "Held"], ["RELEASED", "Returned"], ["FORFEITED", "Forfeited"], ["CANCELLED", "Cancelled"],
+  ["", "All"], ...(Object.entries(DEPOSIT_STATUS) as [DepositStatus, string][]),
 ];
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
 
@@ -61,7 +70,7 @@ export function DepositsTab({ entity, currency }: { entity: string; currency?: s
     { header: "Invoice", cell: (d) => <span className="tabular-nums text-gray-05">{d.invoice_number}</span> },
     { header: "Amount", align: "right", cell: (d) => <Money kobo={d.amount} currency={currency} align="right" /> },
     { header: "Left on", cell: (d) => <span className="tabular-nums">{d.claim_opened_on ? dates.day(d.claim_opened_on) : "-"}</span> },
-    { header: "Status", cell: (d) => <StatusPill status={d.status} /> },
+    { header: "Status", cell: (d) => <StatusPill status={d.status} label={DEPOSIT_STATUS[d.status]} /> },
   ];
 
   return (
@@ -139,7 +148,7 @@ function DepositDrawer({ deposit, entity, currency, offsetAllowed, onClose }: {
       >
         <div className="grid grid-cols-2 gap-4">
           <DetailField label="Amount"><Money kobo={deposit.amount} currency={currency} /></DetailField>
-          <DetailField label="Status"><StatusPill status={deposit.status} /></DetailField>
+          <DetailField label="Status"><StatusPill status={deposit.status} label={DEPOSIT_STATUS[deposit.status]} /></DetailField>
           {branches.show ? <DetailField label="Branch">{branches.name(deposit.branch_id, deposit.branch_name)}</DetailField> : null}
           <DetailField label="Billed on">{deposit.invoice_number}</DetailField>
           <DetailField label="Customer left on">{deposit.claim_opened_on ? dates.day(deposit.claim_opened_on) : "Still a customer"}</DetailField>

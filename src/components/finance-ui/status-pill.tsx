@@ -115,7 +115,13 @@ const PILL_CLASS: Record<BadgeVariant, string> = {
   suspended: "bg-orange-500/10 text-yellow-01-text",
 };
 
-export function StatusPill({ status, className }: { status?: string | null; className?: string }) {
+export function StatusPill({ status, label, className }: {
+  status?: string | null;
+  /** The word a screen uses for this status in its own filter, so the pill and
+   *  the filter read the same; the colour still comes from the status token. */
+  label?: string;
+  className?: string;
+}) {
   if (!status) return <span className="text-gray-05">-</span>;
   return (
     <span
@@ -126,7 +132,7 @@ export function StatusPill({ status, className }: { status?: string | null; clas
         className,
       )}
     >
-      {statusLabel(status)}
+      {label ?? statusLabel(status)}
     </span>
   );
 }

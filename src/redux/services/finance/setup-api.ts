@@ -118,7 +118,7 @@ export const setupApi = baseApi.injectEndpoints({
     }),
     // Shared report pickers stay bounded but newest-first, so current periods do
     // not disappear behind the oldest 25 rows after several years of history.
-    getPeriods: b.query<PaginatedEnvelope<FiscalPeriod>, { entity: string; status?: string; year?: number } & IncludeArchivedArg>({
+    getPeriods: b.query<PaginatedEnvelope<FiscalPeriod>, { entity: string; status?: string; year?: number; include_branches?: "true" } & IncludeArchivedArg>({
       query: (p) => ({ url: `/finance/periods/${qs({ ...p, recent: "true", page_size: 100 })}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),

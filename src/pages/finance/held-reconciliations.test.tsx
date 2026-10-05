@@ -3,7 +3,8 @@
  * (every school user) is told so and shown nothing. A platform reader sees the
  * daily checks and the "balance swept" setting; turning the setting on or off
  * needs a reason, and a reader who may only view cannot change it. The sweeps
- * the check counted show with the setting, to any provider key holder.
+ * the check counted show to a holder of any one of the three keys the server
+ * serves them on: the settlement view key or either provider key.
  */
 
 import { act } from "react";
@@ -83,6 +84,14 @@ describe("Held reconciliations", () => {
     expect(rows.some((t) => t.includes("Agrees"))).toBe(true);
     expect(rows.some((t) => t.includes("Disagrees"))).toBe(true);
     expect(container.textContent).not.toContain("Paystack balance swept automatically");
+  });
+
+  it("lists the counted sweeps to a reader of the checks who holds no provider key", () => {
+    mocks.held = new Set(["801001"]);
+    act(() => root.render(<HeldReconciliationsTab />));
+    expect(container.textContent).toContain("Sweeps counted");
+    expect(container.textContent).toContain("STL-77");
+    expect(container.querySelector('[aria-label="Paystack balance swept automatically"]')).toBeNull();
   });
 
   it("lets a provider viewer read the setting but not change it", () => {

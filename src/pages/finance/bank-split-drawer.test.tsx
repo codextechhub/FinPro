@@ -178,7 +178,7 @@ describe("splitting the account", () => {
     const money = inputs().filter((i) => i.inputMode === "decimal");
     type(money[0], "5000000");
     expect(text()).toContain("₦1,000,000.00 over its share");
-    expect(text()).toContain("A branch over its share owes the branches under theirs");
+    expect(text()).toContain("A branch under its share owes the branches over theirs");
   });
 
   it("fills each share from the branch's own book balance, an overdraft as an overdraft", () => {

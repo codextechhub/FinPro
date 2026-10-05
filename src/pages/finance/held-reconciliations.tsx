@@ -16,9 +16,9 @@
  *   it off the books' figure, so a sweep is not reported as a mismatch. Turning
  *   it on or off needs a reason, which the audit trail keeps. The tolerance is
  *   shown here read-only; it is changed in Settings, Advanced catalogue.
- * - The sweeps the check counted, listed under the setting. The server serves
- *   them to anyone holding either provider key or the settlement view key, so
- *   the list shows wherever the setting does.
+ * - The sweeps the check counted, listed below the setting in a section of
+ *   their own. The server serves them to anyone holding the settlement view
+ *   key or either provider key, so a reader of the checks alone sees them too.
  */
 
 import { useState, type ReactNode } from "react";
@@ -56,6 +56,7 @@ export function HeldReconciliationsTab() {
   return (
     <div className="space-y-6">
       {canProvider ? <ProviderSettingsCard /> : null}
+      <SweepsTable />
       {canChecks ? <ChecksList /> : null}
     </div>
   );
@@ -202,8 +203,6 @@ function ProviderSettingsCard() {
       )}
       {!canUpdate ? <p className="font-mont text-[11px] text-gray-05">You have read-only access.</p> : null}
 
-      <SweepsTable />
-
       {next !== null && settings ? (
         <ConfirmActionModal open onOpenChange={(open) => { if (!open) { setNext(null); setReason(""); } }}
           title={next ? "Turn on balance sweeping?" : "Turn off balance sweeping?"}
@@ -239,11 +238,14 @@ function SweepsTable() {
     { header: "Counted on", cell: (r) => <span className="tabular-nums text-gray-05">{dates.day(r.recorded_on)}</span> },
   ];
   return (
-    <div className="space-y-2 pt-2">
-      <p className="font-mont text-xs font-semibold text-gray-01">Sweeps counted</p>
+    <section className="space-y-3">
+      <div>
+        <h2 className="font-mont text-sm font-semibold text-gray-01">Sweeps counted</h2>
+        <p className="mt-0.5 font-mont text-xs text-gray-05">Paystack&rsquo;s settlements of the platform balance to its bank that the daily check took off the books&rsquo; figure.</p>
+      </div>
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch}
         emptyTitle="No sweeps counted" emptyMessage="Sweeps appear once the setting is on and Paystack settles the balance." />
-    </div>
+    </section>
   );
 }

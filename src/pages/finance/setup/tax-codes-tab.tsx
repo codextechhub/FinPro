@@ -6,15 +6,22 @@
  *
  * Each code states its VAT treatment: standard rated (charges its rate), zero
  * rated or exempt (both charge nothing, and the rate field is locked at zero).
+ *
+ * A tax code binds every branch at once, so the server refuses a create or an
+ * edit from a reader whose reach is one branch, even with the create key
+ * (`SHARED_RECORD_READ_ONLY`). New tax code and editing a row are therefore
+ * offered only to a key holder who covers the whole school; a branch's own
+ * bursar still reads every code, as the tax picker on each line needs.
  */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { DataTable, StatusPill, FormDrawer, FormField, AccountPicker, toArray, type Column } from "@/components/finance-ui";
-import { Can, useCan } from "@/components/finance-ui/can";
+import { useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useReaderReach } from "../../../host";
 import { P } from "../../../permissions";
 import { useGetTaxCodesQuery, useUpsertTaxCodeMutation } from "@/redux/services/finance/setup-api";
 import type { TaxCode } from "@/redux/services/finance/setup-types";
@@ -29,7 +36,8 @@ export function TaxCodesTab({ entity }: { entity: string }) {
   const { data, isLoading, isFetching, isError, refetch } = useGetTaxCodesQuery({ entity });
   const codes = toArray<TaxCode>(data?.data);
   const { can } = useCan();
-  const canEdit = can(P.FIN_CREATE_TAX_CODE);
+  const { wholeSchool } = useReaderReach();
+  const canEdit = wholeSchool && can(P.FIN_CREATE_TAX_CODE);
   const [type, setType] = useState("");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<TaxCode | null>(null);
@@ -57,9 +65,9 @@ export function TaxCodesTab({ entity }: { entity: string }) {
           <option value="">All types</option>
           {types.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        <Can permission={P.FIN_CREATE_TAX_CODE}>
+        {canEdit ? (
           <Button onClick={() => setCreating(true)} className="h-9 gap-1.5 font-mont text-xs font-semibold"><Plus className="size-3.5" /> New tax code</Button>
-        </Can>
+        ) : null}
       </div>
 
       <DataTable columns={columns} rows={rows} rowKey={(t) => t.id}

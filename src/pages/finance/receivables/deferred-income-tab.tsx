@@ -18,6 +18,11 @@
  * The release list names every release journal posted, and the undo form
  * offers only the months the server says can still be undone (`can_reverse`:
  * a release not yet reversed whose month is open), with what each holds.
+ * `can_reverse` reads the school's month; a branch may have closed its own
+ * month while the school's is open, and the undo, which reverses every
+ * branch's release at once, is then refused. So the form also reads each
+ * branch's own month (`branch_states` of the open periods) and lists such a
+ * month disabled, naming the branch that closed it.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -37,6 +42,8 @@ import {
   useGetDeferredIncomeQuery, useGetDeferredIncomeReleasesQuery, useReleaseDeferredIncomeMutation,
   useReverseDeferredIncomeMutation,
 } from "@/redux/services/finance/fees-api";
+import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
+import type { FiscalPeriod } from "@/redux/services/finance/setup-types";
 import type { DeferredIncomeRelease, DeferredIncomeReleaseRow } from "@/redux/services/finance/fees-types";
 import { Kpi, Note, useBranchColumn } from "./fees-parts";
 import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
@@ -47,20 +54,30 @@ export interface UndoableMonth {
   name: string;
   amount: number;
   journals: number;
+  /** Branches holding a release in the month that have closed their own month; any one blocks the undo. */
+  closedAt: string[];
 }
 
 /**
  * The months whose releases can still be undone, newest first, from the
  * server's release rows. Undoing reverses every release of the month, every
- * branch's, so each month is offered once with its total.
+ * branch's, so each month is offered once with its total. `periods` carries
+ * each branch's own state of the month (`branch_states`): a branch with a
+ * release in the month whose own month is not OPEN is named in `closedAt`,
+ * because the server refuses to post its reversal there.
  */
-export function undoableMonths(rows: DeferredIncomeReleaseRow[]): UndoableMonth[] {
+export function undoableMonths(
+  rows: DeferredIncomeReleaseRow[],
+  periods: Pick<FiscalPeriod, "id" | "branch_states">[] = [],
+): UndoableMonth[] {
   const months = new Map<number, UndoableMonth>();
   for (const row of rows) {
     if (!row.can_reverse || row.period_id == null) continue;
-    const month = months.get(row.period_id) ?? { periodId: row.period_id, name: row.period_name ?? row.month, amount: 0, journals: 0 };
+    const month = months.get(row.period_id) ?? { periodId: row.period_id, name: row.period_name ?? row.month, amount: 0, journals: 0, closedAt: [] };
     month.amount += row.amount;
     month.journals += 1;
+    const own = periods.find((p) => p.id === row.period_id)?.branch_states?.find((b) => b.branch === row.branch_id);
+    if (own && own.status !== "OPEN" && !month.closedAt.includes(own.branch_name)) month.closedAt.push(own.branch_name);
     months.set(row.period_id, month);
   }
   return [...months.values()];
@@ -203,10 +220,12 @@ function ReleaseModal({ open, onClose, entity, onDone }: {
 
 function UndoModal({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {
   const { data, isFetching } = useGetDeferredIncomeReleasesQuery({ entity, reversed: "false", page_size: 100 }, { skip: !open });
-  const months = useMemo(() => undoableMonths(toArray(data?.data)), [data]);
+  const periodsQ = useGetPeriodsQuery({ entity, status: "OPEN", include_branches: "true" }, { skip: !open });
+  const months = useMemo(() => undoableMonths(toArray(data?.data), toArray(periodsQ.data?.data)), [data, periodsQ.data]);
   const [period, setPeriod] = useState("");
   const [reverse, { isLoading }] = useReverseDeferredIncomeMutation();
-  const chosen = months.find((m) => String(m.periodId) === period);
+  const chosen = months.find((m) => String(m.periodId) === period && !m.closedAt.length);
+  const blocked = months.some((m) => m.closedAt.length);
   const submit = async () => {
     if (!chosen) return;
     try {
@@ -227,11 +246,16 @@ function UndoModal({ open, onClose, entity, currency }: { open: boolean; onClose
         <NativeSelect value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Month" disabled={!months.length}>
           <option value="" disabled>{isFetching ? "Loading releases" : months.length ? "Select a month" : "No release can be undone"}</option>
           {months.map((m) => (
-            <option key={m.periodId} value={String(m.periodId)}>
-              {`${m.name}: ${formatMoney(m.amount, currency)} in ${m.journals} ${m.journals === 1 ? "journal" : "journals"}`}
+            <option key={m.periodId} value={String(m.periodId)} disabled={m.closedAt.length > 0}>
+              {m.closedAt.length
+                ? `${m.name}: closed at ${m.closedAt.join(", ")}`
+                : `${m.name}: ${formatMoney(m.amount, currency)} in ${m.journals} ${m.journals === 1 ? "journal" : "journals"}`}
             </option>
           ))}
         </NativeSelect>
+        {blocked ? (
+          <span className="mt-1 block font-mont text-[11px] text-gray-05">A month closed at any branch cannot be undone until that branch re-opens it.</span>
+        ) : null}
       </FormField>
     </ConfirmActionModal>
   );

@@ -37,6 +37,18 @@ import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
 
+/**
+ * The one word for each state a credit transfer takes (vs_finance
+ * DocumentStatus), read by the status filter, the row pill and the drawer
+ * alike. A posted transfer undone by Void is REVERSED on the wire and "Voided"
+ * here, after the action that put it there. APPROVED lasts only while an
+ * approved transfer posts, so the filter does not offer it.
+ */
+export const CREDIT_TRANSFER_STATUS: Record<string, string> = {
+  DRAFT: "Draft", PENDING_APPROVAL: "Awaiting approval", APPROVED: "Approved", POSTED: "Posted", REVERSED: "Voided",
+};
+const FILTER_STATUSES = ["DRAFT", "PENDING_APPROVAL", "POSTED", "REVERSED"] as const;
+
 export function CreditTransfersTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
   const { can } = useCan();
@@ -59,7 +71,7 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
     ...(branches.show && list.view.selected === "all" ? [{ header: "Branch", cell: (t: CustomerCreditTransfer) => branches.name(t.branch_id) }] : []),
     { header: "Amount", align: "right", cell: (t) => <Money kobo={t.amount} currency={currency} align="right" /> },
     { header: "Date", cell: (t) => <span className="tabular-nums">{dates.day(t.transfer_date)}</span> },
-    { header: "Status", cell: (t) => <StatusPill status={t.status} /> },
+    { header: "Status", cell: (t) => <StatusPill status={t.status} label={CREDIT_TRANSFER_STATUS[t.status]} /> },
   ];
 
   return (
@@ -68,10 +80,7 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
         <div className="flex flex-wrap items-center gap-2">
           <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectCls} aria-label="Status">
             <option value="">All statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="PENDING_APPROVAL">Awaiting approval</option>
-            <option value="POSTED">Posted</option>
-            <option value="REVERSED">Voided</option>
+            {FILTER_STATUSES.map((code) => <option key={code} value={code}>{CREDIT_TRANSFER_STATUS[code]}</option>)}
           </select>
           <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
         </div>
@@ -225,7 +234,7 @@ function TransferDrawer({ transfer, entity, currency, onClose }: {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <DetailField label="Amount"><Money kobo={transfer.amount} currency={currency} /></DetailField>
-            <DetailField label="Status"><StatusPill status={transfer.status} /></DetailField>
+            <DetailField label="Status"><StatusPill status={transfer.status} label={CREDIT_TRANSFER_STATUS[transfer.status]} /></DetailField>
             <DetailField label="From">{transfer.from_customer_name} <span className="font-normal text-gray-05">{transfer.from_customer_code}</span></DetailField>
             <DetailField label="To">{transfer.to_customer_name} <span className="font-normal text-gray-05">{transfer.to_customer_code}</span></DetailField>
             <DetailField label="Date">{dates.day(transfer.transfer_date)}</DetailField>

@@ -30,7 +30,7 @@ export const DIFFERENCE_TREATMENTS: readonly { value: BankSplitDifferenceTreatme
   {
     value: "DEBT",
     label: "Debt between branches",
-    help: "A branch that kept more of the shared cash than its share owes the branch that kept less. Each difference shows on the inter-branch balances and is repaid with a cash transfer.",
+    help: "A branch whose entries came to less than its share takes cash another branch brought in, so it owes that branch the difference. Each debt shows on the inter-branch balances and is repaid with a cash transfer.",
   },
   {
     value: "PERMANENT_MOVE",
@@ -70,6 +70,21 @@ export function branchDifferences(
     const share = row ? row.opening_balance || 0 : null;
     return { ...b, share, difference: b.book_balance - (share ?? 0) };
   });
+}
+
+/**
+ * The sentence under the branch differences, for the chosen treatment.
+ *
+ * Under a debt the branch under its share owes the branch over its share: the
+ * over branch's entries brought in more cash than the share it takes away, and
+ * the under branch takes that cash. vs_finance.bank_splits.match_differences
+ * pairs them the same way, and each transfer it books names the over branch as
+ * `from_branch` and the owing branch as `to_branch`.
+ */
+export function differenceNote(lines: Pick<BranchDifference, "difference">[], treatment: BankSplitDifferenceTreatment): string {
+  if (lines.every((line) => line.difference === 0)) return "Every branch's entries match its share, so nothing is owed between branches.";
+  if (treatment === "DEBT") return "A branch under its share owes the branches over theirs; the split books each debt as a transfer between branches.";
+  return "Each difference moves through retained earnings, so nothing is owed between branches.";
 }
 
 /**

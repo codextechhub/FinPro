@@ -41,7 +41,7 @@ import { useDates } from "../../lib/display-prefs";
 import { useGetBankSplitPreviewQuery, useSplitBankAccountByBranchMutation } from "@/redux/services/finance/interbranch-api";
 import type { BankSplitDifferenceTreatment, BankSplitPreview, BankSplitResult } from "@/redux/services/finance/interbranch-types";
 import type { BankAccount } from "@/redux/services/finance/ops-types";
-import { DIFFERENCE_TREATMENTS, branchDifferences, splitProblems, splitTotals, type SplitRow } from "./bank-split-model";
+import { DIFFERENCE_TREATMENTS, branchDifferences, differenceNote, splitProblems, splitTotals, type SplitRow } from "./bank-split-model";
 import { transferLink } from "./inter-branch/links";
 import { Note } from "./inter-branch/parts";
 import type { InterBranchReader } from "./inter-branch/use-inter-branch";
@@ -259,7 +259,6 @@ function BranchBooks({ preview, rows, treatment, currency, onStartFromBooks }: {
   const dates = useDates();
   const money = (kobo: number) => formatMoney(kobo, currency);
   const lines = branchDifferences(preview, rows);
-  const differs = lines.some((line) => line.difference !== 0);
   const describe = (difference: number) => difference === 0 ? "Matches its share"
     : difference > 0 ? `${money(difference)} over its share` : `${money(-difference)} under its share`;
   return (
@@ -280,9 +279,7 @@ function BranchBooks({ preview, rows, treatment, currency, onStartFromBooks }: {
       </div>
       <p className="font-mont text-[11px] leading-5 text-gray-05">
         {`Book balances as of ${dates.day(preview.split_date)}. `}
-        {!differs ? "Every branch's entries match its share, so nothing is owed between branches."
-          : treatment === "DEBT" ? "A branch over its share owes the branches under theirs; the split books each debt as a transfer between branches."
-          : "Each difference moves through retained earnings, so nothing is owed between branches."}
+        {differenceNote(lines, treatment)}
       </p>
     </section>
   );
