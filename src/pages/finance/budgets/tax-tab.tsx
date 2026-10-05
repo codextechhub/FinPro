@@ -207,7 +207,7 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
           </div>
 
           <TaxReturnShares filing={f} currency={currency} />
-          <TaxReturnLines filing={f} currency={currency} />
+          <TaxReturnLines filing={f} entity={entity} currency={currency} showBranch={showBranch} />
           <TaxRemittances filing={f} entity={entity} currency={currency} showBranch={showBranch} />
           <RemittanceSchedulePanel filing={f} entity={entity} currency={currency} />
 

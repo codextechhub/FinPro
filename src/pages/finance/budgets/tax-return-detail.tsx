@@ -9,7 +9,9 @@
  * yet" holds lines nobody has placed; at a school with several branches it
  * blocks filing until they are. A September invoice posted in October is
  * declared on October's return as a late item "from September", so October is
- * not short and September's filed figure does not move.
+ * not short and September's filed figure does not move. "What it declares"
+ * lists each line behind the figures, page by page, with the late ones marked:
+ * a filed return the lines it declared, a draft the lines it would declare now.
  *
  * At a school with one branch the return has one share and none of this is
  * shown: the totals already say it.
@@ -24,8 +26,8 @@ import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { useReverseTaxRemittanceMutation } from "@/redux/services/finance/tax-api";
-import type { TaxFilingDetail, TaxFilingShare, TaxRemittance } from "@/redux/services/finance/tax-types";
+import { useGetTaxFilingLinesQuery, useReverseTaxRemittanceMutation } from "@/redux/services/finance/tax-api";
+import type { TaxFilingDetail, TaxFilingLine, TaxFilingShare, TaxRemittance } from "@/redux/services/finance/tax-types";
 import { P } from "../../../permissions";
 import { useReaderReach } from "../../../host";
 import { useDates } from "../../../lib/display-prefs";
@@ -102,7 +104,34 @@ export function TaxReturnShares({ filing, currency }: { filing: TaxFilingDetail;
   );
 }
 
-export function TaxReturnLines({ filing, currency }: { filing: TaxFilingDetail; currency?: string | null }) {
+const DOCUMENT_LABELS: Record<string, string> = {
+  INVOICE: "Invoice",
+  CREDIT_NOTE: "Credit note",
+  PAYMENT: "Receipt",
+  VENDOR_INVOICE: "Supplier bill",
+  VENDOR_CREDIT_NOTE: "Supplier credit note",
+  VENDOR_PAYMENT: "Supplier payment",
+  PAYROLL_RUN: "Payroll run",
+  JOURNAL_ENTRY: "Journal",
+  JOURNAL: "Journal",
+};
+
+/** "Invoice INV-0041": the document behind a declared line, else its journal. */
+export function lineDocument(line: Pick<TaxFilingLine, "document" | "journal_number">): string {
+  const doc = line.document;
+  if (!doc) return line.journal_number;
+  const label = DOCUMENT_LABELS[doc.type]
+    ?? doc.type.charAt(0) + doc.type.slice(1).toLowerCase().replace(/_/g, " ");
+  return `${label} ${doc.number}`;
+}
+
+export function TaxReturnLines({ filing, entity, currency, showBranch = false }: {
+  filing: TaxFilingDetail;
+  entity?: string;
+  currency?: string | null;
+  /** Name each line's branch: only at a school with several. */
+  showBranch?: boolean;
+}) {
   const late = filing.late_items ?? [];
   const declared = filing.declared_line_count ?? 0;
   return (
@@ -127,7 +156,65 @@ export function TaxReturnLines({ filing, currency }: { filing: TaxFilingDetail; 
           ))}
         </ul>
       ) : null}
+      {entity && filing.filing_status !== "CANCELLED" ? (
+        <DeclaredLines filingId={filing.id} entity={entity} currency={currency} showBranch={showBranch} />
+      ) : null}
     </section>
+  );
+}
+
+/** Each line the return declares, a page at a time, the late ones marked. */
+function DeclaredLines({ filingId, entity, currency, showBranch }: {
+  filingId: number; entity: string; currency?: string | null; showBranch: boolean;
+}) {
+  const dates = useDates();
+  const [page, setPage] = useState(1);
+  const { data, isLoading, isFetching, isError } = useGetTaxFilingLinesQuery({ id: filingId, entity, page });
+  const rows = Array.isArray(data?.data) ? data.data : [];
+  const pages = data?.pagination?.totalPages ?? 1;
+  if (isLoading) return <p className="mt-2 font-mont text-xs text-gray-05">Loading the lines…</p>;
+  if (isError) return <p className="mt-2 font-mont text-xs text-gray-05">The lines could not be loaded.</p>;
+  if (!rows.length) return null;
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="overflow-x-auto rounded-md border border-white-02">
+        <table className={cn("w-full", showBranch ? "min-w-[640px]" : "min-w-[540px]")}>
+          <thead>
+            <tr>
+              <th className={thCls}>Date</th>
+              <th className={thCls}>Document</th>
+              <th className={thCls}>Account</th>
+              {showBranch ? <th className={thCls}>Branch</th> : null}
+              <th className={cn(thCls, "text-right")}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((line) => (
+              <tr key={line.id} className={line.is_late ? "bg-amber-50/60" : undefined}>
+                <td className={cn(tdCls, "whitespace-nowrap text-gray-01")}>
+                  {dates.day(line.date)}
+                  {line.is_late ? <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">Late</span> : null}
+                </td>
+                <td className={cn(tdCls, "text-gray-01")}>{lineDocument(line)}</td>
+                <td className={cn(tdCls, "text-gray-05")}>
+                  {line.account.code} {line.account.name}
+                  {line.role === "RECOVERABLE" ? <span className="ml-1">· recoverable</span> : null}
+                </td>
+                {showBranch ? <td className={cn(tdCls, "text-gray-05")}>{line.branch_name ?? "No branch yet"}</td> : null}
+                <td className={cn(tdCls, "text-right text-gray-01")}>{formatMoney(line.amount, currency)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {pages > 1 ? (
+        <div className="flex items-center justify-end gap-2 font-mont text-xs text-gray-05">
+          <Button size="sm" variant="outline" disabled={page <= 1 || isFetching} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+          <span>{`Page ${page} of ${pages}`}</span>
+          <Button size="sm" variant="outline" disabled={page >= pages || isFetching} onClick={() => setPage((p) => p + 1)}>Next</Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

@@ -75,3 +75,26 @@ export interface TaxFilingDetail extends TaxFiling {
   remittances: TaxRemittance[];
   filing_journal_id: number | null;
 }
+
+/**
+ * One ledger line a tax return declares (a filed return) or would declare now
+ * (a draft), from GET /finance/tax-filings/<id>/lines/. `document` is the
+ * invoice, bill, payroll run or journal behind it; a reversal is named by the
+ * document it reverses. `amount` is signed the way the tax reads it, and
+ * `is_late` marks a line dated before the return's period, declared here
+ * because its own month was already filed. A branch-bound reader is sent only
+ * the lines their branches count.
+ */
+export interface TaxFilingLine {
+  id: number;
+  date: string;
+  document: { type: string; id: number; number: string } | null;
+  journal_id: number;
+  journal_number: string;
+  account: { id: number; code: string; name: string };
+  branch_id: number | null;
+  branch_name: string | null;
+  role: "PAYABLE" | "RECOVERABLE";
+  amount: number;
+  is_late: boolean;
+}

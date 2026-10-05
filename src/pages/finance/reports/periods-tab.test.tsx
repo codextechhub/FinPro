@@ -40,7 +40,7 @@ const mocks = vi.hoisted(() => ({
   checklist: vi.fn(),
   years: vi.fn(),
   periods: vi.fn(),
-  yearRows: [] as { id: number; year: number; start_date: string; end_date: string; status: string; is_archived?: boolean }[],
+  yearRows: [] as { id: number; year: number; start_date: string; end_date: string; status: string; is_archived?: boolean; branch_states?: unknown[] }[],
   periodRows: [] as unknown[],
   denied: new Set<string>(),
   wholeSchool: true,
@@ -320,7 +320,7 @@ describe("Bright Star under All branches", () => {
     await mountWorkbench("BRIGHTSTAR");
 
     expect(pageBranchPicker()?.value).toBe("all");
-    expect(yearReads()).toContainEqual({ entity: "BRIGHTSTAR" });
+    expect(yearReads()).toContainEqual({ entity: "BRIGHTSTAR", include_branches: "true" });
     expect(container.textContent).toContain("The school's calendar.");
   });
 
@@ -647,17 +647,22 @@ describe("archiving a closed year", () => {
 describe("each branch's state under All branches", () => {
   beforeEach(atBrightStar);
 
-  it("lists each branch's year beside the school's", async () => {
+  const STATES = [
+    { branch: 1, branch_name: "Ikeja", status: "CLOSED", closed_at: "2026-10-05T09:00:00Z" },
+    { branch: 2, branch_name: "Lekki", status: "OPEN", closed_at: null },
+  ];
+
+  it("lists each branch's year beside the school's, from the one year list", async () => {
+    mocks.yearRows = [{ ...FY, status: "OPEN", branch_states: STATES }];
     await mountWorkbench("BRIGHTSTAR");
 
-    expect(yearReads()).toEqual(expect.arrayContaining([
-      { entity: "BRIGHTSTAR", branch: 1 },
-      { entity: "BRIGHTSTAR", branch: 2 },
-    ]));
+    expect(yearReads()).toEqual([{ entity: "BRIGHTSTAR", include_branches: "true" }]);
+    expect(lastArgs(mocks.periods)).toEqual({ entity: "BRIGHTSTAR", year: 2026, include_branches: "true" });
     expect(container.textContent).toContain("Each branch's year:");
+    expect(container.textContent).toContain("Ikeja");
   });
 
-  it("lists each branch's own state for a month in the drawer", async () => {
+  it("lists each branch's own state for a month in the drawer, with no request per branch", async () => {
     mocks.periodRows = [{ ...H1, status: "OPEN" }];
     checklistWith([], "OPEN");
     await act(async () => {
@@ -668,21 +673,23 @@ describe("each branch's state under All branches", () => {
             entity="BRIGHTSTAR"
             finalPeriodOfOpenYear={false}
             calendar={calendarBranchFor(mocks.lens, null)}
-            year={2026}
+            branchStates={STATES}
             onClose={() => undefined}
           />
         </MemoryRouter>,
       );
     });
 
-    expect(mocks.periods).toHaveBeenCalledWith({ entity: "BRIGHTSTAR", year: 2026, branch: 1 });
-    expect(mocks.periods).toHaveBeenCalledWith({ entity: "BRIGHTSTAR", year: 2026, branch: 2 });
+    expect(mocks.periods).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain("Each branch");
+    expect(document.body.textContent).toContain("Lekki");
   });
 
-  it("is not shown with one branch chosen", async () => {
+  it("is not shown with one branch chosen, and not asked for", async () => {
+    mocks.yearRows = [{ ...FY, status: "OPEN", branch_states: STATES }];
     await mountWorkbench("BRIGHTSTAR", "?branch=2");
 
+    expect(yearReads().at(-1)).toEqual({ entity: "BRIGHTSTAR", branch: 2 });
     expect(container.textContent).not.toContain("Each branch's year:");
   });
 });

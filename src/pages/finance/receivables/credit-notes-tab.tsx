@@ -40,6 +40,7 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { CreditNote } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
+import { IncomeGivenBack } from "./income-given-back";
 import { useDates } from "../../../lib/display-prefs";
 
 const kindLabel = (k: string) => (k === "DEBIT" ? "Debit note" : "Credit note");
@@ -267,6 +268,8 @@ function NoteDetailDrawer({ note, entity, currency, onClose }: {
               <Field label="Unapplied"><Money kobo={note.unallocated_amount} currency={currency} /></Field>
             </div>
           ) : null}
+
+          <IncomeGivenBack rows={note.income_given_back} currency={currency} />
 
           {status !== "DRAFT" ? (
             <div>

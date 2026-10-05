@@ -435,7 +435,7 @@ export const opsApi = baseApi.injectEndpoints({
     }),
     // With `branch`, each year carries that branch's own status; without it, the school's.
     // Archived years are left out unless `include_archived: "true"` asks for them.
-    getFiscalYears: b.query<ApiEnvelope<FiscalYear[]>, { entity: string; status?: string; branch?: number; include_archived?: "true" }>({
+    getFiscalYears: b.query<ApiEnvelope<FiscalYear[]>, { entity: string; status?: string; branch?: number; include_archived?: "true"; include_branches?: "true" }>({
       query: (p) => ({ url: `/finance/fiscal-years/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),

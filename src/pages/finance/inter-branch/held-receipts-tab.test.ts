@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/redux/services/finance/interbranch-api", () => ({}));
 
 import type { HeldReceipt } from "@/redux/services/finance/interbranch-types";
-import { heldActions } from "./held-receipts-tab";
+import { heldActions, lookupNote } from "./held-receipts-tab";
 
 const HELD: HeldReceipt = {
   id: 4, document_number: "HR-0004", status: "POSTED", branch_id: 1, branch_name: "Ikeja",
@@ -35,5 +35,24 @@ describe("a held receipt's actions", () => {
 
   it("follow the keys", () => {
     expect(heldActions(HELD, { canForward: false, canVoid: true, covers: ikeja })).toEqual({ forward: false, void: true });
+  });
+});
+
+describe("the customer code looked up at the other branch", () => {
+  const base = { code: "oka-001", branchName: "Lekki", fetching: false, customer: null, missing: false };
+
+  it("names the customer the code finds", () => {
+    expect(lookupNote({ ...base, customer: { id: 8, code: "OKA-001", name: "Mr Okafor", branch_id: 2 } }))
+      .toEqual({ tone: "found", text: "Mr Okafor (OKA-001)" });
+  });
+
+  it("says plainly when the code names nobody at that branch", () => {
+    expect(lookupNote({ ...base, missing: true }))
+      .toEqual({ tone: "missing", text: "No customer OKA-001 at Lekki. Check the code on the teller." });
+  });
+
+  it("says nothing before a code is typed or while it is being checked", () => {
+    expect(lookupNote({ ...base, code: "" })).toBeNull();
+    expect(lookupNote({ ...base, fetching: true, missing: true })).toBeNull();
   });
 });

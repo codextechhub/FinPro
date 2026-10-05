@@ -35,6 +35,7 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { Concession } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
+import { IncomeGivenBack } from "./income-given-back";
 import { useDates } from "../../../lib/display-prefs";
 
 const KINDS: [string, string][] = [["WAIVER", "Waiver"], ["DISCOUNT", "Discount"], ["SCHOLARSHIP", "Scholarship"]];
@@ -240,6 +241,7 @@ function ConcessionDetailDrawer({ concession, entity, currency, onClose }: {
             </p>
           ) : null}
           <Field label="Basis"><span className="font-normal">{concession.reason || "-"}</span></Field>
+          <IncomeGivenBack rows={concession.income_given_back} currency={currency} />
           <div>
             <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">GL posting</p>
             <PostingRecap

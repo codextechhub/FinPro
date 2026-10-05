@@ -10,9 +10,15 @@
  * The branch that received the money records, forwards and voids it. A receipt
  * already being forwarded cannot be voided: the transfer is voided first.
  * `?document=<id>` opens one receipt, which is how a transfer links here.
+ *
+ * Ikeja's bursar cannot list Lekki's customers, so the form takes the code on
+ * the teller and looks it up at Lekki by exact code as it is typed, showing the
+ * customer's name before the money is held. A code that names nobody at Lekki
+ * is said on the form and cannot be held.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";
@@ -32,9 +38,10 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { formatMoney } from "@/utils/money";
 import {
-  useForwardHeldReceiptMutation, useGetHeldReceiptQuery, useGetHeldReceiptsQuery, useRecordHeldReceiptMutation, useVoidHeldReceiptMutation,
+  useForwardHeldReceiptMutation, useGetHeldReceiptCustomerQuery, useGetHeldReceiptQuery, useGetHeldReceiptsQuery,
+  useRecordHeldReceiptMutation, useVoidHeldReceiptMutation,
 } from "@/redux/services/finance/interbranch-api";
-import type { HeldReceipt } from "@/redux/services/finance/interbranch-types";
+import type { HeldReceipt, HeldReceiptCustomer } from "@/redux/services/finance/interbranch-types";
 import { P } from "../../../permissions";
 import { useDates } from "../../../lib/display-prefs";
 import { transferLink } from "./links";
@@ -260,7 +267,9 @@ function RecordHeldDrawer({ entity, currency, reader, onClose }: {
   const [record, { isLoading }] = useRecordHeldReceiptMutation();
   const others = reader.branches.filter((b) => b.id !== collecting.branchId);
   const canListCustomers = !!forBranch && reader.reach.covers([Number(forBranch)]);
-  const canSubmit = collecting.ready && !!bank && !!forBranch && !!customer.trim() && amount > 0 && !!date;
+  const [found, setFound] = useState(false);
+  const customerKnown = canListCustomers ? !!customer.trim() : found;
+  const canSubmit = collecting.ready && !!bank && !!forBranch && customerKnown && amount > 0 && !!date;
 
   const submit = async () => {
     try {
@@ -290,7 +299,12 @@ function RecordHeldDrawer({ entity, currency, reader, onClose }: {
       <FormField label="Customer who paid" required>
         {canListCustomers
           ? <CustomerPicker entity={entity} value={customer} onChange={setCustomer} />
-          : <Input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder={forBranch ? `Customer code at ${reader.nameOf(Number(forBranch))}` : "Choose the branch first"} disabled={!forBranch} className="h-9 bg-white" />}
+          : (
+            <CustomerCodeLookup
+              entity={entity} forBranch={forBranch} branchName={forBranch ? reader.nameOf(Number(forBranch)) : ""}
+              value={customer} onChange={setCustomer} onFound={setFound}
+            />
+          )}
       </FormField>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></FormField>
@@ -306,5 +320,44 @@ function RecordHeldDrawer({ entity, currency, reader, onClose }: {
       </div>
       <FormField label="Note"><Input value={narration} maxLength={255} onChange={(e) => setNarration(e.target.value)} className="h-9 bg-white" /></FormField>
     </FormDrawer>
+  );
+}
+
+/** What the code lookup says under the field, or null while there is nothing to say. */
+export function lookupNote(state: { code: string; branchName: string; fetching: boolean; customer: HeldReceiptCustomer | null; missing: boolean }): { tone: "found" | "missing"; text: string } | null {
+  if (!state.code || state.fetching) return null;
+  if (state.customer) return { tone: "found", text: `${state.customer.name} (${state.customer.code})` };
+  if (state.missing) return { tone: "missing", text: `No customer ${state.code.toUpperCase()} at ${state.branchName}. Check the code on the teller.` };
+  return null;
+}
+
+/**
+ * The customer code of a branch the reader cannot list, checked at that branch
+ * by exact code once typing pauses. `onFound` tells the form whether the code
+ * names a customer there, so a mistyped code is never held.
+ */
+function CustomerCodeLookup({ entity, forBranch, branchName, value, onChange, onFound }: {
+  entity: string; forBranch: string; branchName: string; value: string;
+  onChange: (code: string) => void; onFound: (found: boolean) => void;
+}) {
+  const code = useDebounce(value.trim(), 300);
+  const settled = code === value.trim();
+  const { data, isFetching, isError } = useGetHeldReceiptCustomerQuery(
+    forBranch && code ? { entity, for_branch: Number(forBranch), code } : skipToken,
+  );
+  const customer = settled && !isError && data?.data && data.data.code === code.toUpperCase() ? data.data : null;
+  const note = lookupNote({ code, branchName, fetching: isFetching || !settled, customer, missing: isError });
+  const known = !!customer && !isFetching;
+  useEffect(() => { onFound(known); }, [known, onFound]);
+  return (
+    <div className="space-y-1">
+      <Input
+        value={value} onChange={(e) => onChange(e.target.value)} disabled={!forBranch} className="h-9 bg-white"
+        placeholder={forBranch ? `Customer code at ${branchName}` : "Choose the branch first"} aria-label="Customer code"
+      />
+      {note ? (
+        <p className={note.tone === "found" ? "font-mont text-xs font-medium text-green-01" : "font-mont text-xs text-destructive"}>{note.text}</p>
+      ) : null}
+    </div>
   );
 }

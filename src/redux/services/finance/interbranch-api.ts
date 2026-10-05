@@ -14,10 +14,12 @@ import { baseApi } from "@/redux/services/base-api";
 import type { ApiEnvelope, PaginatedEnvelope } from "./api-types";
 import type {
   BankSplitBody,
+  BankSplitPreview,
   BankSplitResult,
   CreateRechargeBody,
   ForwardHeldReceiptBody,
   HeldReceipt,
+  HeldReceiptCustomer,
   InterBranchBalances,
   InterBranchListParams,
   InterBranchTransfer,
@@ -87,6 +89,12 @@ export const interBranchApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/held-receipts/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceInterBranch"],
     }),
+    // Exact code only; a 404 is the form's own answer ("no such customer"), so it is not toasted.
+    getHeldReceiptCustomer: b.query<ApiEnvelope<HeldReceiptCustomer>, { entity: string; for_branch: number; code: string }>({
+      query: (p) => ({ url: `/finance/held-receipts/customer-lookup/${qs(p)}`, method: "GET" }),
+      extraOptions: { silent: true },
+      providesTags: ["FinanceCustomers"],
+    }),
     getHeldReceipt: b.query<ApiEnvelope<HeldReceipt>, Act>({
       query: ({ id, entity }) => ({ url: `/finance/held-receipts/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["FinanceInterBranch"],
@@ -133,6 +141,10 @@ export const interBranchApi = baseApi.injectEndpoints({
       invalidatesTags: ["FinanceInterBranch"],
     }),
 
+    getBankSplitPreview: b.query<ApiEnvelope<BankSplitPreview>, { id: number; entity: string; split_date?: string }>({
+      query: ({ id, ...p }) => ({ url: `/finance/bank-accounts/${id}/split-by-branch/${qs(p)}`, method: "GET" }),
+      providesTags: ["FinanceBankAccounts", "FinanceJournals"],
+    }),
     splitBankAccountByBranch: b.mutation<ApiEnvelope<BankSplitResult>, BankSplitBody>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/bank-accounts/${id}/split-by-branch/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: [...MONEY_TAGS, "FinanceAccounts"],
@@ -142,6 +154,7 @@ export const interBranchApi = baseApi.injectEndpoints({
 
 export const {
   useGetInterBranchTransfersQuery,
+  useGetBankSplitPreviewQuery,
   useGetInterBranchTransferQuery,
   useSendInterBranchMoneyMutation,
   useRequestInterBranchMoneyMutation,
@@ -153,6 +166,7 @@ export const {
   useGetInterBranchBalancesQuery,
   useGetHeldReceiptsQuery,
   useGetHeldReceiptQuery,
+  useGetHeldReceiptCustomerQuery,
   useRecordHeldReceiptMutation,
   useForwardHeldReceiptMutation,
   useVoidHeldReceiptMutation,

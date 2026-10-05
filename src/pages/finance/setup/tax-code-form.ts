@@ -1,11 +1,12 @@
 /**
  * The tax code form's values and the upsert it sends.
  *
- * A code's VAT treatment travels on every save. The server reads a missing
- * treatment as Standard, so a form that left it out turned VAT-EXEMPT into a
- * standard code the first time somebody renamed it. Only a standard code
- * carries a rate: an exempt or zero-rated code charges no tax, so its rate is
- * sent as 0 and the server refuses anything else. The treatments and their
+ * The form shows and edits a code's VAT treatment, so the save sends the
+ * treatment on screen: renaming VAT-EXEMPT keeps it exempt because the form
+ * says exempt. (A save that names no treatment keeps the code's own on the
+ * server; a new code defaults to Standard.) Only a standard code carries a
+ * rate: an exempt or zero-rated code charges no tax, so its rate is sent as 0
+ * and the server refuses anything else. The treatments and their
  * labels are `utils/tax-treatment.ts`, shared with the fee and invoice lines.
  */
 

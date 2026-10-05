@@ -66,6 +66,18 @@ export interface ConsolidatedAccountActivityTotals {
   net_movement: { kobo: number; naira: string };
 }
 
+/**
+ * Where one branch stands in a fiscal period or year, sent with
+ * `?include_branches=true`: every in-service branch in the reader's reach, a
+ * branch with no close of its own taking the school's state.
+ */
+export interface BranchCloseState {
+  branch: number;
+  branch_name: string;
+  status: "OPEN" | "SOFT_CLOSED" | "CLOSED" | "LOCKED" | string;
+  closed_at: string | null;
+}
+
 export interface FiscalPeriod {
   id: number;
   period_no: number;
@@ -75,6 +87,8 @@ export interface FiscalPeriod {
   end_date: string;
   status: "OPEN" | "SOFT_CLOSED" | "CLOSED" | "LOCKED";
   closed_at: string | null;
+  /** Present only when asked for with `include_branches`. */
+  branch_states?: BranchCloseState[];
 }
 
 export interface StartedFiscalYear {

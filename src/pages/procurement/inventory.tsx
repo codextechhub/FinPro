@@ -33,7 +33,7 @@ import { formatMoney } from "@/utils/money";
 import { ActivityFeed, EmptyPanel, Field } from "./sourcing/shared";
 import { isForbidden } from "./sourcing/helpers";
 import { BalancesTable, LocationsSection } from "./stock-locations";
-import { StockLocationPicker } from "./pickers";
+import { StockLocationPicker, StockTransferDestinationPicker } from "./pickers";
 import { useStockLocations } from "./use-stock-locations";
 import { DEFAULT_INVENTORY_SECTION, type InventorySection } from "./console-sections";
 import { PageShell } from "@/components/layout/page-shell";
@@ -624,8 +624,9 @@ function AdjustDrawer({ entity, currency, item, onClose }: { entity: string; cur
  * through the inter-branch account (Lekki owes Ikeja N15,000 for 50 exercise
  * books at N300); between two stores of one branch nothing posts.
  *
- * A reader lists only their own branch's stores, so a store at another branch
- * is named by its code; the server accepts any live store of the books.
+ * A reader lists only their own branch's stores, so the receiving store is
+ * picked from the server's transfer destinations: every live store of the
+ * books, other branches' included, by code, name and branch.
  */
 function TransferStockDrawer({ entity, currency, item, onClose }: { entity: string; currency?: string | null; item: StockItemDetail; onClose: () => void }) {
   const loc = useMovementLocation(entity, item);
@@ -633,7 +634,6 @@ function TransferStockDrawer({ entity, currency, item, onClose }: { entity: stri
   const [qty, setQty] = useState("");
   const [movementDate, setMovementDate] = useState("");
   const [toStore, setToStore] = useState("");
-  const [toCode, setToCode] = useState("");
   const [reference, setReference] = useState("");
   const [narration, setNarration] = useState("");
   const [transfer, { isLoading }] = useTransferStockMutation();
@@ -641,16 +641,15 @@ function TransferStockDrawer({ entity, currency, item, onClose }: { entity: stri
   const q = Number(qty);
   const qtyValid = Number.isFinite(q) && q > 0 && q <= onHand;
   const value = onHand > 0 && qtyValid ? Math.round((loc.stockValue * q) / onHand) : 0;
-  const others = loc.locations.filter((l) => String(l.id) !== (loc.multi ? loc.locationId : String(loc.locations[0]?.id ?? "")));
-  const target = toCode.trim() || toStore;
-  const sameStore = !!toStore && toStore === loc.locationId;
-  const canSubmit = qtyValid && !!target && !sameStore && loc.ready;
+  const fromStore = loc.multi ? loc.locationId : String(loc.locations[0]?.id ?? "");
+  const sameStore = !!toStore && toStore === fromStore;
+  const canSubmit = qtyValid && !!toStore && !sameStore && loc.ready;
 
   const save = async () => {
     if (!canSubmit) return;
     try {
       const r = await transfer({
-        id: item.id, entity, quantity: q, to_location: toCode.trim() || Number(toStore),
+        id: item.id, entity, quantity: q, to_location: Number(toStore),
         ...(loc.multi ? { location: Number(loc.locationId) } : {}),
         movement_date: movementDate || undefined,
         reference: reference.trim() || undefined, narration: narration.trim() || undefined,
@@ -673,13 +672,8 @@ function TransferStockDrawer({ entity, currency, item, onClose }: { entity: stri
           <StockLocationPicker locations={loc.locations} value={loc.locationId} onChange={loc.setLocationId} isRequired />
         </FormField>
       )}
-      {others.length ? (
-        <FormField label="To store">
-          <StockLocationPicker locations={others} value={toStore} onChange={(v) => { setToStore(v); setToCode(""); }} />
-        </FormField>
-      ) : null}
-      <FormField label={others.length ? "Or the code of a store at another branch" : "Code of the receiving store"} required={!others.length}>
-        <Input value={toCode} onChange={(e) => { setToCode(e.target.value); if (e.target.value) setToStore(""); }} placeholder="e.g. LEK-MAIN" className="bg-white" />
+      <FormField label="To store" required>
+        <StockTransferDestinationPicker entity={entity} value={toStore} onChange={(id) => setToStore(id)} exclude={fromStore} isRequired />
       </FormField>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Quantity" required>

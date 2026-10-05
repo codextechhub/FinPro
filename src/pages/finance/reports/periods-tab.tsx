@@ -65,7 +65,7 @@ import {
   useUnarchiveFiscalYearMutation,
 } from "@/redux/services/finance/records-api";
 import { toArray } from "@/redux/services/finance/api-types";
-import type { FiscalPeriod, ChecklistItem } from "@/redux/services/finance/setup-types";
+import type { BranchCloseState, FiscalPeriod, ChecklistItem } from "@/redux/services/finance/setup-types";
 import { routesPath } from "@/routes/routes-path";
 import {
   archiveReadiness,
@@ -84,7 +84,7 @@ import {
   useCalendarBranch,
   type CalendarBranch,
 } from "./calendar-branch";
-import { useBranches, useReaderReach } from "../../../host";
+import { useReaderReach } from "../../../host";
 import { useDates } from "../../../lib/display-prefs";
 import { isForbidden } from "../../../lib/api-errors";
 
@@ -175,13 +175,16 @@ export function PeriodsTab({ entity, headerSlot }: {
   const [showArchived] = useShowArchived();
   const archivedArg = includeArchivedArg(showArchived);
   const readArg = calendar.readBranch != null ? { branch: calendar.readBranch } : {};
+  // Under All branches at a school with several, each row brings every branch's own state.
+  const eachBranch = calendar.applies && calendar.selected === "all";
+  const branchesArg = eachBranch ? { include_branches: "true" as const } : {};
   const {
     data: fiscalYearData,
     isLoading: fiscalYearsLoading,
     isError: fiscalYearsFailed,
     error: fiscalYearsError,
     refetch: refetchFiscalYears,
-  } = useGetFiscalYearsQuery({ entity, ...readArg, ...archivedArg }, { skip: calendar.isLoading });
+  } = useGetFiscalYearsQuery({ entity, ...readArg, ...archivedArg, ...branchesArg }, { skip: calendar.isLoading });
   const fiscalYears = useMemo(
     () => [...toArray(fiscalYearData?.data)].sort((a, b) => b.year - a.year),
     [fiscalYearData],
@@ -196,7 +199,7 @@ export function PeriodsTab({ entity, headerSlot }: {
     isError: periodsFailed,
     error: periodsError,
     refetch: refetchPeriods,
-  } = useGetFiscalYearPeriodsQuery(activeYear && !calendar.isLoading ? { entity, year: activeYear, ...readArg, ...archivedArg } : skipToken);
+  } = useGetFiscalYearPeriodsQuery(activeYear && !calendar.isLoading ? { entity, year: activeYear, ...readArg, ...archivedArg, ...branchesArg } : skipToken);
   const periods = useMemo(
     () => [...(Array.isArray(periodData?.data) ? periodData.data : [])]
       .sort((a, b) => a.start_date.localeCompare(b.start_date)),
@@ -429,9 +432,7 @@ export function PeriodsTab({ entity, headerSlot }: {
             onUnarchiveYear={() => openYearAction({ kind: "unarchive", id: activeFiscalYear.id, year: activeFiscalYear.year })}
           />
 
-          {calendar.applies && calendar.selected === "all" ? (
-            <BranchYearStates entity={entity} yearId={activeFiscalYear.id} branches={calendar.choices} archived={archivedArg} />
-          ) : null}
+          {eachBranch ? <BranchYearStates states={activeFiscalYear.branch_states} /> : null}
 
           <section data-guide="finance-periods.periods">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
@@ -462,8 +463,7 @@ export function PeriodsTab({ entity, headerSlot }: {
         yearShut={yearShut}
         calendar={calendar}
         status={selectedPeriod?.status}
-        year={activeYear}
-        includeArchived={showArchived}
+        branchStates={selectedPeriod?.branch_states}
         onClose={() => setSelected(null)}
       />
 
@@ -866,8 +866,7 @@ export function PeriodCloseDrawer({
   yearShut = null,
   calendar = ONE_BRANCH_CALENDAR,
   status: listedStatus,
-  year = null,
-  includeArchived = false,
+  branchStates,
   onClose,
 }: {
   id: number | null;
@@ -876,14 +875,11 @@ export function PeriodCloseDrawer({
   yearShut?: { year: number; status: string } | null;
   calendar?: CalendarBranch;
   status?: FiscalPeriod["status"];
-  /** The fiscal year the month belongs to, for the per-branch rows. */
-  year?: number | null;
-  includeArchived?: boolean;
+  /** Each branch's own state in the month, from the period list, under All branches. */
+  branchStates?: BranchCloseState[];
   onClose: () => void;
 }) {
   const dates = useDates();
-  const { data: branchRows } = useBranches();
-  const branchName = (branchId: number) => branchRows?.find((b) => Number(b.id) === branchId)?.name;
   const { can } = useCan();
   const { data, isLoading, isError, error, refetch } = useGetPeriodChecklistQuery(
     id ? { id, entity, ...(calendar.readBranch != null ? { branch: calendar.readBranch } : {}) } : skipToken,
@@ -920,7 +916,7 @@ export function PeriodCloseDrawer({
       const override = forced ? { force: true as const, reason: reason.trim() } : {};
       const response = await close({ id: id!, entity, soft, ...branchArg, ...override }).unwrap();
       toast.success(closeOutcomeMessage(period?.name, response.data?.checklist?.items,
-        (item) => checklistDetail(item, { branchName, money: (kobo) => formatMoney(kobo) })));
+        (item) => checklistDetail(item, { money: (kobo) => formatMoney(kobo) })));
       closeDrawer();
     } catch { /* central */ }
   };
@@ -1098,15 +1094,7 @@ export function PeriodCloseDrawer({
               </div>
             ) : null}
 
-            {several && calendar.selected === "all" && year != null && period ? (
-              <BranchMonthStates
-                entity={entity}
-                year={year}
-                periodId={period.id}
-                branches={calendar.choices}
-                archived={includeArchived ? { include_archived: "true" } : {}}
-              />
-            ) : null}
+            {several && calendar.selected === "all" && period ? <BranchMonthStates states={branchStates} /> : null}
 
             <div>
               <div className="mb-3 flex items-center gap-1.5">
@@ -1147,7 +1135,7 @@ export function PeriodCloseDrawer({
                             <span className="rounded bg-gray-02 px-1.5 py-0.5 font-mont text-[10px] text-gray-05">Non-blocking</span>
                           ) : null}
                         </div>
-                        {item.detail ? <p className="mt-1 break-words font-mont text-xs leading-5 text-gray-05">{checklistDetail(item, { branchName, money: (kobo) => formatMoney(kobo) })}</p> : null}
+                        {item.detail ? <p className="mt-1 break-words font-mont text-xs leading-5 text-gray-05">{checklistDetail(item, { money: (kobo) => formatMoney(kobo) })}</p> : null}
                         {sealsLink(item) && can(P.FIN_VIEW_SEALS) ? (
                           <Link to={`${F.REPORTS}/seals`} className="mt-1 inline-block font-mont text-xs font-semibold text-primary hover:underline">
                             Verify sealed figures

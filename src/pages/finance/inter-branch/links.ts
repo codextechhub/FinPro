@@ -17,6 +17,11 @@ export function pairLink(a: number, b: number): string {
   return `${INTER_BRANCH_PATH}/transfers?branch=${a}&counterparty=${b}`;
 }
 
+/** The register filtered to the income one credit note or concession gave back, by its journal. */
+export function adjustmentLink(journalId: number): string {
+  return `${INTER_BRANCH_PATH}/transfers?adjustment=${journalId}`;
+}
+
 /** One held receipt, open. */
 export function heldReceiptLink(id: number): string {
   return `${INTER_BRANCH_PATH}/held-receipts?document=${id}`;

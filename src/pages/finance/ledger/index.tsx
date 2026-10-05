@@ -3,6 +3,12 @@
  * status tabs with counts, source + period filters, search, a Total-Debit /
  * Created-By table, and a posted-total footer. Read-only list + detail drawer +
  * the Reverse action; Direct Entry is the only raw-lines post ("New journal").
+ *
+ * The status counts and the footer leave archived years out exactly as the list
+ * does, and take them in with it when "Show archived years" is ticked, so a
+ * tab's count always matches the rows under it. A journal raised by somebody
+ * who has since left the school keeps their name, with the dashed outline the
+ * server's `created_by_is_exited` flag draws.
  */
 
 import { useMemo, useState } from "react";
@@ -19,6 +25,8 @@ import { UserAvatar } from "../../../host";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useActionParam } from "@/hooks/use-action-param";
 import { formatMoney } from "@/utils/money";
+import { cn } from "@/lib/utils";
+import { exitedOutline, exitedTitle } from "@/components/finance-ui/exited-person";
 import { P } from "../../../permissions";
 import { useGetJournalsQuery, useGetJournalSummaryQuery } from "@/redux/services/finance/gl-api";
 import type { JournalListItem, JournalSource, JournalStatus } from "@/redux/services/finance/gl-types";
@@ -71,7 +79,7 @@ export default function GeneralLedgerPage() {
   const { data, isLoading, isFetching, isError, refetch } = useGetJournalsQuery(
     { ...filters, page, ...(status ? { status } : {}), ...includeArchivedArg(showArchived) }, { skip: !entity },
   );
-  const summaryQ = useGetJournalSummaryQuery(filters, { skip: !entity });
+  const summaryQ = useGetJournalSummaryQuery({ ...filters, ...includeArchivedArg(showArchived) }, { skip: !entity });
   const summary = summaryQ.data?.data;
   const rows = data?.data ?? [];
   const pg = data?.pagination;
@@ -95,8 +103,8 @@ export default function GeneralLedgerPage() {
     { header: "Total Debit", align: "right", cell: (j) => <Money kobo={j.total_debit} currency={currency} align="right" /> },
     { header: "Status", cell: (j) => <StatusPill status={j.status} /> },
     { header: "Created By", cell: (j) => (
-      <span className="inline-flex items-center gap-2">
-        <UserAvatar userId={j.created_by_id ?? undefined} name={j.created_by} className="size-6" fallbackClassName="text-[9px] font-semibold" />
+      <span className="inline-flex items-center gap-2" title={exitedTitle(j.created_by_is_exited)}>
+        <UserAvatar userId={j.created_by_id ?? undefined} name={j.created_by} className={cn("size-6 rounded-full", exitedOutline(j.created_by_is_exited))} fallbackClassName="text-[9px] font-semibold" />
         <span className="text-gray-01">{j.created_by}</span>
       </span>
     ) },

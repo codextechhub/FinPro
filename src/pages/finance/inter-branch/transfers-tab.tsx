@@ -6,8 +6,15 @@
  * reader works in, filtered by stage, kind and branch pair. The filters live in
  * the page address (`?status=&kind=&branch=&counterparty=`), so a link from the
  * balances grid opens the transfers behind one pair, and two tabs can hold two
- * different views. `?document=<id>` opens one transfer, which is how the bank
- * split's result and an approval link land on it.
+ * different views. `?adjustment=<journal id>` narrows the register to the income
+ * one credit note or concession gave back, which an "Income given back" transfer
+ * links to. `?document=<id>` opens one transfer, which is how the bank split's
+ * result, a credit note's give-back and an approval link land on it.
+ *
+ * A customer balance move opened here says what it carried (each bill and
+ * credit, with the income not yet earned) and who owes whom for it, from the
+ * transfer's own `moved_items` and `net_owed`, as fully as the screen that made
+ * the move.
  *
  * Who may act follows the backend (see transfer-actions.ts): the receiving
  * branch asks for money and confirms it arrived, the sending branch sends or
@@ -41,7 +48,8 @@ import {
 } from "@/redux/services/finance/interbranch-api";
 import type { InterBranchKind, InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
 import { useDates } from "../../../lib/display-prefs";
-import { heldReceiptLink, rechargeLink } from "./links";
+import { adjustmentLink, heldReceiptLink, rechargeLink } from "./links";
+import { moveDebtSentence, movedDebt, movedItemAmount, movedItemLabel } from "./move-summary";
 import { MoveBalanceDrawer } from "./move-balance-drawer";
 import { BranchSelect, Fact, Note, StagePill } from "./parts";
 import {
@@ -51,7 +59,7 @@ import {
 import type { InterBranchReader } from "./use-inter-branch";
 
 const KIND_FILTERS = Object.entries(KIND_LABELS) as [InterBranchKind, string][];
-const FILTER_KEYS = ["status", "kind", "branch", "counterparty"] as const;
+const FILTER_KEYS = ["status", "kind", "branch", "counterparty", "adjustment"] as const;
 
 /** The register's filters, read from and written to the page address. */
 function useRegisterFilters() {
@@ -76,12 +84,14 @@ export function TransfersTab({ entity, currency, reader }: { entity: string; cur
 
   const branch = filters.value("branch");
   const counterparty = filters.value("counterparty");
+  const adjustment = Number(filters.value("adjustment")) || undefined;
   const { data, isLoading, isFetching, isError, refetch } = useGetInterBranchTransfersQuery({
     entity, page, page_size: 25,
     status: filters.value("status") || undefined,
     kind: filters.value("kind") || undefined,
     branch: branch ? Number(branch) : undefined,
     counterparty: branch && counterparty ? Number(counterparty) : undefined,
+    adjustment,
   });
   const rows = toArray(data?.data);
   const setFilter = (key: (typeof FILTER_KEYS)[number], next: string) => { setPage(1); filters.set(key, next); };
@@ -114,6 +124,12 @@ export function TransfersTab({ entity, currency, reader }: { entity: string; cur
           <div className="w-full sm:w-48">
             <BranchSelect label="Branch" branches={reader.branches} value={branch} onChange={(v) => setFilter("branch", v)} placeholder="Any branch" allowEmpty className="h-9" />
           </div>
+          {adjustment ? (
+            <span className="inline-flex items-center gap-2 rounded-md border border-white-02 bg-white px-3 py-1.5 font-mont text-xs text-gray-01">
+              Income given back by one document
+              <button type="button" onClick={() => setFilter("adjustment", "")} className="font-medium text-primary hover:underline">Clear</button>
+            </span>
+          ) : null}
           {branch ? (
             <div className="w-full sm:w-48">
               <BranchSelect
@@ -165,6 +181,7 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
   const actions = t ? transferActions(t, reader.keys, reader.reach) : [];
   const blocked = t && t.status === "POSTED" ? voidBlockedByKind(t) : null;
   const reachNote = t ? voidReachNote(t, reader.keys, reader.reach) : null;
+  const debt = t ? movedDebt(t) : null;
 
   return (
     <>
@@ -212,6 +229,22 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
               {t.arrival_date ? <Fact label="Arrived">{dates.day(t.arrival_date, t.to_branch_id)}</Fact> : null}
               {t.declined_at ? <Fact label="Declined">{`${dates.dateTime(t.declined_at, t.branch_id)}${t.decline_reason ? `: ${t.decline_reason}` : ""}`}</Fact> : null}
             </dl>
+            {t.moved_items?.length ? (
+              <section className="space-y-1.5">
+                <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">What it carried</p>
+                <ul className="divide-y divide-white-02 rounded-md border border-white-02">
+                  {t.moved_items.map((item, index) => (
+                    <li key={`${item.kind}-${item.invoice_id ?? item.note_id ?? item.payment_id ?? index}`} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 px-3 py-2">
+                      <span className="font-mont text-sm text-black-01">{movedItemLabel(item)}</span>
+                      <span className="font-mont text-xs tabular-nums text-gray-05">{movedItemAmount(item, money)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {debt != null ? (
+              <Note tone={debt === 0 ? "plain" : "warn"}>{moveDebtSentence(debt, t.branch_name, t.to_branch_name, money)}</Note>
+            ) : null}
             {t.journals.length ? (
               <section className="space-y-1.5">
                 <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Journals</p>
@@ -227,6 +260,11 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
             {t.held_receipt_id ? (
               <Link to={heldReceiptLink(t.held_receipt_id)} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline">
                 Open the held receipt <ArrowRight className="size-3.5" />
+              </Link>
+            ) : null}
+            {t.kind === "INCOME_GIVEN_BACK" && t.adjustment_entry_id ? (
+              <Link to={adjustmentLink(t.adjustment_entry_id)} onClick={onClose} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline">
+                Everything the same document gave back <ArrowRight className="size-3.5" />
               </Link>
             ) : null}
             {t.recharge_id ? (

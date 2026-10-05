@@ -1,11 +1,13 @@
 // Procurement-scoped reference pickers (vendor, category) over SearchSelect.
 // Kept in the procurement feature so finance-ui doesn't import procurement.
 
+import { useState } from "react";
 import { SearchSelect } from "@/components/custom/search-select";
 import { toArray } from "@/components/finance-ui";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useGetVendorsQuery, useGetCategoriesQuery, useGetRequisitionsQuery, useGetPurchaseOrdersQuery } from "@/redux/services/procurement/procurement-api";
-import { useGetRfqsQuery, useGetContractsQuery } from "@/redux/services/procurement/procurement-ext-api";
-import type { StockLocation, VendorCategory } from "@/redux/services/procurement/procurement-types";
+import { useGetRfqsQuery, useGetContractsQuery, useGetStockTransferDestinationsQuery } from "@/redux/services/procurement/procurement-ext-api";
+import type { StockLocation, StockTransferDestination, VendorCategory } from "@/redux/services/procurement/procurement-types";
 
 const adapt = (onChange: (v: string) => void) =>
   (e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value);
@@ -84,4 +86,52 @@ export function StockLocationPicker({ locations, value, onChange, label, placeho
     label: `${l.code} - ${l.name}${l.branch_name ? ` · ${l.branch_name}` : ""}${l.is_default ? " (default)" : ""}`,
   }));
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={loading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} />;
+}
+
+/** "LEK-MAIN - Lekki main store · Lekki Branch", the branch named only when the stores span several. */
+export function destinationLabel(row: StockTransferDestination, showBranch: boolean): string {
+  return `${row.code} - ${row.name}${showBranch && row.branch_name ? ` · ${row.branch_name}` : ""}`;
+}
+
+/**
+ * The receiving store of a stock transfer, from every live store of the books.
+ *
+ * A storekeeper lists only their own branch's stores, yet a transfer may send
+ * goods to any branch's. The server's transfer-destination list names them
+ * all (code, name and branch, never stock figures), searched on the server as
+ * the reader types, so nobody has to know another branch's store code. The
+ * sending store (`exclude`) is left out. The chosen store stays on the list
+ * while the search moves on, so its name never drops out of the field.
+ */
+export function StockTransferDestinationPicker({ entity, value, onChange, exclude, label, isRequired }: {
+  entity: string;
+  value: string;
+  onChange: (id: string, row: StockTransferDestination | null) => void;
+  exclude?: string;
+  label?: string;
+  isRequired?: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const term = useDebounce(search.trim(), 250);
+  const [picked, setPicked] = useState<StockTransferDestination | null>(null);
+  const { data, isFetching } = useGetStockTransferDestinationsQuery({ entity, page_size: 50, ...(term ? { search: term } : {}) });
+  const listed = toArray(data?.data);
+  const rows = listed.filter((r) => String(r.id) !== exclude);
+  const all = picked && String(picked.id) === value && !rows.some((r) => r.id === picked.id) ? [picked, ...rows] : rows;
+  // Once the stores have been seen to span several branches, keep naming them while a search narrows the list.
+  const [manyBranches, setManyBranches] = useState(false);
+  if (!manyBranches && new Set(listed.map((r) => r.branch_id)).size > 1) setManyBranches(true);
+  const showBranch = manyBranches;
+  const options = all.map((r) => ({ value: String(r.id), label: destinationLabel(r, showBranch) }));
+  const choose = (id: string) => {
+    const row = all.find((r) => String(r.id) === id) ?? null;
+    setPicked(row);
+    onChange(id, row);
+  };
+  return (
+    <SearchSelect
+      label={label} options={options} value={value} onChange={adapt(choose)} onSearchChange={setSearch}
+      loading={isFetching} placeholder="Search stores by code or name" isRequired={isRequired}
+    />
+  );
 }

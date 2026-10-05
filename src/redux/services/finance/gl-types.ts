@@ -21,6 +21,8 @@ export interface JournalListItem {
   total_debit: number;
   created_by: string;
   created_by_id: number | null;
+  /** True once the person who raised it has left the school; null when nobody is named. */
+  created_by_is_exited?: boolean | null;
 }
 
 export interface JournalSummary {

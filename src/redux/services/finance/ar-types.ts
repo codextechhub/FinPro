@@ -51,6 +51,22 @@ export interface CreditNoteLine {
   cost_center: string | null;
 }
 
+/**
+ * One INCOME_GIVEN_BACK transfer a credit note or concession booked: the
+ * document reduced income another branch had already booked (a bill raised at
+ * Ikeja and moved to Lekki with the pupil), so that branch gives its share
+ * back through the inter-branch account. `to_branch_*` is the branch giving it
+ * back. A voided document's rows stay listed as REVERSED.
+ */
+export interface IncomeGivenBackRow {
+  id: number;
+  document_number: string;
+  to_branch_id: number;
+  to_branch_name: string;
+  amount: number;
+  status: string;
+}
+
 export interface CreditNote {
   id: number;
   document_number: string;
@@ -80,6 +96,8 @@ export interface CreditNote {
    */
   approval_required?: boolean;
   lines: CreditNoteLine[];
+  /** Empty for a note that took nothing from another branch, and for a draft. */
+  income_given_back?: IncomeGivenBackRow[];
 }
 
 export interface Refund {
@@ -220,6 +238,8 @@ export interface Concession {
    * it after an edit rather than caching it against a document id.
    */
   approval_required?: boolean;
+  /** Empty for a concession that took nothing from another branch, and for a draft. */
+  income_given_back?: IncomeGivenBackRow[];
 }
 
 export interface PaymentPlanInstallment {

@@ -73,6 +73,37 @@ export interface InterBranchTransfer {
   journals: InterBranchLegJournal[];
   /** Present when a send or forward was held for approval at the sending branch. */
   approval?: ApprovalParkState;
+  /** The credit note's or concession's journal behind an INCOME_GIVEN_BACK transfer. */
+  adjustment_entry_id?: number | null;
+  /** What a RECEIVABLE move carried; empty for every other kind. */
+  moved_items?: MovedItem[];
+  /** Who owes whom for a RECEIVABLE move; null for every other kind. */
+  net_owed?: MoveNetOwed | null;
+}
+
+/**
+ * One document a receivable move carried: an open invoice or debit note (its
+ * balance moved, with `deferred_amount` of income not yet earned), or a credit
+ * drawn from a receipt or a credit note.
+ */
+export interface MovedItem {
+  kind: "INVOICE" | "DEBIT_NOTE" | "RECEIPT_CREDIT" | "NOTE_CREDIT";
+  document_number: string;
+  invoice_id: number | null;
+  note_id: number | null;
+  payment_id: number | null;
+  amount: number;
+  deferred_amount: number;
+}
+
+/**
+ * Open bills less the credit and unearned income a move handed over: the
+ * inter-branch balance it booked. Both branches are null when it nets to 0.
+ */
+export interface MoveNetOwed {
+  amount: number;
+  owed_by: { id: number; name: string } | null;
+  owed_to: { id: number; name: string } | null;
 }
 
 export interface InterBranchListParams {
@@ -87,6 +118,8 @@ export interface InterBranchListParams {
   counterparty?: number;
   date_from?: string;
   date_to?: string;
+  /** A credit note's or concession's journal id: the income it gave back. */
+  adjustment?: number;
 }
 
 /** POST /finance/inter-branch-transfers/ - send money unprompted. */
@@ -177,6 +210,18 @@ export interface InterBranchBalances {
   /** The inter-branch account across every branch (zero when the books agree);
    *  null for a reader bound to some branches. */
   net_total: number | null;
+}
+
+/**
+ * One customer of a branch (or one every branch shares), found by exact code
+ * for a held receipt. Only what the held-receipt form already sends and echoes:
+ * no balance, contact or invoice.
+ */
+export interface HeldReceiptCustomer {
+  id: number;
+  code: string;
+  name: string;
+  branch_id: number | null;
 }
 
 export interface HeldReceipt {
@@ -312,6 +357,20 @@ export interface BankSplitBody {
   agreement_reference: string;
   difference_treatment: BankSplitDifferenceTreatment;
   allocations: BankSplitAllocation[];
+}
+
+/**
+ * What a split of a shared bank account would start from, read before any share
+ * is agreed: the whole ledger's balance, the part still in entries no branch
+ * holds (the split refuses until it is 0), and each branch's own book balance
+ * on the account, read exactly as the split will measure its difference.
+ */
+export interface BankSplitPreview {
+  bank_account_id: number;
+  legacy_balance: number;
+  unbranched_balance: number;
+  split_date: string;
+  branches: { branch_id: number; branch_name: string; book_balance: number }[];
 }
 
 export interface BankSplitResult {

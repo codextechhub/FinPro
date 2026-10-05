@@ -9,6 +9,10 @@
  *   3. Choosing a branch pair in the filters asks the list for that pair, and
  *      the filters live in the page address.
  *   4. A branch-bound reader is not offered Move a customer's balance.
+ *   5. Tunde's move, opened a day later, lists the term bill and the credit it
+ *      carried and says Lekki owes Ikeja N10,000.
+ *   6. An income given back opens the register narrowed to its document, and
+ *      the register asks the list for that document's journal.
  */
 
 import { act } from "react";
@@ -142,5 +146,42 @@ describe("the inter-branch register", () => {
     root = createRoot(container);
     render("/finance/inter-branch/transfers", true);
     expect(buttons()).toContain("Move a customer's balance");
+  });
+
+  it("says what a past customer balance move carried and who owes whom", () => {
+    mocks.transfer = {
+      ...SENT, kind: "RECEIVABLE", kind_label: "Customer balance moved", stage: "DONE", amount: 39_000_000,
+      from_bank_account_name: null, to_bank_account_name: null, customer_id: 5, customer_name: "Tunde Bakare",
+      moved_items: [
+        { kind: "INVOICE", document_number: "INV-0041", invoice_id: 41, note_id: null, payment_id: null, amount: 40_000_000, deferred_amount: 38_000_000 },
+        { kind: "RECEIPT_CREDIT", document_number: "RCT-0012", invoice_id: null, note_id: null, payment_id: 12, amount: 1_000_000, deferred_amount: 0 },
+      ],
+      net_owed: { amount: 1_000_000, owed_by: { id: 2, name: "Lekki" }, owed_to: { id: 1, name: "Ikeja" } },
+    };
+    render("/finance/inter-branch/transfers?document=9", true);
+
+    expect(text()).toContain("What it carried");
+    expect(text()).toContain("Invoice INV-0041");
+    expect(text()).toContain("₦400,000.00 owed, ₦380,000.00 of it not yet earned");
+    expect(text()).toContain("Credit from a receipt RCT-0012");
+    expect(text()).toContain("Lekki owes Ikeja ₦10,000.00");
+  });
+
+  it("links an income given back to everything its document gave back", () => {
+    mocks.transfer = {
+      ...SENT, kind: "INCOME_GIVEN_BACK", kind_label: "Income given back", from_bank_account_name: null,
+      to_bank_account_name: null, adjustment_entry_id: 77, moved_items: [], net_owed: null,
+    };
+    render("/finance/inter-branch/transfers?document=9", true);
+    const link = Array.from(document.body.querySelectorAll("a")).find((a) => a.textContent?.includes("Everything the same document gave back"));
+    expect(link?.getAttribute("href")).toBe("/finance/inter-branch/transfers?adjustment=77");
+    expect(text()).not.toContain("What it carried");
+  });
+
+  it("narrows the register to one document's income given back", () => {
+    mocks.transfer = null;
+    render("/finance/inter-branch/transfers?adjustment=77", true);
+    expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ adjustment: 77 }));
+    expect(text()).toContain("Income given back by one document");
   });
 });

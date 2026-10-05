@@ -9,6 +9,10 @@
  *      overdraft share as a negative figure.
  *   3. The result lists what is now owed between the branches, each linked to
  *      its transfer in the register.
+ *   4. Before anything is agreed, the drawer shows each branch's own entries on
+ *      the account (Ikeja N6,000,000, Lekki minus N1,000,000) and each one's
+ *      difference from its share, and money in journals no branch holds keeps
+ *      the split back.
  */
 
 import { act } from "react";
@@ -16,10 +20,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ split: vi.fn() }));
+const mocks = vi.hoisted(() => ({ split: vi.fn(), preview: vi.fn() }));
 
 vi.mock("@/redux/services/finance/interbranch-api", () => ({
   useSplitBankAccountByBranchMutation: () => [mocks.split, { isLoading: false }],
+  useGetBankSplitPreviewQuery: (args: unknown) => mocks.preview(args),
 }));
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -51,8 +56,18 @@ const READER: InterBranchReader = {
 let container: HTMLDivElement;
 let root: Root;
 
+const PREVIEW = {
+  bank_account_id: 7, legacy_balance: 500_000_000, unbranched_balance: 0, split_date: "2026-09-30",
+  branches: [
+    { branch_id: 1, branch_name: "Ikeja", book_balance: 600_000_000 },
+    { branch_id: 2, branch_name: "Lekki", book_balance: -100_000_000 },
+  ],
+};
+
 beforeEach(() => {
   mocks.split.mockReset();
+  mocks.preview.mockReset();
+  mocks.preview.mockReturnValue({ data: undefined });
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -145,5 +160,60 @@ describe("splitting the account", () => {
     ));
     expect(button("Split account")?.disabled).toBe(true);
     expect(document.body.textContent).toContain("The shares must add up exactly to the account's book balance.");
+  });
+
+  it("shows each branch's book balance and its difference from the share as it is typed", () => {
+    mocks.preview.mockReturnValue({ data: { data: PREVIEW } });
+    act(() => root.render(
+      <MemoryRouter>
+        <BankSplitDrawer account={SHARED} bookBalance={500_000_000} entity="BSS" currency="NGN" reader={READER} onClose={() => undefined} />
+      </MemoryRouter>,
+    ));
+    expect(mocks.preview).toHaveBeenCalledWith({ id: 7, entity: "BSS", split_date: undefined });
+    const text = () => document.body.textContent ?? "";
+    expect(text()).toContain("Each branch's entries on this account");
+    expect(text()).toContain("₦6,000,000.00 over its share");
+    expect(text()).toContain("₦1,000,000.00 under its share");
+
+    const money = inputs().filter((i) => i.inputMode === "decimal");
+    type(money[0], "5000000");
+    expect(text()).toContain("₦1,000,000.00 over its share");
+    expect(text()).toContain("A branch over its share owes the branches under theirs");
+  });
+
+  it("fills each share from the branch's own book balance, an overdraft as an overdraft", () => {
+    mocks.preview.mockReturnValue({ data: { data: PREVIEW } });
+    act(() => root.render(
+      <MemoryRouter>
+        <BankSplitDrawer account={SHARED} bookBalance={500_000_000} entity="BSS" currency="NGN" reader={READER} onClose={() => undefined} />
+      </MemoryRouter>,
+    ));
+    act(() => { button("Use these as the shares")?.click(); });
+    expect(document.body.textContent).toContain("Matches its share");
+    expect(document.body.textContent).not.toContain("over its share");
+    expect(inputs().find((i) => i.getAttribute("aria-label") === "Lekki's share is an overdraft")?.checked).toBe(true);
+  });
+
+  it("asks for the preview on the split date once one is given", () => {
+    mocks.preview.mockReturnValue({ data: { data: PREVIEW } });
+    act(() => root.render(
+      <MemoryRouter>
+        <BankSplitDrawer account={SHARED} bookBalance={500_000_000} entity="BSS" currency="NGN" reader={READER} onClose={() => undefined} />
+      </MemoryRouter>,
+    ));
+    type(inputs().find((i) => i.getAttribute("aria-label") === "Split date"), "2026-09-30");
+    expect(mocks.preview).toHaveBeenLastCalledWith({ id: 7, entity: "BSS", split_date: "2026-09-30" });
+  });
+
+  it("keeps the split back while money sits in journals no branch holds, and says why", () => {
+    mocks.preview.mockReturnValue({ data: { data: { ...PREVIEW, unbranched_balance: 2_500_000 } } });
+    act(() => root.render(
+      <MemoryRouter>
+        <BankSplitDrawer account={SHARED} bookBalance={500_000_000} entity="BSS" currency="NGN" reader={READER} onClose={() => undefined} />
+      </MemoryRouter>,
+    ));
+    act(() => { button("Use these as the shares")?.click(); });
+    expect(button("Split account")?.disabled).toBe(true);
+    expect(document.body.textContent).toContain("₦25,000.00 on this account is in journals no branch holds yet.");
   });
 });

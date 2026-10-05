@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { DIFFERENCE_TREATMENTS, splitProblems, splitTotals, type SplitRow } from "./bank-split-model";
+import { DIFFERENCE_TREATMENTS, branchDifferences, splitProblems, splitTotals, type SplitRow } from "./bank-split-model";
 
 const row = (over: Partial<SplitRow>): SplitRow => ({
   branch: "1", opening_balance: 0, bank_account_name: "GTBank - Ikeja", ledger_account_code: "1111",
@@ -58,5 +58,30 @@ describe("a shared bank account split", () => {
   it("needs at least two branches", () => {
     expect(splitProblems({ rows: [good[0]], bookBalance: 300_000_000, ledgerPrefix: "1", agreementReference: "M", splitDate: "2026-09-30" }))
       .toEqual(["Split into at least two branches."]);
+  });
+});
+
+describe("each branch's difference from its share", () => {
+  const preview = { branches: [
+    { branch_id: 1, branch_name: "Ikeja", book_balance: 600_000_000 },
+    { branch_id: 2, branch_name: "Lekki", book_balance: -100_000_000 },
+    { branch_id: 3, branch_name: "Ajah", book_balance: 0 },
+  ] };
+
+  it("is the branch's book balance less its share, and the whole balance where it takes none", () => {
+    const lines = branchDifferences(preview, [
+      { branch: "1", opening_balance: 500_000_000 }, { branch: "2", opening_balance: 0 },
+    ]);
+    expect(lines.map((l) => [l.branch_name, l.share, l.difference])).toEqual([
+      ["Ikeja", 500_000_000, 100_000_000], ["Lekki", 0, -100_000_000], ["Ajah", null, 0],
+    ]);
+  });
+
+  it("blocks the split while money sits in journals no branch holds", () => {
+    const problems = splitProblems({
+      rows: good, bookBalance: 500_000_000, ledgerPrefix: "1", agreementReference: "Minute 14", splitDate: "2026-09-30",
+      unbranched: 2_500_000, formatAmount: (k) => `N${k / 100}`,
+    });
+    expect(problems).toEqual(["N25000 on this account is in journals no branch holds yet. Give each of those journals its branch before splitting."]);
   });
 });

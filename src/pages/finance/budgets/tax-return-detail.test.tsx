@@ -4,7 +4,8 @@
  * sees each share, the late item "from September", and may reverse Lekki's
  * payment with a reason; Mrs Adeyemi, Lekki's own bursar, is not offered the
  * reversal, which changes the whole return. A return with one share shows no
- * share table.
+ * share table. "What it declares" lists each line behind the figures, the
+ * September invoice marked late.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -12,12 +13,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   reverse: vi.fn(),
+  lines: vi.fn(),
   wholeSchool: true,
   denied: new Set<string>(),
 }));
 
 vi.mock("@/redux/services/finance/tax-api", () => ({
   useReverseTaxRemittanceMutation: () => [mocks.reverse, { isLoading: false }],
+  useGetTaxFilingLinesQuery: (args: unknown) => mocks.lines(args),
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -39,7 +42,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import type { TaxFilingDetail, TaxFilingShare } from "@/redux/services/finance/tax-types";
 import { P } from "../../../permissions";
 import {
-  TaxRemittances, TaxReturnLines, TaxReturnShares, payableShares, penaltyBranches, showsShares,
+  TaxRemittances, TaxReturnLines, TaxReturnShares, lineDocument, payableShares, penaltyBranches, showsShares,
 } from "./tax-return-detail";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -125,6 +128,41 @@ describe("the return's detail", () => {
 
     expect(container.textContent).toContain("17 transaction lines, 1 of them late.");
     expect(container.textContent).toContain("Late items from September");
+    expect(mocks.lines).not.toHaveBeenCalled();
+  });
+
+  it("lists each line it declares, the late one marked, with its branch at a school with several", async () => {
+    mocks.lines.mockReturnValue({
+      data: {
+        data: [
+          { id: 1, date: "2026-09-28", document: { type: "INVOICE", id: 41, number: "INV-0041" }, journal_id: 300, journal_number: "JE-0300",
+            account: { id: 5, code: "2300", name: "VAT output payable" }, branch_id: 1, branch_name: "Ikeja", role: "PAYABLE", amount: 150_000, is_late: true },
+          { id: 2, date: "2026-10-04", document: { type: "VENDOR_INVOICE", id: 7, number: "BILL-0007" }, journal_id: 301, journal_number: "JE-0301",
+            account: { id: 6, code: "1350", name: "VAT input" }, branch_id: 2, branch_name: "Lekki", role: "RECOVERABLE", amount: 20_000, is_late: false },
+        ],
+        pagination: { currentPage: 1, totalPages: 2 },
+      },
+      isLoading: false, isFetching: false, isError: false,
+    });
+    await render(<TaxReturnLines filing={OCTOBER} entity="BRIGHTSTAR" showBranch />);
+
+    expect(mocks.lines).toHaveBeenCalledWith({ id: 9, entity: "BRIGHTSTAR", page: 1 });
+    const text = container.textContent ?? "";
+    expect(text).toContain("Invoice INV-0041");
+    expect(text).toContain("Supplier bill BILL-0007");
+    expect(text).toContain("Late");
+    expect(text).toContain("Lekki");
+    expect(text).toContain("· recoverable");
+    expect(text).toContain("Page 1 of 2");
+
+    await act(async () => button("Next")!.click());
+    expect(mocks.lines).toHaveBeenLastCalledWith({ id: 9, entity: "BRIGHTSTAR", page: 2 });
+  });
+
+  it("names a line's document, or its journal when nothing owns it", () => {
+    expect(lineDocument({ document: { type: "PAYROLL_RUN", id: 3, number: "PR-0003" }, journal_number: "JE-1" })).toBe("Payroll run PR-0003");
+    expect(lineDocument({ document: { type: "PETTY_CASH_VOUCHER", id: 3, number: "PCV-3" }, journal_number: "JE-1" })).toBe("Petty cash voucher PCV-3");
+    expect(lineDocument({ document: null, journal_number: "JE-1" })).toBe("JE-1");
   });
 
   it("reverses a payment with a reason", async () => {

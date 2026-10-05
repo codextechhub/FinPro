@@ -2,6 +2,7 @@
  * Tax returns read whole and acted on share by share (vs_finance).
  *
  *   GET  /finance/tax-filings/{id}/                       finance.tax.view
+ *   GET  /finance/tax-filings/{id}/lines/                 finance.tax.view (paginated)
  *   POST /finance/tax-filings/{id}/file/                  finance.tax.file (whole school)
  *   POST /finance/tax-filings/{id}/pay/                   finance.tax.pay
  *   POST /finance/tax-filings/{id}/remittances/{r}/reverse/  finance.tax.pay (whole school)
@@ -15,8 +16,8 @@
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
-import type { ApiEnvelope } from "./api-types";
-import type { TaxFilingDetail } from "./tax-types";
+import type { ApiEnvelope, PaginatedEnvelope } from "./api-types";
+import type { TaxFilingDetail, TaxFilingLine } from "./tax-types";
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
 
@@ -25,6 +26,10 @@ export const taxApi = baseApi.injectEndpoints({
     getTaxFiling: b.query<ApiEnvelope<TaxFilingDetail>, { id: number; entity: string }>({
       query: ({ id, entity }) => ({ url: `/finance/tax-filings/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["FinanceTax"],
+    }),
+    getTaxFilingLines: b.query<PaginatedEnvelope<TaxFilingLine>, { id: number; entity: string; page?: number }>({
+      query: ({ id, ...p }) => ({ url: `/finance/tax-filings/${id}/lines/${qs(p)}`, method: "GET" }),
+      providesTags: ["FinanceTax", "FinanceJournals"],
     }),
     fileTaxReturn: b.mutation<
       ApiEnvelope<TaxFilingDetail>,
@@ -57,6 +62,7 @@ export const taxApi = baseApi.injectEndpoints({
 
 export const {
   useGetTaxFilingQuery,
+  useGetTaxFilingLinesQuery,
   useFileTaxReturnMutation,
   usePayTaxShareMutation,
   useReverseTaxRemittanceMutation,

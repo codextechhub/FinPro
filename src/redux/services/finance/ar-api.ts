@@ -49,7 +49,7 @@ export const arApi = baseApi.injectEndpoints({
       query: (params) => ({ url: `/finance/invoices/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceInvoices"],
     }),
-    getInvoiceSummary: builder.query<ApiEnvelope<InvoiceSummary>, { entity: string; search?: string }>({
+    getInvoiceSummary: builder.query<ApiEnvelope<InvoiceSummary>, { entity: string; search?: string; include_archived?: "true" }>({
       query: (params) => ({ url: `/finance/invoices/summary/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceInvoices"],
     }),

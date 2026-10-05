@@ -34,6 +34,7 @@ vi.mock("@/redux/services/finance/tax-api", () => ({
   useFileTaxReturnMutation: () => [mocks.file, { isLoading: false }],
   usePayTaxShareMutation: () => [mocks.pay, { isLoading: false }],
   useReverseTaxRemittanceMutation: () => [vi.fn(), { isLoading: false }],
+  useGetTaxFilingLinesQuery: () => ({ data: { data: [] }, isLoading: false, isFetching: false, isError: false }),
 }));
 
 vi.mock("./payroll-returns", () => ({

@@ -9,10 +9,18 @@
  * balance; a branch's share may be an overdraft.
  *
  * A branch's own entries on the shared account rarely come to its agreed share.
- * The bursar chooses what the difference becomes: a debt between branches (the
- * default, booked as inter-branch transfers listed in the register and on the
- * balances) or a permanent move through retained earnings. The result lists the
- * transfers it booked, each linked to the register.
+ * The drawer reads each branch's book balance on the account from the server's
+ * split preview (as of the split date, today until one is given) and shows each
+ * branch's difference while the shares are typed, so the bursars see what the
+ * split will book before they choose. The bursar chooses what the difference
+ * becomes: a debt between branches (the default, booked as inter-branch
+ * transfers listed in the register and on the balances) or a permanent move
+ * through retained earnings. The result lists the transfers it booked, each
+ * linked to the register.
+ *
+ * Money still in journals no branch holds blocks the split: nobody can say
+ * whose share it is, so the drawer names the amount and keeps "Split account"
+ * off until those journals are given their branch.
  *
  * It changes several branches at once, so it is offered only to a whole-school
  * reader holding the bank account update key, and only on a live account no
@@ -29,10 +37,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { useSplitBankAccountByBranchMutation } from "@/redux/services/finance/interbranch-api";
-import type { BankSplitDifferenceTreatment, BankSplitResult } from "@/redux/services/finance/interbranch-types";
+import { useDates } from "../../lib/display-prefs";
+import { useGetBankSplitPreviewQuery, useSplitBankAccountByBranchMutation } from "@/redux/services/finance/interbranch-api";
+import type { BankSplitDifferenceTreatment, BankSplitPreview, BankSplitResult } from "@/redux/services/finance/interbranch-types";
 import type { BankAccount } from "@/redux/services/finance/ops-types";
-import { DIFFERENCE_TREATMENTS, splitProblems, splitTotals, type SplitRow } from "./bank-split-model";
+import { DIFFERENCE_TREATMENTS, branchDifferences, splitProblems, splitTotals, type SplitRow } from "./bank-split-model";
 import { transferLink } from "./inter-branch/links";
 import { Note } from "./inter-branch/parts";
 import type { InterBranchReader } from "./inter-branch/use-inter-branch";
@@ -80,12 +89,28 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<BankSplitResult | null>(null);
   const [split, { isLoading }] = useSplitBankAccountByBranchMutation();
+  const dates = useDates();
+  const { data: previewData } = useGetBankSplitPreviewQuery(
+    { id: account.id, entity, split_date: date && date <= dates.today() ? date : undefined }, { skip: !!result },
+  );
+  const preview = previewData?.data ?? null;
+  const toShare = preview?.legacy_balance ?? bookBalance;
 
   const chosen: SplitRow[] = rows.filter((r) => r.include).map((r) => ({ ...r, opening_balance: r.overdraft ? -r.share : r.share }));
-  const totals = splitTotals(bookBalance, chosen);
+  const totals = splitTotals(toShare, chosen);
   const ledgerPrefix = (account.gl_account || "").slice(0, 1);
-  const problems = splitProblems({ rows: chosen, bookBalance, ledgerPrefix, agreementReference: reference, splitDate: date });
   const money = (kobo: number) => formatMoney(kobo, currency);
+  const problems = splitProblems({
+    rows: chosen, bookBalance: toShare, ledgerPrefix, agreementReference: reference, splitDate: date,
+    unbranched: preview?.unbranched_balance ?? 0, formatAmount: money,
+  });
+  const startFromBooks = () => {
+    if (!preview) return;
+    setRows((prev) => prev.map((row) => {
+      const own = preview.branches.find((b) => b.branch_id === Number(row.branch))?.book_balance ?? 0;
+      return { ...row, share: Math.abs(own), overdraft: own < 0 };
+    }));
+  };
   const edit = (index: number, patch: Partial<EditRow>) =>
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : patch.is_primary ? { ...row, is_primary: false } : row)));
 
@@ -123,7 +148,7 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
         {result ? <SplitResult result={result} reader={reader} currency={currency} /> : (
           <div className="space-y-5">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Total label="Book balance to share" kobo={bookBalance} currency={currency} />
+              <Total label="Book balance to share" kobo={toShare} currency={currency} />
               <Total label="Agreed so far" kobo={totals.agreed} currency={currency} />
               <Total label="Left to place" kobo={totals.remaining} currency={currency} danger={!totals.balanced} />
             </div>
@@ -187,10 +212,11 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
                   </label>
                 ))}
               </div>
-              <Note>
-                Each branch's difference is its own entries on this account less its agreed share. This screen cannot read each branch's entries on the account yet, so the differences are worked out when the split is made and listed afterwards.
-              </Note>
             </section>
+
+            {preview ? (
+              <BranchBooks preview={preview} rows={chosen} treatment={treatment} currency={currency} onStartFromBooks={startFromBooks} />
+            ) : null}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <PostingDateField label="Split date" entity={entity} value={date} onChange={setDate} hint="Nothing may be booked on this account after this day." />
@@ -214,6 +240,51 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
         confirmText="Split account" destructive
       />
     </>
+  );
+}
+
+/**
+ * Each branch's own entries on the shared account (as of the split date) beside
+ * its agreed share and the difference the split will book for it. The words
+ * under the table follow the chosen treatment: a debt between branches, or a
+ * move through retained earnings with nothing owed.
+ */
+function BranchBooks({ preview, rows, treatment, currency, onStartFromBooks }: {
+  preview: BankSplitPreview;
+  rows: SplitRow[];
+  treatment: BankSplitDifferenceTreatment;
+  currency?: string | null;
+  onStartFromBooks: () => void;
+}) {
+  const dates = useDates();
+  const money = (kobo: number) => formatMoney(kobo, currency);
+  const lines = branchDifferences(preview, rows);
+  const differs = lines.some((line) => line.difference !== 0);
+  const describe = (difference: number) => difference === 0 ? "Matches its share"
+    : difference > 0 ? `${money(difference)} over its share` : `${money(-difference)} under its share`;
+  return (
+    <section className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Each branch's entries on this account</p>
+        <Button type="button" variant="outline" size="sm" onClick={onStartFromBooks}>Use these as the shares</Button>
+      </div>
+      <div className="divide-y divide-white-02 rounded-md border border-white-02">
+        {lines.map((line) => (
+          <div key={line.branch_id} className="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center sm:gap-4">
+            <span className="min-w-0 truncate font-mont text-sm text-black-01">{line.branch_name}</span>
+            <span className="font-mont text-xs text-gray-05">Book balance <span className="tabular-nums text-black-01">{money(line.book_balance)}</span></span>
+            <span className="font-mont text-xs text-gray-05">Share <span className="tabular-nums text-black-01">{line.share == null ? "None" : money(line.share)}</span></span>
+            <span className={cn("font-mont text-xs tabular-nums", line.difference === 0 ? "text-gray-05" : "font-medium text-black-01")}>{describe(line.difference)}</span>
+          </div>
+        ))}
+      </div>
+      <p className="font-mont text-[11px] leading-5 text-gray-05">
+        {`Book balances as of ${dates.day(preview.split_date)}. `}
+        {!differs ? "Every branch's entries match its share, so nothing is owed between branches."
+          : treatment === "DEBT" ? "A branch over its share owes the branches under theirs; the split books each debt as a transfer between branches."
+          : "Each difference moves through retained earnings, so nothing is owed between branches."}
+      </p>
+    </section>
   );
 }
 

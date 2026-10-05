@@ -6,6 +6,7 @@
 
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
 import type { PayeSource, PayeWorking, PayrollLineItem } from "./payroll-types";
+import type { BranchCloseState } from "./setup-types";
 
 // ── Banking ──────────────────────────────────────────────────────────────────
 export interface BankAccount {
@@ -498,6 +499,8 @@ export interface FiscalYear {
   /** Put away: left out of pickers and lists unless asked for. Absent from an older server. */
   is_archived?: boolean;
   archived_at?: string | null;
+  /** Present only when asked for with `include_branches`. */
+  branch_states?: BranchCloseState[];
 }
 
 export interface Budget {

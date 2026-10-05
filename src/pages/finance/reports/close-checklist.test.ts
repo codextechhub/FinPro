@@ -50,7 +50,7 @@ describe("close outcome message", () => {
 
   it("words that detail as the checklist does when given the same wording", () => {
     const warning = item({ name: "grir_explained", passed: false, blocking: false, detail: "GR/IR clearing balance 480000 kobo" });
-    const words = { branchName: () => undefined, money: (kobo: number) => `N${(kobo / 100).toFixed(2)}` };
+    const words = { money: (kobo: number) => `N${(kobo / 100).toFixed(2)}` };
     expect(closeOutcomeMessage("Aug 2026", [warning], (row) => checklistDetail(row, words)))
       .toBe("Closed Aug 2026. GR/IR clearing balance N4800.00");
   });
@@ -79,34 +79,21 @@ describe("close outcome message", () => {
 });
 
 /**
- * Bright Star closes September with Ikeja (branch 3) and Lekki (branch 5) still
- * disagreeing about a transfer Lekki never confirmed. The check names them by id
- * and counts in kobo; the reader sees the branches and naira.
+ * Bright Star closes September with Ikeja and Lekki still disagreeing about a
+ * transfer Lekki never confirmed. The check names the branches and gives naira
+ * itself, so it reads as sent; the other checks' kobo is worded in naira.
  */
 describe("the inter-branch close check", () => {
-  const names: Record<number, string> = { 3: "Ikeja", 5: "Lekki" };
-  const words = {
-    branchName: (id: number) => names[id],
-    money: (kobo: number) => `N${(kobo / 100).toFixed(2)}`,
-  };
+  const words = { money: (kobo: number) => `N${(kobo / 100).toFixed(2)}` };
 
   it("has a label of its own", () => {
     expect(checklistLabel("inter_branch_balanced", (v) => v)).toBe("Branches agree on what they owe each other");
   });
 
-  it("names the branches and the amounts in naira", () => {
-    const row = item({
-      name: "inter_branch_balanced", passed: false, blocking: true,
-      detail: "branches 3 and 5 disagree: 100000000 kobo on one side and 95000000 kobo on the other; the inter-branch account nets to 5000000 kobo, not zero",
-    });
-    expect(checklistDetail(row, words)).toBe(
-      "Ikeja and Lekki disagree: N1000000.00 on one side and N950000.00 on the other; the inter-branch account nets to N50000.00, not zero",
-    );
-  });
-
-  it("keeps the ids when a branch is not in the list", () => {
-    const row = item({ name: "inter_branch_balanced", passed: false, detail: "branches 3 and 9 disagree: 100 kobo on one side and 0 kobo on the other" });
-    expect(checklistDetail(row, words)).toBe("branches 3 and 9 disagree: N1.00 on one side and N0.00 on the other");
+  it("shows the server's own branch names and naira as sent", () => {
+    const detail = "Ikeja Branch and Lekki Branch disagree: Ikeja Branch's books say Lekki Branch owes Ikeja Branch ₦1,000,050.00; Lekki Branch's books say nothing is owed; the inter-branch account nets to ₦50.00 debit, not zero";
+    const row = item({ name: "inter_branch_balanced", passed: false, blocking: true, detail });
+    expect(checklistDetail(row, words)).toBe(detail);
   });
 
   it("words both figures of a sub-ledger check in naira", () => {

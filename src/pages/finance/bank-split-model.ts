@@ -14,7 +14,7 @@
  * show on the pair balances) or a permanent move through retained earnings.
  */
 
-import type { BankSplitDifferenceTreatment } from "@/redux/services/finance/interbranch-types";
+import type { BankSplitDifferenceTreatment, BankSplitPreview } from "@/redux/services/finance/interbranch-types";
 
 export interface SplitRow {
   branch: string;
@@ -45,19 +45,55 @@ export function splitTotals(bookBalance: number, rows: Pick<SplitRow, "opening_b
   return { agreed, remaining: bookBalance - agreed, balanced: agreed === bookBalance };
 }
 
+/** One branch's own entries on the shared account against its agreed share. */
+export interface BranchDifference {
+  branch_id: number;
+  branch_name: string;
+  book_balance: number;
+  /** The agreed share, or null when the branch takes no share of the account. */
+  share: number | null;
+  /** Book balance less share: above 0 the branch kept more of the cash than its share. */
+  difference: number;
+}
+
+/**
+ * Each branch's difference from its agreed share, for every branch the
+ * preview lists (in its order). A branch left out of the split takes no share,
+ * so its whole book balance is its difference.
+ */
+export function branchDifferences(
+  preview: Pick<BankSplitPreview, "branches">,
+  rows: Pick<SplitRow, "branch" | "opening_balance">[],
+): BranchDifference[] {
+  return preview.branches.map((b) => {
+    const row = rows.find((r) => Number(r.branch) === b.branch_id);
+    const share = row ? row.opening_balance || 0 : null;
+    return { ...b, share, difference: b.book_balance - (share ?? 0) };
+  });
+}
+
 /**
  * Everything on the form the server would refuse, in plain words. Empty when
  * the split may be sent. `ledgerPrefix` is the first digit of the shared
  * account's ledger code: a successor ledger must be the same kind of account.
+ * A balance still in journals no branch holds blocks the split outright,
+ * because the split cannot tell whose share that money is.
  */
-export function splitProblems({ rows, bookBalance, ledgerPrefix, agreementReference, splitDate }: {
+export function splitProblems({ rows, bookBalance, ledgerPrefix, agreementReference, splitDate, unbranched = 0, formatAmount }: {
   rows: SplitRow[];
   bookBalance: number;
   ledgerPrefix: string;
   agreementReference: string;
   splitDate: string;
+  /** The part of the balance in entries no branch holds yet, from the preview. */
+  unbranched?: number;
+  formatAmount?: (kobo: number) => string;
 }): string[] {
   const problems: string[] = [];
+  if (unbranched) {
+    const amount = formatAmount ? formatAmount(unbranched) : String(unbranched);
+    problems.push(`${amount} on this account is in journals no branch holds yet. Give each of those journals its branch before splitting.`);
+  }
   if (!splitDate) problems.push("Give the split date.");
   if (!agreementReference.trim()) problems.push("Give the reference of the bursars' agreement on these shares.");
   if (rows.length < 2) problems.push("Split into at least two branches.");

@@ -124,7 +124,7 @@ export const setupApi = baseApi.injectEndpoints({
     }),
     // The close workbench reads exactly one complete fiscal calendar (4 or 12
     // rows), never the entity's unbounded lifetime history.
-    getFiscalYearPeriods: b.query<ApiEnvelope<FiscalPeriod[]>, { entity: string; year: number } & CalendarBranchArg & IncludeArchivedArg>({
+    getFiscalYearPeriods: b.query<ApiEnvelope<FiscalPeriod[]>, { entity: string; year: number; include_branches?: "true" } & CalendarBranchArg & IncludeArchivedArg>({
       query: (p) => ({ url: `/finance/periods/${qs({ ...p, all: "true" })}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),

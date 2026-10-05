@@ -5,6 +5,7 @@ import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
 import type { ApiEnvelope, PaginatedEnvelope } from "../finance/api-types";
 import type {
+  StockTransferDestination,
   ContractLinkedPo,
   ContractSummary,
   FreeRequisitionLine,
@@ -198,6 +199,11 @@ export const procurementExtApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/procurement/stock-locations/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcStockLocations"],
     }),
+    // Every live store a transfer may name, other branches' too; no stock figures.
+    getStockTransferDestinations: b.query<PaginatedEnvelope<StockTransferDestination>, { entity: string; search?: string; page?: number; page_size?: number }>({
+      query: (p) => ({ url: `/procurement/stock-locations/transfer-destinations/${qs(p)}`, method: "GET" }),
+      providesTags: ["ProcStockLocations"],
+    }),
     createStockLocation: b.mutation<ApiEnvelope<StockLocation>, {
       entity: string; code: string; name: string; description?: string;
       // Branch id or branch code. Required at a school with several branches unless
@@ -388,6 +394,7 @@ export const {
   useSubmitQuotationMutation,
   useAwardQuotationMutation,
   useGetStockLocationsQuery,
+  useGetStockTransferDestinationsQuery,
   useCreateStockLocationMutation,
   useUpdateStockLocationMutation,
   useGetStockBalancesQuery,

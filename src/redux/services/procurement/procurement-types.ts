@@ -800,6 +800,19 @@ export interface StockLocation {
 }
 
 /**
+ * A store a stock transfer may send goods to, as the transfer form names it:
+ * every live store of the books, other branches' included, with who runs it
+ * and never what it holds.
+ */
+export interface StockTransferDestination {
+  id: number;
+  code: string;
+  name: string;
+  branch_id: number | null;
+  branch_name: string | null;
+}
+
+/**
  * What one item holds at one location. The stock item's own totals stay the roll-up
  * across locations, so every entity-level figure is unchanged by this existing.
  *

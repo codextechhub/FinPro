@@ -22,7 +22,7 @@ import type {
   JournalSummary,
 } from "./gl-types";
 
-type SummaryParams = { entity: string; source?: string; date_from?: string; date_to?: string; search?: string };
+type SummaryParams = { entity: string; source?: string; date_from?: string; date_to?: string; search?: string; include_archived?: "true" };
 
 export const glApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({

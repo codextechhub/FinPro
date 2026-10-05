@@ -95,7 +95,8 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
   const [showArchived] = useShowArchived();
   const params = useMemo(() => ({ entity, page, ...(bucket ? { bucket } : {}), ...(search ? { search } : {}), ...includeArchivedArg(showArchived) }), [entity, page, bucket, search, showArchived]);
   const { data, isLoading, isFetching, isError, refetch } = useGetInvoicesQuery(params);
-  const summaryQ = useGetInvoiceSummaryQuery({ entity, ...(search ? { search } : {}) });
+  // The counts leave archived years out exactly as the list does, so a tab's count matches its rows.
+  const summaryQ = useGetInvoiceSummaryQuery({ entity, ...(search ? { search } : {}), ...includeArchivedArg(showArchived) });
   const summary = summaryQ.data?.data;
   const [doWriteOff, { isLoading: writingOff }] = useWriteOffInvoiceMutation();
 
