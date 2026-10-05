@@ -15,11 +15,15 @@
  * server refuses. A transfer between two branches is an inter-branch transfer,
  * so the second account is offered only from the first one's branch.
  *
+ * Each document says where it stands with its approval (`approval_state`), so
+ * one rejected back to DRAFT reads Rejected rather than still waiting, and
+ * names its branch as the server sent it.
+ *
  * The section reads `?bank_document=transaction|transfer` and `?document=<id>`,
  * which is where an approval's link to a bank document lands.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Ban, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -37,7 +41,6 @@ import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
-import { useBranches } from "../../host";
 import { isForbidden } from "../../lib/api-errors";
 import { useDates } from "../../lib/display-prefs";
 import { SOURCE_DOCUMENT_ID_PARAM, sourceDocumentIdFromParams } from "@/lib/source-document-route";
@@ -48,17 +51,19 @@ import {
   useGetBankTransfersQuery, useVoidBankTransactionMutation, useVoidBankTransferMutation,
 } from "@/redux/services/finance/bank-documents-api";
 import type { BankTransactionDirection, BankTransactionDocument, BankTransferDocument } from "@/redux/services/finance/bank-documents-types";
-import { bankDocumentAccountProblem } from "./bank-document-rules";
+import { bankDocumentAccountProblem, bankDocumentApprovalNote, bankDocumentStatus } from "./bank-document-rules";
+import { NO_BRANCH_YET } from "../../lib/branch-labels";
 
 type Kind = "transaction" | "transfer";
 const KIND_PARAM = "bank_document";
 
-/** The branch names a list needs, and whether branches mean anything here. */
+/** Whether branches mean anything here, and a document's branch by the name the server sent. */
 function useBranchNames() {
   const { applies } = useReaderBranchLens();
-  const { data } = useBranches();
-  const names = useMemo(() => new Map((data ?? []).map((b) => [Number(b.id), b.name])), [data]);
-  return { multiBranch: applies, name: (id: number | null | undefined) => (id == null ? "-" : names.get(id) ?? "-") };
+  return {
+    multiBranch: applies,
+    name: (doc: { branch_id: number | null; branch_name?: string | null }) => (doc.branch_id == null ? NO_BRANCH_YET : doc.branch_name || "-"),
+  };
 }
 
 export function BankDocumentsSection({ entity, currency }: { entity: string; currency?: string | null }) {
@@ -118,10 +123,10 @@ function TransactionsList({ entity, currency, openId, onOpen }: { entity: string
     { header: "Document", cell: (t) => <span className="font-mont text-sm font-semibold text-primary">{t.document_number}</span> },
     { header: "Date", cell: (t) => dates.day(t.transaction_date, t.branch_id) },
     { header: "Bank account", cell: (t) => t.bank_account_name },
-    ...(branches.multiBranch ? [{ header: "Branch", cell: (t: BankTransactionDocument) => branches.name(t.branch_id) }] : []),
+    ...(branches.multiBranch ? [{ header: "Branch", cell: (t: BankTransactionDocument) => branches.name(t) }] : []),
     { header: "Other side", cell: (t) => <span className="min-w-0"><span className="tabular-nums text-gray-05">{t.counter_account_code}</span> {t.counter_account_name}</span> },
     { header: "Amount", align: "right", cell: (t) => <span className={cn("inline-flex items-center gap-1 tabular-nums", t.direction === "IN" ? "text-green-01" : "text-black-01")}>{t.direction === "IN" ? <ArrowDownLeft className="size-3.5" /> : <ArrowUpRight className="size-3.5" />}{formatMoney(t.amount, currency)}</span> },
-    { header: "Status", cell: (t) => <StatusPill status={t.status} /> },
+    { header: "Status", cell: (t) => <StatusPill status={bankDocumentStatus(t)} /> },
   ];
   return <>
     <DataTable columns={columns} rows={rows} rowKey={(t) => t.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(t) => onOpen(t.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle="No bank transactions" emptyMessage="Record capital, a loan, drawings, interest or charges here." />
@@ -140,9 +145,9 @@ function TransfersList({ entity, currency, openId, onOpen }: { entity: string; c
     { header: "Date", cell: (t) => dates.day(t.transfer_date, t.branch_id) },
     { header: "From", cell: (t) => t.from_account_name },
     { header: "To", cell: (t) => t.to_account_name },
-    ...(branches.multiBranch ? [{ header: "Branch", cell: (t: BankTransferDocument) => branches.name(t.branch_id) }] : []),
+    ...(branches.multiBranch ? [{ header: "Branch", cell: (t: BankTransferDocument) => branches.name(t) }] : []),
     { header: "Amount", align: "right", cell: (t) => <span className="tabular-nums">{formatMoney(t.amount, currency)}</span> },
-    { header: "Status", cell: (t) => <StatusPill status={t.status} /> },
+    { header: "Status", cell: (t) => <StatusPill status={bankDocumentStatus(t)} /> },
   ];
   return <>
     <DataTable columns={columns} rows={rows} rowKey={(t) => t.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(t) => onOpen(t.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle="No transfers" emptyMessage="Move money between two accounts of the same branch here." />
@@ -169,6 +174,7 @@ function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
   const [voidTransaction, { isLoading: voidingTransaction }] = useVoidBankTransactionMutation();
   const [voidTransfer, { isLoading: voidingTransfer }] = useVoidBankTransferMutation();
   const doc = kind === "transaction" ? transaction : transfer;
+  const approvalNote = doc ? bankDocumentApprovalNote(doc) : null;
   const busy = voidingTransaction || voidingTransfer;
   const doVoid = async () => {
     if (!doc) return;
@@ -183,7 +189,7 @@ function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
   return <>
     <DetailDrawer open onOpenChange={(open) => !open && onClose()} title={doc?.document_number || (kind === "transaction" ? "Bank transaction" : "Transfer")} description={kind === "transaction" ? "Money in or out of a bank account" : "Money between two accounts of one branch"} widthClass="sm:max-w-[560px]" footer={doc && doc.status === "POSTED" && <Can permission={kind === "transaction" ? P.FIN_REVERSE_BANK_TRANSACTION : P.FIN_REVERSE_BANK_TRANSFER}><Button variant="outline-dest" onClick={() => setConfirming(true)}><Ban className="size-4" /> Void</Button></Can>}>
       {loading ? <LoadingState rows={4} /> : !doc ? <ErrorState onRetry={kind === "transaction" ? transactionQ.refetch : transferQ.refetch} /> : <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">
-        <Field label="Status" value={<StatusPill status={doc.status} />} />
+        <Field label="Status" value={<StatusPill status={bankDocumentStatus(doc)} />} />
         <Field label="Amount" value={formatMoney(doc.amount, currency)} />
         {transaction && <>
           <Field label="Date" value={dates.day(transaction.transaction_date, transaction.branch_id)} />
@@ -196,10 +202,10 @@ function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
           <Field label="From" value={transfer.from_account_name} />
           <Field label="To" value={transfer.to_account_name} />
         </>}
-        {branches.multiBranch && <Field label="Branch" value={branches.name(doc.branch_id)} />}
+        {branches.multiBranch && <Field label="Branch" value={branches.name(doc)} />}
         <Field label="Reference" value={doc.reference} />
         <div className="sm:col-span-2"><Field label="Narration" value={doc.narration} /></div>
-        {doc.status === "DRAFT" && <p className="sm:col-span-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs text-amber-900">Waiting for approval under Workflow, Approvals. It reaches the books once approved.</p>}
+        {approvalNote && <p data-testid="bank-document-approval" className={cn("sm:col-span-2 rounded-md border px-3 py-2 font-mont text-xs", approvalNote.tone === "rejected" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-amber-200 bg-amber-50 text-amber-900")}>{approvalNote.text}</p>}
       </dl>}
     </DetailDrawer>
     <ConfirmActionModal open={confirming} onOpenChange={setConfirming} title={`Void ${doc?.document_number}?`} description={kind === "transaction" ? "Reverses the money in or out. Refused once its bank line has been reconciled; unmatch the line first." : "Reverses both sides of the transfer. Refused while either side is reconciled; unmatch the line first."} confirmText="Void" destructive loading={busy} onConfirm={doVoid} />

@@ -10,12 +10,16 @@
  * the float has changed since; the dialog names the refusal it can already see
  * and lists the rest, and the central handler words any refusal that comes back.
  *
- * The list reads up to the latest 100 returns in the reader's reach. The server
- * filters by fund but not by branch, so under one branch the rows are narrowed
- * here.
+ * The list reads up to the latest 100 returns in the reader's reach, asking the
+ * server for the branch shown (`?branch=`) and the fund picked. Each row names
+ * its branch and its people as the server sent them.
+ *
+ * A link to one return (a journal's "Open return", `?document=<id>`) opens it
+ * in `LinkedReturnDrawer`, whichever fund the page is on.
  */
 
 import { useMemo, useState } from "react";
+import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { Ban } from "lucide-react";
 
@@ -28,11 +32,11 @@ import {
   useGetPettyCashReturnQuery, useGetPettyCashReturnsQuery, useVoidPettyCashReturnMutation,
 } from "@/redux/services/finance/ops-api";
 import type { PettyCashFund, PettyCashReturn } from "@/redux/services/finance/ops-types";
+import { exitedTitle } from "@/components/finance-ui/exited-person";
 import { P } from "../../../permissions";
 import { useDates } from "../../../lib/display-prefs";
-import { useUserDirectory } from "../../../components/workflow/use-user-directory";
 import { VoidReturnDialog } from "./petty-cash-return-drawers";
-import { branchName, inBranch, type PettyCashBranch } from "./petty-cash-branch";
+import { branchQueryArg, inBranch, rowBranchName, type PettyCashBranch } from "./petty-cash-branch";
 import { returnVoidable, voidBlocker } from "./petty-cash-returns";
 
 /** The page size the list asks for: the server's ceiling. */
@@ -57,10 +61,9 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
   const [fundFilter, setFundFilter] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
   const { data, isLoading, isError, refetch } = useGetPettyCashReturnsQuery({
-    entity, page_size: RETURNS_PAGE, ...(fundFilter ? { fund: Number(fundFilter) } : {}),
+    entity, page_size: RETURNS_PAGE, ...branchQueryArg(view), ...(fundFilter ? { fund: Number(fundFilter) } : {}),
   });
   const all = useMemo(() => toArray(data?.data), [data]);
-  const rows = useMemo(() => inBranch(all, view), [all, view]);
   const total = data?.pagination?.totalItems ?? all.length;
   const fundOptions = useMemo(() => inBranch(funds, view), [funds, view]);
   const open = openId != null ? all.find((r) => r.id === openId) : undefined;
@@ -68,7 +71,7 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
   const cols: Column<PettyCashReturn>[] = [
     { header: "Return no.", cell: (r) => <span className="font-semibold tabular-nums">{r.document_number}</span> },
     { header: "Fund", cell: (r) => r.fund_name },
-    ...(view.showBranch ? [{ header: "Branch", cell: (r: PettyCashReturn) => branchName(view, r.branch_id) }] : []),
+    ...(view.showBranch ? [{ header: "Branch", cell: (r: PettyCashReturn) => rowBranchName(view, r) }] : []),
     { header: "Kind", cell: (r) => returnKindLabel(r) },
     { header: "Date", cell: (r) => <span className="tabular-nums text-gray-05">{dates.day(r.return_date)}</span> },
     { header: "Banked", align: "right", cell: (r) => <span className="tabular-nums">{formatMoney(r.amount, currency)}</span> },
@@ -88,7 +91,7 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
         {total > all.length ? <span className="font-mont text-[11px] text-gray-05">Showing the latest {all.length} of {total}.</span> : null}
       </div>
       <DataTable
-        columns={cols} rows={rows} rowKey={(r) => r.id} loading={isLoading} error={isError} onRetry={refetch}
+        columns={cols} rows={all} rowKey={(r) => r.id} loading={isLoading} error={isError} onRetry={refetch}
         onRowClick={(r) => setOpenId(r.id)}
         emptyTitle="No returns yet" emptyMessage="Reduce a float or close a fund to bank its cash."
       />
@@ -103,6 +106,34 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
   );
 }
 
+/** A person on a return by name, saying so when they have left the school. */
+function Person({ name, exited }: { name?: string | null; exited?: boolean | null }) {
+  if (!name) return <>-</>;
+  return <span title={exitedTitle(exited)}>{name}{exited ? <span className="text-gray-05"> (left)</span> : null}</span>;
+}
+
+/**
+ * A return opened from a link, read on its own so it opens whichever fund or
+ * branch the page shows. Its fund's other returns are read beside it, so Void
+ * names a later return of the same fund before the server would refuse it.
+ */
+export function LinkedReturnDrawer({ id, entity, currency, view, funds, onClose }: {
+  id: number; entity: string; currency?: string | null; view: PettyCashBranch;
+  funds: PettyCashFund[]; onClose: () => void;
+}) {
+  const { data } = useGetPettyCashReturnQuery({ id, entity });
+  const ret = data?.data;
+  const siblings = useGetPettyCashReturnsQuery(ret ? { entity, fund: ret.fund_id, page_size: RETURNS_PAGE } : skipToken);
+  if (!ret) return null;
+  return (
+    <ReturnDetailDrawer
+      ret={ret} entity={entity} currency={currency} view={view}
+      fund={funds.find((f) => f.id === ret.fund_id)} returns={toArray(siblings.data?.data)}
+      onClose={onClose}
+    />
+  );
+}
+
 /** One return in full, with Void for a holder of the reverse key. */
 export function ReturnDetailDrawer({ ret: row, entity, currency, view, fund, returns, onClose }: {
   ret: PettyCashReturn; entity: string; currency?: string | null; view: PettyCashBranch;
@@ -110,7 +141,6 @@ export function ReturnDetailDrawer({ ret: row, entity, currency, view, fund, ret
 }) {
   const dates = useDates();
   const { can } = useCan();
-  const people = useUserDirectory();
   const { data } = useGetPettyCashReturnQuery({ id: row.id, entity });
   const ret = data?.data ?? row;
   const [confirming, setConfirming] = useState(false);
@@ -131,7 +161,7 @@ export function ReturnDetailDrawer({ ret: row, entity, currency, view, fund, ret
   const facts: [string, React.ReactNode][] = [
     ["Kind", returnKindLabel(ret)],
     ["Fund", ret.fund_name],
-    ...(view.applies ? [["Branch", branchName(view, ret.branch_id)] as [string, React.ReactNode]] : []),
+    ...(view.applies ? [["Branch", rowBranchName(view, ret)] as [string, React.ReactNode]] : []),
     ["Date", dates.day(ret.return_date)],
     ["Counted", money(ret.counted_amount)],
     ["Books said", money(ret.book_balance)],
@@ -141,8 +171,8 @@ export function ReturnDetailDrawer({ ret: row, entity, currency, view, fund, ret
     ["Into", ret.bank_account_name || "-"],
     ["Tin kept", money(ret.cash_left)],
     ["Float", `${money(ret.previous_float_amount)} to ${money(ret.new_float_amount)}`],
-    ["Counted by", ret.counted_by_id ? people.name(ret.counted_by_id) : "-"],
-    ["Raised by", ret.created_by_id ? people.name(ret.created_by_id) : "-"],
+    ["Counted by", <Person key="counted" name={ret.counted_by_name} exited={ret.counted_by_is_exited} />],
+    ["Raised by", <Person key="raised" name={ret.created_by_name} exited={ret.created_by_is_exited} />],
     ...(ret.reference ? [["Reference", ret.reference] as [string, React.ReactNode]] : []),
     ...(ret.narration ? [["Note", ret.narration] as [string, React.ReactNode]] : []),
   ];

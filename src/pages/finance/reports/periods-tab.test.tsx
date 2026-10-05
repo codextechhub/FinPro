@@ -504,6 +504,31 @@ function checklistWith(items: unknown[], status = "OPEN") {
   });
 }
 
+describe("opening a new fiscal year", () => {
+  beforeEach(atBrightStar);
+
+  it("is offered to a whole-school holder of the key", async () => {
+    await mountWorkbench("BRIGHTSTAR");
+
+    expect(button("New fiscal year", container)).toBeTruthy();
+  });
+
+  it("is not offered to a branch's own bursar, even holding the key", async () => {
+    mocks.wholeSchool = false;
+    mocks.lens = { applies: true, pinnedBranch: 2, branch: 2, choices: [LEKKI], isLoading: false };
+    await mountWorkbench("BRIGHTSTAR");
+
+    expect(button("New fiscal year", container)).toBeUndefined();
+  });
+
+  it("is not offered to somebody without the key", async () => {
+    mocks.denied = new Set([P.FIN_CREATE_PERIOD]);
+    await mountWorkbench("BRIGHTSTAR");
+
+    expect(button("New fiscal year", container)).toBeUndefined();
+  });
+});
+
 describe("forcing a month's close over a failing check", () => {
   it("is offered to a holder of the force key while a blocking check fails", async () => {
     checklistWith([FAILING_BANK]);
@@ -615,7 +640,7 @@ describe("archiving a closed year", () => {
     expect(yearReads()).toEqual([]);
     expect(lastArgs(mocks.years)).toEqual({ entity: "HARBOUR", include_archived: "true" });
     expect(lastArgs(mocks.periods)).toEqual({ entity: "HARBOUR", year: 2026, include_archived: "true" });
-    expect(container.textContent).toContain("FY 2026 · CLOSED · Archived");
+    expect(container.textContent).toContain("FY 2026 · Closed · Archived");
   });
 });
 

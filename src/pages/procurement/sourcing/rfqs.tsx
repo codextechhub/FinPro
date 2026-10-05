@@ -43,7 +43,8 @@ import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../../lib/display-prefs";
 import { useReaderReach } from "../../../host";
-import { SharedSourcingEditor, useApprovedSourceLines } from "./shared-sourcing-editor";
+import { SharedSourcingEditor, useFreeSourceLines } from "./shared-sourcing-editor";
+import { useDebounce } from "@/hooks/use-debounce";
 import { groupSharedLines, sharedRfqLinesBody, sharedSourcingProblem } from "./shared-sourcing";
 
 const DETAIL_TABS = [
@@ -455,8 +456,10 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
   const sharedEdit = !!initial?.shared_sourcing;
   const [sharedSelected, setSharedSelected] = useState<number[]>([]);
   const [sharedDescriptions, setSharedDescriptions] = useState<Record<string, string>>({});
-  const sourceLines = useApprovedSourceLines(entity, reach.wholeSchool ? null : reach.branchIds);
-  const sharedChosen = sourceLines.lines.filter((line) => sharedSelected.includes(line.requisition_line));
+  const [sourceSearch, setSourceSearch] = useState("");
+  const sourceQuery = useDebounce(sourceSearch.trim(), 350);
+  const sourceLines = useFreeSourceLines(entity, sourceQuery, { skip: !shared });
+  const sharedChosen = sourceLines.pick(sharedSelected);
   const sharedProblem = shared ? sharedSourcingProblem(sharedChosen) : null;
   // An RFQ from a requisition takes the requisition's branch; a draft keeps its own.
   const branch = useRaisingBranchChoice({ unless: !!initial || !!requisition || shared });
@@ -562,7 +565,7 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
         {shared ? <div className="pt-1">
           <p className="mb-1 font-mont text-xs font-semibold text-gray-05">Approved requisition lines to buy together</p>
           <p className="mb-2 font-mont text-[11px] leading-5 text-gray-05">Each line goes on whole. Vendors see one RFQ; the award raises one purchase order for each branch.</p>
-          <SharedSourcingEditor lines={sourceLines.lines} isLoading={sourceLines.isLoading} selected={sharedSelected} onSelectedChange={setSharedSelected} descriptions={sharedDescriptions} onDescriptionsChange={setSharedDescriptions} />
+          <SharedSourcingEditor lines={sourceLines.lines} total={sourceLines.total} chosen={sharedChosen} isLoading={sourceLines.isLoading} search={sourceSearch} onSearchChange={setSourceSearch} selected={sharedSelected} onSelectedChange={setSharedSelected} descriptions={sharedDescriptions} onDescriptionsChange={setSharedDescriptions} />
           {sharedProblem && sharedSelected.length > 0 && <p role="alert" className="mt-2 font-mont text-[11px] text-destructive">{sharedProblem}</p>}
         </div> : sharedEdit ? <p className="rounded-md border border-white-02 bg-gray-50 px-3 py-2 font-mont text-[11px] leading-5 text-gray-05">Several branches are buying together on this RFQ, so its lines stay as allocated. To change them, cancel it and raise a new one.</p> : <div className="pt-1">
           <p className="mb-2 font-mont text-xs font-semibold text-gray-05">Lines (specification only - no price)</p>

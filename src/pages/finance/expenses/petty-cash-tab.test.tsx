@@ -10,6 +10,9 @@
  * Branches: Harbour Primary runs one, so no branch picker shows; Bright Star runs
  * Ikeja and Lekki, so Mrs Bello picks All branches or one, and under All
  * branches each fund names its branch.
+ *
+ * A journal's link to a return (`?document=<id>`) opens that return over the
+ * page.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -21,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   detail: null as unknown,
   vouchers: [] as unknown[],
   returns: [] as unknown[],
+  linked: null as unknown,
   cancel: vi.fn(),
   denied: new Set<string>(),
   lens: {
@@ -39,7 +43,7 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetPettyCashFundQuery: () => ({ data: mocks.detail ? { data: mocks.detail } : undefined }),
   useGetPettyCashVouchersQuery: () => ({ data: { data: mocks.vouchers }, isFetching: false }),
   useGetPettyCashReturnsQuery: () => ({ data: { data: mocks.returns, pagination: { totalItems: mocks.returns.length } }, isLoading: false, isError: false, refetch: vi.fn() }),
-  useGetPettyCashReturnQuery: () => ({ data: undefined }),
+  useGetPettyCashReturnQuery: () => ({ data: mocks.linked ? { data: mocks.linked } : undefined }),
   useGetBankAccountsQuery: () => ({ data: { data: [] } }),
   useCancelPettyCashVoucherMutation: () => [mocks.cancel, { isLoading: false }],
   useCreatePettyCashFundMutation: idle,
@@ -68,7 +72,6 @@ vi.mock("../../../host", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   hostBranchLens: () => mocks.lens,
   useBranches: () => ({ data: mocks.lens.choices, isLoading: false, isError: false }),
-  useDirectory: () => ({ data: [{ id: "7", full_name: "Mrs Bello", email: "", role: "", status: "ACTIVE" }], isLoading: false, isError: false }),
 }));
 
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
@@ -115,6 +118,7 @@ beforeEach(() => {
   mocks.detail = null;
   mocks.vouchers = [];
   mocks.returns = [];
+  mocks.linked = null;
   mocks.denied = new Set();
   mocks.lens = { applies: false, pinnedBranch: null, branch: "all", choices: [{ id: 1, name: "Main" }], isLoading: false };
   mocks.cancel.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Petty cash voucher PCV-1 cancelled." }) });
@@ -188,7 +192,7 @@ describe("a running fund", () => {
 
 describe("a closed fund", () => {
   beforeEach(() => {
-    mocks.funds = [fund({ state: "CLOSED", is_active: false, float_amount: 0, current_balance: 0, closed_on: "2026-10-01", closed_by_id: 7 })];
+    mocks.funds = [fund({ state: "CLOSED", is_active: false, float_amount: 0, current_balance: 0, closed_on: "2026-10-01", closed_by_id: 7, closed_by_name: "Mrs Bello", closed_by_is_exited: false })];
   });
 
   it("says when and by whom it closed, and offers only Reopen and Edit", () => {
@@ -196,6 +200,12 @@ describe("a closed fund", () => {
     expect(container.querySelector("[data-testid=fund-closed]")?.textContent)
       .toContain("Closed on 1 Oct 2026 by Mrs Bello.");
     expect(actions()).toEqual(["Reopen", "Edit fund"]);
+  });
+
+  it("says when the person who closed it has left the school", () => {
+    mocks.funds = [fund({ state: "CLOSED", is_active: false, closed_on: "2026-10-01", closed_by_id: 7, closed_by_name: "Mrs Bello", closed_by_is_exited: true })];
+    render();
+    expect(container.querySelector("[data-testid=fund-closed]")?.textContent).toContain("by Mrs Bello (left).");
   });
 
   it("hides Reopen from a reader without the reopen key", () => {
@@ -226,5 +236,25 @@ describe("branches", () => {
     render("/?branch=2");
     const options = [...container.querySelectorAll("select[aria-label=Fund] option")].map((o) => o.textContent);
     expect(options).toEqual(["Lekki float · Mrs Eze"]);
+  });
+});
+
+describe("a link to one return", () => {
+  it("opens the return the journal names", () => {
+    mocks.linked = {
+      id: 11, document_number: "PCR-0011", status: "POSTED", kind: "CLOSE", kind_label: "Close the fund",
+      branch_id: 1, branch_name: "Main", fund_id: 1, fund_name: "Front desk", bank_account_id: 3, bank_account_name: "GTBank",
+      return_date: "2026-10-01", counted_amount: 0, book_balance: 0, difference: 0, shortage: 0, overage: 0,
+      difference_reason: "", amount: 0, amount_naira: "", cash_left: 0, previous_float_amount: 0, new_float_amount: 0,
+      counted_by_id: 7, counted_by_name: "Mrs Eze", narration: "", reference: "", journal_id: 5, created_by_id: 7, created_by_name: "Mrs Bello",
+    };
+    render("/?document=11");
+    expect(document.body.querySelector("[role=dialog]")?.textContent).toContain("PCR-0011");
+    expect(document.body.textContent).toContain("Raised byMrs Bello");
+  });
+
+  it("opens nothing without one", () => {
+    render();
+    expect(document.body.querySelector("[role=dialog]")).toBeNull();
   });
 });

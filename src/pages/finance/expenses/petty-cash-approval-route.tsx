@@ -3,10 +3,14 @@
  *
  * No school has it until it adopts it, and with no route a return posts the
  * moment it is raised. Adopting publishes one step: a second person from the
- * approver group `finance-petty-cash-approver` approves any count more than the
+ * approver group "Finance Petty Cash Approver" approves any count more than the
  * school's chosen shortage figure short (N5,000 suggested), and every closure.
- * The group is created empty, so the card says to fill it; until somebody is in
- * it, a return the route stops waits with nobody able to approve it.
+ * Once adopted, the figure shown is the one the school's route holds now, so a
+ * route raised to N20,000 on the approval screens reads N20,000 here.
+ *
+ * The group is created empty, so while nobody is in it the card says to fill
+ * it: until then a return the route stops waits with nobody able to approve it.
+ * Once it has members the card says how many instead.
  *
  * Reading the route needs `workflow.template.view`. Adopting needs
  * `workflow.template.publish` and a reader who covers the whole school, since a
@@ -36,6 +40,14 @@ import { useServesPath } from "../../../lib/host-routes";
 /** The shortage the server suggests when the route has not loaded: N5,000 in kobo. */
 export const SUGGESTED_SHORTAGE = 500_000;
 
+/**
+ * An approver group's name, from its code, as the server names the groups it
+ * creates: `finance-petty-cash-approver` is "Finance Petty Cash Approver".
+ */
+export function approverGroupName(code: string): string {
+  return code.replace(/[-_]/g, " ").toLowerCase().replace(/[a-z]+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
+}
+
 /** Why Adopt is not offered to this reader, or null when it is. */
 export function adoptRefusal({ canPublish, wholeSchool }: { canPublish: boolean; wholeSchool: boolean }): string | null {
   if (!canPublish) return "Adopting it needs permission to publish approval routes.";
@@ -54,9 +66,10 @@ export function PettyCashApprovalRouteCard({ entity, currency }: { entity: strin
   if (!canView) return null;
 
   const route = data?.data;
-  const shortage = threshold ?? route?.threshold ?? SUGGESTED_SHORTAGE;
+  const shortage = threshold ?? route?.threshold ?? route?.default_threshold ?? SUGGESTED_SHORTAGE;
   const refusal = adoptRefusal({ canPublish: can(P.PUBLISH_WORKFLOW_TEMPLATE), wholeSchool: reach.wholeSchool });
-  const group = route?.approver_group_code ?? "finance-petty-cash-approver";
+  const group = approverGroupName(route?.approver_group_code ?? "finance-petty-cash-approver");
+  const members = route?.approver_group_member_count ?? 0;
   const groupsHref = routesPath.PROTECTED.WORKFLOW.APPROVER_GROUPS;
   const routeHref = route?.route_id ? `/workflow/templates/${route.route_id}` : null;
 
@@ -78,7 +91,9 @@ export function PettyCashApprovalRouteCard({ entity, currency }: { entity: strin
               <p className="mt-0.5 font-mont text-xs text-gray-05">{isLoading ? "Loading…" : "The route could not be read."}</p>
             ) : route.adopted ? (
               <p className="mt-0.5 font-mont text-xs text-gray-05" data-testid="route-adopted">
-                Adopted. A count short by more than the school's figure, and every closure, wait for a second person before they reach the books.
+                {route.threshold != null
+                  ? `Adopted. A count more than ${formatMoney(route.threshold, currency)} short, and every closure, wait for a second person before they reach the books.`
+                  : "Adopted. The returns its steps name wait for a second person before they reach the books."}
               </p>
             ) : (
               <p className="mt-0.5 font-mont text-xs text-gray-05" data-testid="route-none">
@@ -87,7 +102,13 @@ export function PettyCashApprovalRouteCard({ entity, currency }: { entity: strin
             )}
           </div>
 
-          {route && route.adopted ? (
+          {route && route.adopted && members > 0 ? (
+            <p className="font-mont text-xs text-gray-05" data-testid="route-group-members">
+              {members === 1 ? "1 person" : `${members} people`} in <span className="font-semibold text-black-01">{group}</span> can approve these returns.
+            </p>
+          ) : null}
+
+          {route && route.adopted && members === 0 ? (
             <div className="rounded-md border border-yellow-01/30 bg-yellow-01/10 px-3 py-2 font-mont text-xs leading-5 text-yellow-01-text" data-testid="route-group-reminder">
               <p>
                 The approver group <span className="font-semibold">{group}</span> starts empty. Add the people who approve
@@ -108,7 +129,7 @@ export function PettyCashApprovalRouteCard({ entity, currency }: { entity: strin
             <div className="space-y-3 rounded-md border border-gray-03 px-3 py-3">
               <p className="font-mont text-xs font-semibold text-black-01">The ready-made route</p>
               <ul className="list-disc space-y-1 pl-4 font-mont text-xs leading-5 text-gray-01" data-testid="route-stages">
-                {route.stages.map((stage) => <li key={stage.code}>{stage.label}, by someone in <span className="font-semibold">{stage.approver_group_code}</span>.</li>)}
+                {route.stages.map((stage) => <li key={stage.code}>{stage.label}, by someone in <span className="font-semibold">{approverGroupName(stage.approver_group_code)}</span>.</li>)}
                 <li>It stops a count more than {formatMoney(shortage, currency)} short, and every closure. Anything else posts at once.</li>
                 <li>Adopting creates the approver group <span className="font-semibold">{group}</span> empty. Fill it afterwards.</li>
               </ul>

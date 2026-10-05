@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaxCode } from "@/redux/services/finance/setup-types";
-import { taxCodeFormValid, taxCodeFormValues, taxCodeUpsertPayload } from "./tax-code-form";
+import { taxCodeFormValid, taxCodeFormValues, taxCodeUpsertPayload, zeroRateHint } from "./tax-code-form";
 
 const taxCode: TaxCode = {
   id: 7,
@@ -65,5 +65,12 @@ describe("VAT treatment", () => {
 
   it("reads an older server's code as standard", () => {
     expect(taxCodeFormValues({ ...taxCode, treatment: undefined }).treatment).toBe("STANDARD");
+  });
+});
+
+describe("the hint beside a code with no rate", () => {
+  it("takes the article its treatment needs", () => {
+    expect(zeroRateHint("EXEMPT")).toBe("An exempt code charges no tax, so its rate is 0.");
+    expect(zeroRateHint("ZERO_RATED")).toBe("A zero-rated code charges no tax, so its rate is 0.");
   });
 });

@@ -9,6 +9,15 @@
 
 export type BankTransactionDirection = "IN" | "OUT";
 
+/**
+ * Where a bank document stands with its approval route, read from its latest
+ * approval: `NOT_SUBMITTED` when it never went for approval (posted at once, or
+ * withdrawn), `PENDING` while a request is in flight, then `APPROVED` or
+ * `REJECTED`. A rejected document goes back to DRAFT, so its status alone
+ * cannot tell it from one still waiting.
+ */
+export type BankDocumentApprovalState = "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
+
 export interface BankTransactionDocument {
   id: number;
   document_number: string;
@@ -25,6 +34,9 @@ export interface BankTransactionDocument {
   narration: string;
   reference: string;
   journal_id: number | null;
+  /** The branch's name; null for a document not yet given a branch. */
+  branch_name?: string | null;
+  approval_state?: BankDocumentApprovalState;
 }
 
 export interface BankTransferDocument {
@@ -41,4 +53,7 @@ export interface BankTransferDocument {
   narration: string;
   reference: string;
   journal_id: number | null;
+  /** The branch's name; null for a document not yet given a branch. */
+  branch_name?: string | null;
+  approval_state?: BankDocumentApprovalState;
 }

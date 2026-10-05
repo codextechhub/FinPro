@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { groupSharedLines, participatingBranches, sharedRfqLinesBody, sharedSourcingProblem, type SourceLine } from "./shared-sourcing";
+import type { FreeRequisitionLine } from "@/redux/services/procurement/procurement-types";
+import {
+  groupSharedLines, participatingBranches, sharedRfqLinesBody, sharedSourcingProblem, sourceLinesFrom, type SourceLine,
+} from "./shared-sourcing";
 
 const ikejaChairs: SourceLine = { requisition_line: 101, requisition_number: "PR-0001", branch_id: 1, branch_name: "Ikeja", description: "Classroom chair", quantity: 60, expense_code: "5300" };
 const lekkiChairs: SourceLine = { requisition_line: 202, requisition_number: "PR-0002", branch_id: 2, branch_name: "Lekki", description: "classroom  chair ", quantity: 40, expense_code: "5300" };
@@ -38,5 +41,21 @@ describe("sharedSourcingProblem", () => {
 
   it("names each branch once", () => {
     expect(participatingBranches([lekkiDesks, ikejaChairs, lekkiChairs])).toEqual([{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }]);
+  });
+});
+
+describe("sourceLinesFrom", () => {
+  const free = (over: Partial<FreeRequisitionLine>): FreeRequisitionLine => ({
+    id: 101, line_no: 1, catalog_item_id: null, description: "Classroom chair", quantity: "60.000", unit: "each",
+    estimated_unit_price: 0, expense_code: "5300", estimated_line_total: 0,
+    requisition_id: 1, requisition_number: "PR-0001", request_date: "2026-10-01", branch_id: 1, branch_name: "Ikeja", ...over,
+  });
+
+  it("offers each free line with its requisition and branch", () => {
+    expect(sourceLinesFrom([free({})])).toEqual([ikejaChairs]);
+  });
+
+  it("leaves out a line whose requisition has no branch yet, which the server would refuse", () => {
+    expect(sourceLinesFrom([free({ branch_id: null, branch_name: null }), free({ id: 202, branch_id: 2, branch_name: "Lekki" })]).map((l) => l.requisition_line)).toEqual([202]);
   });
 });

@@ -7,6 +7,7 @@ import type { ApiEnvelope, PaginatedEnvelope } from "../finance/api-types";
 import type {
   ContractLinkedPo,
   ContractSummary,
+  FreeRequisitionLine,
   Quotation,
   QuotationDetail,
   Rfq,
@@ -110,6 +111,16 @@ export const procurementExtApi = baseApi.injectEndpoints({
     getRfqs: b.query<PaginatedEnvelope<Rfq>, E & { q?: string }>({
       query: (p) => ({ url: `/procurement/rfqs/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcRfqs"],
+    }),
+    /**
+     * Requisition lines a shared RFQ may still take, oldest requisition first:
+     * approved, and on no live RFQ, order or shared RFQ. Narrowed to the
+     * caller's branches, then by `branch`, `requisition` and `q` (description
+     * or requisition number).
+     */
+    getFreeRequisitionLines: b.query<PaginatedEnvelope<FreeRequisitionLine>, E & { page_size?: number; branch?: number; requisition?: number; q?: string }>({
+      query: (p) => ({ url: `/procurement/rfqs/free-requisition-lines/${qs(p)}`, method: "GET" }),
+      providesTags: ["ProcRfqs", "ProcRequisitions", "ProcPurchaseOrders"],
     }),
     getRfq: b.query<ApiEnvelope<RfqDetail>, Act>({
       query: ({ id, entity }) => ({ url: `/procurement/rfqs/${id}/${qs({ entity })}`, method: "GET" }),
@@ -359,6 +370,7 @@ export const {
   useTerminateContractMutation,
   useCompleteMilestoneMutation,
   useGetRfqsQuery,
+  useGetFreeRequisitionLinesQuery,
   useGetRfqQuery,
   useGetRfqSummaryQuery,
   useCreateRfqMutation,

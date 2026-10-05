@@ -2,7 +2,9 @@
  * Journal detail drawer - design topology: header (no · date · period · source),
  * four stat cards (Status / Total Dr / Total Cr / Difference), the Dr/Cr lines
  * table with cost centres + totals, a teaching note, and a footer with the author
- * + the safe reversal/void action for this journal's source + Print.
+ * + the safe reversal/void action for this journal's source + Print. A journal
+ * whose document is corrected elsewhere (a goods return, received again on a
+ * new receipt) says how, and links to where.
  */
 
 import { useState } from "react";
@@ -17,8 +19,8 @@ import { P } from "../../../permissions";
 import { useGetJournalQuery, useReverseJournalMutation, useSubmitJournalMutation } from "@/redux/services/finance/gl-api";
 import { DocumentVoidAction } from "../receivables/document-void-action";
 import { isVoidableDocument } from "../receivables/document-void-config";
-import { DocumentCorrectionAction } from "./document-correction-action";
-import { isCorrectableDocument } from "./document-correction";
+import { DocumentCorrectionAction, SourceDocumentGuidanceLink } from "./document-correction-action";
+import { isCorrectableDocument, sourceDocumentGuidance } from "./document-correction";
 import { useDates } from "../../../lib/display-prefs";
 
 const cap = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
@@ -47,6 +49,7 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
   const j = data?.data;
   const diff = j ? j.total_debit - j.total_credit : 0;
   const reversalAction = j?.reversal_action;
+  const guidance = sourceDocumentGuidance(reversalAction);
 
   const doReverse = async () => {
     try {
@@ -108,6 +111,7 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
                   onVoided={onClose}
                 />
               )}
+              {guidance && <SourceDocumentGuidanceLink guidance={guidance} onDone={onClose} />}
               <Button variant="outline" onClick={() => window.print()} className="gap-1.5"><Printer className="size-4" /> Print</Button>
             </div>
           </div>
@@ -128,6 +132,8 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
             </div>
 
             {j.reverses_id && <p className="font-mont text-xs text-gray-05">Reverses journal #{j.reverses_id}</p>}
+
+            {guidance && <p data-testid="journal-correction-guidance" className="rounded-md bg-gray-02/50 px-3 py-2 font-mont text-xs leading-5 text-gray-01">{guidance.message}</p>}
 
             {/* lines */}
             <div>

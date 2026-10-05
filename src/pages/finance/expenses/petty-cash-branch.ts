@@ -58,6 +58,20 @@ export function branchName(view: PettyCashBranch, id: number | null | undefined)
   return view.choices.find((b) => b.id === id)?.name ?? `Branch ${id}`;
 }
 
+/**
+ * A row's branch by name: the name the server sent with the row, else the
+ * reader's own branch list, else what a row not yet given a branch is called.
+ */
+export function rowBranchName(view: PettyCashBranch, row: { branch_id?: number | null; branch_name?: string | null }): string {
+  if (row.branch_id == null) return NO_BRANCH_YET;
+  return row.branch_name || branchName(view, row.branch_id);
+}
+
+/** The `?branch=` a list asks the server for: the branch shown, or none under All branches. */
+export function branchQueryArg(view: PettyCashBranch): { branch?: number } {
+  return view.applies && view.selected !== "all" ? { branch: view.selected } : {};
+}
+
 /** The rows of the branch shown; every row under All branches. */
 export function inBranch<T extends { branch_id?: number | null }>(rows: T[], view: PettyCashBranch): T[] {
   if (!view.applies || view.selected === "all") return rows;

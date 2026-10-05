@@ -30,7 +30,7 @@ import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 import { GoodsReturnDrawer } from "./goods-return-drawer";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
-import { returnableQuantity } from "./goods-return";
+import { returnableQuantity, returnedGoodsText } from "./goods-return";
 
 const DETAIL_TABS = [
   { value: "overview", label: "Overview", icon: FileText },
@@ -191,6 +191,22 @@ function ReceiptDrawer({ id, entity, currency, onClose, onSelectReceipt }: {
             <Field label="Items" value={`${formatQuantity(receipt.received_item_count)} of ${formatQuantity(receipt.ordered_item_count)}`} />
             <Field label="Received by" value={receipt.received_by_name} />
           </dl>
+          {receipt.returns?.length ? <section data-testid="receipt-returns" className="rounded-md border border-white-02">
+            <div className="flex items-center gap-1.5 border-b border-white-02 px-4 py-2.5">
+              <p className="font-mont text-xs font-semibold text-gray-05">Returns</p>
+              <InfoHint ariaLabel="About goods returns">A goods return is not voided. If goods went back in error, or have come back, receive them again against the order.</InfoHint>
+            </div>
+            <ul className="divide-y divide-white-02">
+              {receipt.returns.map((ret) => <li key={ret.id} className="space-y-1 px-4 py-3 font-mont text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-black-01">{ret.document_number} · {dates.day(ret.return_date)}</span>
+                  <span className="font-semibold tabular-nums">{formatMoney(ret.total_value, currency)}</span>
+                </div>
+                <p className="text-gray-01">{returnedGoodsText(ret.lines, formatQuantity)}</p>
+                {ret.reason && <p className="text-gray-05">{ret.reason}</p>}
+              </li>)}
+            </ul>
+          </section> : null}
           {receipt.status === "DRAFT" && <PostingRecap title="Posting preview" currency={currency}
             dr={[{ code: "Expense", name: "Accepted delivery value", amount: total }]}
             cr={[{ code: "GR/IR", name: "Goods received / invoice received", amount: total }]}

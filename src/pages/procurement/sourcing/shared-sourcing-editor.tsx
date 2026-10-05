@@ -2,45 +2,55 @@
  * Choosing the requisition lines several branches buy together on one RFQ, and
  * seeing the RFQ lines they make. See shared-sourcing.ts for the rules.
  *
- * Only approved requisitions of branches the reader works in are offered, since
- * the server refuses a shared RFQ that reaches a branch the buyer does not. A
- * requisition is picked whole by default, and single lines can be left out.
+ * The lines offered are the server's free lines: approved requisitions of the
+ * branches the reader works in, on no live RFQ, order or shared RFQ. A
+ * requisition is picked whole by default, and single lines can be left out. A
+ * search narrows the list without dropping what is already picked, so a buyer
+ * can pick Ikeja's chairs, search for Lekki's and keep both.
  */
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import { LoadingState, toArray } from "@/components/finance-ui";
 import { Input } from "@/components/ui/input";
 import { formatQuantity } from "@/utils/quantity";
-import { useGetRequisitionsQuery } from "@/redux/services/procurement/procurement-api";
-import { groupSharedLines, participatingBranches, type SourceLine } from "./shared-sourcing";
+import { useGetFreeRequisitionLinesQuery } from "@/redux/services/procurement/procurement-ext-api";
+import { groupSharedLines, participatingBranches, sourceLinesFrom, type SourceLine } from "./shared-sourcing";
 
-export function useApprovedSourceLines(entity: string, branchIds: number[] | null): { lines: SourceLine[]; isLoading: boolean } {
-  const { data, isLoading } = useGetRequisitionsQuery({ entity, status: "APPROVED", page_size: 100 });
-  const lines = useMemo(() => toArray(data?.data).flatMap((req) => {
-    if (req.branch_id == null || (branchIds && !branchIds.includes(req.branch_id))) return [];
-    return req.lines.map((line) => ({
-      requisition_line: line.id,
-      requisition_number: req.document_number,
-      branch_id: req.branch_id as number,
-      branch_name: req.branch_name || "",
-      description: line.description,
-      quantity: Number(line.quantity),
-      expense_code: line.expense_code,
-    }));
-  }), [data, branchIds]);
-  return { lines, isLoading };
+/** The page size the picker asks for: the server's ceiling. */
+const FREE_LINES_PAGE = 100;
+
+/**
+ * The free lines matching `q`, and every line seen so far by id, so a pick
+ * survives a search that no longer lists it.
+ */
+export function useFreeSourceLines(entity: string, q: string, { skip = false }: { skip?: boolean } = {}) {
+  const { data, isLoading, isFetching } = useGetFreeRequisitionLinesQuery(
+    { entity, page_size: FREE_LINES_PAGE, ...(q ? { q } : {}) }, { skip },
+  );
+  const seen = useRef(new Map<number, SourceLine>());
+  const lines = useMemo(() => {
+    const next = sourceLinesFrom(toArray(data?.data));
+    for (const line of next) seen.current.set(line.requisition_line, line);
+    return next;
+  }, [data]);
+  const total = data?.pagination?.totalItems ?? lines.length;
+  const pick = (ids: number[]) => ids.flatMap((id) => seen.current.get(id) ?? []);
+  return { lines, total, isLoading, isFetching, pick };
 }
 
-export function SharedSourcingEditor({ lines, isLoading, selected, onSelectedChange, descriptions, onDescriptionsChange }: {
+export function SharedSourcingEditor({ lines, total, chosen, isLoading, search, onSearchChange, selected, onSelectedChange, descriptions, onDescriptionsChange }: {
   lines: SourceLine[];
+  total: number;
+  chosen: SourceLine[];
   isLoading: boolean;
+  search: string;
+  onSearchChange: (next: string) => void;
   selected: number[];
   onSelectedChange: (ids: number[]) => void;
   descriptions: Record<string, string>;
   onDescriptionsChange: (next: Record<string, string>) => void;
 }) {
-  const chosen = lines.filter((line) => selected.includes(line.requisition_line));
   const groups = groupSharedLines(chosen);
   const byRequisition = useMemo(() => {
     const map = new Map<string, SourceLine[]>();
@@ -49,8 +59,12 @@ export function SharedSourcingEditor({ lines, isLoading, selected, onSelectedCha
   }, [lines]);
   const toggle = (ids: number[], on: boolean) => onSelectedChange(on ? [...new Set([...selected, ...ids])] : selected.filter((id) => !ids.includes(id)));
   if (isLoading) return <LoadingState rows={3} />;
-  if (!lines.length) return <p className="rounded-md border border-dashed border-white-02 px-4 py-6 text-center font-mont text-xs text-gray-05">No approved requisitions to buy from yet.</p>;
+  const searchBox = <Input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search by item or requisition number" aria-label="Search requisition lines" className="h-9 bg-white" />;
+  if (!lines.length && !search.trim() && !chosen.length) return <p className="rounded-md border border-dashed border-white-02 px-4 py-6 text-center font-mont text-xs text-gray-05">No approved requisition lines are free to buy from. A line already on an RFQ or a purchase order is not offered.</p>;
   return <div className="space-y-4">
+    {searchBox}
+    {total > lines.length && <p className="font-mont text-[11px] text-gray-05">Showing the first {lines.length} of {total} lines. Search to find the rest.</p>}
+    {!lines.length && <p className="rounded-md border border-dashed border-white-02 px-4 py-4 text-center font-mont text-xs text-gray-05">No free requisition lines match.</p>}
     <div className="space-y-2">
       {byRequisition.map(([number, reqLines]) => {
         const ids = reqLines.map((line) => line.requisition_line);

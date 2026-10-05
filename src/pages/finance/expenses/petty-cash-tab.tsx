@@ -16,6 +16,9 @@
  *
  * Branches follow `petty-cash-branch.ts`: nothing at a one-branch school, a
  * branch picker kept in the page address for a reader who covers several.
+ *
+ * A link naming one return (`?document=<id>`, a journal's "Open return") opens
+ * that return over the page, whichever fund or branch is shown.
  */
 
 import { useMemo, useState } from "react";
@@ -42,11 +45,12 @@ import {
 } from "@/redux/services/finance/ops-api";
 import type { PettyCashFund, PettyCashVoucher, PettyCashMovement } from "@/redux/services/finance/ops-types";
 import { useDates } from "../../../lib/display-prefs";
-import { useUserDirectory } from "../../../components/workflow/use-user-directory";
+import { exitedOutline, exitedTitle } from "@/components/finance-ui/exited-person";
+import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { branchName, fundOptionLabel, inBranch, pickFund, usePettyCashBranch, type PettyCashBranch } from "./petty-cash-branch";
 import { closeBlockers, floatBeforeClosure, registerTone, type RegisterTone } from "./petty-cash-returns";
 import { CloseFundDrawer, EditFundDrawer, ReduceFloatDrawer, ReopenFundDialog } from "./petty-cash-return-drawers";
-import { PettyCashReturnsList } from "./petty-cash-returns-list";
+import { LinkedReturnDrawer, PettyCashReturnsList } from "./petty-cash-returns-list";
 import { PettyCashApprovalRouteCard } from "./petty-cash-approval-route";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
@@ -59,9 +63,9 @@ const TONE_CLASS: Record<RegisterTone, string> = {
   short: "bg-destructive/10 text-destructive",
 };
 
-function Initials({ name }: { name: string }) {
+function Initials({ name, exited }: { name: string; exited?: boolean | null }) {
   const init = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-  return <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-pry-01 font-mont text-xs font-semibold text-primary">{init || "-"}</span>;
+  return <span title={exitedTitle(exited)} className={cn("flex size-9 shrink-0 items-center justify-center rounded-full bg-pry-01 font-mont text-xs font-semibold text-primary", exitedOutline(exited))}>{init || "-"}</span>;
 }
 function Kpi({ label, value, hint, danger }: { label: string; value: string; hint?: string; danger?: boolean }) {
   return (
@@ -80,6 +84,11 @@ export function PettyCashTab({ entity, currency }: { entity: string; currency?: 
   const funds = useMemo(() => inBranch(allFunds, view), [allFunds, view]);
   const [establishing, setEstablishing] = useState(false);
   const fund = useMemo(() => pickFund(funds, fundParam), [funds, fundParam]);
+  const [linkedReturn, setLinkedReturn] = useState<number | null>(null);
+  useSourceDocumentParam(setLinkedReturn);
+  const linkedReturnDrawer = linkedReturn != null ? (
+    <LinkedReturnDrawer id={linkedReturn} entity={entity} currency={currency} view={view} funds={allFunds} onClose={() => setLinkedReturn(null)} />
+  ) : null;
 
   const establishDrawer = (
     <EstablishFloatDrawer open={establishing} onClose={() => setEstablishing(false)} entity={entity}
@@ -111,6 +120,7 @@ export function PettyCashTab({ entity, currency }: { entity: string; currency?: 
           {establishDrawer}
         </div>
         <PettyCashApprovalRouteCard entity={entity} currency={currency} />
+        {linkedReturnDrawer}
       </div>
     );
   }
@@ -128,6 +138,7 @@ export function PettyCashTab({ entity, currency }: { entity: string; currency?: 
       {fund ? <FundWorkbench key={fund.id} fund={fund} funds={allFunds} view={view} entity={entity} currency={currency} onEstablish={() => setEstablishing(true)} /> : null}
       <PettyCashApprovalRouteCard entity={entity} currency={currency} />
       {establishDrawer}
+      {linkedReturnDrawer}
     </div>
   );
 }
@@ -145,7 +156,6 @@ function FundWorkbench({ fund, funds, view, entity, currency, onEstablish }: {
   fund: PettyCashFund; funds: PettyCashFund[]; view: PettyCashBranch; entity: string; currency?: string | null; onEstablish: () => void;
 }) {
   const dates = useDates();
-  const people = useUserDirectory();
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("register");
   const [drawer, setDrawer] = useState<Drawer>(null);
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "petty cash return" });
@@ -181,7 +191,7 @@ function FundWorkbench({ fund, funds, view, entity, currency, onEstablish }: {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <Initials name={live.custodian_label || live.name} />
+          <Initials name={live.custodian_label || live.name} exited={live.custodian_is_exited} />
           <div className="min-w-0 leading-tight">
             <p className="flex flex-wrap items-center gap-2 font-mont text-sm font-semibold text-black-01">
               {live.custodian_label || "No custodian set"}
@@ -232,7 +242,7 @@ function FundWorkbench({ fund, funds, view, entity, currency, onEstablish }: {
           <XCircle className="mt-0.5 size-4 shrink-0 text-gray-05" />
           <div className="min-w-0 font-mont text-xs leading-5 text-gray-01">
             <p className="font-semibold text-black-01">
-              Closed on {live.closed_on ? dates.day(live.closed_on) : "-"}{live.closed_by_id ? ` by ${people.name(live.closed_by_id)}` : ""}.
+              Closed on {live.closed_on ? dates.day(live.closed_on) : "-"}{live.closed_by_name ? ` by ${live.closed_by_name}${live.closed_by_is_exited ? " (left)" : ""}` : ""}.
             </p>
             <p className="text-gray-05">Its cash was banked. It takes no vouchers, top-ups or float changes until it is reopened.</p>
           </div>

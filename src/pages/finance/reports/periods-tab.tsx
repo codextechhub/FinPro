@@ -100,8 +100,9 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+/** `SOFT_CLOSED` reads "Soft closed": a server code in sentence case. */
 const humanize = (value: string) => {
-  const text = value.replace(/_/g, " ");
+  const text = value.replace(/_/g, " ").toLowerCase();
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
@@ -158,6 +159,10 @@ type YearAction = { kind: "close" | "reopen" | "archive" | "unarchive"; id: numb
  * render inline above the workbench. The pickers own the selection that drives
  * every query below them, which is why the controls stay part of this component
  * instead of being lifted into the host.
+ *
+ * Opening a fiscal year changes every branch's calendar, so the server takes it
+ * from a whole-school reader only, and "New fiscal year" is offered to nobody
+ * else, as "Re-open year" is not.
  */
 export function PeriodsTab({ entity, headerSlot }: {
   entity: string;
@@ -327,11 +332,13 @@ export function PeriodsTab({ entity, headerSlot }: {
         </label>
       ) : null}
       <ShowArchivedToggle entity={entity} className="h-9" />
-      <Can permission={P.FIN_CREATE_PERIOD}>
-        <Button onClick={() => setCreating(true)} className="h-9 flex-1 gap-1.5 font-mont text-xs font-semibold sm:flex-none">
-          <Plus className="size-3.5" /> New fiscal year
-        </Button>
-      </Can>
+      {wholeSchool ? (
+        <Can permission={P.FIN_CREATE_PERIOD}>
+          <Button onClick={() => setCreating(true)} className="h-9 flex-1 gap-1.5 font-mont text-xs font-semibold sm:flex-none">
+            <Plus className="size-3.5" /> New fiscal year
+          </Button>
+        </Can>
+      ) : null}
     </div>
   );
 
@@ -912,7 +919,8 @@ export function PeriodCloseDrawer({
     try {
       const override = forced ? { force: true as const, reason: reason.trim() } : {};
       const response = await close({ id: id!, entity, soft, ...branchArg, ...override }).unwrap();
-      toast.success(closeOutcomeMessage(period?.name, response.data?.checklist?.items));
+      toast.success(closeOutcomeMessage(period?.name, response.data?.checklist?.items,
+        (item) => checklistDetail(item, { branchName, money: (kobo) => formatMoney(kobo) })));
       closeDrawer();
     } catch { /* central */ }
   };

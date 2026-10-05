@@ -2,8 +2,9 @@
  * The returns list and Void, at Bright Star (Ikeja and Lekki).
  *
  * Under All branches each return names its fund and branch; with Lekki picked
- * only Lekki's returns show and the branch column goes. Opening a return shows
- * the count against the books and where the cash went. Void is offered only to
+ * the server is asked for Lekki's returns only and the branch column goes.
+ * Opening a return shows the count against the books, where the cash went and
+ * who counted and raised it, by the names the server sent. Void is offered only to
  * a holder of `finance.pettycash.reverse`; an older return while a later one of
  * the same fund stands is not sent, and says which return to void first.
  */
@@ -37,11 +38,6 @@ vi.mock("@/hooks/use-permissions", () => ({
   }),
 }));
 
-vi.mock("../../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useDirectory: () => ({ data: [{ id: "7", full_name: "Mrs Bello", email: "", role: "", status: "ACTIVE" }], isLoading: false, isError: false }),
-}));
-
 vi.mock("sonner", () => ({ toast: mocks.toast }));
 
 import type { PettyCashFund, PettyCashReturn } from "@/redux/services/finance/ops-types";
@@ -64,13 +60,14 @@ const ret = (over: Partial<PettyCashReturn>): PettyCashReturn => ({
   return_date: "2026-10-01", counted_amount: 98_500 * NAIRA, book_balance: 100_000 * NAIRA, difference: -1_500 * NAIRA,
   shortage: 1_500 * NAIRA, overage: 0, difference_reason: "coins missing", amount: 38_500 * NAIRA, amount_naira: "",
   cash_left: 60_000 * NAIRA, previous_float_amount: 100_000 * NAIRA, new_float_amount: 60_000 * NAIRA,
-  counted_by_id: 7, narration: "", reference: "", journal_id: 5, created_by_id: 7, ...over,
+  counted_by_id: 7, narration: "", reference: "", journal_id: 5, created_by_id: 7,
+  branch_name: "Ikeja", counted_by_name: "Mrs Eze", created_by_name: "Mrs Bello", ...over,
 });
 
 const FUNDS = [fund(1, 1), fund(2, 2, { state: "CLOSED", is_active: false, float_amount: 0 })];
 const IKEJA_REDUCE = ret({});
 const LEKKI_CLOSE = ret({
-  id: 11, document_number: "PCR-0011", kind: "CLOSE", kind_label: "Close the fund", branch_id: 2, fund_id: 2,
+  id: 11, document_number: "PCR-0011", kind: "CLOSE", kind_label: "Close the fund", branch_id: 2, branch_name: "Lekki", fund_id: 2,
   fund_name: "Lekki float", shortage: 0, difference: 0, amount: 20_000 * NAIRA, new_float_amount: 0, difference_reason: "",
 });
 
@@ -111,10 +108,21 @@ describe("petty cash returns", () => {
     expect(mocks.list).toHaveBeenCalledWith({ entity: "BSS", page_size: 100 });
   });
 
-  it("shows only the picked branch's returns, without a branch column", () => {
+  it("asks the server for the picked branch's returns, without a branch column", () => {
+    mocks.rows = [LEKKI_CLOSE];
     act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, "2")} />));
+    expect(mocks.list).toHaveBeenCalledWith({ entity: "BSS", page_size: 100, branch: 2 });
     expect(headers()).not.toContain("Branch");
     expect(tableRows().map((r) => r.querySelector("td")?.textContent)).toEqual(["PCR-0011"]);
+  });
+
+  it("names a branch and the people as the server sent them, marking who has left", () => {
+    mocks.rows = [ret({ branch_id: 3, branch_name: "Victoria Island", counted_by_is_exited: true })];
+    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    expect(tableRows()[0].textContent).toContain("Victoria Island");
+    act(() => (tableRows()[0] as HTMLElement).click());
+    expect(document.body.textContent).toContain("Counted byMrs Eze (left)");
+    expect(document.body.textContent).toContain("Raised byMrs Bello");
   });
 
   it("voids a closure, which reopens the fund", async () => {

@@ -6,7 +6,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { PettyCashFund } from "@/redux/services/finance/ops-types";
-import { branchName, fundOptionLabel, inBranch, pettyCashBranchFor, pickFund } from "./petty-cash-branch";
+import {
+  branchName, branchQueryArg, fundOptionLabel, inBranch, pettyCashBranchFor, pickFund, rowBranchName,
+} from "./petty-cash-branch";
 
 const IKEJA = { id: 1, name: "Ikeja" };
 const LEKKI = { id: 2, name: "Lekki" };
@@ -52,5 +54,19 @@ describe("petty cash branch lens", () => {
     expect(pickFund(funds, null)?.id).toBe(2);
     expect(pickFund(funds, "x")?.id).toBe(2);
     expect(pickFund([], null)).toBeUndefined();
+  });
+
+  it("asks the server for the branch shown, and for every branch under All branches", () => {
+    expect(branchQueryArg(pettyCashBranchFor(lens({ applies: false, choices: [{ id: 9, name: "Main" }] }), null))).toEqual({});
+    expect(branchQueryArg(pettyCashBranchFor(lens({}), null))).toEqual({});
+    expect(branchQueryArg(pettyCashBranchFor(lens({}), "2"))).toEqual({ branch: 2 });
+    expect(branchQueryArg(pettyCashBranchFor(lens({ pinnedBranch: 2, choices: [LEKKI] }), null))).toEqual({ branch: 2 });
+  });
+
+  it("names a row's branch as the server named it, before looking it up", () => {
+    const all = pettyCashBranchFor(lens({}), null);
+    expect(rowBranchName(all, { branch_id: 3, branch_name: "Victoria Island" })).toBe("Victoria Island");
+    expect(rowBranchName(all, { branch_id: 2 })).toBe("Lekki");
+    expect(rowBranchName(all, { branch_id: null, branch_name: null })).toBe("No branch yet");
   });
 });

@@ -61,7 +61,24 @@ export interface JournalDetail extends JournalListItem {
      * a reader of this field must treat an unknown kind as "no button".
      */
     | { kind: "VOID_DOCUMENT"; document_type: string; document_id: number; document_number: string }
-    | { kind: "SOURCE_DOCUMENT_ACTION"; document_type: string; document_number: string };
+    | SourceDocumentAction;
+}
+
+/**
+ * A document that owns a journal but is not undone from it. Most name only the
+ * document. A goods return also names itself (`document_id`) and the receipt
+ * it came off, and says how it is corrected (`correction` `RECEIVE_AGAIN`:
+ * goods sent back in error are received again on a new receipt), in words for
+ * the reader (`correction_message`).
+ */
+export interface SourceDocumentAction {
+  kind: "SOURCE_DOCUMENT_ACTION";
+  document_type: string;
+  document_number: string;
+  document_id?: number;
+  receipt?: { document_type: string; document_id: number; document_number: string };
+  correction?: string;
+  correction_message?: string;
 }
 
 export interface JournalListParams {

@@ -33,6 +33,13 @@ export const taxCodeFormValues = (taxCode: TaxCode | null): TaxCodeFormValues =>
   active: taxCode?.is_active ?? true,
 });
 
+/** Why a code that is not standard shows no rate: "An exempt code ..." or "A zero-rated code ...". */
+export function zeroRateHint(treatment: TaxTreatment): string {
+  return treatment === "EXEMPT"
+    ? "An exempt code charges no tax, so its rate is 0."
+    : "A zero-rated code charges no tax, so its rate is 0.";
+}
+
 /** Whether the values may be sent: a rate only on a standard code. */
 export function taxCodeFormValid(values: TaxCodeFormValues): boolean {
   if (!values.code.trim() || !values.name.trim()) return false;

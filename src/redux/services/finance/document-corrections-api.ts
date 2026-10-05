@@ -20,7 +20,7 @@ export const documentCorrectionsApi = baseApi.injectEndpoints({
     correctSourceDocument: b.mutation<ApiEnvelope<unknown>, { path: string; entity: string }>({
       query: ({ path, entity }) => ({ url: `/${path}${qs({ entity })}`, method: "POST", body: {} }),
       invalidatesTags: [
-        "FinanceJournals", "FinanceReports", "FinanceBankAccounts", "FinanceBankDocuments", "FinanceStatementLines",
+        "FinanceJournals", "FinanceReports", "FinanceBankAccounts", "FinanceBankDocuments", "FinanceStatementLines", "FinancePettyCash",
         "ProcVendorInvoices", "ProcVendorCreditNotes", "ProcVendorPayments", "ProcPurchaseOrders", "ProcGoodsReceipts", "ProcStock",
       ],
     }),

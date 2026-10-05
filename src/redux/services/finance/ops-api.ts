@@ -298,7 +298,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: ({ id, entity, ...body }) => ({ url: `/finance/petty-cash-funds/${id}/reopen/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePettyCash"],
     }),
-    getPettyCashReturns: b.query<PaginatedEnvelope<PettyCashReturn>, E & { fund?: number; kind?: string }>({
+    getPettyCashReturns: b.query<PaginatedEnvelope<PettyCashReturn>, E & { fund?: number; kind?: string; branch?: number | "unassigned" }>({
       query: (p) => ({ url: `/finance/petty-cash-returns/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePettyCash"],
     }),

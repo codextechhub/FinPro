@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { P } from "../../../permissions";
 import { useGetTaxCodesQuery, useUpsertTaxCodeMutation } from "@/redux/services/finance/setup-api";
 import type { TaxCode } from "@/redux/services/finance/setup-types";
-import { taxCodeFormValid, taxCodeFormValues, taxCodeUpsertPayload } from "./tax-code-form";
+import { taxCodeFormValid, taxCodeFormValues, taxCodeUpsertPayload, zeroRateHint } from "./tax-code-form";
 import { TAX_TREATMENTS, treatmentLabel } from "../../../utils/tax-treatment";
 import type { TaxTreatment } from "@/redux/services/finance/setup-types";
 
@@ -116,7 +116,7 @@ function TaxCodeModal({ existing, onClose, entity }: { existing: TaxCode | null;
       </div>
       <FormField label="Rate (%)" required={standard}>
         <Input value={standard ? pct : "0"} onChange={(e) => setPct(e.target.value)} type="number" step="0.01" placeholder="7.5" disabled={!standard} className="bg-white font-mont disabled:opacity-60" />
-        {!standard ? <span className="mt-1 block font-mont text-[11px] text-gray-05">A {treatment === "EXEMPT" ? "exempt" : "zero-rated"} code charges no tax, so its rate is 0.</span> : null}
+        {!standard ? <span className="mt-1 block font-mont text-[11px] text-gray-05">{zeroRateHint(treatment)}</span> : null}
       </FormField>
       <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="VAT 7.5%" className="bg-white" /></FormField>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

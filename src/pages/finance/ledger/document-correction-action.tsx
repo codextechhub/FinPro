@@ -14,7 +14,9 @@ import { Can } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { useServesPath } from "../../../lib/host-routes";
 import { useCorrectSourceDocumentMutation } from "@/redux/services/finance/document-corrections-api";
-import { DOCUMENT_CORRECTIONS, documentScreenLink, type CorrectableDocumentType } from "./document-correction";
+import {
+  DOCUMENT_CORRECTIONS, documentScreenLink, type CorrectableDocumentType, type SourceDocumentGuidance,
+} from "./document-correction";
 
 export function DocumentCorrectionAction({ documentType, documentId, documentNumber, entity, onDone }: {
   documentType: CorrectableDocumentType;
@@ -48,4 +50,18 @@ export function DocumentCorrectionAction({ documentType, documentId, documentNum
     </Can>}
     {undo && <ConfirmActionModal open={open} onOpenChange={setOpen} title={`${undo.verb.split(" ")[0]} ${documentNumber}?`} description={undo.effect} confirmText={undo.verb} destructive loading={isLoading} onConfirm={confirm} />}
   </>;
+}
+
+/**
+ * The journal footer's link for a document corrected elsewhere: it opens the
+ * screen the guidance names, when the host serves it.
+ */
+export function SourceDocumentGuidanceLink({ guidance, onDone }: {
+  guidance: SourceDocumentGuidance;
+  onDone?: () => void;
+}) {
+  const navigate = useNavigate();
+  const serves = useServesPath();
+  if (!serves(guidance.link)) return null;
+  return <Button variant="outline" className="gap-1.5" onClick={() => { onDone?.(); navigate(guidance.link); }}><ExternalLink className="size-4" /> {guidance.label}</Button>;
 }

@@ -9,6 +9,12 @@
  * confirms first and never fires straight off a row click.
  *
  * A stage's channel is one or more of Email / In-app, stored comma-separated.
+ *
+ * A policy has no branch: its ladder decides when every branch's overdue
+ * customers are reminded, so the server takes a policy change from a
+ * whole-school reader only. Lekki's own bursar, holding the keys, reads the
+ * policies and is told why she cannot change them, rather than being offered
+ * New policy, Edit or the active switch and refused after saving.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -20,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
+import { WHOLE_TENANT_SETTINGS_NOTE, useSettingsWriteAccess } from "@/components/finance-ui/settings-write-access";
 import { P } from "../../../permissions";
 import {
   useGetDunningNoticesQuery, useGetDunningSummaryQuery, useGetDunningPoliciesQuery,
@@ -67,6 +74,7 @@ export function DunningTab({ entity, currency }: { entity: string; currency?: st
   const noticesQ = useGetDunningNoticesQuery({ entity, page: 1 });
   const [generate, { isLoading: generating }] = useGenerateDunningMutation();
   const { can } = useCan();
+  const policyWrite = useSettingsWriteAccess(P.FIN_UPDATE_DUNNING);
 
   const s = summaryQ.data?.data;
   const policies = useMemo(() => toArray(policiesQ.data?.data), [policiesQ.data]);
@@ -97,9 +105,9 @@ export function DunningTab({ entity, currency }: { entity: string; currency?: st
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <TabStrip items={viewTabs} value={tab} onChange={setTab} variant="segmented" ariaLabel="Dunning view" />
         <div className="flex items-center gap-2">
-          <Can permission={P.FIN_UPDATE_DUNNING}>
+          {policyWrite.canUpdate ? (
             <Button variant="outline" onClick={() => setTab("policies")} className="gap-1.5"><SlidersHorizontal className="size-4" /> Configure cadence</Button>
-          </Can>
+          ) : null}
           <Can permission={P.FIN_GENERATE_DUNNING}>
             <Button onClick={runReminders} disabled={generating} className="gap-1.5"><Play className="size-4" />{generating ? "Running…" : "Run reminders now"}</Button>
           </Can>
@@ -215,9 +223,12 @@ function PoliciesPanel({ entity, policies }: { entity: string; policies: Dunning
   const [editing, setEditing] = useState<DunningPolicy | "new" | null>(null);
   const [generate] = useGenerateDunningMutation();
   const [update] = useUpdateDunningPolicyMutation();
-  const { can } = useCan();
-  const canCreate = can(P.FIN_CREATE_DUNNING);
-  const canUpdate = can(P.FIN_UPDATE_DUNNING);
+  const createAccess = useSettingsWriteAccess(P.FIN_CREATE_DUNNING);
+  const updateAccess = useSettingsWriteAccess(P.FIN_UPDATE_DUNNING);
+  const canCreate = createAccess.canUpdate;
+  const canUpdate = updateAccess.canUpdate;
+  // Said only to a holder of a key who lacks the reach, never to a plain reader.
+  const branchBound = [createAccess, updateAccess].some((a) => a.readOnlyNote === WHOLE_TENANT_SETTINGS_NOTE);
 
   const toggleActive = async (p: DunningPolicy) => {
     try { await update({ id: p.id, entity, is_active: !p.is_active }).unwrap(); toast.success(p.is_active ? "Policy deactivated." : "Policy activated."); } catch { /* central */ }
@@ -228,6 +239,7 @@ function PoliciesPanel({ entity, policies }: { entity: string; policies: Dunning
 
   return (
     <div className="space-y-4">
+      {branchBound ? <p data-testid="dunning-read-only" className="font-mont text-xs text-gray-05">Only a school-wide administrator can change the reminder policies, because they apply to every branch. You can read them.</p> : null}
       {canCreate ? <div className="flex justify-end"><Button variant="outline" onClick={() => setEditing("new")} className="gap-1.5"><Plus className="size-4" /> New policy</Button></div> : null}
       {policies.length === 0 ? (
         <div className="rounded-md bg-white p-8 text-center ring-1 ring-white-02">

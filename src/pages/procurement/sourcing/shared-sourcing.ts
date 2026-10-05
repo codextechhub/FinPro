@@ -11,7 +11,13 @@
  * RFQ whose lines come from only one branch, which is an ordinary RFQ. Lines with
  * the same description and expense account are put on one RFQ line, and each
  * keeps its allocation to the requisition line and branch it came from.
+ *
+ * Only lines nothing sources yet are offered: the server lists them (approved,
+ * on no live RFQ, order or shared RFQ) and refuses any other, so the same
+ * chairs are never put out to tender, or ordered, twice.
  */
+
+import type { FreeRequisitionLine } from "@/redux/services/procurement/procurement-types";
 
 export interface SourceLine {
   requisition_line: number;
@@ -29,6 +35,23 @@ export interface SharedRfqLine {
   quantity: number;
   expense_code: string | null;
   allocations: SourceLine[];
+}
+
+/**
+ * The free lines the server listed, as the editor offers them. A line whose
+ * requisition has no branch yet is left out: the server refuses it until the
+ * requisition is placed in a branch.
+ */
+export function sourceLinesFrom(rows: FreeRequisitionLine[]): SourceLine[] {
+  return rows.flatMap((row) => row.branch_id == null ? [] : [{
+    requisition_line: row.id,
+    requisition_number: row.requisition_number,
+    branch_id: row.branch_id,
+    branch_name: row.branch_name || "",
+    description: row.description,
+    quantity: Number(row.quantity),
+    expense_code: row.expense_code,
+  }]);
 }
 
 const groupKey = (line: Pick<SourceLine, "description" | "expense_code">) =>

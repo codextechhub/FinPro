@@ -182,6 +182,11 @@ export interface PettyCashFund {
   closed_on?: string | null;
   /** Who closed it (a user id); null while it runs. */
   closed_by_id?: number | null;
+  /** Who closed it, by name; null while it runs. */
+  closed_by_name?: string | null;
+  /** True once that person has left the school; null when nobody is named. */
+  closed_by_is_exited?: boolean | null;
+  custodian_is_exited?: boolean | null;
 }
 
 export type PettyCashFundState = "ACTIVE" | "INACTIVE" | "CLOSED";
@@ -223,6 +228,14 @@ export interface PettyCashReturn {
   reference: string;
   journal_id: number | null;
   created_by_id: number | null;
+  /** The branch's name; null for a return not yet given a branch. */
+  branch_name?: string | null;
+  /** The people on the return by name, each null when nobody is named. */
+  counted_by_name?: string | null;
+  created_by_name?: string | null;
+  /** True once that person has left the school; null when nobody is named. */
+  counted_by_is_exited?: boolean | null;
+  created_by_is_exited?: boolean | null;
   /** Present when raising it started an approval (status PENDING_APPROVAL). */
   approval?: ApprovalParkState;
   /** The fund as the return left it, present when it posted at once. */
@@ -256,10 +269,19 @@ export interface PettyCashReturnRoute {
   document_type: string;
   code: string;
   name: string;
-  /** Above this shortage (kobo) a count needs a second person. */
-  threshold: number;
-  threshold_naira: string;
+  /**
+   * Above this shortage (kobo) a count needs a second person: the school's own
+   * route as it now stands once adopted, the figure on offer before. Null when
+   * the school has edited the shortage test out of its route.
+   */
+  threshold: number | null;
+  threshold_naira: string | null;
+  /** The ready-made figure (kobo), whatever the school has chosen. */
+  default_threshold?: number;
   approver_group_code: string;
+  approver_group_id?: number | null;
+  /** People in the approver group; 0 until somebody is added, or before it exists. */
+  approver_group_member_count?: number;
   stages: PettyCashRouteStage[];
   adopted: boolean;
   route_id: number | null;

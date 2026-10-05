@@ -145,6 +145,19 @@ export interface RequisitionLine {
   expense_code: string | null;
   estimated_line_total: number;
 }
+/**
+ * A requisition line still free to source: its requisition is approved and no
+ * RFQ, purchase order or shared RFQ sources it yet. It names the requisition
+ * and the branch it is for.
+ */
+export interface FreeRequisitionLine extends RequisitionLine {
+  requisition_id: number;
+  requisition_number: string;
+  request_date: string;
+  branch_id: number | null;
+  branch_name: string | null;
+}
+
 export interface Requisition {
   id: number;
   document_number: string;
@@ -315,6 +328,8 @@ export interface GoodsReceipt {
   purchase_order_ordered_item_count: string | null;
   purchase_order_remaining_item_count: string | null;
   lines: GRNLine[];
+  /** The returns taken off this receipt, oldest first. Sent on the detail read only. */
+  returns?: GoodsReturn[];
 }
 
 export interface VendorInvoiceLine {
