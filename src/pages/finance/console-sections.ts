@@ -26,6 +26,8 @@ export const SETUP_SECTIONS = [
   "tax-codes",
   "cost-centers",
   "dimensions",
+  // National payroll tax data, kept by the platform. A school app leaves it unmounted.
+  "tax-tables",
 ] as const;
 export type SetupSection = (typeof SETUP_SECTIONS)[number];
 export const DEFAULT_SETUP_SECTION: SetupSection = "entities";
@@ -79,6 +81,10 @@ export const PAYMENTS_SECTIONS = [
   "settlement",
   "transactions",
   "webhooks",
+  "held-settlements",
+  // Platform only: the daily held-ledger check and the provider account settings.
+  // A school app leaves it unmounted.
+  "held-reconciliations",
 ] as const;
 export type PaymentsSection = (typeof PAYMENTS_SECTIONS)[number];
 export const DEFAULT_PAYMENTS_SECTION: PaymentsSection = "payouts";

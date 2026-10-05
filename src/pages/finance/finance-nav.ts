@@ -13,6 +13,7 @@ import {
   CalendarClock, BadgePercent, BellRing, ListChecks, Landmark, Wallet,
   PiggyBank, Boxes, Scale, TrendingUp, ArrowLeftRight, GitBranch, ScrollText,
   CircleDollarSign, Send, Settings, AlertTriangle, ArrowRightLeft, HandCoins, Split, Handshake,
+  Gavel, ShieldCheck,
 } from "lucide-react";
 import type { ConsoleNavGroup } from "@/components/finance-ui/console-nav";
 import { routesPath } from "@/routes/routes-path";
@@ -36,6 +37,10 @@ export const financeNav: ConsoleNavGroup[] = [
       { title: "Tax Codes", url: `${F.SETUP}/tax-codes`, icon: Percent, permissions: [P.FIN_VIEW_TAX_CODES] },
       { title: "Cost Centres", url: `${F.SETUP}/cost-centers`, icon: Layers, permissions: [P.FIN_VIEW_COST_CENTERS] },
       { title: "Dimensions", url: `${F.SETUP}/dimensions`, icon: GitBranch, permissions: [P.FIN_VIEW_DIMENSIONS] },
+      // The national PAYE tables, states and PFAs. Everybody in finance may read
+      // them, but the screen is for the platform staff who keep them, so it opens
+      // on the keys that change them.
+      { title: "Tax Tables", url: `${F.SETUP}/tax-tables`, icon: Gavel, permissions: [P.FIN_CREATE_STATUTORY, P.FIN_UPDATE_STATUTORY] },
     ],
   },
 
@@ -86,7 +91,13 @@ export const financeNav: ConsoleNavGroup[] = [
       { title: "Virtual Accounts", url: `${F.COLLECTIONS}/virtual-accounts`, icon: Landmark, permissions: [P.PAY_VIEW_VIRTUAL_ACCOUNTS] },
       { title: "Payouts", url: `${F.PAYMENTS}/payouts`, icon: Send, permissions: [P.PAY_VIEW_PAYOUTS] },
       { title: "Batches", url: `${F.PAYMENTS}/batches`, icon: Layers, permissions: [P.PAY_VIEW_PAYOUTS], resources: ["payments.payout_batch"] },
-      { title: "Settlement", url: `${F.PAYMENTS}/settlement`, icon: ArrowLeftRight, permissions: [P.PAY_VIEW_PAYMENT_REPORTS] },
+      { title: "Settlement", url: `${F.PAYMENTS}/settlement`, icon: ArrowLeftRight, permissions: [P.PAY_VIEW_PAYMENT_REPORTS], resources: ["payments.settlement"] },
+      // A school reads what the platform paid its branches; a platform operator
+      // reads every school's settlements and puts them forward for approval.
+      { title: "Held Settlements", url: `${F.PAYMENTS}/held-settlements`, icon: HandCoins, permissions: [P.PAY_VIEW_PAYMENT_REPORTS, P.PAY_VIEW_PLATFORM_SETTLEMENTS], resources: ["payments.platform_settlement"] },
+      // Platform only: the daily check of held money against the provider, and
+      // the platform's own provider account settings.
+      { title: "Held Reconciliations", url: `${F.PAYMENTS}/held-reconciliations`, icon: ShieldCheck, permissions: [P.PAY_VIEW_PLATFORM_SETTLEMENTS, P.PAY_VIEW_PLATFORM_PROVIDER, P.PAY_UPDATE_PLATFORM_PROVIDER], resources: ["payments.platform_provider"] },
       { title: "Transactions Log", url: `${F.PAYMENTS}/transactions`, icon: ScrollText, permissions: [P.PAY_VIEW_PAYMENT_REPORTS] },
       { title: "Needs Attention", url: `${F.PAYMENTS}/webhooks`, icon: AlertTriangle, permissions: [P.PAY_VIEW_WEBHOOKS] },
     ],
@@ -107,7 +118,8 @@ export const financeNav: ConsoleNavGroup[] = [
   {
     label: "Administration",
     items: [
-      { title: "Settings", url: F.SETTINGS, icon: Settings, permissions: [P.FIN_VIEW_SETTINGS] },
+      // Online payments (custody, branch subaccounts) is a panel under Banking and cash.
+      { title: "Settings", url: F.SETTINGS, icon: Settings, permissions: [P.FIN_VIEW_SETTINGS], resources: ["payments.settings"] },
     ],
   },
 ];

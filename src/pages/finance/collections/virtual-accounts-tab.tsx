@@ -7,6 +7,9 @@
  * `payments.virtual_account`: a hidden one has no column and no line in the
  * drawer. The provider issues both, so neither is ever edited here.
  * No prototype exists for this screen; built in the house theme to match AR.
+ *
+ * At a school with several branches each account names the branch whose
+ * collection account its deposits settle into (see payment-branches.ts).
  */
 
 import { useMemo, useState } from "react";
@@ -29,6 +32,7 @@ import {
 import type { VirtualAccount } from "@/redux/services/payments/payments-types";
 import { PROVIDER_CHOICES, providerInfo } from "../payment-providers";
 import { useDates } from "../../../lib/display-prefs";
+import { usePaymentBranchColumn } from "../payment-branches";
 
 const providerLabel = (p: string) => providerInfo(p).label;
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
@@ -71,6 +75,7 @@ export function VirtualAccountsTab({ entity, currency }: { entity: string; curre
   const pg = data?.pagination;
   const kpis = data?.kpis;
   const access = useFieldAccess(VIRTUAL_ACCOUNT);
+  const branchColumn = usePaymentBranchColumn();
 
   const columns: Column<VirtualAccount>[] = [
     { header: "Customer", cell: (v) => (
@@ -79,6 +84,7 @@ export function VirtualAccountsTab({ entity, currency }: { entity: string; curre
         <span className="font-medium text-gray-01">{v.customer_name || v.customer_code || "-"}</span>
       </span>
     ) },
+    ...(branchColumn.show ? [{ header: "Branch", cell: (v: VirtualAccount) => <span className="text-gray-05">{branchColumn.name(v.branch)}</span> }] : []),
     { header: "Bank", cell: (v) => v.bank_name || "-" },
     ...(access.isHidden("account_number") ? [] : [{ header: "Account number", cell: (v: VirtualAccount) => <span className="tabular-nums">{v.account_number || "-"}</span> }]),
     { header: "Provider", cell: (v) => providerLabel(v.provider) },

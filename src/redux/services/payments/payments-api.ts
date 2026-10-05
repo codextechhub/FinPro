@@ -6,15 +6,26 @@
  *   GET  /payments/collections/{id}/?verify=1 confirm + book the receipt
  *   POST /payments/virtual-accounts/         payments.virtual_account.create
  *   GET  /payments/payouts/ , /payout-batches/  payments.payout.view (slice 6)
+ *   GET/PATCH /payments/settings/custody/    payments.settings.view / .update (whole school)
+ *   POST /payments/subaccounts/              payments.settings.update (whole school)
+ *   POST /payments/settlements/              payments.settlement.create
+ *   GET  /payments/held-settlements/         payments.report.view, narrowed to the reader's branches
+ *   /payments/platform/...                   platform staff only, with no `entity`
  */
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
 import type { ApiEnvelope, PaginatedEnvelope } from "@/redux/services/finance/api-types";
 import type {
+  BookSettlementPayload,
+  BookedSettlement,
   Collection,
   CollectionSummary,
   CreatePayoutBatchPayload,
+  CustodyPayload,
+  HeldReconciliation,
+  HeldSettlement,
+  HeldSettlementStatus,
   InitiateCollectionPayload,
   InitiatePayoutPayload,
   Movement,
@@ -24,8 +35,14 @@ import type {
   PayoutBatchSummary,
   PayoutInstruction,
   PayoutSummary,
+  PlatformHeldSettlement,
+  ProviderSettings,
+  ProviderSweep,
+  SaveSubaccountPayload,
+  SavedSubaccount,
   SettlementReconciliation,
   TransactionLogEntry,
+  UpdateCustodyPayload,
   VirtualAccount,
   VirtualAccountKpis,
   WebhookEvent,
@@ -142,6 +159,62 @@ export const paymentsApi = baseApi.injectEndpoints({
     }),
     getSettlementReconciliation: builder.query<ApiEnvelope<SettlementReconciliation>, { entity: string; provider?: string; start_date?: string; end_date?: string }>({
       query: (p) => ({ url: `/payments/reports/settlement-reconciliation/${qs(p)}`, method: "GET" }),
+      providesTags: ["PaymentsCollections"],
+    }),
+    // Books a bank line as the settlement of the online payments it carries:
+    // Dr bank (net), Dr bank charges (fee), Cr gateway clearing (gross).
+    bookSettlement: builder.mutation<ApiEnvelope<BookedSettlement>, BookSettlementPayload>({
+      query: ({ entity, ...body }) => ({ url: `/payments/settlements/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["PaymentsCollections", "FinanceStatementLines", "FinanceBankAccounts", "FinanceJournals", "FinanceReports"],
+    }),
+
+    getCustodySettings: builder.query<ApiEnvelope<CustodyPayload>, { entity: string }>({
+      query: (p) => ({ url: `/payments/settings/custody/${qs(p)}`, method: "GET" }),
+      providesTags: ["PaymentsCustody"],
+    }),
+    updateCustodySettings: builder.mutation<ApiEnvelope<CustodyPayload>, UpdateCustodyPayload>({
+      query: ({ entity, ...body }) => ({ url: `/payments/settings/custody/${qs({ entity })}`, method: "PATCH", body }),
+      invalidatesTags: ["PaymentsCustody"],
+    }),
+    // Creates the branch collection account's provider subaccount, or points an
+    // existing one at the account's current details.
+    saveCollectionSubaccount: builder.mutation<ApiEnvelope<SavedSubaccount>, SaveSubaccountPayload>({
+      query: ({ entity, ...body }) => ({ url: `/payments/subaccounts/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["PaymentsCustody", "FinanceBankAccounts"],
+    }),
+
+    // The school's own read-only list of what the platform has paid its branches.
+    getHeldSettlements: builder.query<ApiEnvelope<HeldSettlement[]>, { entity: string; status?: HeldSettlementStatus; limit?: number }>({
+      query: (p) => ({ url: `/payments/held-settlements/${qs(p)}`, method: "GET" }),
+      providesTags: ["PaymentsHeldSettlements"],
+    }),
+
+    // Platform scope (CodeX staff only): no `entity`, every school at once.
+    getPlatformHeldSettlements: builder.query<ApiEnvelope<PlatformHeldSettlement[]>, { status?: HeldSettlementStatus; client?: string; limit?: number }>({
+      query: (p) => ({ url: `/payments/platform/held-settlements/${qs(p)}`, method: "GET" }),
+      providesTags: ["PaymentsHeldSettlements"],
+    }),
+    submitPlatformHeldSettlement: builder.mutation<
+      ApiEnvelope<PlatformHeldSettlement & { approval?: ApprovalParkState }>, { id: number }
+    >({
+      query: ({ id }) => ({ url: `/payments/platform/held-settlements/${id}/submit/`, method: "POST" }),
+      invalidatesTags: ["PaymentsHeldSettlements", "WorkflowPending", "WorkflowSubmissions"],
+    }),
+    getPlatformHeldReconciliations: builder.query<ApiEnvelope<HeldReconciliation[]>, { agrees?: "true" | "false"; limit?: number }>({
+      query: (p) => ({ url: `/payments/platform/held-reconciliations/${qs(p)}`, method: "GET" }),
+      providesTags: ["PaymentsHeldChecks"],
+    }),
+    getPlatformProviderSettings: builder.query<ApiEnvelope<ProviderSettings>, void>({
+      query: () => ({ url: `/payments/platform/provider-settings/`, method: "GET" }),
+      providesTags: ["PaymentsHeldChecks"],
+    }),
+    updatePlatformProviderSettings: builder.mutation<ApiEnvelope<ProviderSettings>, { balance_swept: boolean; reason: string }>({
+      query: (body) => ({ url: `/payments/platform/provider-settings/`, method: "PATCH", body }),
+      invalidatesTags: ["PaymentsHeldChecks"],
+    }),
+    getPlatformProviderSweeps: builder.query<ApiEnvelope<ProviderSweep[]>, { limit?: number }>({
+      query: (p) => ({ url: `/payments/platform/provider-sweeps/${qs(p)}`, method: "GET" }),
+      providesTags: ["PaymentsHeldChecks"],
     }),
     // Append-only gateway action log (PaymentEvent), paginated.
     getTransactionsLog: builder.query<PaginatedEnvelope<TransactionLogEntry>, { entity: string; page?: number; action?: string; provider?: string; succeeded?: string }>({
@@ -151,11 +224,11 @@ export const paymentsApi = baseApi.injectEndpoints({
     // Unified, paginated money-movement feed (collections in + payouts out) + its summary.
     getMovements: builder.query<PaginatedEnvelope<Movement>, { entity: string; page?: number; direction?: string; group?: string; provider?: string }>({
       query: (p) => ({ url: `/payments/movements/${qs(p)}`, method: "GET" }),
-      providesTags: ["PaymentsCollections", "PaymentsPayouts"],
+      providesTags: ["PaymentsCollections", "PaymentsPayouts", "PaymentsHeldSettlements"],
     }),
     getMovementsSummary: builder.query<ApiEnvelope<MovementsSummary>, { entity: string; provider?: string }>({
       query: (p) => ({ url: `/payments/movements/summary/${qs(p)}`, method: "GET" }),
-      providesTags: ["PaymentsCollections", "PaymentsPayouts"],
+      providesTags: ["PaymentsCollections", "PaymentsPayouts", "PaymentsHeldSettlements"],
     }),
     // Inbound provider events that need an operator. Defaults to FAILED + IGNORED:
     // money has usually moved at the provider by the time one of these appears.
@@ -215,6 +288,17 @@ export const {
   useGetMovementsQuery,
   useGetMovementsSummaryQuery,
   useGetSettlementReconciliationQuery,
+  useBookSettlementMutation,
+  useGetCustodySettingsQuery,
+  useUpdateCustodySettingsMutation,
+  useSaveCollectionSubaccountMutation,
+  useGetHeldSettlementsQuery,
+  useGetPlatformHeldSettlementsQuery,
+  useSubmitPlatformHeldSettlementMutation,
+  useGetPlatformHeldReconciliationsQuery,
+  useGetPlatformProviderSettingsQuery,
+  useUpdatePlatformProviderSettingsMutation,
+  useGetPlatformProviderSweepsQuery,
   useGetTransactionsLogQuery,
   useGetWebhookEventsQuery,
   useGetWebhookSummaryQuery,

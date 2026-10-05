@@ -21,7 +21,8 @@
  *   21 tax, 22 payrollrun, 23 budget, 24 fixedasset, 25 audit, 26 customer,
  *   27 feestructure, 28 payment, 29 pettycashvoucher, 30 salary, 31 writeoff,
  *   32 settings; 33 entity, 34 account and 35 period hold the renumbered codes
- *   described below; 36 fiscalyear; 45 banktransaction, 46 banktransfer;
+ *   described below; 36 fiscalyear; 37 statutory (the national payroll tax
+ *   data the platform maintains); 45 banktransaction, 46 banktransfer;
  *   55 interbranch (transfers between a school's branches, with its own
  *   actions 52 request, 53 transfer, 54 confirm and 55 recharge).
  *
@@ -33,7 +34,8 @@
  *   action, because carrying in opening bills is the bill's only import.
  *
  *   Payments (80): 01 collection, 02 virtual_account, 03 payout, 04 report,
- *   05 payout_batch, 06 webhook, 07 unattributed_webhook.
+ *   05 payout_batch, 06 webhook, 07 unattributed_webhook, 08 settings
+ *   (custody), 09 settlement, 10 platform_settlement, 11 platform_provider.
  *
  *   Workflow (60): 01 template, 02 instance, 03 action, 04 group, 05 approvers.
  *   Most workflow codes are declared by each host, which gates its own menus on
@@ -187,6 +189,8 @@ export const P = {
   FIN_VIEW_TAX: "202101",
   FIN_VIEW_TAX_CODES: "201501",
   FIN_VIEW_WRITE_OFFS: "203101",
+  FIN_CREATE_STATUTORY: "203702",  // add a national tax table, state or PFA (platform staff)
+  FIN_UPDATE_STATUTORY: "203703",  // change one (platform staff)
   FIN_WRITE_OFF_INVOICE: "200521",
   PAY_REPLAY_UNATTRIBUTED_WEBHOOK: "800748",
   PAY_VIEW_COLLECTIONS: "800101",
@@ -201,6 +205,13 @@ export const P = {
   PAY_VIEW_UNATTRIBUTED_WEBHOOKS: "800701",
   PAY_VIEW_VIRTUAL_ACCOUNTS: "800201",
   PAY_VIEW_WEBHOOKS: "800601",
+  PAY_VIEW_PAYMENT_SETTINGS: "800801",  // custody mode and each branch's collection account
+  PAY_UPDATE_PAYMENT_SETTINGS: "800803",  // change custody, set up a branch's subaccount
+  PAY_CREATE_SETTLEMENT: "800902",  // book a bank line as the settlement of online payments
+  PAY_VIEW_PLATFORM_SETTLEMENTS: "801001",  // every school's held settlements and the daily checks (platform)
+  PAY_SUBMIT_PLATFORM_SETTLEMENT: "801030",  // put a held settlement forward for approval (platform)
+  PAY_VIEW_PLATFORM_PROVIDER: "801101",  // the platform's own provider account settings
+  PAY_UPDATE_PLATFORM_PROVIDER: "801103",  // change them, with a reason (platform)
   PROC_ACTIVATE_CONTRACT: "700427",
   PROC_ADJUST_STOCK: "701337",
   PROC_ALLOCATE_VENDOR_ADVANCE: "701120",  // apply a prepayment to a later bill
@@ -521,4 +532,13 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "800601": "payments.webhook.view",
   "800701": "payments.unattributed_webhook.view",
   "800748": "payments.unattributed_webhook.replay",
+  "800801": "payments.settings.view",
+  "800803": "payments.settings.update",
+  "800902": "payments.settlement.create",
+  "801001": "payments.platform_settlement.view",
+  "801030": "payments.platform_settlement.submit",
+  "801101": "payments.platform_provider.view",
+  "801103": "payments.platform_provider.update",
+  "203702": "finance.statutory.create",
+  "203703": "finance.statutory.update",
 };

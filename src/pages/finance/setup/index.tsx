@@ -12,13 +12,14 @@ import { CurrenciesTab } from "./currencies-tab";
 import { TaxCodesTab } from "./tax-codes-tab";
 import { CostCentersTab } from "./cost-centers-tab";
 import { DimensionsTab } from "./dimensions-tab";
+import { TaxTablesTab } from "./tax-tables-tab";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 
 const LABELS: Record<string, string> = {
   entities: "Entities", accounts: "Chart of Accounts", periods: "Periods",
   currencies: "Currencies & FX", "tax-codes": "Tax Codes", "cost-centers": "Cost Centres",
-  dimensions: "Dimensions",
+  dimensions: "Dimensions", "tax-tables": "Tax Tables",
 };
 
 const HINTS: Record<string, string> = {
@@ -28,6 +29,7 @@ const HINTS: Record<string, string> = {
   currencies: "FX rates convert foreign-currency amounts to your base currency for the GL; unrealised gains/losses on foreign balances are recognised by the FX revaluation step at period close.",
   "tax-codes": "Tax codes attach rates and accounting rules to lines - a VAT code posts to VAT Payable; a WHT code reduces cash and credits WHT Payable. \"Recoverable\" marks input tax that offsets output tax.",
   "cost-centers": "Cost centres tag journal lines with the department or branch that owns the spend, so reports can slice income and expense by unit.",
+  "tax-tables": "The national PAYE tables, the states PAYE is remitted to and the pension fund administrators. Every payroll prices its months from these, so only platform staff change them; a change reaches the next payroll run, never a month already priced.",
   dimensions: "Dimensions are extra analytical axes (e.g. fund, project) you can tag on journal lines, each with a constrained value list. The Cost & Dimension Analysis report slices net activity per account by any axis.",
 };
 
@@ -44,6 +46,7 @@ const DESCRIPTIONS: Record<string, string> = {
   "tax-codes": "VAT and withholding codes, the rates they apply and the accounts they post to.",
   "cost-centers": "The departments and branches that own the spend, so reports can slice income and expense by unit.",
   dimensions: "Extra analytical axes such as fund or project, each with its own list of allowed values.",
+  "tax-tables": "PAYE bands and reliefs for each tax year, PAYE states and pension fund administrators.",
 };
 const AREA_DESCRIPTION = "Ledger entities, chart of accounts, periods and reference data.";
 
@@ -75,6 +78,7 @@ export default function SetupPage({ section = DEFAULT_SETUP_SECTION }: {
           : section === "tax-codes" ? needsEntity(<TaxCodesTab entity={entity!} />)
           : section === "cost-centers" ? needsEntity(<CostCentersTab entity={entity!} />)
           : section === "dimensions" ? needsEntity(<DimensionsTab entity={entity!} />)
+          : section === "tax-tables" ? <TaxTablesTab />
           : <EntitiesTab />}
       </PageShell>
     </FinanceShell>

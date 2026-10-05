@@ -9,6 +9,8 @@ export type CollectionStatus = "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED"
 export interface Collection {
   id: number;
   entity_code: string;
+  /** The branch the money belongs to (its invoice's); null on a row still waiting for one. */
+  branch?: number | null;
   provider: string;
   channel: string;
   reference: string;
@@ -33,6 +35,8 @@ export interface Collection {
 export interface VirtualAccount {
   id: number;
   entity_code: string;
+  /** The branch whose collection account the deposits settle into. */
+  branch?: number | null;
   provider: string;
   customer_code: string | null;
   customer_name: string | null;
@@ -58,6 +62,8 @@ export interface VirtualAccountKpis {
 export interface PayoutInstruction {
   id: number;
   entity_code: string;
+  /** The branch of the bank account the payout is paid from. */
+  branch?: number | null;
   batch_id: number | null;
   provider: string;
   reference: string;
@@ -164,13 +170,54 @@ export interface SettlementRow {
   amount_naira: string;
   confirmed_at: string | null;
   settled: boolean;
-  match_basis: "reference" | "amount" | "";
+  match_basis: "reference" | "amount" | "settlement" | "platform_settlement" | "";
   matched_bank_line_id: number | null;
   settled_amount: number | null; // the matched bank line's signed amount (net of fees)
   fee_amount: number; // |amount| − |settled_amount| - the PSP fee
   settlement_reference: string; // the matched bank line's reference
   settlement_date: string | null; // the matched bank line's txn date
   settlement_description: string; // the matched bank line's description
+  /** Amount-only match: a person should confirm it. */
+  needs_review?: boolean;
+  /** Booked to gateway clearing: it settles through a booked settlement, not a line of its own. */
+  via_clearing?: boolean;
+  /** The provider's own fee for this payment, where it reported one. */
+  reported_fee?: number | null;
+}
+
+/** A bank inflow the server thinks carries these waiting payments. Nothing is booked
+ *  until a person confirms it through `POST /payments/settlements/`. */
+export interface SuggestedSettlement {
+  bank_line_id: number;
+  bank_account_id: number;
+  txn_date: string;
+  branch: number | null;
+  /** "reference": the line names one payment; "day": one branch's payments of one day. */
+  basis: "reference" | "day";
+  confirmed_on: string | null;
+  collection_ids: number[];
+  gross: number;
+  fee: number;
+  net: number;
+}
+
+export interface BookSettlementPayload {
+  entity: string;
+  statement_line: number;
+  collections: number[];
+  posting_date?: string;
+}
+
+/** The journal a booked settlement posted: Dr bank (net), Dr bank charges (fee), Cr gateway clearing (gross). */
+export interface BookedSettlement {
+  journal_id: number;
+  journal_number: string;
+  date: string;
+  statement_line: number;
+  collections: number[];
+  gross: number;
+  fee: number;
+  net: number;
 }
 
 export interface UnmatchedBankLine {
@@ -200,6 +247,7 @@ export interface SettlementReconciliation {
   };
   rows: SettlementRow[];
   unmatched_bank_lines: UnmatchedBankLine[];
+  suggested_settlements?: SuggestedSettlement[];
 }
 
 // Append-only gateway action log (PaymentEvent) - the transactions log.
@@ -249,11 +297,12 @@ export interface PayoutBatchKpis {
 // number, absent when Field Access on payments.payout hides them. `amount` is
 // the money that moved: on a payout, the line less the WHT withheld.
 export interface Movement {
-  kind: "collection" | "payout";
+  /** "settlement": held money paid into a branch's bank, a transfer rather than spending. */
+  kind: "collection" | "payout" | "settlement";
   gateway_id: number;
   reference: string;
   created_at: string | null;
-  direction: "in" | "out";
+  direction: MovementDirection;
   party?: string;
   provider: string;
   amount: number; // kobo that moved (a payout's line net of WHT)
@@ -271,9 +320,14 @@ export interface Movement {
   beneficiary_account?: string;
 }
 
+/** "transfer" moves the school's own money (a held settlement) and is never money spent. */
+export type MovementDirection = "in" | "out" | "transfer";
+
 export interface MovementsSummary {
   in7d: Money;
   out7d: Money;
+  /** Settlements of held money in the last 7 days; absent on an older server. */
+  transfers7d?: Money;
   pending: number;
   failed: number;
 }
@@ -313,4 +367,158 @@ export interface WebhookSummary {
   /** failed + ignored - the badge number. */
   needs_attention: number;
   status_counts: Record<string, number>;
+}
+
+// ── Custody: who holds the online money between the payer and the bank ──────
+
+/** HELD: the platform holds it and pays each branch on schedule. DIRECT: each
+ *  branch's provider subaccount settles straight into its collection account. */
+export type CustodyMode = "HELD" | "DIRECT";
+
+export interface CustodySettings {
+  /** The mode in force today. */
+  mode: CustodyMode;
+  stored_mode: CustodyMode;
+  effective_from: string | null;
+  /** A change waiting for its month start (a move to direct also waits until nothing is held). */
+  pending_mode: CustodyMode | null;
+  pending_from: string | null;
+  /** Why a pending change has not happened yet, in the server's words. */
+  pending_note: string | null;
+  settlement_interval_days: number;
+  clearing_stale_days: number;
+  updated_at: string | null;
+}
+
+/** A branch's collection account as the custody screen lists it (no account number). */
+export interface CustodyCollectionAccount {
+  id: number;
+  name: string;
+  bank_name: string;
+  subaccount_ready: boolean;
+  subaccount_provider: string | null;
+}
+
+export interface CustodyBranch {
+  branch: number;
+  branch_name: string;
+  collection_account: CustodyCollectionAccount | null;
+  /** Kobo the platform holds for this branch now. */
+  held_balance: number;
+}
+
+export interface CustodyPayload {
+  settings: CustodySettings;
+  /** The branches in the reader's reach. */
+  branches: CustodyBranch[];
+}
+
+export interface UpdateCustodyPayload {
+  entity: string;
+  mode?: CustodyMode;
+  settlement_interval_days?: number;
+  clearing_stale_days?: number;
+}
+
+export interface SaveSubaccountPayload {
+  entity: string;
+  bank_account: number;
+  /** The bank's code at the provider, digits only (058 for GTBank). */
+  settlement_bank_code: string;
+  business_name?: string;
+  provider?: string;
+}
+
+export interface SavedSubaccount extends CustodyCollectionAccount {
+  branch: number | null;
+}
+
+// ── Held settlements: the platform paying a branch the money it held ─────────
+
+export type HeldSettlementStatus = "PENDING" | "PAID" | "FAILED";
+
+export interface HeldSettlement {
+  id: number;
+  branch: number;
+  branch_name: string;
+  status: HeldSettlementStatus;
+  run_on: string;
+  /** The last settlement before a move to direct payment. */
+  final: boolean;
+  /** Payments covered. */
+  gross: number;
+  /** The provider's fees on those payments. */
+  fees: number;
+  /** The provider's fee for the transfer itself, borne by the branch. */
+  transfer_fee: number;
+  /** What is sent to the bank. */
+  amount: number;
+  bank_account: { id: number; name: string };
+  batch: {
+    id: number;
+    reference: string;
+    status: string;
+    approval_status?: "PENDING" | "APPROVED" | "REJECTED" | null;
+  } | null;
+  journal_id: number | null;
+  paid_at: string | null;
+  failure_reason: string | null;
+}
+
+/** The platform's view of a held settlement: which school it pays. */
+export interface PlatformHeldSettlement extends HeldSettlement {
+  tenant: string;
+  tenant_name: string;
+  entity: string;
+}
+
+/** One day's check of the platform's books against its provider balance. */
+export interface HeldReconciliation {
+  id: number;
+  checked_on: string;
+  provider: string;
+  currency: string;
+  /** What the provider reported; null when it could not be read. */
+  provider_balance: number | null;
+  /** What the books say the provider should hold. */
+  books_balance: number;
+  /** The provider balance account in the platform's books. */
+  provider_account: number;
+  /** Every branch's held balance added up. */
+  held_total: number;
+  /** The platform's own online takings not yet settled, less fees. */
+  own_in_transit: number;
+  /** The provider sweeps the balance to the platform's bank, so sweeps were allowed for. */
+  balance_swept: boolean;
+  /** Sweeps taken off the books' figure. */
+  swept_total: number;
+  /** The platform's own takings matched to a bank line after sweeping began, added back. */
+  own_swept_settled: number;
+  /** Provider less books; null when the provider could not be read. */
+  difference: number | null;
+  tolerance: number;
+  agrees: boolean;
+  error: string | null;
+  incident_code: string | null;
+}
+
+/** How the platform's own merchant account behaves at the provider. */
+export interface ProviderSettings {
+  balance_swept: boolean;
+  /** "platform": a value was stored; "default": nobody has set it. */
+  source: "platform" | "default";
+  updated_at: string | null;
+  tolerance_kobo: number;
+  sweeps: { count: number; total: number; latest_settled_at: string | null };
+}
+
+/** One provider settlement of the platform balance that the daily check counted. */
+export interface ProviderSweep {
+  id: number;
+  provider: string;
+  settlement_id: string;
+  currency: string;
+  amount: number;
+  settled_at: string | null;
+  recorded_on: string;
 }
