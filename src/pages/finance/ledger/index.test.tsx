@@ -6,6 +6,8 @@
  *      of both until "Show archived years" is ticked, and taken in by both after.
  *   2. A journal Mr Eze raised before he left keeps his name, with the dashed
  *      outline and its "No longer on the staff" title.
+ *   3. A link from another screen (`?document=501`, an inter-branch transfer's
+ *      journal) opens that journal.
  */
 
 import { act } from "react";
@@ -13,7 +15,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ journals: vi.fn(), summary: vi.fn(), rows: [] as unknown[] }));
+const mocks = vi.hoisted(() => ({ journals: vi.fn(), summary: vi.fn(), rows: [] as unknown[], opened: [] as (number | null)[] }));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
@@ -49,7 +51,9 @@ vi.mock("@/redux/services/finance/gl-api", () => ({
   },
 }));
 vi.mock("./direct-entry-drawer", () => ({ DirectEntryDrawer: () => null }));
-vi.mock("./journal-detail-drawer", () => ({ JournalDetailDrawer: () => null }));
+vi.mock("./journal-detail-drawer", () => ({
+  JournalDetailDrawer: ({ journalId }: { journalId: number | null }) => { mocks.opened.push(journalId); return null; },
+}));
 
 import GeneralLedgerPage from "./index";
 
@@ -103,5 +107,13 @@ describe("who raised a journal", () => {
     expect(eze?.className).toContain("outline-dashed");
     expect(eze?.parentElement?.getAttribute("title")).toBe("No longer on the staff");
     expect(bello?.className).not.toContain("outline-dashed");
+  });
+});
+
+describe("a link to one journal", () => {
+  it("opens the journal its address names", () => {
+    mocks.opened = [];
+    mount("/finance/ledger?document=501");
+    expect(mocks.opened.at(-1)).toBe(501);
   });
 });

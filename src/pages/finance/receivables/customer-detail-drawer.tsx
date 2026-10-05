@@ -250,6 +250,15 @@ function OpenItemsTab({ d, currency }: { d: CustomerDetail; currency?: string | 
   );
 }
 
+/**
+ * The statement's range as its heading reads it, in the school's date format
+ * like the rows below it: "1 Sep 2026 - 5 Oct 2026", or "Up to 5 Oct 2026"
+ * with no start day.
+ */
+export function statementPeriodLabel(from: string, to: string, day: (iso: string) => string): string {
+  return from ? `${day(from)} - ${day(to)}` : `Up to ${day(to)}`;
+}
+
 /** A printable statement-of-account document for the active date range. */
 function StatementTab({ d, entity, entityName, currency }: { d: CustomerDetail; entity: string; entityName: string; currency?: string | null }) {
   const dates = useDates();
@@ -269,7 +278,7 @@ function StatementTab({ d, entity, entityName, currency }: { d: CustomerDetail; 
     return { opening: open, rows: rng, closing: rng.length ? rng[rng.length - 1].balance.kobo : open };
   }, [d.statement, from, to]);
 
-  const period = from ? `${from} - ${to}` : `Up to ${to}`;
+  const period = statementPeriodLabel(from, to, dates.day);
 
   return (
     <div className="space-y-3">

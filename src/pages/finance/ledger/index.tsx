@@ -32,6 +32,7 @@ import { useGetJournalsQuery, useGetJournalSummaryQuery } from "@/redux/services
 import type { JournalListItem, JournalSource, JournalStatus } from "@/redux/services/finance/gl-types";
 import { DirectEntryDrawer } from "./direct-entry-drawer";
 import { JournalDetailDrawer } from "./journal-detail-drawer";
+import { useSourceDocumentParam } from "../../../lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
@@ -66,6 +67,8 @@ export default function GeneralLedgerPage() {
   const { can } = useCan();
   const [showArchived] = useShowArchived();
   useActionParam("new", can(P.FIN_POST_DIRECT_ENTRY), () => setDirectOpen(true));
+  // A link from another screen (`?document=<journal id>`) opens that journal.
+  useSourceDocumentParam(setSelected);
 
   const range = preset === "custom" ? custom : presetRange(preset, dates.today());
   const filters = useMemo(() => ({

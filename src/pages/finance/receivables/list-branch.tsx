@@ -86,7 +86,7 @@ export function ListBranchSelect({ view, onChange, className }: {
 }) {
   if (!view.canChoose) return null;
   return (
-    <div className={className ?? "w-full sm:w-48"}>
+    <div className={className ?? "w-full sm:w-60"}>
       <NativeSelect value={String(view.selected)} onChange={(e) => onChange(e.target.value)} aria-label="Branch" className="h-9">
         <option value="all">All branches</option>
         {view.choices.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}

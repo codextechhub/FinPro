@@ -5,6 +5,7 @@
  * register already filtered.
  */
 
+import { routesPath } from "@/routes/routes-path";
 import { INTER_BRANCH_PATH } from "../console-sections";
 
 /** One transfer, open in the register. */
@@ -30,4 +31,9 @@ export function heldReceiptLink(id: number): string {
 /** One recharge, open. */
 export function rechargeLink(id: number): string {
   return `${INTER_BRANCH_PATH}/recharges?document=${id}`;
+}
+
+/** One journal, open in the General Ledger. */
+export function journalLink(id: number): string {
+  return `${routesPath.PROTECTED.FINANCE.LEDGER}?document=${id}`;
 }

@@ -48,7 +48,7 @@ import {
 } from "@/redux/services/finance/interbranch-api";
 import type { InterBranchKind, InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
 import { useDates } from "../../../lib/display-prefs";
-import { adjustmentLink, heldReceiptLink, rechargeLink } from "./links";
+import { adjustmentLink, heldReceiptLink, journalLink, rechargeLink } from "./links";
 import { moveDebtSentence, movedDebt, movedItemAmount, movedItemLabel } from "./move-summary";
 import { MoveBalanceDrawer } from "./move-balance-drawer";
 import { BranchSelect, Fact, Note, StagePill } from "./parts";
@@ -250,8 +250,13 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
                 <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Journals</p>
                 <ul className="space-y-1">
                   {t.journals.map((leg) => (
-                    <li key={leg.role} className="font-mont text-xs text-gray-01">
-                      {reader.nameOf(leg.branch_id)}: {leg.journal_id ? `journal #${leg.journal_id}` : leg.role === "RECEIVING" && t.receipt_id ? `receipt #${t.receipt_id}` : "the adjusting document's own journal"}
+                    <li key={leg.role} className="flex flex-wrap items-center gap-x-1.5 font-mont text-xs text-gray-01">
+                      <span>{reader.nameOf(leg.branch_id)}:</span>
+                      {leg.journal_id ? (
+                        <Link to={journalLink(leg.journal_id)} onClick={onClose} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                          Open its journal <ArrowRight className="size-3.5" />
+                        </Link>
+                      ) : leg.role === "RECEIVING" && t.receipt_id ? "booked by the receipt" : "the adjusting document's own journal"}
                     </li>
                   ))}
                 </ul>

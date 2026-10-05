@@ -620,9 +620,9 @@ export function SettingsTab({ account, record, entity, canEdit }: { account: Ban
           <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} disabled={!canEdit} className="bg-white font-mont" />
         </AccessField>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Currency"><CurrencyPicker value={currency} onChange={setCurrency} disabled={!canEdit} /></FormField>
-        <div className="flex items-end gap-4 pb-2">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-2 pb-2">
           <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} disabled={!canEdit} className="accent-primary" /> Active</label>
           <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={primary} onChange={(e) => setPrimary(e.target.checked)} disabled={!canEdit} className="accent-primary" /> Primary</label>
           <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={primaryCollection} onChange={(e) => setPrimaryCollection(e.target.checked)} disabled={!canEdit} className="accent-primary" /> Collection</label>
