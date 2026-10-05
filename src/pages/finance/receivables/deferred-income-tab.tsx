@@ -30,13 +30,12 @@ import { CalendarCheck, Undo2 } from "lucide-react";
 import {
   ConfirmActionModal, DataTable, FormField, Money, PostingDateField, StatusPill, toArray, type Column,
 } from "@/components/finance-ui";
-import { useCan } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
-import { useReaderReach } from "../../../host";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { useDates } from "../../../lib/display-prefs";
 import {
   useGetDeferredIncomeQuery, useGetDeferredIncomeReleasesQuery, useReleaseDeferredIncomeMutation,
@@ -85,8 +84,7 @@ export function undoableMonths(
 
 export function DeferredIncomeTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
-  const { can } = useCan();
-  const { wholeSchool } = useReaderReach();
+  const { canWholeSchool, heldWithoutReach } = useWholeSchoolAccess();
   const branches = useBranchColumn();
   const list = useListBranch();
   const branchArg = listBranchArg(list.view);
@@ -98,9 +96,9 @@ export function DeferredIncomeTab({ entity, currency }: { entity: string; curren
   const [undoing, setUndoing] = useState(false);
   const [lastRun, setLastRun] = useState<DeferredIncomeRelease[] | null>(null);
   const summary = data?.data;
-  const canRelease = wholeSchool && can(P.FIN_RELEASE_DEFERRED_INCOME);
-  const canUndo = wholeSchool && can(P.FIN_REVERSE_DEFERRED_INCOME);
-  const runsOffered = can(P.FIN_RELEASE_DEFERRED_INCOME) || can(P.FIN_REVERSE_DEFERRED_INCOME);
+  const canRelease = canWholeSchool(P.FIN_RELEASE_DEFERRED_INCOME);
+  const canUndo = canWholeSchool(P.FIN_REVERSE_DEFERRED_INCOME);
+  const runsWithheld = heldWithoutReach(P.FIN_RELEASE_DEFERRED_INCOME) || heldWithoutReach(P.FIN_REVERSE_DEFERRED_INCOME);
 
   const monthColumns: Column<{ month: string; amount: number }>[] = [
     { header: "Month", cell: (r) => <span className="font-medium text-gray-01">{dates.monthYear(`${r.month}-01`)}</span> },
@@ -144,7 +142,7 @@ export function DeferredIncomeTab({ entity, currency }: { entity: string; curren
           ) : null}
         </div>
       </div>
-      {runsOffered && !wholeSchool ? (
+      {runsWithheld ? (
         <Note>A release covers every branch at once, so only someone who covers the whole school runs or undoes it.</Note>
       ) : null}
 

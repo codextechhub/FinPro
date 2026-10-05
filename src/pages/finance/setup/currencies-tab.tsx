@@ -4,13 +4,17 @@
  * history), base/source filters, the rate table, and New FX rate. Currencies tab
  * lists the platform currencies. (No "Sync" - there's no live feed integration;
  * no "captured by" - FxRate has no user field.)
+ *
+ * An exchange rate is shared by every branch, so the server records one only
+ * from a holder of the create key who covers the whole school. New FX rate is
+ * offered to that reader alone.
  */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus, TrendingUp, TrendingDown } from "lucide-react";
 import { DataTable, StatusPill, Sparkline, FormDrawer, FormField, TabStrip, CHART_COLORS, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
-import { Can, useCan } from "@/components/finance-ui/can";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
@@ -45,8 +49,9 @@ export function CurrenciesTab() {
   const [base, setBase] = useState("");
   const [source, setSource] = useState("");
   const [creating, setCreating] = useState(false);
-  const { can } = useCan();
-  useActionParam("new", can(P.FIN_CREATE_FX_RATE), () => setCreating(true));
+  const { canWholeSchool } = useWholeSchoolAccess();
+  const canCreate = canWholeSchool(P.FIN_CREATE_FX_RATE);
+  useActionParam("new", canCreate, () => { if (canCreate) setCreating(true); });
 
   const bases = useMemo(() => [...new Set(rates.map((r) => r.base))].sort(), [rates]);
   const sources = useMemo(() => [...new Set(rates.map((r) => r.source).filter(Boolean))].sort(), [rates]);
@@ -92,11 +97,9 @@ export function CurrenciesTab() {
       {/* tabs + action */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <TabStrip items={VIEW_TABS} value={tab} onChange={setTab} ariaLabel="Currency views" />
-        {tab === "fx" && (
-          <Can permission={P.FIN_CREATE_FX_RATE}>
-            <Button onClick={() => setCreating(true)} className="h-9 gap-1.5 font-mont text-xs font-semibold"><Plus className="size-3.5" /> New FX rate</Button>
-          </Can>
-        )}
+        {tab === "fx" && canCreate ? (
+          <Button onClick={() => setCreating(true)} className="h-9 gap-1.5 font-mont text-xs font-semibold"><Plus className="size-3.5" /> New FX rate</Button>
+        ) : null}
       </div>
 
       {tab === "fx" ? (

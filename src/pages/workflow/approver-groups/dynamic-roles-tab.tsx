@@ -16,11 +16,11 @@ import {
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { P } from "@/permissions";
-import { usePermissions } from "@/hooks/use-permissions";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { useActionParam } from "@/hooks/use-action-param";
 import { useAppSelector } from "@/redux/store";
 import { apiErrorMessage, errorStatus } from "@/utils/api-errors";
-import { useBranches, useDirectory, useReaderReach } from "@xvs/finance/host";
+import { useBranches, useDirectory } from "@xvs/finance/host";
 import {
   useDeleteDynamicRoleMutation,
   useGetDynamicRoleFieldsQuery,
@@ -64,14 +64,14 @@ const EVERY_DOCUMENT: string[] = [];
  * changes nothing. The same create gate covers `?action=new`.
  */
 export default function DynamicRolesTab() {
-  const { hasPermission } = usePermissions();
-  const { wholeSchool } = useReaderReach();
-  const canCreate = hasPermission(P.CREATE_APPROVER_GROUP) && wholeSchool;
-  const canUpdate = hasPermission(P.UPDATE_APPROVER_GROUP) && wholeSchool;
-  const canDelete = hasPermission(P.DELETE_APPROVER_GROUP) && wholeSchool;
+  const { canWholeSchool, heldWithoutReach } = useWholeSchoolAccess();
+  const canCreate = canWholeSchool(P.CREATE_APPROVER_GROUP);
+  const canUpdate = canWholeSchool(P.UPDATE_APPROVER_GROUP);
+  const canDelete = canWholeSchool(P.DELETE_APPROVER_GROUP);
   const readOnly =
-    !wholeSchool &&
-    [P.CREATE_APPROVER_GROUP, P.UPDATE_APPROVER_GROUP, P.DELETE_APPROVER_GROUP].some((code) => hasPermission(code));
+    heldWithoutReach(P.CREATE_APPROVER_GROUP) ||
+    heldWithoutReach(P.UPDATE_APPROVER_GROUP) ||
+    heldWithoutReach(P.DELETE_APPROVER_GROUP);
 
   const [selectedId, setSelectedId] = useState("");
   const [editor, setEditor] = useState<EditorState>(null);

@@ -84,7 +84,7 @@ import {
   useCalendarBranch,
   type CalendarBranch,
 } from "./calendar-branch";
-import { useReaderReach } from "../../../host";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { useDates } from "../../../lib/display-prefs";
 import { isForbidden } from "../../../lib/api-errors";
 
@@ -169,7 +169,7 @@ export function PeriodsTab({ entity, headerSlot }: {
   headerSlot?: HTMLElement | null;
 }) {
   const calendar = useCalendarBranch();
-  const { wholeSchool } = useReaderReach();
+  const { canWholeSchool } = useWholeSchoolAccess();
   const { can } = useCan();
   const dates = useDates();
   const [showArchived] = useShowArchived();
@@ -223,7 +223,7 @@ export function PeriodsTab({ entity, headerSlot }: {
   // only: to a whole-school holder of the key, under All branches or at a
   // school with one branch. The minimum age comes from the record-keeping
   // settings when the reader may read them; otherwise the server judges it.
-  const mayArchive = wholeSchool && can(P.FIN_ARCHIVE_FISCAL_YEAR) && calendar.readBranch == null;
+  const mayArchive = canWholeSchool(P.FIN_ARCHIVE_FISCAL_YEAR) && calendar.readBranch == null;
   const retentionQ = useGetRecordRetentionSettingsQuery(
     { entity },
     { skip: !mayArchive || !can(P.FIN_VIEW_SETTINGS) },
@@ -335,12 +335,10 @@ export function PeriodsTab({ entity, headerSlot }: {
         </label>
       ) : null}
       <ShowArchivedToggle entity={entity} className="h-9" />
-      {wholeSchool ? (
-        <Can permission={P.FIN_CREATE_PERIOD}>
-          <Button onClick={() => setCreating(true)} className="h-9 flex-1 gap-1.5 font-mont text-xs font-semibold sm:flex-none">
-            <Plus className="size-3.5" /> New fiscal year
-          </Button>
-        </Can>
+      {canWholeSchool(P.FIN_CREATE_PERIOD) ? (
+        <Button onClick={() => setCreating(true)} className="h-9 flex-1 gap-1.5 font-mont text-xs font-semibold sm:flex-none">
+          <Plus className="size-3.5" /> New fiscal year
+        </Button>
       ) : null}
     </div>
   );
@@ -422,7 +420,7 @@ export function PeriodsTab({ entity, headerSlot }: {
             year={activeFiscalYear.year}
             fiscalYearId={activeFiscalYear.id}
             openCount={summary.open}
-            mayReopenYear={wholeSchool}
+            mayReopenYear={canWholeSchool(P.FIN_REOPEN_FISCAL_YEAR)}
             isArchived={!!activeFiscalYear.is_archived}
             archive={archive}
             branchName={calendar.applies && calendar.readBranch != null ? calendarBranchName(calendar, calendar.readBranch) : null}
@@ -577,7 +575,7 @@ function FiscalYearOverview({
  *
  * An open year offers Close fiscal year once every month is restricted. A
  * CLOSED year offers Re-open fiscal year to a holder of its own key who also
- * covers the whole school (`mayReopenYear`): re-opening a year moves a whole
+ * covers the whole school (`mayReopenYear`, from `useWholeSchoolAccess`): re-opening a year moves a whole
  * year's result out of Retained Earnings, so the server keeps it for a
  * school-wide administrator and refuses a branch's own bursar with a 403. A
  * reader pinned to the only branch of a one-branch school counts as
@@ -645,15 +643,13 @@ function YearCloseReadiness({
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           {status === "CLOSED" && mayReopenYear ? (
-            <Can permission={P.FIN_REOPEN_FISCAL_YEAR}>
-              <Button
-                variant="outline"
-                onClick={onReopenYear}
-                disabled={!fiscalYearId || isArchived}
-                title={isArchived ? `Unarchive FY ${year} before re-opening it.` : undefined}
-                className="w-full sm:w-auto"
-              >Re-open year</Button>
-            </Can>
+            <Button
+              variant="outline"
+              onClick={onReopenYear}
+              disabled={!fiscalYearId || isArchived}
+              title={isArchived ? `Unarchive FY ${year} before re-opening it.` : undefined}
+              className="w-full sm:w-auto"
+            >Re-open year</Button>
           ) : null}
           {archive?.kind === "archived" ? (
             <Button variant="outline" onClick={onUnarchiveYear} className="w-full gap-1.5 sm:w-auto">
@@ -881,6 +877,7 @@ export function PeriodCloseDrawer({
 }) {
   const dates = useDates();
   const { can } = useCan();
+  const { canWholeSchool } = useWholeSchoolAccess();
   const { data, isLoading, isError, error, refetch } = useGetPeriodChecklistQuery(
     id ? { id, entity, ...(calendar.readBranch != null ? { branch: calendar.readBranch } : {}) } : skipToken,
   );
@@ -1136,7 +1133,7 @@ export function PeriodCloseDrawer({
                           ) : null}
                         </div>
                         {item.detail ? <p className="mt-1 break-words font-mont text-xs leading-5 text-gray-05">{checklistDetail(item, { money: (kobo) => formatMoney(kobo) })}</p> : null}
-                        {sealsLink(item) && can(P.FIN_VIEW_SEALS) ? (
+                        {sealsLink(item) && canWholeSchool(P.FIN_VIEW_SEALS) ? (
                           <Link to={`${F.REPORTS}/seals`} className="mt-1 inline-block font-mont text-xs font-semibold text-primary hover:underline">
                             Verify sealed figures
                           </Link>

@@ -30,7 +30,7 @@ import type { TaxFilingDetail } from "@/redux/services/finance/tax-types";
 import { TaxRemittances, TaxReturnLines, TaxReturnShares, payableShares, penaltyBranches, showsShares } from "./tax-return-detail";
 import { AnnualPayeReturnDrawer, RemittanceSchedulePanel } from "./payroll-returns";
 import { useDates } from "../../../lib/display-prefs";
-import { useReaderReach } from "../../../host";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 
@@ -60,7 +60,7 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
   const dates = useDates();
   // Preparing and filing a return, and setting up an obligation, change what
   // every branch owes, so they are offered only to a whole-school reader.
-  const { wholeSchool } = useReaderReach();
+  const { canWholeSchool } = useWholeSchoolAccess();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [newFiling, setNewFiling] = useState(false);
   const [newObligation, setNewObligation] = useState(false);
@@ -102,12 +102,12 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={() => printTaxFilingPack(rows, currency, dates.prefs)} disabled={!rows.length} className="gap-1.5"><Printer className="size-4" /> Filing pack</Button>
           <Button variant="outline" onClick={() => setAnnualReturn(true)} className="gap-1.5"><FileCheck2 className="size-4" /> Annual PAYE return</Button>
-          {wholeSchool && <Can permission={P.FIN_CREATE_TAX}>
+          {canWholeSchool(P.FIN_CREATE_TAX) ? (
             <Button variant="outline" onClick={() => setNewObligation(true)} className="gap-1.5"><Plus className="size-4" /> New obligation</Button>
-          </Can>}
-          {wholeSchool && <Can permission={P.FIN_FILE_TAX}>
+          ) : null}
+          {canWholeSchool(P.FIN_FILE_TAX) ? (
             <Button onClick={() => setNewFiling(true)} className="gap-1.5"><Plus className="size-4" /> New filing</Button>
-          </Can>}
+          ) : null}
         </div>
       </div>
 
@@ -154,7 +154,7 @@ function Step({ state, title, sub }: { state: "done" | "current" | "todo"; title
 function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filingId: number | null; filings: TaxFiling[]; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
   const showBranch = useReaderBranchLens().applies;
-  const { wholeSchool } = useReaderReach();
+  const { canWholeSchool } = useWholeSchoolAccess();
   const detailQ = useGetTaxFilingQuery({ id: filingId ?? 0, entity }, { skip: filingId == null });
   const listed = useMemo(() => (filings.find((x) => x.id === filingId) ?? null) as TaxFilingDetail | null, [filings, filingId]);
   const f = (detailQ.data?.data && detailQ.data.data.id === filingId ? detailQ.data.data : listed);
@@ -185,8 +185,8 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
         footer={<>
           <StatusPill status={f.filing_status} />
           <div className="flex-1" />
-          {f.filing_status === "DRAFT" && wholeSchool ? <Can permission={P.FIN_FILE_TAX}><Button onClick={() => setFiling(true)} className="gap-1.5"><FileCheck2 className="size-4" /> Mark as filed</Button></Can> : null}
-          {canUnfile && wholeSchool ? <Can permission={P.FIN_FILE_TAX}><Button variant="outline" disabled={unfilingBusy} onClick={() => setUnfiling(true)} className="gap-1.5"><Undo2 className="size-4" /> Un-file</Button></Can> : null}
+          {f.filing_status === "DRAFT" && canWholeSchool(P.FIN_FILE_TAX) ? <Button onClick={() => setFiling(true)} className="gap-1.5"><FileCheck2 className="size-4" /> Mark as filed</Button> : null}
+          {canUnfile && canWholeSchool(P.FIN_FILE_TAX) ? <Button variant="outline" disabled={unfilingBusy} onClick={() => setUnfiling(true)} className="gap-1.5"><Undo2 className="size-4" /> Un-file</Button> : null}
           {f.filing_status === "FILED" ? <Can permission={P.FIN_PAY_TAX}><Button onClick={() => setPaying(true)} className="gap-1.5"><Banknote className="size-4" /> Pay {formatMoney(f.balance_due, currency)}</Button></Can> : null}
         </>}>
         <div className="space-y-5">

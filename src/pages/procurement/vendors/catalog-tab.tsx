@@ -10,7 +10,8 @@ import {
   AccountPicker, DataTable, DetailDrawer, FormDrawer, FormField, Money,
   MoneyInput, StatusPill, TabStrip, TaxCodePicker, toArray, type Column, type TabStripItem,
 } from "@/components/finance-ui";
-import { Can, useCan } from "@/components/finance-ui/can";
+import { useCan } from "@/components/finance-ui/can";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,8 +71,19 @@ function EmptyPanel({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-32 items-center justify-center rounded-md border border-dashed border-white-02 px-4 text-center font-mont text-xs leading-5 text-gray-05">{children}</div>;
 }
 
+/**
+ * The catalogue: the item list every branch buys from, with its purchasing
+ * defaults, preferred vendors and reference pricing.
+ *
+ * An item has no branch, so adding or changing one changes it for every
+ * branch, and the server takes it only from a holder of the key who covers the
+ * whole school. New Item and Edit Item are offered to that reader alone; a
+ * branch's own buyer reads the catalogue to raise requisitions from it.
+ */
 export function CatalogTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const { can } = useCan();
+  const { canWholeSchool } = useWholeSchoolAccess();
+  const canCreate = canWholeSchool(P.PROC_CREATE_CATALOG_ITEM);
   const canStock = can(P.PROC_VIEW_STOCK);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -81,7 +93,7 @@ export function CatalogTab({ entity, currency }: { entity: string; currency?: st
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", can(P.PROC_CREATE_CATALOG_ITEM), () => setCreating(true));
+  useActionParam("new", canCreate, () => { if (canCreate) setCreating(true); });
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
@@ -129,7 +141,7 @@ export function CatalogTab({ entity, currency }: { entity: string; currency?: st
         <h1 className="font-mont text-lg font-semibold text-gray-01">Catalog</h1>
         <p className="mt-0.5 font-mont text-xs text-gray-05">Master item list with purchasing defaults, preferred vendors and reference pricing.</p>
       </div>
-      <Can permission={P.PROC_CREATE_CATALOG_ITEM}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Item</Button></Can>
+      {canCreate ? <Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Item</Button> : null}
     </header>
 
     <section data-guide="procurement-catalog.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
@@ -184,8 +196,9 @@ function CatalogDrawer({ id, entity, currency, onClose }: { id: number | null; e
   const insights = insightsResponse?.data;
   const [tab, setTab] = useState<(typeof DETAIL_TABS)[number][1]>("overview");
   const [editing, setEditing] = useState(false);
+  const canEdit = useWholeSchoolAccess().canWholeSchool(P.PROC_UPDATE_CATALOG_ITEM);
   return <>
-    <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={item?.name || "Catalog Item"} description={item ? `${item.code} · ${item.category_path || "Uncategorised"}` : "Loading catalog item"} widthClass="sm:max-w-[700px]" footer={item && <Can permission={P.PROC_UPDATE_CATALOG_ITEM}><Button variant="outline" onClick={() => setEditing(true)}><PencilLine className="size-4" /> Edit Item</Button></Can>}>
+    <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={item?.name || "Catalog Item"} description={item ? `${item.code} · ${item.category_path || "Uncategorised"}` : "Loading catalog item"} widthClass="sm:max-w-[700px]" footer={item && canEdit ? <Button variant="outline" onClick={() => setEditing(true)}><PencilLine className="size-4" /> Edit Item</Button> : null}>
       {isLoading ? <EmptyPanel>Loading catalog item…</EmptyPanel> : isForbidden(error) ? <EmptyPanel>You do not have permission to view this catalog item.</EmptyPanel> : isError || !item ? <EmptyPanel><button type="button" className="text-primary" onClick={() => refetch()}>Catalog item could not be loaded. Try again.</button></EmptyPanel> : <div className="space-y-5">
         <TabStrip
           items={DETAIL_TAB_ITEMS}

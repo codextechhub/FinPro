@@ -15,7 +15,8 @@ import {
   type Column,
   type TabStripItem,
 } from "@/components/finance-ui";
-import { Can, useCan } from "@/components/finance-ui/can";
+import { useCan } from "@/components/finance-ui/can";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchSelect } from "@/components/custom/search-select";
@@ -87,8 +88,18 @@ function hierarchyRows(rows: VendorCategory[]) {
   return ordered;
 }
 
+/**
+ * Vendor categories: the spend taxonomy and its accounting defaults.
+ *
+ * A category has no branch, so adding or changing one changes it for every
+ * branch, and the server takes it only from a holder of the key who covers the
+ * whole school. New Category and Edit Category are offered to that reader
+ * alone; a branch's own buyer reads the list.
+ */
 export function CategoriesTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const { can } = useCan();
+  const { canWholeSchool } = useWholeSchoolAccess();
+  const canCreate = canWholeSchool(P.PROC_CREATE_CATEGORY);
   const canReports = can(P.PROC_VIEW_PROC_REPORTS);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -96,7 +107,7 @@ export function CategoriesTab({ entity, currency }: { entity: string; currency?:
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  useActionParam("new", can(P.PROC_CREATE_CATEGORY), () => setCreating(true));
+  useActionParam("new", canCreate, () => { if (canCreate) setCreating(true); });
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
@@ -143,7 +154,7 @@ export function CategoriesTab({ entity, currency }: { entity: string; currency?:
         <h1 className="font-mont text-lg font-semibold text-gray-01">Categories</h1>
         <p className="mt-0.5 font-mont text-xs text-gray-05">Spend taxonomy and accounting defaults for vendor purchasing.</p>
       </div>
-      <Can permission={P.PROC_CREATE_CATEGORY}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Category</Button></Can>
+      {canCreate ? <Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Category</Button> : null}
     </header>
 
     <section data-guide="procurement-categories.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
@@ -191,8 +202,9 @@ function CategoryDrawer({ id, entity, currency, canReports, insight, onClose }: 
   const category = data?.data;
   const [tab, setTab] = useState<(typeof DETAIL_TABS)[number][1]>("overview");
   const [editing, setEditing] = useState(false);
+  const canEdit = useWholeSchoolAccess().canWholeSchool(P.PROC_UPDATE_CATEGORY);
   return <>
-    <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={category?.name || "Category"} description={category ? `${category.code} · ${category.default_expense_code || "No default expense account"}` : "Loading category"} widthClass="sm:max-w-[640px]" footer={category && <Can permission={P.PROC_UPDATE_CATEGORY}><Button variant="outline" onClick={() => setEditing(true)}>Edit Category</Button></Can>}>
+    <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={category?.name || "Category"} description={category ? `${category.code} · ${category.default_expense_code || "No default expense account"}` : "Loading category"} widthClass="sm:max-w-[640px]" footer={category && canEdit ? <Button variant="outline" onClick={() => setEditing(true)}>Edit Category</Button> : null}>
       {isLoading ? <RestrictedPanel>Loading category…</RestrictedPanel> : isForbidden(error) ? <RestrictedPanel>You do not have permission to view this category.</RestrictedPanel> : isError || !category ? <RestrictedPanel><button type="button" className="text-primary" onClick={() => refetch()}>Category could not be loaded. Try again.</button></RestrictedPanel> : <div className="space-y-5">
         <TabStrip
           items={DETAIL_TAB_ITEMS}

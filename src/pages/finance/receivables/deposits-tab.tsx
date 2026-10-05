@@ -22,7 +22,7 @@ import {
 import { useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { P } from "../../../permissions";
-import { useReaderReach } from "../../../host";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { useDates } from "../../../lib/display-prefs";
 import {
   useForfeitDepositsMutation, useGetDepositsQuery, useGetReceivablesSettingsQuery, useReleaseDepositsMutation,
@@ -48,7 +48,7 @@ const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont
 export function DepositsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
   const { can } = useCan();
-  const { wholeSchool } = useReaderReach();
+  const { canWholeSchool } = useWholeSchoolAccess();
   const branches = useBranchColumn();
   const list = useListBranch();
   const [status, setStatus] = useState<DepositStatus | "">("HELD");
@@ -86,7 +86,7 @@ export function DepositsTab({ entity, currency }: { entity: string; currency?: s
           </div>
           {customer ? <Button variant="ghost" size="sm" onClick={() => setCustomer("")}>Clear</Button> : null}
         </div>
-        {wholeSchool && can(P.FIN_FORFEIT_DEPOSITS) ? (
+        {canWholeSchool(P.FIN_FORFEIT_DEPOSITS) ? (
           <Button variant="outline" onClick={() => setForfeiting(true)} className="gap-1.5"><Archive className="size-4" /> Forfeit unclaimed</Button>
         ) : null}
       </div>

@@ -27,7 +27,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { MoneyInput } from "@/components/finance-ui";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
-import { useReaderReach } from "../../host";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import {
   useGetFinanceDocumentSettingsQuery, useUpdateFinanceDocumentSettingsMutation,
 } from "@/redux/services/finance/setup-api";
@@ -46,10 +46,13 @@ const hint = "mt-1 block font-normal leading-5 text-gray-05";
 /** Who may change these settings: the update key and the whole school. */
 export function useReceivablesSettingsAccess() {
   const { hasPermission } = usePermissions();
-  const { wholeSchool } = useReaderReach();
+  const { canWholeSchool, heldWithoutReach } = useWholeSchoolAccess();
   const canView = hasPermission(P.FIN_VIEW_SETTINGS);
-  const holdsUpdate = hasPermission(P.FIN_UPDATE_SETTINGS);
-  return { canView, canUpdate: holdsUpdate && wholeSchool, branchBound: holdsUpdate && !wholeSchool };
+  return {
+    canView,
+    canUpdate: canWholeSchool(P.FIN_UPDATE_SETTINGS),
+    branchBound: heldWithoutReach(P.FIN_UPDATE_SETTINGS),
+  };
 }
 
 export function ReceivablesSettings({ entityCode }: { entityCode: string | null }) {

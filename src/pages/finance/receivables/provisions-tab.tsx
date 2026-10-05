@@ -24,12 +24,12 @@ import {
   ConfirmActionModal, DataTable, DetailDrawer, FormField, FormModal, Money, PostingDateField,
   PostingRecap, StatusPill, toArray, type Column,
 } from "@/components/finance-ui";
-import { useCan } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { P } from "../../../permissions";
 import { useReaderReach } from "../../../host";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { useDates } from "../../../lib/display-prefs";
 import {
   useCreateProvisionMutation, useGetProvisionsQuery, usePostProvisionMutation, useSubmitProvisionMutation,
@@ -67,8 +67,8 @@ export function provisionRecap(lines: ProvisionLine[]) {
 
 export function ProvisionsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
-  const { can } = useCan();
-  const { wholeSchool, branchIds } = useReaderReach();
+  const { branchIds } = useReaderReach();
+  const { wholeSchool, canWholeSchool, heldWithoutReach } = useWholeSchoolAccess();
   const list = useListBranch();
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
@@ -103,11 +103,11 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
           <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
           <p className="font-mont text-xs text-gray-05">One journal per branch, worked out from each branch&apos;s aged debts.</p>
         </div>
-        {wholeSchool && can(P.FIN_CREATE_PROVISION) ? (
+        {canWholeSchool(P.FIN_CREATE_PROVISION) ? (
           <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New provision run</Button>
         ) : null}
       </div>
-      {!wholeSchool && can(P.FIN_CREATE_PROVISION) ? (
+      {heldWithoutReach(P.FIN_CREATE_PROVISION) ? (
         <Note>A provision run covers every branch at once, so only someone who covers the whole school raises one.</Note>
       ) : null}
       {showsParts ? (
@@ -162,8 +162,8 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
   provision: DoubtfulDebtProvision | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
-  const { can } = useCan();
-  const { wholeSchool, branchIds } = useReaderReach();
+  const { branchIds } = useReaderReach();
+  const { canWholeSchool } = useWholeSchoolAccess();
   const branches = useBranchColumn();
   const [confirming, setConfirming] = useState(false);
   const [submit, { isLoading: submitting }] = useSubmitProvisionMutation();
@@ -174,7 +174,7 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
   const isDraft = provision.status === "DRAFT";
   const partOnly = isPartOfRun(provision);
   const gated = provision.approval_required !== false;
-  const allowed = !partOnly && wholeSchool && can(gated ? P.FIN_SUBMIT_PROVISION : P.FIN_POST_PROVISION);
+  const allowed = !partOnly && (gated ? canWholeSchool(P.FIN_SUBMIT_PROVISION) : canWholeSchool(P.FIN_POST_PROVISION));
   const recap = provisionRecap(provision.lines);
   const bandKeys = [...new Set(provision.lines.flatMap((l) => Object.keys(l.bands)))].sort((a, b) => Number(a) - Number(b));
 

@@ -53,7 +53,7 @@ import type {
 } from "@/redux/services/payments/payments-types";
 import type { BankAccount } from "@/redux/services/finance/ops-types";
 import { P } from "../../permissions";
-import { useReaderReach } from "../../host";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { useDates } from "../../lib/display-prefs";
 import { providerInfo } from "./payment-providers";
 import {
@@ -71,11 +71,10 @@ const WHOLE_TENANT_ONLY = "Only someone who covers the whole school can change t
 
 /** Whether the reader may change custody and subaccounts, and why not when they may not. */
 function useCustodyWrite(): { may: boolean; why: string | null } {
-  const { can } = useCan();
-  const reach = useReaderReach();
-  if (!can(P.PAY_UPDATE_PAYMENT_SETTINGS)) return { may: false, why: "You have read-only access." };
-  if (!reach.wholeSchool) return { may: false, why: WHOLE_TENANT_ONLY };
-  return { may: true, why: null };
+  const { canWholeSchool, heldWithoutReach } = useWholeSchoolAccess();
+  if (canWholeSchool(P.PAY_UPDATE_PAYMENT_SETTINGS)) return { may: true, why: null };
+  if (heldWithoutReach(P.PAY_UPDATE_PAYMENT_SETTINGS)) return { may: false, why: WHOLE_TENANT_ONLY };
+  return { may: false, why: "You have read-only access." };
 }
 
 /** The Online payments panel under Finance Settings, Banking and cash. */

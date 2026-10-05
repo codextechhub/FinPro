@@ -4,13 +4,19 @@
  * The endpoint uses the code as its upsert key, so the same form creates and
  * edits a centre. Deactivation preserves historical journal references while
  * keeping the centre out of active use.
+ *
+ * A cost centre is shared by every branch, so the server takes a new one or an
+ * edit only from a holder of the create key who covers the whole school. New
+ * cost centre and opening a row to edit are offered to that reader alone; a
+ * branch's own bursar reads the list, as the cost centre picker on each line
+ * needs.
  */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { DataTable, StatusPill, FormDrawer, FormField, toArray, type Column } from "@/components/finance-ui";
-import { Can, useCan } from "@/components/finance-ui/can";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { P } from "../../../permissions";
@@ -28,9 +34,9 @@ export function CostCentersTab({ entity }: { entity: string }) {
   const [branch, setBranch] = useState("");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<CostCenter | null>(null);
-  const { can } = useCan();
-  const canEdit = can(P.FIN_CREATE_COST_CENTER);
-  useActionParam("new", canEdit, () => setCreating(true));
+  const { canWholeSchool } = useWholeSchoolAccess();
+  const canEdit = canWholeSchool(P.FIN_CREATE_COST_CENTER);
+  useActionParam("new", canEdit, () => { if (canEdit) setCreating(true); });
 
   const branches = useMemo(() => [...new Set(centres.map((c) => branchOf(c.code)).filter(Boolean))].sort(), [centres]);
   const rows = useMemo(() => centres.filter((c) => !branch || branchOf(c.code) === branch), [centres, branch]);
@@ -49,9 +55,9 @@ export function CostCentersTab({ entity }: { entity: string }) {
           <option value="">All branches</option>
           {branches.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
-        <Can permission={P.FIN_CREATE_COST_CENTER}>
+        {canEdit ? (
           <Button onClick={() => setCreating(true)} className="h-9 gap-1.5 font-mont text-xs font-semibold"><Plus className="size-3.5" /> New cost centre</Button>
-        </Can>
+        ) : null}
       </div>
 
       <DataTable columns={columns} rows={rows} rowKey={(c) => c.id}

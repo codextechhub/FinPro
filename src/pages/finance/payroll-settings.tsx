@@ -30,7 +30,7 @@ import {
 } from "@/components/settings/settings-layout";
 import { AccountPicker, toArray } from "@/components/finance-ui";
 import { P } from "../../permissions";
-import { useReaderReach } from "../../host";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import {
   useCreatePayrollDeductionTypeMutation, useGetFinancePayrollSettingsQuery, useGetPayrollDeductionTypesQuery,
   useUpdateFinancePayrollSettingsMutation, useUpdatePayrollDeductionTypeMutation,
@@ -65,9 +65,9 @@ export function payrollSettingsChanges(saved: FinancePayrollSettingsValues, draf
 
 export function PayrollSettingsPanel({ entityCode }: { entityCode: string | null }) {
   const { hasPermission } = usePermissions();
-  const { wholeSchool } = useReaderReach();
+  const { canWholeSchool, heldWithoutReach } = useWholeSchoolAccess();
   const canView = hasPermission(P.FIN_VIEW_SETTINGS);
-  const canUpdate = hasPermission(P.FIN_UPDATE_SETTINGS) && wholeSchool;
+  const canUpdate = canWholeSchool(P.FIN_UPDATE_SETTINGS);
   const query = useGetFinancePayrollSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
   const payload = query.data?.data;
   return (
@@ -79,7 +79,7 @@ export function PayrollSettingsPanel({ entityCode }: { entityCode: string | null
         <SettingsPanel><SettingsRow label="Loading the payroll policy" description="Reading the selected entity's payroll settings." /></SettingsPanel>
       ) : (
         <PayrollSettingsForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers}
-          canUpdate={canUpdate} readOnlyReason={hasPermission(P.FIN_UPDATE_SETTINGS) && !wholeSchool ? "The payroll policy binds every branch, so only someone who covers the whole school may change it." : null} />
+          canUpdate={canUpdate} readOnlyReason={heldWithoutReach(P.FIN_UPDATE_SETTINGS) ? "The payroll policy binds every branch, so only someone who covers the whole school may change it." : null} />
       )}
       {canView && entityCode ? <DeductionTypesPanel entityCode={entityCode} /> : null}
       {payload ? <SettingsAuditHistory rows={payload.history} /> : null}
@@ -218,11 +218,11 @@ function SwitchRow({ label, description, checked, onChange, disabled, consumer }
  */
 export function DeductionTypesPanel({ entityCode }: { entityCode: string }) {
   const { hasPermission } = usePermissions();
-  const { wholeSchool } = useReaderReach();
+  const { canWholeSchool } = useWholeSchoolAccess();
   const { data, isLoading } = useGetPayrollDeductionTypesQuery({ entity: entityCode }, { skip: !hasPermission(P.FIN_VIEW_SALARIES) });
   const types = useMemo(() => toArray(data?.data), [data]);
-  const canCreate = hasPermission(P.FIN_CREATE_SALARY) && wholeSchool;
-  const canUpdate = hasPermission(P.FIN_UPDATE_SALARY) && wholeSchool;
+  const canCreate = canWholeSchool(P.FIN_CREATE_SALARY);
+  const canUpdate = canWholeSchool(P.FIN_UPDATE_SALARY);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [account, setAccount] = useState("");

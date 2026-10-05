@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { WHOLE_TENANT_SETTINGS_NOTE, useSettingsWriteAccess } from "@/components/finance-ui/settings-write-access";
+import { WHOLE_TENANT_SETTINGS_NOTE, useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
 import { P } from "../../../permissions";
 import {
   useGetDunningNoticesQuery, useGetDunningSummaryQuery, useGetDunningPoliciesQuery,

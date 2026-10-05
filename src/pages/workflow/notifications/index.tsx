@@ -5,7 +5,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { cn } from "@/lib/utils";
 import { P } from "@/permissions";
-import { usePermissions } from "@/hooks/use-permissions";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { apiErrorMessage } from "@/utils/api-errors";
 import {
   useGetWorkflowNotificationSettingQuery,
@@ -33,10 +33,15 @@ const MOMENTS = [
  * Switching this off silences all four. It changes nothing about the approvals
  * themselves: a request still waits for the same decision from the same people,
  * who will find it in their own queue.
+ *
+ * The answer binds every branch, so the server takes it only from a holder of
+ * the template update key who covers the whole school. A branch administrator
+ * with the key reads the switch, disabled, with the reason beneath it.
  */
 export default function WorkflowNotifications() {
-  const { hasPermission } = usePermissions();
-  const canManage = hasPermission(P.UPDATE_WORKFLOW_TEMPLATE);
+  const { canWholeSchool, heldWithoutReach } = useWholeSchoolAccess();
+  const canManage = canWholeSchool(P.UPDATE_WORKFLOW_TEMPLATE);
+  const branchBound = heldWithoutReach(P.UPDATE_WORKFLOW_TEMPLATE);
   const { data, isLoading } = useGetWorkflowNotificationSettingQuery();
   const [save, { isLoading: saving }] = useSetWorkflowNotificationSettingMutation();
   // Notifying is what the engine does when a school has chosen nothing, so the
@@ -109,7 +114,9 @@ export default function WorkflowNotifications() {
 
         {!canManage && (
           <p className="mt-4 text-xs text-gray-01">
-            Changing this needs the same access as changing an approval path.
+            {branchBound
+              ? "Only a school-wide administrator can change this, because it applies to every branch."
+              : "Changing this needs the same access as changing an approval path."}
           </p>
         )}
       </div>

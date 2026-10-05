@@ -1,12 +1,19 @@
-// Setup → Dimensions. Analytical axes (e.g. FUND, PROJECT) with a constrained value
-// list, tagged per journal line and sliced by the Cost & Dimension Analysis report.
-// Upsert-by-code, so the same form creates or edits an axis.
+/**
+ * Setup → Dimensions. Analytical axes (e.g. FUND, PROJECT) with a constrained
+ * value list, tagged per journal line and sliced by the Cost & Dimension
+ * Analysis report. Upsert-by-code, so the same form creates or edits an axis.
+ *
+ * A dimension is shared by every branch, so the server takes a new one or an
+ * edit only from a holder of the create key who covers the whole school. New
+ * dimension and opening a row to edit are offered to that reader alone; anyone
+ * else reads the list.
+ */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus, Search } from "lucide-react";
 import { DataTable, StatusPill, FormDrawer, FormField, toArray, type Column } from "@/components/finance-ui";
-import { Can, useCan } from "@/components/finance-ui/can";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -19,8 +26,9 @@ export function DimensionsTab({ entity }: { entity: string }) {
   const dims = toArray<Dimension>(data?.data);
   const [editing, setEditing] = useState<Dimension | null>(null);
   const [creating, setCreating] = useState(false);
-  const { can } = useCan();
-  useActionParam("new", can(P.FIN_CREATE_DIMENSION), () => setCreating(true));
+  const { canWholeSchool } = useWholeSchoolAccess();
+  const canEdit = canWholeSchool(P.FIN_CREATE_DIMENSION);
+  useActionParam("new", canEdit, () => { if (canEdit) setCreating(true); });
   const [search, setSearch] = useState("");
 
   const rows = useMemo(() => {
@@ -45,14 +53,14 @@ export function DimensionsTab({ entity }: { entity: string }) {
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code, name or value" className="h-9 w-64 pl-8 font-mont text-sm" />
         </div>
-        <Can permission={P.FIN_CREATE_DIMENSION}>
+        {canEdit ? (
           <Button onClick={() => setCreating(true)} className="h-9 gap-1.5 font-mont text-xs font-semibold"><Plus className="size-3.5" /> New dimension</Button>
-        </Can>
+        ) : null}
       </div>
 
       <DataTable columns={columns} rows={rows} rowKey={(d) => d.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch}
-        onRowClick={(d) => setEditing(d)}
+        onRowClick={canEdit ? setEditing : undefined}
         emptyTitle="No dimensions" emptyMessage="Analytical axes (fund, project…) will appear here." />
 
       <DimensionModal open={creating || !!editing} existing={editing} entity={entity}

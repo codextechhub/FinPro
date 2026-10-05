@@ -43,7 +43,7 @@ import {
   type ConsoleSettingsSection,
 } from "@/components/settings/settings-layout";
 import { useActiveEntity } from "@/components/finance-ui";
-import { useSettingsWriteAccess } from "@/components/finance-ui/settings-write-access";
+import { useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
 import { useGetFinanceAccountSettingsQuery } from "@/redux/services/finance/setup-api";
 import { useGetProcurementSettingsQuery, useUpdateProcurementSettingsMutation } from "@/redux/services/procurement/procurement-api";
 import type { ProcurementSettingsValues } from "@/redux/services/procurement/procurement-types";

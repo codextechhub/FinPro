@@ -1,6 +1,16 @@
-// Setup → Chart of Accounts. The design's tree-table ported to the house theme:
-// an expandable account tree (or flat view) with type pills, normal balance,
-// currency, rolled-up GL balance and sub-ledger tags. Read-only viewer.
+/**
+ * Setup → Chart of Accounts. The design's tree-table ported to the house theme:
+ * an expandable account tree (or flat view) with type pills, normal balance,
+ * currency, rolled-up GL balance and sub-ledger tags.
+ *
+ * The chart is the school's, and every branch posts to it. A new account joins
+ * it for every branch, so New account is offered only to a holder of the create
+ * key who covers the whole school; the server refuses anyone else. Editing
+ * follows the account: the ledger account behind a branch's own bank belongs to
+ * that branch, and its bursar may rename it, while every other account needs
+ * whole-school reach. Lekki's bursar sees her bank's ledger account editable and
+ * the rest of the chart read-only, with the reason.
+ */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { skipToken } from "@reduxjs/toolkit/query";
@@ -8,7 +18,8 @@ import { toast } from "sonner";
 import { ArrowLeft, ChevronDown, ChevronRight, Check, Plus, Printer, Activity, Columns2, Network, Settings2 } from "lucide-react";
 import { Money, FormField, DetailDrawer, InfoHint, StatusPill, DataTable, TabStrip, toArray, useActiveEntity, type Column, type TabStripItem } from "@/components/finance-ui";
 import { SearchSelect } from "@/components/custom/search-select";
-import { Can, useCan } from "@/components/finance-ui/can";
+import { useCan } from "@/components/finance-ui/can";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/states";
 import { Input } from "@/components/ui/input";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
@@ -108,8 +119,9 @@ export function AccountsTab({ entity }: { entity: string }) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [touched, setTouched] = useState(false);
   const [creating, setCreating] = useState(false);
-  const { can } = useCan();
-  useActionParam("new", can(P.FIN_CREATE_ACCOUNT), () => setCreating(true));
+  const { canWholeSchool } = useWholeSchoolAccess();
+  const canCreate = canWholeSchool(P.FIN_CREATE_ACCOUNT);
+  useActionParam("new", canCreate, () => { if (canCreate) setCreating(true); });
   const [detailId, setDetailId] = useState<number | null>(null);
 
   // Default: expand every parent until the user starts toggling.
@@ -148,11 +160,11 @@ export function AccountsTab({ entity }: { entity: string }) {
           <option value="">All types</option>
           {ACCOUNT_TYPES.map((t) => <option key={t} value={t}>{t[0] + t.slice(1).toLowerCase()}</option>)}
         </select>
-        <Can permission={P.FIN_CREATE_ACCOUNT}>
+        {canCreate ? (
           <Button onClick={() => setCreating(true)} className="ml-auto h-9 gap-1.5 font-mont text-xs font-semibold">
             <Plus className="size-3.5" /> New account
           </Button>
-        </Can>
+        ) : null}
       </div>
 
       {isLoading || isFetching ? (
@@ -728,8 +740,18 @@ function GroupLedger({ initialView, entity, account, accounts, summary, currency
   );
 }
 
-function AccountSettings({ entity, account, onSaved }: { entity: string; account: Account; onSaved: () => void }) {
+/**
+ * An account's Settings tab: its name, subtype and whether it is active.
+ *
+ * Editable by a holder of the update key who may change this account: the
+ * branch of the bank behind it, or anyone covering the whole school when no
+ * bank backs it. Anyone else reads why it is read-only.
+ */
+export function AccountSettings({ entity, account, onSaved }: { entity: string; account: Account; onSaved: () => void }) {
   const [update, { isLoading }] = useUpdateAccountMutation();
+  const { can } = useCan();
+  const { canChange } = useWholeSchoolAccess();
+  const mayEdit = canChange(P.FIN_UPDATE_ACCOUNT, [account.bank_branch_id]);
   const [name, setName] = useState(account.name);
   const [subtype, setSubtype] = useState(account.subtype ?? "");
   const [active, setActive] = useState(account.is_active);
@@ -743,14 +765,22 @@ function AccountSettings({ entity, account, onSaved }: { entity: string; account
     } catch { /* central */ }
   };
 
+  if (!mayEdit) {
+    return (
+      <EmptyState
+        title="Read-only"
+        message={can(P.FIN_UPDATE_ACCOUNT)
+          ? "Only a school-wide administrator can change this account, because every branch posts to it."
+          : "You don’t have permission to edit accounts."}
+      />
+    );
+  }
   return (
-    <Can permission={P.FIN_UPDATE_ACCOUNT} fallback={<EmptyState title="Read-only" message="You don’t have permission to edit accounts." />}>
-      <div className="space-y-3">
-        <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} className="bg-white" /></FormField>
-        <FormField label="Subtype"><Input value={subtype} onChange={(e) => setSubtype(e.target.value)} placeholder="e.g. Current asset" className="bg-white" /></FormField>
-        <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label>
-        <Button onClick={save} disabled={!dirty || isLoading} className="font-mont text-xs font-semibold">{isLoading ? "Saving…" : "Save changes"}</Button>
-      </div>
-    </Can>
+    <div className="space-y-3">
+      <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} className="bg-white" /></FormField>
+      <FormField label="Subtype"><Input value={subtype} onChange={(e) => setSubtype(e.target.value)} placeholder="e.g. Current asset" className="bg-white" /></FormField>
+      <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label>
+      <Button onClick={save} disabled={!dirty || isLoading} className="font-mont text-xs font-semibold">{isLoading ? "Saving…" : "Save changes"}</Button>
+    </div>
   );
 }

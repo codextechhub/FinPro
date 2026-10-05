@@ -15,7 +15,7 @@
  * its end a closed year may be archived.
  *
  * Both bind every branch, so a reader who holds the update key but covers only
- * some branches reads the panels without a Save (see `settings-write-access.ts`).
+ * some branches reads the panels without a Save (see `whole-school-access.ts`).
  */
 
 import { useState } from "react";
@@ -32,7 +32,7 @@ import {
   SettingsRow,
 } from "@/components/settings/settings-layout";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useSettingsWriteAccess } from "@/components/finance-ui/settings-write-access";
+import { useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
 import {
   useGetFinanceCalendarSettingsQuery,
   useGetRecordRetentionSettingsQuery,

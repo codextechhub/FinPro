@@ -29,7 +29,7 @@ import { useGetFiscalYearsQuery } from "@/redux/services/finance/ops-api";
 import { toArray } from "@/redux/services/finance/api-types";
 import type { SealCheck, SealVerification } from "@/redux/services/finance/records-types";
 import { P } from "../../../permissions";
-import { useReaderReach } from "../../../host";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { useDates } from "../../../lib/display-prefs";
 import { isForbidden } from "../../../lib/api-errors";
 
@@ -117,9 +117,9 @@ function CheckRow({ check, showBranch, currency }: { check: SealCheck; showBranc
 
 export function SealsReport({ entity, currency }: { entity: string; currency?: string | null }) {
   const { can } = useCan();
-  const { wholeSchool } = useReaderReach();
+  const { wholeSchool, canWholeSchool } = useWholeSchoolAccess();
   const showBranch = useReaderBranchLens().applies;
-  const allowed = can(P.FIN_VIEW_SEALS) && wholeSchool;
+  const allowed = canWholeSchool(P.FIN_VIEW_SEALS);
   const [year, setYear] = useState("");
   const yearsQ = useGetFiscalYearsQuery({ entity, include_archived: "true" }, { skip: !allowed });
   const years = useMemo(

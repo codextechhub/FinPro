@@ -18,10 +18,9 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { DataTable, StatusPill, FormDrawer, FormField, AccountPicker, toArray, type Column } from "@/components/finance-ui";
-import { useCan } from "@/components/finance-ui/can";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useReaderReach } from "../../../host";
 import { P } from "../../../permissions";
 import { useGetTaxCodesQuery, useUpsertTaxCodeMutation } from "@/redux/services/finance/setup-api";
 import type { TaxCode } from "@/redux/services/finance/setup-types";
@@ -35,9 +34,8 @@ const taxType = (code: string) => (code.split(/[-_ ]/)[0] || code).toUpperCase()
 export function TaxCodesTab({ entity }: { entity: string }) {
   const { data, isLoading, isFetching, isError, refetch } = useGetTaxCodesQuery({ entity });
   const codes = toArray<TaxCode>(data?.data);
-  const { can } = useCan();
-  const { wholeSchool } = useReaderReach();
-  const canEdit = wholeSchool && can(P.FIN_CREATE_TAX_CODE);
+  const { canWholeSchool } = useWholeSchoolAccess();
+  const canEdit = canWholeSchool(P.FIN_CREATE_TAX_CODE);
   const [type, setType] = useState("");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<TaxCode | null>(null);

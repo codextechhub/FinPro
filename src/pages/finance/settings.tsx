@@ -61,7 +61,7 @@ import { OnlinePaymentsPanel } from "./online-payments";
 import { ReceivablesSettings } from "./receivables-settings";
 import { PayrollSettingsPanel } from "./payroll-settings";
 import { CalendarRulePanel, RecordKeepingPanel } from "./settings-records";
-import { useSettingsWriteAccess } from "@/components/finance-ui/settings-write-access";
+import { useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
 
 const F = routesPath.PROTECTED.FINANCE;
 
