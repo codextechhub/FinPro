@@ -493,11 +493,36 @@ export interface FixedAsset {
 
 // Run-depreciation preview: the compound journal a period run will post.
 export interface DepreciationPreviewLine { account: string; name: string; amount: number }
+/** A charge a run leaves unposted because it is dated in a closed fiscal year. */
+export interface SkippedDepreciationCharge {
+  asset_id: number;
+  asset: string;
+  asset_number: string;
+  seq: number;
+  date: string;
+  amount: number;
+  /** The closed year's label, as "FY2026". */
+  fiscal_year: string;
+  reason: string;
+}
+
 export interface DepreciationPreview {
   debits: DepreciationPreviewLine[];
   credits: DepreciationPreviewLine[];
   total: number;
   asset_count: number;
+  /** Absent from an older server. */
+  skipped?: SkippedDepreciationCharge[];
+}
+
+export interface DepreciationRunResult {
+  journal_id: number;
+  journal_ids?: number[];
+  period_count?: number;
+  total: number;
+  charge_count: number;
+  asset_count: number;
+  skipped?: SkippedDepreciationCharge[];
 }
 
 // ── Tax ──────────────────────────────────────────────────────────────────────

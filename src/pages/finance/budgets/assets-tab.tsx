@@ -29,6 +29,8 @@ import {
 import type { FixedAsset } from "@/redux/services/finance/ops-types";
 import { monthBounds } from "../../../utils/dates";
 import { useDates } from "../../../lib/display-prefs";
+import type { SkippedDepreciationCharge } from "@/redux/services/finance/ops-types";
+import { SkippedCharges } from "./depreciation-skipped";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -366,21 +368,33 @@ function RunDepreciationDrawer({ open, onClose, entity, currency }: { open: bool
   const { data, isFetching } = useGetDepreciationPreviewQuery({ entity, up_to_date: upTo }, { skip: !open || !upTo });
   const preview = data?.data;
   const [run, { isLoading }] = useRunDepreciationMutation();
+  const [ranSkipped, setRanSkipped] = useState<SkippedDepreciationCharge[] | null>(null);
   const dr: RecapRow[] = (preview?.debits ?? []).map((l) => ({ code: l.account, name: l.name, amount: l.amount }));
   const cr: RecapRow[] = (preview?.credits ?? []).map((l) => ({ code: l.account, name: l.name, amount: l.amount }));
   const nothing = !!preview && preview.total === 0;
+  const close = () => { setRanSkipped(null); onClose(); };
+  // A run that skipped charges in a closed year stays open to list them.
   const submit = async () => {
-    try { const r = await run({ entity, up_to_date: upTo }).unwrap(); toast.success(r.message || "Depreciation posted."); onClose(); }
-    catch { /* central */ }
+    try {
+      const r = await run({ entity, up_to_date: upTo }).unwrap();
+      toast.success(r.message || "Depreciation posted.");
+      if (r.data?.skipped?.length) setRanSkipped(r.data.skipped);
+      else close();
+    } catch { /* central */ }
   };
   return (
-    <DetailDrawer open={open} onOpenChange={(o) => (o ? undefined : onClose())}
+    <DetailDrawer open={open} onOpenChange={(o) => (o ? undefined : close())}
       title="Run depreciation" description="Preview the period's depreciation posting." widthClass="sm:max-w-2xl"
-      footer={<>
-        <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
+      footer={ranSkipped ? <Button onClick={close}>Done</Button> : <>
+        <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
         <Button disabled={isLoading || isFetching || nothing || !preview} onClick={submit} className="gap-1.5"><Sparkles className="size-4" />{isLoading ? "Posting…" : "Post depreciation"}</Button>
       </>}>
-      <div className="space-y-4">
+      {ranSkipped ? (
+        <div className="space-y-4">
+          <p className="font-mont text-sm text-gray-01">Depreciation posted. These charges were left unposted:</p>
+          <SkippedCharges skipped={ranSkipped} currency={currency} />
+        </div>
+      ) : <div className="space-y-4">
         <FormField label="Post all charges due up to"><DatePickerInput value={upTo} onChange={(e) => setUpTo(e.target.value)} className="h-9 w-52 bg-white" /></FormField>
         {isFetching && !preview ? <p className="py-6 text-center font-mont text-xs text-gray-05">Loading…</p> : null}
         {preview ? (
@@ -389,13 +403,14 @@ function RunDepreciationDrawer({ open, onClose, entity, currency }: { open: bool
           ) : (
             <>
               <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-[11px] text-amber-700">
-                This posts depreciation for {preview.asset_count} in-use asset(s) - one compound journal per fiscal period in range. A closed period in the range will block the run; re-open it first.
+                This posts depreciation for {preview.asset_count} in-use asset(s) - one compound journal per fiscal period in range. A closed month in an open year blocks the run; re-open it first. Charges dated in a closed year are skipped and listed below.
               </p>
               <PostingRecap title={`Depreciation posting - to ${dates.day(upTo)}`} dr={dr} cr={cr} currency={currency} />
             </>
           )
         ) : null}
-      </div>
+        {preview ? <SkippedCharges skipped={preview.skipped} currency={currency} /> : null}
+      </div>}
     </DetailDrawer>
   );
 }

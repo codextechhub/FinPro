@@ -15,7 +15,8 @@ import { Input } from "@/components/ui/input";
 import { P } from "../../../permissions";
 import { useGetTaxCodesQuery, useUpsertTaxCodeMutation } from "@/redux/services/finance/setup-api";
 import type { TaxCode } from "@/redux/services/finance/setup-types";
-import { taxCodeFormValues, taxCodeUpsertPayload } from "./tax-code-form";
+import { TAX_TREATMENTS, taxCodeFormValid, taxCodeFormValues, taxCodeUpsertPayload, treatmentLabel } from "./tax-code-form";
+import type { TaxTreatment } from "@/redux/services/finance/setup-types";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
 const taxType = (code: string) => (code.split(/[-_ ]/)[0] || code).toUpperCase();
@@ -37,6 +38,7 @@ export function TaxCodesTab({ entity }: { entity: string }) {
     { header: "Code", cell: (t) => <span className="font-semibold">{t.code}</span> },
     { header: "Name", cell: (t) => t.name },
     { header: "Type", cell: (t) => <span className="rounded bg-pry-01 px-1.5 py-0.5 font-mont text-[10px] font-semibold uppercase text-primary">{taxType(t.code)}</span> },
+    { header: "Treatment", cell: (t) => <span className="text-gray-01">{treatmentLabel(t.treatment)}</span> },
     { header: "Rate", align: "right", cell: (t) => <span className="tabular-nums">{(t.rate_bps / 100).toFixed(2)}%</span> },
     { header: "Recoverable", cell: (t) => (t.is_recoverable ? "Yes" : "No") },
     { header: "Collected a/c", cell: (t) => t.collected_account ?? "-" },
@@ -75,18 +77,20 @@ function TaxCodeModal({ existing, onClose, entity }: { existing: TaxCode | null;
   const initial = taxCodeFormValues(existing);
   const [code, setCode] = useState(initial.code);
   const [name, setName] = useState(initial.name);
+  const [treatment, setTreatment] = useState<TaxTreatment>(initial.treatment);
   const [pct, setPct] = useState(initial.percentage);
+  const standard = treatment === "STANDARD";
   const [recoverable, setRecoverable] = useState(initial.recoverable);
   const [collected, setCollected] = useState(initial.collectedAccount);
   const [paid, setPaid] = useState(initial.paidAccount);
   const [active, setActive] = useState(initial.active);
 
-  const canSubmit = code.trim() !== "" && name.trim() !== "" && pct !== "" && Number(pct) >= 0;
+  const canSubmit = taxCodeFormValid({ code, name, treatment, percentage: pct, recoverable, collectedAccount: collected, paidAccount: paid, active });
 
   const submit = async () => {
     try {
       const r = await upsert(taxCodeUpsertPayload(entity, {
-        code, name, percentage: pct, recoverable,
+        code, name, treatment, percentage: pct, recoverable,
         collectedAccount: collected, paidAccount: paid, active,
       })).unwrap();
       toast.success(r.message || "Tax code saved.");
@@ -100,8 +104,16 @@ function TaxCodeModal({ existing, onClose, entity }: { existing: TaxCode | null;
       loading={isLoading} canSubmit={canSubmit} widthClass="sm:max-w-lg">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Code" required><Input value={code} onChange={(e) => setCode(e.target.value)} disabled={!!existing} placeholder="e.g. VAT-7.5" className="bg-white font-mont" /></FormField>
-        <FormField label="Rate (%)" required><Input value={pct} onChange={(e) => setPct(e.target.value)} type="number" step="0.01" placeholder="7.5" className="bg-white font-mont" /></FormField>
+        <FormField label="Rate (%)" required={standard}>
+          <Input value={standard ? pct : "0"} onChange={(e) => setPct(e.target.value)} type="number" step="0.01" placeholder="7.5" disabled={!standard} className="bg-white font-mont" />
+        </FormField>
       </div>
+      <FormField label="Treatment" required>
+        <select value={treatment} onChange={(e) => setTreatment(e.target.value as TaxTreatment)} className="h-9 w-full rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none" aria-label="Treatment">
+          {TAX_TREATMENTS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        {!standard ? <p className="mt-1 font-mont text-[11px] text-gray-05">A {treatmentLabel(treatment).toLowerCase()} code charges no tax, so its rate is 0.</p> : null}
+      </FormField>
       <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="VAT 7.5%" className="bg-white" /></FormField>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Collected a/c (output)"><AccountPicker entity={entity} value={collected} onChange={setCollected} placeholder="None" /></FormField>

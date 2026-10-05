@@ -162,10 +162,15 @@ export interface FxRate {
   source: string;
 }
 
+/** How a supply is treated for VAT. Only STANDARD carries a rate. */
+export type TaxTreatment = "STANDARD" | "ZERO_RATED" | "EXEMPT";
+
 export interface TaxCode {
   id: number;
   code: string;
   name: string;
+  /** Absent from an older server, which treats every code as standard. */
+  treatment?: TaxTreatment;
   rate_bps: number;
   is_recoverable: boolean;
   collected_account: string | null;

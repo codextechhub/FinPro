@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { TaxCode } from "@/redux/services/finance/setup-types";
-import { taxCodeFormValues, taxCodeUpsertPayload } from "./tax-code-form";
+import { taxCodeFormValid, taxCodeFormValues, taxCodeUpsertPayload, treatmentLabel } from "./tax-code-form";
 
 const taxCode: TaxCode = {
   id: 7,
   code: "VAT-7.5",
   name: "VAT 7.5%",
+  treatment: "STANDARD",
   rate_bps: 750,
   is_recoverable: false,
   collected_account: "2210",
@@ -18,6 +19,7 @@ describe("tax code edit form", () => {
     expect(taxCodeFormValues(taxCode)).toEqual({
       code: "VAT-7.5",
       name: "VAT 7.5%",
+      treatment: "STANDARD",
       percentage: "7.5",
       recoverable: false,
       collectedAccount: "2210",
@@ -37,11 +39,33 @@ describe("tax code edit form", () => {
       entity: "ACME",
       code: "VAT-7.5",
       name: "Updated VAT",
+      treatment: "STANDARD",
       rate_bps: 825,
       is_recoverable: false,
       collected_account: undefined,
       paid_account: "1210",
       is_active: true,
     });
+  });
+});
+
+describe("VAT treatment", () => {
+  const exempt: TaxCode = { ...taxCode, code: "VAT-EXEMPT", name: "VAT exempt", treatment: "EXEMPT", rate_bps: 0 };
+
+  it("keeps an exempt code exempt when it is renamed", () => {
+    const sent = taxCodeUpsertPayload("ACME", { ...taxCodeFormValues(exempt), name: "Exempt supplies" });
+    expect(sent.treatment).toBe("EXEMPT");
+    expect(sent.rate_bps).toBe(0);
+  });
+
+  it("sends no rate for an exempt or zero-rated code, whatever was typed", () => {
+    expect(taxCodeUpsertPayload("ACME", { ...taxCodeFormValues(exempt), percentage: "5" }).rate_bps).toBe(0);
+    expect(taxCodeFormValid({ ...taxCodeFormValues(exempt), percentage: "" })).toBe(true);
+  });
+
+  it("reads an older server's code as standard, and names each treatment", () => {
+    expect(taxCodeFormValues({ ...taxCode, treatment: undefined }).treatment).toBe("STANDARD");
+    expect(treatmentLabel("ZERO_RATED")).toBe("Zero-rated");
+    expect(treatmentLabel(undefined)).toBe("Standard");
   });
 });

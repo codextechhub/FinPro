@@ -20,6 +20,7 @@ import type {
   ExpenseClaim,
   FixedAsset,
   DepreciationPreview,
+  DepreciationRunResult,
   EmployeeSalary,
   PayrollRun,
   SalaryComponent,
@@ -430,7 +431,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/fixed-assets/run-depreciation/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceFixedAssets"],
     }),
-    runDepreciation: b.mutation<ApiEnvelope<{ journal_id: number; journal_ids?: number[]; period_count?: number; total: number; charge_count: number; asset_count: number }>, { entity: string; up_to_date: string }>({
+    runDepreciation: b.mutation<ApiEnvelope<DepreciationRunResult>, { entity: string; up_to_date: string }>({
       query: ({ entity, ...body }) => ({ url: `/finance/fixed-assets/run-depreciation/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceFixedAssets", "FinanceJournals", "FinanceReports"],
     }),
