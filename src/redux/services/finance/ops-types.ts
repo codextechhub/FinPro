@@ -4,6 +4,8 @@
 // cannot read it; a detail response lists the present ones the caller cannot
 // change in `_read_only_fields`.
 
+import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
+
 // ── Banking ──────────────────────────────────────────────────────────────────
 export interface BankAccount {
   id: number;
@@ -173,6 +175,93 @@ export interface PettyCashFund {
   currency: string | null;
   last_replenished_at: string | null;
   is_active: boolean;
+  /** CLOSED once a closure banked the fund's cash, else ACTIVE or INACTIVE. */
+  state?: PettyCashFundState;
+  /** The date the fund was closed; null while it runs. */
+  closed_on?: string | null;
+  /** Who closed it (a user id); null while it runs. */
+  closed_by_id?: number | null;
+}
+
+export type PettyCashFundState = "ACTIVE" | "INACTIVE" | "CLOSED";
+
+/** Why cash went back to the bank: a lower float, or the fund closing. */
+export type PettyCashReturnKind = "REDUCE" | "CLOSE";
+
+/**
+ * A count of a petty cash tin and the cash it banked.
+ *
+ * `difference` is the count less the books (positive over, negative short);
+ * `cash_left` is what the tin keeps afterwards. Every amount is kobo.
+ */
+export interface PettyCashReturn {
+  id: number;
+  document_number: string;
+  status: string;
+  kind: PettyCashReturnKind;
+  kind_label: string;
+  branch_id: number | null;
+  fund_id: number;
+  fund_name: string;
+  bank_account_id: number | null;
+  bank_account_name: string | null;
+  return_date: string;
+  counted_amount: number;
+  book_balance: number;
+  difference: number;
+  shortage: number;
+  overage: number;
+  difference_reason: string;
+  amount: number;
+  amount_naira: string;
+  cash_left: number;
+  previous_float_amount: number;
+  new_float_amount: number;
+  counted_by_id: number | null;
+  narration: string;
+  reference: string;
+  journal_id: number | null;
+  created_by_id: number | null;
+  /** Present when raising it started an approval (status PENDING_APPROVAL). */
+  approval?: ApprovalParkState;
+  /** The fund as the return left it, present when it posted at once. */
+  fund?: PettyCashFund;
+}
+
+/** What raising a return sends; amounts in kobo. */
+export interface PettyCashReturnInput {
+  counted_amount: number;
+  return_date: string;
+  bank_account?: string;
+  difference_reason?: string;
+  narration?: string;
+  reference?: string;
+}
+
+/** One step of the ready-made petty cash return route, as the server describes it. */
+export interface PettyCashRouteStage {
+  code: string;
+  label: string;
+  kind: string;
+  approver_group_code: string;
+  inclusion_condition?: unknown;
+}
+
+/**
+ * The ready-made approval route for petty cash returns a school may adopt, and
+ * whether this school already has a route of its own.
+ */
+export interface PettyCashReturnRoute {
+  document_type: string;
+  code: string;
+  name: string;
+  /** Above this shortage (kobo) a count needs a second person. */
+  threshold: number;
+  threshold_naira: string;
+  approver_group_code: string;
+  stages: PettyCashRouteStage[];
+  adopted: boolean;
+  route_id: number | null;
 }
 
 export interface PettyCashMovement {
