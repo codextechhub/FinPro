@@ -14,6 +14,15 @@
  * account arrives unsolicited and the gateway records it as a collection on the
  * VIRTUAL_ACCOUNT channel, with no link and no payer hand-off - so those rows are
  * tagged, and the drawer tells that story instead of the checkout one.
+ *
+ * Failed and Abandoned are not final. They record what the provider said when
+ * somebody last asked, and a payer can still finish paying on the same checkout
+ * afterwards, so Re-verify is offered on them as on a pending one: a success the
+ * provider confirms books the receipt from either state. A collection the
+ * provider never accepted (no provider reference) has nothing to re-check.
+ *
+ * At a school with several branches each row names the branch its money belongs
+ * to (see payment-branches.ts).
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -35,6 +44,8 @@ import { useGetInvoicesQuery } from "@/redux/services/finance/ar-api";
 import type { Collection } from "@/redux/services/payments/payments-types";
 import type { Invoice } from "@/redux/services/finance/ar-types";
 import { useDates } from "../../../lib/display-prefs";
+import { usePaymentBranchColumn } from "../payment-branches";
+import { canReverify } from "./collection-reverify";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 
@@ -71,6 +82,7 @@ const customerLabel = (c: Collection) => c.customer_name || c.payer_name || c.cu
 // A transfer the payer sent straight into their dedicated NUBAN: no checkout, no link.
 const isDeposit = (c: Collection) => c.channel === "VIRTUAL_ACCOUNT";
 
+
 export function CollectionsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -86,6 +98,7 @@ export function CollectionsTab({ entity, currency }: { entity: string; currency?
   const rows = useMemo(() => toArray<Collection>(data?.data), [data]);
   const pg = data?.pagination;
   const s = summaryRes?.data;
+  const branchColumn = usePaymentBranchColumn();
 
   const columns: Column<Collection>[] = [
     { header: "Reference", cell: (c) => (
@@ -96,6 +109,7 @@ export function CollectionsTab({ entity, currency }: { entity: string; currency?
     ) },
     { header: "Created", cell: (c) => <span className="tabular-nums text-gray-05">{dates.dateTime(c.created_at)}</span> },
     { header: "Customer", cell: (c) => <span><span className="font-medium text-gray-01">{customerLabel(c)}</span>{c.narration ? <span className="block font-mont text-[11px] text-gray-05">{c.narration}</span> : null}</span> },
+    ...(branchColumn.show ? [{ header: "Branch", cell: (c: Collection) => <span className="text-gray-05">{branchColumn.name(c.branch)}</span> }] : []),
     { header: "Provider", cell: (c) => <ProviderTag provider={c.provider} /> },
     { header: "Amount", align: "right", cell: (c) => <Money kobo={c.amount} currency={currency} align="right" /> },
     { header: "Status", cell: (c) => <StatusPill status={c.status} /> },
@@ -199,7 +213,7 @@ function CollectionDrawer({ collectionId, collections, entity, currency, onClose
         <StatusPill status={c.status} />
         <div className="flex-1" />
         {c.checkout_url ? <Button variant="outline" onClick={copyLink} className="gap-1.5"><Link2 className="size-4" /> Copy link</Button> : null}
-        {!paid && !failed ? <Button disabled={verifying} onClick={doVerify} className="gap-1.5"><RefreshCw className="size-4" />{verifying ? "Checking…" : "Re-verify"}</Button> : null}
+        {canReverify(c) ? <Button disabled={verifying} onClick={doVerify} className="gap-1.5"><RefreshCw className="size-4" />{verifying ? "Checking…" : "Re-verify"}</Button> : null}
       </>}>
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -222,7 +236,7 @@ function CollectionDrawer({ collectionId, collections, entity, currency, onClose
               </>
             )}
             <TimelineStep done={paid} current={!paid && !failed} title={failed ? "Payment failed" : deposit ? "Deposit confirmed" : "Payment confirmed"}
-              sub={paid ? `Verified with the provider - receipt booked (Dr bank / Cr ${linked ? "AR" : "customer credit"})${c.confirmed_at ? ` · ${dates.dateTime(c.confirmed_at)}` : ""}` : failed ? "The provider reported a failed/abandoned payment" : "Awaiting the provider's confirmation"} />
+              sub={paid ? `Verified with the provider - receipt booked (Dr bank / Cr ${linked ? "AR" : "customer credit"})${c.confirmed_at ? ` · ${dates.dateTime(c.confirmed_at)}` : ""}` : failed ? `The provider reported a failed or abandoned payment${c.provider_reference ? ". The payer can still finish paying; Re-verify asks the provider again" : ""}` : "Awaiting the provider's confirmation"} />
           </div>
         </div>
 

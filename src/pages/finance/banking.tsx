@@ -57,6 +57,7 @@ import { routesPath } from "@/routes/routes-path";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
+import { CollectionSubaccountBlock } from "./online-payments";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -604,6 +605,7 @@ export function SettingsTab({ account, record, entity, canEdit }: { account: Ban
       {canEdit ? (
         <div className="flex justify-end"><Button disabled={isLoading || !name.trim()} onClick={save}>{isLoading ? "Saving…" : "Save changes"}</Button></div>
       ) : null}
+      <CollectionSubaccountBlock entity={entity} account={record} />
     </div>
   );
 }

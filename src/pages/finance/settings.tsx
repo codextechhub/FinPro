@@ -56,6 +56,7 @@ import { DEFAULT_FINANCE_SETTINGS_SECTION, type FinanceSettingsSection } from ".
 import { FeeDuePolicyPanel, financeSettingsSections, setupSections } from "@xvs/finance/host";
 import { FinanceShell } from "./finance-shell";
 import { EntitiesTab } from "./setup/entities-tab";
+import { OnlinePaymentsPanel } from "./online-payments";
 
 const F = routesPath.PROTECTED.FINANCE;
 
@@ -73,7 +74,7 @@ const SECTIONS: (ConsoleSettingsSection & { key: FinanceSettingsSection })[] = [
   { key: "reference-data", title: "Reference data", description: "Codes and dimensions", icon: ListTree, group: "books" },
   { key: "documents", title: "Documents", description: "Collections and policies", icon: FileCog, group: "billing" },
   { key: "fees", title: "Fee due dates", description: "When fee bills fall due", icon: CalendarClock, group: "billing" },
-  { key: "banking-cash", title: "Banking and cash", description: "Matching and allocation", icon: Banknote, group: "billing" },
+  { key: "banking-cash", title: "Banking and cash", description: "Matching, allocation, online payments", icon: Banknote, group: "billing" },
   { key: "approvals", title: "Approvals", description: "Finance workflows", icon: Workflow },
 ];
 
@@ -158,7 +159,7 @@ const OVERVIEW_CARDS: Record<Exclude<FinanceSettingsSection, "overview">, {
   "fiscal-calendar": { description: "Open fiscal years, manage posting periods and control the close.", status: "Configured", tone: "ready" },
   accounting: { description: "Review the control accounts currently resolved by finance posting services.", status: "Review", tone: "attention" },
   documents: { description: "Manage collection defaults, reminders, fee structures and document policies.", status: "Mixed" },
-  "banking-cash": { description: "Set automatic reconciliation and receipt-allocation defaults.", status: "Configurable", tone: "ready" },
+  "banking-cash": { description: "Set reconciliation and receipt-allocation defaults, and who holds the school's online payments.", status: "Configurable", tone: "ready" },
   // Deliberately not a list of the pages behind it. Which reference pages exist
   // is the host's answer, and naming currencies and dimensions here was wrong in
   // an app that mounts neither.
@@ -380,6 +381,8 @@ function BankingCashPolicy({ entityCode }: { entityCode: string | null }) {
     <div className="space-y-5">
       <SettingsSectionHeader title="Banking and cash policy" description="Set reconciliation, receipt allocation and petty-cash alert defaults for the selected entity." />
       {!canView ? <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read banking policy." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading banking policy" description="Reading the selected entity's reconciliation and allocation defaults." /></SettingsPanel> : <BankingCashForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} />}
+      {/* Read under its own payments key, so it stands apart from the finance policy above. */}
+      <OnlinePaymentsPanel entityCode={entityCode} />
       <SettingsPanel title="How defaults are applied">
         <SettingsRow icon={RotateCcw} label="Explicit workbench choices win" description="A user-supplied reconciliation window, grouping choice, or receipt strategy overrides these defaults for that operation." badge={<PolicyBadge kind="enforced">Override allowed</PolicyBadge>} />
         <SettingsRow icon={ShieldCheck} label="Matching does not post new money" description="Automatic reconciliation links existing statement and ledger evidence. It does not create an adjusting journal unless a separate authorized action does so." badge={<PolicyBadge kind="enforced" />} />

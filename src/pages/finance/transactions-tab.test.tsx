@@ -9,6 +9,10 @@
  * A payout's `amount` is what was sent, net of WHT. Where WHT was withheld the
  * drawer shows the line it settles and the WHT beside the amount; where none
  * was, it shows the amount alone.
+ *
+ * A held settlement is the school's own money moving from the platform's balance
+ * to a branch's bank. It is a Transfer, offered as its own direction, and never
+ * shown as money out.
  */
 
 import { act } from "react";
@@ -45,6 +49,13 @@ const ROWS = [
     provider: "PAYSTACK", amount: 950000, amount_naira: "9,500.00", status: "PAID",
     gross_amount: 1000000, wht_amount: 50000,
     narration: "", provider_reference: null, confirmed_at: null, linked_id: null, email: "", account_code: null, account_name: null,
+  },
+  {
+    kind: "settlement", gateway_id: 4, reference: "HS-4", created_at: "2026-09-21T06:30:00Z", direction: "transfer",
+    party: "Settled by the platform", provider: "PAYSTACK", amount: 985000, amount_naira: "9,850.00", status: "PAID",
+    gross_amount: 985000, wht_amount: 0,
+    narration: "Online payments held by the platform, paid into the branch's bank", provider_reference: "",
+    confirmed_at: "2026-09-21T08:00:00Z", linked_id: null, email: "", account_code: "1110", account_name: "Ikeja Zenith",
   },
 ];
 
@@ -108,5 +119,23 @@ describe("A payout's WHT in the drawer", () => {
     act(() => row("PO-2").click());
     expect(document.body.textContent).not.toContain("Line amount");
     expect(document.body.textContent).not.toContain("WHT withheld");
+  });
+});
+
+describe("Settlements are transfers, not money spent", () => {
+  it("offers Transfer as its own direction", () => {
+    act(() => root.render(<TransactionsTab entity="COD" />));
+    const options = [...container.querySelectorAll("select")][0].querySelectorAll("option");
+    expect([...options].map((o) => o.textContent)).toEqual(["All directions", "In", "Out", "Transfer"]);
+  });
+
+  it("tags a held settlement Transfer and does not colour it as money out", () => {
+    act(() => root.render(<TransactionsTab entity="COD" />));
+    const settlement = row("HS-4");
+    expect(settlement.textContent).toContain("Transfer");
+    expect(settlement.querySelector(".text-destructive")).toBeNull();
+    act(() => settlement.click());
+    expect(document.body.textContent).toContain("Settlement transfer");
+    expect(document.body.textContent).toContain("Paid into");
   });
 });

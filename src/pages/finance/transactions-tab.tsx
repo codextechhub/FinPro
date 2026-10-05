@@ -1,9 +1,13 @@
 /**
  * Transactions Log - a unified money-movement feed (Vision "Transactions Log"), house theme.
- * Money IN (collections) + money OUT (payouts) in one paginated read-only ledger, served by
- * the backend /payments/movements/ union (no client-side merge or caps). KPIs from the
- * movements summary; direction / status / provider filters are server-side; a row drawer
- * shows the movement's detail.
+ * Money IN (collections), money OUT (payouts) and TRANSFERS in one paginated read-only
+ * ledger, served by the backend /payments/movements/ union (no client-side merge or caps).
+ * KPIs from the movements summary; direction / status / provider filters are server-side;
+ * a row drawer shows the movement's detail.
+ *
+ * A transfer is the school's own money moving, never money spent: the platform paying a
+ * branch the online payments it held for it (a held settlement). It is listed under its
+ * own direction so a settlement never reads as an expense.
  *
  * A payout row's `party` and `beneficiary_account` are its beneficiary name and
  * account number, under Field Access on `payments.payout`. The backend leaves
@@ -13,7 +17,7 @@
  */
 
 import { useMemo, useState, type ReactNode } from "react";
-import { ArrowDownLeft, ArrowUpRight, Receipt, Banknote } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Receipt, Banknote } from "lucide-react";
 import { DataTable, Money, KpiCard, DetailDrawer, toArray, useFieldAccess, type Column } from "@/components/finance-ui";
 import { QuickExportButton } from "../../host";
 import { cn } from "@/lib/utils";
@@ -21,7 +25,7 @@ import { PROVIDER_CHOICES, providerInfo } from "./payment-providers";
 import { formatMoney } from "@/utils/money";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { useGetMovementsQuery, useGetMovementsSummaryQuery } from "@/redux/services/payments/payments-api";
-import type { Movement } from "@/redux/services/payments/payments-types";
+import type { Movement, MovementDirection } from "@/redux/services/payments/payments-types";
 import { useDates } from "../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
@@ -46,10 +50,17 @@ function StatusPill({ status }: { status: string }) {
   const s = STATUS_PILL[status] ?? { label: status, cls: "bg-gray-02 text-gray-01" };
   return <span className={cn(PILL, s.cls)}>{s.label}</span>;
 }
-function DirectionTag({ dir }: { dir: "in" | "out" }) {
+/** Each direction's tag, and the words the filter and drawer use for it. */
+const DIRECTIONS: Record<MovementDirection, { label: string; long: string; cls: string; Icon: typeof ArrowDownLeft }> = {
+  in: { label: "In", long: "Money in", cls: "bg-green-01/10 text-green-01", Icon: ArrowDownLeft },
+  out: { label: "Out", long: "Money out", cls: "bg-amber-50 text-amber-700", Icon: ArrowUpRight },
+  transfer: { label: "Transfer", long: "Transfer of the school's own money", cls: "bg-blue-50 text-blue-700", Icon: ArrowLeftRight },
+};
+function DirectionTag({ dir }: { dir: MovementDirection }) {
+  const d = DIRECTIONS[dir] ?? DIRECTIONS.out;
   return (
-    <span className={cn("inline-flex items-center gap-1", PILL, dir === "in" ? "bg-green-01/10 text-green-01" : "bg-amber-50 text-amber-700")}>
-      {dir === "in" ? <ArrowDownLeft className="size-3" /> : <ArrowUpRight className="size-3" />}{dir === "in" ? "In" : "Out"}
+    <span className={cn("inline-flex items-center gap-1", PILL, d.cls)}>
+      <d.Icon className="size-3" />{d.label}
     </span>
   );
 }
@@ -106,16 +117,17 @@ export function TransactionsTab({ entity, currency }: { entity: string; currency
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard label="Money in (7d)" value={formatMoney(s?.in7d.kobo ?? 0, currency)} foot="Settled collections" />
         <KpiCard label="Money out (7d)" value={formatMoney(s?.out7d.kobo ?? 0, currency)} foot="Paid payouts" />
+        <KpiCard label="Transfers (7d)" value={formatMoney(s?.transfers7d?.kobo ?? 0, currency)} foot="Held money paid to the bank" />
         <KpiCard label="Pending" value={String(s?.pending ?? 0)} tone={(s?.pending ?? 0) > 0 ? "warn" : "default"} foot="Awaiting settlement" />
         <KpiCard label="Failed" value={String(s?.failed ?? 0)} tone={(s?.failed ?? 0) > 0 ? "warn" : "default"} foot="Rejected / failed" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={direction} onChange={setDirection} className="w-36"><option value="">All directions</option><option value="in">In</option><option value="out">Out</option></Select>
+          <Select value={direction} onChange={setDirection} className="w-36"><option value="">All directions</option>{(Object.keys(DIRECTIONS) as MovementDirection[]).map((d) => <option key={d} value={d}>{DIRECTIONS[d].label}</option>)}</Select>
           <Select value={group} onChange={setGroup} className="w-36"><option value="">All status</option>{STATUS_GROUPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select>
           <Select value={provider} onChange={setProvider} className="w-40"><option value="">All providers</option>{PROVIDER_CHOICES.map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}</Select>
         </div>
@@ -134,7 +146,9 @@ export function TransactionsTab({ entity, currency }: { entity: string; currency
           typeface="geist"
           defaultName={direction === "out" ? "Payout instructions" : "Gateway collections"}
           disabledReason={
-            direction
+            direction === "transfer"
+              ? "Transfers are not exported from this list."
+              : direction
               ? undefined
               : "Choose In or Out first - money in and money out export as different files."
           }
@@ -145,7 +159,7 @@ export function TransactionsTab({ entity, currency }: { entity: string; currency
         loading={isFetching} page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
         emptyTitle="No transactions" emptyMessage="Collections and payouts will appear here as one feed." />
 
-      <p className="font-mont text-[11px] text-gray-05">A unified view of collections &amp; payouts; each lives in full on its own screen.</p>
+      <p className="font-mont text-[11px] text-gray-05">A unified view of collections, payouts and transfers; each lives in full on its own screen. A transfer moves the school&rsquo;s own money and is never counted as money out.</p>
 
       <MovementDrawer move={picked} currency={currency} onClose={() => setPicked(null)} />
     </div>
@@ -174,22 +188,24 @@ function MovementDrawer({ move, currency, onClose }: { move: Movement | null; cu
   const payoutAccess = useFieldAccess("payments.payout");
   if (!move) return null;
   const inbound = move.direction === "in";
+  const transfer = move.direction === "transfer";
   const showName = inbound || !payoutAccess.isHidden("beneficiary_name");
   const showAccount = !inbound && !payoutAccess.isHidden("beneficiary_account_number") && !!move.beneficiary_account;
   const showEmail = inbound && !!move.email;
+  const kindLabel = inbound ? "Collection in" : transfer ? "Settlement transfer" : "Payout out";
 
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title={move.reference} description={`${inbound ? "Collection in" : "Payout out"} · ${providerInfo(move.provider).label} · ${formatMoney(move.amount, currency)}`}
+      title={move.reference || kindLabel} description={`${kindLabel} · ${providerInfo(move.provider).label} · ${formatMoney(move.amount, currency)}`}
       widthClass="sm:max-w-md"
       footer={<><DirectionTag dir={move.direction} /><div className="flex-1" /><StatusPill status={move.status} /></>}>
       <div className="space-y-4">
         <Section title="Movement">
           <Field label="Reference" mono>{move.reference}</Field>
-          <Field label="Direction">{inbound ? "Money in" : "Money out"}</Field>
+          <Field label="Direction">{(DIRECTIONS[move.direction] ?? DIRECTIONS.out).long}</Field>
           <Field label="Provider"><ProviderTag provider={move.provider} /></Field>
           {move.provider_reference ? <Field label="Provider ref" mono>{move.provider_reference}</Field> : null}
-          <Field label="Amount" mono><span className={!inbound ? "text-destructive" : ""}>{formatMoney(move.amount, currency)}</span></Field>
+          <Field label="Amount" mono><span className={move.direction === "out" ? "text-destructive" : ""}>{formatMoney(move.amount, currency)}</span></Field>
           {move.wht_amount > 0 ? (
             <>
               <Field label="Line amount" mono>{formatMoney(move.gross_amount, currency)}</Field>
@@ -201,7 +217,7 @@ function MovementDrawer({ move, currency, onClose }: { move: Movement | null; cu
         </Section>
 
         {showName || showAccount || showEmail || move.narration ? (
-          <Section title={inbound ? "Counterparty" : "Beneficiary"}>
+          <Section title={inbound || transfer ? "Counterparty" : "Beneficiary"}>
             {showName ? <Field label={inbound ? "Customer" : "Name"}>{move.party || "-"}</Field> : null}
             {showEmail ? <Field label="Payer email">{move.email}</Field> : null}
             {showAccount ? <Field label="Account" mono>{move.beneficiary_account}</Field> : null}
@@ -211,8 +227,8 @@ function MovementDrawer({ move, currency, onClose }: { move: Movement | null; cu
 
         <Section title="Settlement">
           <Field label="Confirmed" mono>{dates.dateTime(move.confirmed_at)}</Field>
-          <Field label={inbound ? "Deposit account" : "Source account"} mono>{move.account_code ? `${move.account_code}${move.account_name ? ` · ${move.account_name}` : ""}` : (inbound ? "Bank / collections" : "Cash & bank")}</Field>
-          <Field label={inbound ? "Booked receipt" : "Booked payment"}>
+          <Field label={inbound ? "Deposit account" : transfer ? "Paid into" : "Source account"} mono>{move.account_code ? `${move.account_code}${move.account_name ? ` · ${move.account_name}` : ""}` : (inbound ? "Bank / collections" : "Cash & bank")}</Field>
+          <Field label={inbound ? "Booked receipt" : transfer ? "Settlement" : "Booked payment"}>
             {move.linked_id ? <span className="inline-flex items-center gap-1">{inbound ? <Receipt className="size-3.5" /> : <Banknote className="size-3.5" />} #{move.linked_id}</span> : "-"}
           </Field>
         </Section>
