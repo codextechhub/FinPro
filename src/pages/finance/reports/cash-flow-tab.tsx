@@ -20,6 +20,7 @@ import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import { toArray } from "@/redux/services/finance/api-types";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
+import { periodParams } from "./period-params";
 
 const BAND: Record<string, string> = {
   operating: "bg-green-01/10 text-green-01",
@@ -51,7 +52,8 @@ export function CashFlowReport({ entity, currency }: { entity: string; currency?
   const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 
-  const { data, isLoading, isFetching, isError, refetch } = useGetCashFlowQuery({ entity, ...(period ? { period } : {}) });
+  const picked = periodParams(periods, period);
+  const { data, isLoading, isFetching, isError, refetch } = useGetCashFlowQuery({ entity, ...picked });
   const d = data?.data;
 
   if (isLoading) return <LoadingState />;
@@ -73,7 +75,7 @@ export function CashFlowReport({ entity, currency }: { entity: string; currency?
         </Select>
         <div className="flex items-center gap-2">
           {(["csv", "xlsx", "pdf"] as const).map((f) => (
-            <button key={f} onClick={() => viewReportExport("/finance/reports/cash-flow/", { entity, period: period || undefined }, f)}
+            <button key={f} onClick={() => viewReportExport("/finance/reports/cash-flow/", { entity, ...picked }, f)}
               className="inline-flex items-center gap-1.5 rounded-md border border-white-02 px-2.5 py-1.5 font-mont text-xs font-semibold text-gray-01 hover:border-primary hover:text-primary">
               <Eye className="size-3.5" /> {f.toUpperCase()}
             </button>
