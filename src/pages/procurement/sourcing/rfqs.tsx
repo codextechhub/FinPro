@@ -15,7 +15,7 @@ import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, LineEditor,
   LoadingState, Money, MoneyInput, StatCard, StatusPill, ActionButton, TabStrip, emptyLine, toArray,
   useActiveEntity, useFieldAccess, type Column, type DocLine, type TabStripItem,
-  RaisingBranchChoiceField, useRaisingBranchChoice,
+  RaisingBranchChoiceField, useRaisingBranchChoice, useReaderBranchLens, Segmented,
 } from "@/components/finance-ui";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
@@ -42,6 +42,9 @@ import { NO_DEADLINE, deadlineInstant, type DeadlineValue } from "./deadline";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../../lib/display-prefs";
+import { useReaderReach } from "../../../host";
+import { SharedSourcingEditor, useApprovedSourceLines } from "./shared-sourcing-editor";
+import { groupSharedLines, sharedRfqLinesBody, sharedSourcingProblem } from "./shared-sourcing";
 
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["lines", "Lines", List],
@@ -101,6 +104,7 @@ export default function RfqsPage() {
         <div className="min-w-40">
           <p className="font-semibold">{r.title || "Untitled RFQ"}</p>
           {r.requisition_number && <p className="mt-0.5 text-xs text-gray-05">From {r.requisition_number}</p>}
+          {r.shared_sourcing && <p className="mt-0.5 text-xs text-gray-05">Buying together: {r.shared_sourcing.participant_branches.map((b) => b.name).join(", ")}</p>}
         </div>
       ),
     },
@@ -216,7 +220,9 @@ function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entit
             <Field label="RFQ number" value={rfq.document_number} />
             <Field label="Status" value={<RfqStatusPill status={rfq.rfq_status} />} />
             <Field label="Title" value={rfq.title} />
-            <Field label="Requisition" value={rfq.requisition_number || "-"} />
+            {rfq.shared_sourcing
+              ? <Field label="Branches buying together" value={rfq.shared_sourcing.participant_branches.map((b) => b.name).join(", ")} />
+              : <Field label="Requisition" value={rfq.requisition_number || "-"} />}
             <Field label="Issued" value={dates.day(rfq.issue_date)} />
             <Field label="Response deadline" value={dates.day(rfq.response_due_date)} />
             <Field label="Published version" value={`Version ${rfq.version}`} />
@@ -234,7 +240,7 @@ function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entit
             <tbody>{rfq.lines.map((line) => (
               <tr key={line.id}>
                 <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums text-gray-05">{line.line_no}</td>
-                <td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold">{line.description}</td>
+                <td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold">{line.description}{rfq.shared_sourcing?.allocations?.some((a) => a.rfq_line_id === line.id) && <span className="mt-0.5 block font-normal text-gray-05">{rfq.shared_sourcing.allocations.filter((a) => a.rfq_line_id === line.id).map((a) => `${a.branch_name} ${formatQuantity(a.quantity)} (${a.requisition_number})`).join(" · ")}</span>}</td>
                 <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{formatQuantity(line.quantity)}</td>
                 <td className="border-t border-white-02 px-3 py-2 font-mont text-xs">{line.expense_code || "-"}</td>
                 <td className="border-t border-white-02 px-3 py-2 font-mont text-xs">{line.tax_code_id ? "Taxed" : "-"}</td>
@@ -309,7 +315,7 @@ function RfqAmendmentForm({ rfq, entity, onClose }: { rfq: RfqDetail; entity: st
         {deadlinePartial && <p role="alert" className="mt-1 font-mont text-[11px] text-destructive">Give the new deadline both a day and a time, or leave both empty.</p>}
       </FormField>
       <label className="flex items-start gap-2 rounded-md border border-white-02 p-3 font-mont text-xs"><input type="checkbox" className="mt-0.5" checked={responseRequired} onChange={(event) => setResponseRequired(event.target.checked)} /><span><strong className="block text-gray-01">Require a new response</strong><span className="mt-1 block leading-5 text-gray-05">Submitted quotations reopen as drafts. Their earlier receipts remain unchanged.</span></span></label>
-      <label className="flex items-start gap-2 rounded-md border border-white-02 p-3 font-mont text-xs"><input type="checkbox" className="mt-0.5" checked={changeLines} onChange={(event) => setChangeLines(event.target.checked)} /><span><strong className="block text-gray-01">Change requested items or quantities</strong><span className="mt-1 block leading-5 text-gray-05">The current specification remains preserved in earlier quotation receipts.</span></span></label>
+      {rfq.shared_sourcing ? <p className="font-mont text-[11px] leading-5 text-gray-05">Several branches are buying together on this RFQ, so its items stay as allocated. To change them, cancel it and raise a new one.</p> : <label className="flex items-start gap-2 rounded-md border border-white-02 p-3 font-mont text-xs"><input type="checkbox" className="mt-0.5" checked={changeLines} onChange={(event) => setChangeLines(event.target.checked)} /><span><strong className="block text-gray-01">Change requested items or quantities</strong><span className="mt-1 block leading-5 text-gray-05">The current specification remains preserved in earlier quotation receipts.</span></span></label>}
       {changeLines && <div><p className="mb-2 font-mont text-xs font-semibold text-gray-05">Replacement specification</p><LineEditor entity={entity} lines={lines} onChange={setLines} accountLabel="Expense account (optional)" accountType="EXPENSE" showTax showCostCenter={false} taxUsage="purchase" /></div>}
     </div>
   </DetailDrawer>;
@@ -439,8 +445,21 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
   const [create, { isLoading: creating }] = useCreateRfqMutation();
   const [update, { isLoading: updating }] = useUpdateRfqMutation();
   const [issue, { isLoading: issuing }] = useIssueRfqMutation();
+  // Several branches may buy together on a new RFQ where the school has several
+  // branches and the buyer works in at least two of them.
+  const lens = useReaderBranchLens();
+  const reach = useReaderReach();
+  const canShare = !initial && lens.applies && (reach.wholeSchool || (reach.branchIds?.length ?? 0) >= 2);
+  const [mode, setMode] = useState<"single" | "shared">("single");
+  const shared = canShare && mode === "shared";
+  const sharedEdit = !!initial?.shared_sourcing;
+  const [sharedSelected, setSharedSelected] = useState<number[]>([]);
+  const [sharedDescriptions, setSharedDescriptions] = useState<Record<string, string>>({});
+  const sourceLines = useApprovedSourceLines(entity, reach.wholeSchool ? null : reach.branchIds);
+  const sharedChosen = sourceLines.lines.filter((line) => sharedSelected.includes(line.requisition_line));
+  const sharedProblem = shared ? sharedSourcingProblem(sharedChosen) : null;
   // An RFQ from a requisition takes the requisition's branch; a draft keeps its own.
-  const branch = useRaisingBranchChoice({ unless: !!initial || !!requisition });
+  const branch = useRaisingBranchChoice({ unless: !!initial || !!requisition || shared });
 
   // When a requisition is picked, prefill lines from its own lines (create only).
   const { data: reqData } = useGetRequisitionQuery({ id: Number(requisition), entity }, { skip: !requisition || !!initial });
@@ -469,7 +488,7 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
     });
 
   const saving = creating || updating || issuing;
-  const valid = !!title.trim() && !!issueDate && apiLines.length > 0 && (!dueDate || dueDate >= issueDate) && branch.ready;
+  const valid = !!title.trim() && !!issueDate && (shared ? !sharedProblem : sharedEdit || apiLines.length > 0) && (!dueDate || dueDate >= issueDate) && branch.ready;
   // Backend issue rule: an RFQ needs ≥1 line AND ≥1 invited vendor before it opens.
   const canIssue = valid && invited.length > 0;
   // Edit is gated on dirty too; create just needs validity.
@@ -487,12 +506,14 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
       // 0 means "no budget": omit on create, clear (null) on edit.
       budget_estimate: budgetKobo > 0 ? budgetKobo : (initial ? null : undefined),
       invited_vendors: invited.map((v) => v.code),
-      notes: notes.trim() || undefined, lines: apiLines,
+      notes: notes.trim() || undefined,
     };
+    const lines = shared ? sharedRfqLinesBody(groupSharedLines(sharedChosen), sharedDescriptions) : apiLines;
     try {
       const res = initial
-        ? await update({ id: initial.id, entity, ...body }).unwrap()
-        : await create({ entity, ...body, ...(requisition ? { requisition: Number(requisition) } : branch.body()) }).unwrap();
+        // A shared RFQ's lines carry their branch allocations and are not rewritten by an edit.
+        ? await update({ id: initial.id, entity, ...body, ...(sharedEdit ? {} : { lines }) }).unwrap()
+        : await create({ entity, ...body, lines, ...(shared ? {} : requisition ? { requisition: Number(requisition) } : branch.body()) }).unwrap();
       if (issueAfter && !initial) await issue({ id: res.data.id, entity }).unwrap();
       toast.success(
         issueAfter ? "RFQ created and issued." : res.message || (initial ? "RFQ updated." : "RFQ created."),
@@ -525,7 +546,8 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
     >
       <div className="space-y-4">
         <FormField label="Title" required><Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-white" /></FormField>
-        {!initial && <FormField label="From requisition"><RequisitionPicker entity={entity} value={requisition} onChange={setRequisition} status="APPROVED" placeholder="Optional - prefill from an approved requisition" /></FormField>}
+        {canShare && <Segmented label="Who is buying" value={mode} onChange={setMode} options={[["single", "One branch"], ["shared", "Several branches together"]] as const} />}
+        {!initial && !shared && <FormField label="From requisition"><RequisitionPicker entity={entity} value={requisition} onChange={setRequisition} status="APPROVED" placeholder="Optional - prefill from an approved requisition" /></FormField>}
         <RaisingBranchChoiceField choice={branch} hint="The branch the goods are for. An RFQ from a requisition takes the requisition's branch." />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField label="Issue date" required><DatePickerInput value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="bg-white" /></FormField>
@@ -537,10 +559,15 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
           <InviteVendorsEditor entity={entity} invited={invited} onChange={setInvited} />
         </div>
         <FormField label="Notes"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="bg-white" /></FormField>
-        <div className="pt-1">
+        {shared ? <div className="pt-1">
+          <p className="mb-1 font-mont text-xs font-semibold text-gray-05">Approved requisition lines to buy together</p>
+          <p className="mb-2 font-mont text-[11px] leading-5 text-gray-05">Each line goes on whole. Vendors see one RFQ; the award raises one purchase order for each branch.</p>
+          <SharedSourcingEditor lines={sourceLines.lines} isLoading={sourceLines.isLoading} selected={sharedSelected} onSelectedChange={setSharedSelected} descriptions={sharedDescriptions} onDescriptionsChange={setSharedDescriptions} />
+          {sharedProblem && sharedSelected.length > 0 && <p role="alert" className="mt-2 font-mont text-[11px] text-destructive">{sharedProblem}</p>}
+        </div> : sharedEdit ? <p className="rounded-md border border-white-02 bg-gray-50 px-3 py-2 font-mont text-[11px] leading-5 text-gray-05">Several branches are buying together on this RFQ, so its lines stay as allocated. To change them, cancel it and raise a new one.</p> : <div className="pt-1">
           <p className="mb-2 font-mont text-xs font-semibold text-gray-05">Lines (specification only - no price)</p>
           <LineEditor entity={entity} lines={lines} onChange={setLines} accountLabel="Expense account (optional)" accountType="EXPENSE" showTax showCostCenter={false} taxUsage="purchase" />
-        </div>
+        </div>}
       </div>
     </DetailDrawer>
   );

@@ -31,6 +31,8 @@ import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
 import { useGetPayoutBatchesQuery, useGetPayoutBatchesSummaryQuery, useCreatePayoutBatchMutation, useGetPayoutBatchQuery, useSubmitPayoutBatchMutation, useSubmitPayoutBatchForApprovalMutation } from "@/redux/services/payments/payments-api";
 import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
+import { useGetTaxCodesQuery } from "@/redux/services/finance/setup-api";
+import { computedWht } from "../procurement/withholding-tax";
 import type { PayoutBatchSummary, PayoutInstruction, PayoutBatchItemPayload } from "@/redux/services/payments/payments-types";
 import type { Vendor } from "@/redux/services/procurement/procurement-types";
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
@@ -141,9 +143,15 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 // ── Build batch ──────────────────────────────────────────────────────────────
-type Line = { id: number; vendor: string; amount: number; wht: number };
+/**
+ * One batch line. `wht` is a figure the person typed; null leaves it to the
+ * server, which works it out from the vendor's WHT code on the whole amount (a
+ * payout names a vendor, not a bill, so no VAT is identified). The line shows
+ * that figure and sends nothing, so what the batch shows is what it pays.
+ */
+type Line = { id: number; vendor: string; amount: number; wht: number | null };
 let LINE_SEQ = 1;
-const newLine = (): Line => ({ id: LINE_SEQ++, vendor: "", amount: 0, wht: 0 });
+const newLine = (): Line => ({ id: LINE_SEQ++, vendor: "", amount: 0, wht: null });
 
 function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {
   const [title, setTitle] = useState("");
@@ -156,6 +164,11 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
   const { data: vendorsData } = useGetVendorsQuery({ entity });
   const vendors = useMemo(() => toArray<Vendor>(vendorsData?.data), [vendorsData]);
   const vendorByCode = (code: string) => vendors.find((v) => v.code === code);
+  const { data: taxCodeRows } = useGetTaxCodesQuery({ entity }, { skip: !open });
+  const lineWht = (l: Line) => l.wht ?? computedWht({
+    gross: l.amount,
+    rateBps: toArray(taxCodeRows?.data).find((t) => t.code === vendorByCode(l.vendor)?.default_wht_tax_code_value)?.rate_bps,
+  });
 
   const reset = () => { setTitle(""); setProvider("PAYSTACK"); setSourceAccount(""); setNarration(""); setLines([newLine()]); LINE_SEQ = 1; };
   const close = () => { reset(); onClose(); };
@@ -163,12 +176,12 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
 
   // A line is valid with a vendor and an amount; the backend resolves its bank account.
   const validItems = useMemo<PayoutBatchItemPayload[]>(() => lines.flatMap((l) => {
-    if (!l.vendor || l.amount <= 0 || l.wht > l.amount) return [];
-    return [{ vendor: l.vendor, amount: l.amount, wht_amount: l.wht || undefined }];
+    if (!l.vendor || l.amount <= 0 || (l.wht ?? 0) >= l.amount) return [];
+    return [{ vendor: l.vendor, amount: l.amount, ...(l.wht !== null ? { wht_amount: l.wht } : {}) }];
   }), [lines]);
 
   const gross = lines.reduce((s, l) => s + (l.amount || 0), 0);
-  const wht = lines.reduce((s, l) => s + (l.wht || 0), 0);
+  const wht = lines.reduce((s, l) => s + lineWht(l), 0);
   const net = gross - wht;
 
   const submit = async (dispatch: boolean) => {
@@ -222,7 +235,7 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
           <div className="space-y-2">
             {lines.map((l) => {
               const v = vendorByCode(l.vendor);
-              const lineNet = (l.amount || 0) - (l.wht || 0);
+              const lineNet = (l.amount || 0) - lineWht(l);
               return (
                 <div key={l.id} className="rounded-md border border-white-02 bg-white p-2.5">
                   {/* Phone: vendor takes its own row; amounts + remove share the second. */}
@@ -231,14 +244,14 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
                       <VendorPicker entity={entity} value={l.vendor} onChange={(code) => setLine(l.id, { vendor: code })} label="Vendor" own />
                     </div>
                     <div><p className="mb-1 font-mont text-[11px] text-gray-05">Amount</p><MoneyInput valueKobo={l.amount} onChangeKobo={(k) => setLine(l.id, { amount: k })} currency={currency} className="[&_input]:h-9" /></div>
-                    <div><p className="mb-1 font-mont text-[11px] text-gray-05">WHT</p><MoneyInput valueKobo={l.wht} onChangeKobo={(k) => setLine(l.id, { wht: k })} currency={currency} className="[&_input]:h-9" /></div>
+                    <div><p className="mb-1 font-mont text-[11px] text-gray-05">WHT</p><MoneyInput valueKobo={lineWht(l)} onChangeKobo={(k) => setLine(l.id, { wht: k })} currency={currency} className="[&_input]:h-9" /></div>
                     <Button variant="ghost" size="icon" onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.id !== l.id) : ls))} className="size-9 text-gray-05 hover:text-destructive"><X className="size-4" /></Button>
                   </div>
                   <div className="mt-1.5 flex items-center justify-between font-mont text-[11px]">
                     <span className="text-gray-05">
                       {v ? `Paid to ${v.name}'s bank account on file` : "Pick a vendor to disburse to"}
                     </span>
-                    {l.amount > 0 ? <span className="tabular-nums text-gray-05">Net {formatMoney(lineNet, currency)}</span> : null}
+                    {l.amount > 0 ? <span className="tabular-nums text-gray-05">{l.wht === null ? "WHT from the vendor's code · " : <>WHT entered · <button type="button" className="text-primary hover:underline" onClick={() => setLine(l.id, { wht: null })}>work it out</button> · </>}Net {formatMoney(lineNet, currency)}</span> : null}
                   </div>
                 </div>
               );
