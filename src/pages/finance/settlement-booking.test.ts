@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { settlementFigures, settlementProblem, waitingPayments } from "./settlement-booking";
+import { paymentsForLine, settlementFigures, settlementProblem, waitingPayments } from "./settlement-booking";
 
 const ZONE = "Africa/Lagos";
 const line = { amount: 98_500_000, txn_date: "2026-10-07" };
@@ -70,5 +70,20 @@ describe("waitingPayments", () => {
       { ...base, gateway_id: 4, kind: "COLLECTION" as const, settled: false, via_clearing: false },
     ];
     expect(waitingPayments(rows).map((r) => r.gateway_id)).toEqual([1]);
+  });
+});
+
+describe("paymentsForLine", () => {
+  const ikejaPay = { gateway_id: 1, branch_id: 1 };
+  const lekkiPay = { gateway_id: 2, branch_id: 2 };
+
+  it("offers a line only its own branch's payments", () => {
+    expect(paymentsForLine({ branch_id: 1 }, [ikejaPay, lekkiPay]).map((p) => p.gateway_id)).toEqual([1]);
+  });
+
+  it("leaves the list whole where the line or a payment names no branch", () => {
+    expect(paymentsForLine({ branch_id: null }, [ikejaPay, lekkiPay])).toHaveLength(2);
+    expect(paymentsForLine({}, [ikejaPay, lekkiPay])).toHaveLength(2);
+    expect(paymentsForLine({ branch_id: 1 }, [{ gateway_id: 3, branch_id: undefined }]).map((p) => p.gateway_id)).toEqual([3]);
   });
 });

@@ -49,6 +49,15 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
 
 const statusOf = (c: Customer) => (!c.is_active ? "INACTIVE" : c.account_status ?? "ACTIVE");
 
+/**
+ * The mark on a payer's row: "Pays for 2" when the account pays other
+ * customers' bills (a parent paying for two children, a sponsor), counting only
+ * the customers the reader can see; nothing for anyone else.
+ */
+export function payerLabel(count: number | undefined): string | null {
+  return count && count > 0 ? `Pays for ${count}` : null;
+}
+
 export function CustomersTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput.trim(), 350);
@@ -79,9 +88,15 @@ export function CustomersTab({ entity, currency }: { entity: string; currency?: 
 
   const columns: Column<Customer>[] = [
     { header: "Code", cell: (c) => <span className="font-semibold tabular-nums">{c.code}</span> },
-    { header: "Customer", cell: (c) => (
-      <span className="inline-flex items-center gap-2"><Initials name={c.name} /><span className="font-medium text-gray-01">{c.name}</span></span>
-    ) },
+    { header: "Customer", cell: (c) => {
+      const payer = payerLabel(c.pays_for_count);
+      return (
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <Initials name={c.name} /><span className="font-medium text-gray-01">{c.name}</span>
+          {payer ? <span className="rounded bg-blue-50 px-2 py-0.5 font-mont text-[11px] font-medium text-blue-700" title="This account pays other customers' bills">{payer}</span> : null}
+        </span>
+      );
+    } },
     { header: "Contact", cell: (c) => <span className="text-gray-05">{c.billing_email || c.billing_phone || "-"}</span> },
     { header: "Balance", align: "right", cell: (c) => {
       const bal = c.balance ?? 0;

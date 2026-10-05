@@ -181,6 +181,9 @@ export interface SettlementRow {
   needs_review?: boolean;
   /** Booked to gateway clearing: it settles through a booked settlement, not a line of its own. */
   via_clearing?: boolean;
+  /** The branch the money belongs to, or a payout leaves from; absent from an older server. */
+  branch_id?: number | null;
+  branch_name?: string | null;
   /** The provider's own fee for this payment, where it reported one. */
   reported_fee?: number | null;
 }
@@ -228,6 +231,9 @@ export interface UnmatchedBankLine {
   reference: string;
   amount: number; // signed kobo
   amount_naira: string;
+  /** The branch of the bank account the line is on; absent from an older server. */
+  branch_id?: number | null;
+  branch_name?: string | null;
 }
 
 export interface SettlementReconciliation {
@@ -397,6 +403,8 @@ export interface CustodyCollectionAccount {
   bank_name: string;
   subaccount_ready: boolean;
   subaccount_provider: string | null;
+  /** The provider's handle for the subaccount; null until one is set up. Absent from an older server. */
+  subaccount_code?: string | null;
 }
 
 export interface CustodyBranch {

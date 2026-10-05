@@ -27,6 +27,14 @@ export interface BankAccount {
   book_balance_naira: string;
   unreconciled_count: number;
   last_reconciled_at: string | null;
+  /**
+   * How the payment provider settles the branch's online payments into this
+   * account: read only, and present only for a whole-school reader or a holder
+   * of payments.settings.view (absent, not blank, for anyone else).
+   */
+  gateway_subaccount_code?: string;
+  gateway_subaccount_provider?: string;
+  settlement_bank_code?: string;
   _read_only_fields?: string[];
 }
 
@@ -414,7 +422,20 @@ export interface EmployeeSalary {
   paye_override?: number | null; // Field Access: finance.salary PAYE
   paye_override_reason?: string; // Field Access: finance.salary PAYE
   pension_pin?: string; // Field Access: finance.salary Pension
+  /** The day the terms shown (those in force today) took effect; null with no history. */
+  terms_effective_from?: string | null;
+  /** The next dated change to the terms, or null; its figures follow the same read switches. */
+  next_terms?: EmployeeSalaryNextTerms | null;
   _read_only_fields?: string[];
+}
+
+export interface EmployeeSalaryNextTerms {
+  effective_from: string;
+  branch_id: number | null;
+  branch_name: string | null;
+  gross_amount?: number; // Field Access: finance.salary
+  paye_amount?: number; // Field Access: finance.salary
+  pension_amount?: number; // Field Access: finance.salary
 }
 
 // ── Salary structures (reusable pay templates) ───────────────────────────────

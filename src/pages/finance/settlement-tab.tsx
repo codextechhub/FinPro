@@ -12,12 +12,15 @@
  * provider's fee, Cr gateway clearing, in the bank account's branch. "To book" lists the
  * server's suggestions; any unmatched inflow can be booked by hand from its drawer. See
  * book-settlement-modal.tsx. Payments the platform held settle through its own run and
- * are never booked here.
+ * are never booked here. At a school with several branches every gateway row and bank
+ * line names its branch, as the server sends it, and booking a line offers only its
+ * branch's payments.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Eye, RefreshCw, ArrowDownLeft, ArrowUpRight, BookCheck } from "lucide-react";
-import { DataTable, Money, KpiCard, DetailDrawer, TabStrip, toArray, type Column } from "@/components/finance-ui";
+import { DataTable, Money, KpiCard, DetailDrawer, TabStrip, toArray, useReaderBranchLens, type Column } from "@/components/finance-ui";
+import { NO_BRANCH_YET } from "../../lib/branch-labels";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PROVIDER_CHOICES, providerInfo } from "./payment-providers";
@@ -74,6 +77,9 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
   const [booking, setBooking] = useState<BookSettlementTarget | null>(null);
   const { can } = useCan();
   const canBook = can(P.PAY_CREATE_SETTLEMENT);
+  const multiBranch = useReaderBranchLens().applies;
+  const branchOf = (row: { branch_id?: number | null; branch_name?: string | null }) =>
+    row.branch_id == null ? NO_BRANCH_YET : row.branch_name || "-";
   const { data, isLoading, isFetching, isError, refetch } = useGetSettlementReconciliationQuery({ entity, ...(provider ? { provider } : {}) });
   const recon = data?.data;
   // Bank account names for the lines; a reader without the bank list sees the line alone.
@@ -109,6 +115,7 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
   const gwBase: Column<SettlementRow>[] = [
     { header: "Date", cell: (r) => <span className="tabular-nums text-gray-05">{dates.day(r.confirmed_at)}</span> },
     { header: "Type", cell: (r) => <TypeTag kind={r.kind} /> },
+    ...(multiBranch ? [{ header: "Branch", cell: (r: SettlementRow) => <span className="text-gray-01">{branchOf(r)}</span> }] : []),
     { header: "Provider", cell: (r) => <ProviderTag provider={r.provider} /> },
     { header: "Reference", cell: (r) => <span className="tabular-nums text-gray-01">{r.reference}</span> },
     { header: "Gross", align: "right", cell: (r) => <Money kobo={Math.abs(r.amount)} currency={currency} align="right" /> },
@@ -144,6 +151,7 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
   ];
   const unmatchedCols: Column<UnmatchedBankLine>[] = [
     { header: "Date", cell: (b) => <span className="tabular-nums text-gray-05">{dates.day(b.txn_date)}</span> },
+    ...(multiBranch ? [{ header: "Branch", cell: (b: UnmatchedBankLine) => <span className="text-gray-01">{branchOf(b)}</span> }] : []),
     { header: "Description", cell: (b) => b.description || "-" },
     { header: "Reference", cell: (b) => <span className="tabular-nums text-gray-05">{b.reference || "-"}</span> },
     { header: "Amount", align: "right", cell: (b) => <span className={cn("tabular-nums font-medium", b.amount < 0 ? "text-destructive" : "text-black-01")}>{signed(b.amount, currency)}</span> },
@@ -220,7 +228,7 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
           emptyMessage={tab === "matched" ? "Imported bank lines will match here by reference or amount." : "Every gateway record has settled to the bank."} />
       )}
 
-      <SettlementDrawer picked={picked} currency={currency} onClose={() => setPicked(null)}
+      <SettlementDrawer picked={picked} currency={currency} branchOf={multiBranch ? branchOf : undefined} onClose={() => setPicked(null)}
         onBook={canBook ? (line) => { setPicked(null); setBooking({ line, picked: [] }); } : undefined} />
       {booking ? (
         <BookSettlementModal target={booking} payments={waiting} bankName={bankName(booking.line.bank_account_id)}
@@ -247,8 +255,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function SettlementDrawer({ picked, currency, onClose, onBook }: {
+function SettlementDrawer({ picked, currency, branchOf, onClose, onBook }: {
   picked: Picked | null; currency?: string | null; onClose: () => void;
+  /** The branch a row or line names, at a school with several branches. */
+  branchOf?: (row: { branch_id?: number | null; branch_name?: string | null }) => string;
   /** Present when the reader may book a line as a settlement. */
   onBook?: (line: UnmatchedBankLine) => void;
 }) {
@@ -268,6 +278,7 @@ function SettlementDrawer({ picked, currency, onClose, onBook }: {
     <div className="space-y-4" data-guide="finance-settlement.workbench">
           <Section title="Bank statement line">
             <Field label="Date" mono>{dates.day(b.txn_date)}</Field>
+            {branchOf ? <Field label="Branch">{branchOf(b)}</Field> : null}
             <Field label="Description">{b.description || "-"}</Field>
             <Field label="Reference" mono>{b.reference || "-"}</Field>
             <Field label="Amount" mono><span className={b.amount < 0 ? "text-destructive" : ""}>{signed(b.amount, currency)}</span></Field>
@@ -291,6 +302,7 @@ function SettlementDrawer({ picked, currency, onClose, onBook }: {
       <div className="space-y-4">
         <Section title="Gateway record">
           <Field label="Type"><TypeTag kind={r.kind} /></Field>
+          {branchOf ? <Field label="Branch">{branchOf(r)}</Field> : null}
           <Field label="Provider"><ProviderTag provider={r.provider} /></Field>
           <Field label="Reference" mono>{r.reference}</Field>
           {r.provider_reference ? <Field label="Provider ref" mono>{r.provider_reference}</Field> : null}

@@ -29,6 +29,7 @@ import {
 } from "@/redux/services/finance/fees-api";
 import type { CustomerDeposit, DepositStatus } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
+import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
 
 const STATUSES: [DepositStatus | "", string][] = [
   ["", "All"], ["HELD", "Held"], ["RELEASED", "Returned"], ["FORFEITED", "Forfeited"], ["CANCELLED", "Cancelled"],
@@ -40,14 +41,15 @@ export function DepositsTab({ entity, currency }: { entity: string; currency?: s
   const { can } = useCan();
   const { wholeSchool } = useReaderReach();
   const branches = useBranchColumn();
+  const list = useListBranch();
   const [status, setStatus] = useState<DepositStatus | "">("HELD");
   const [customer, setCustomer] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<CustomerDeposit | null>(null);
   const [forfeiting, setForfeiting] = useState(false);
   const params = useMemo(() => ({
-    entity, page, ...(status ? { status } : {}), ...(customer ? { customer } : {}),
-  }), [entity, page, status, customer]);
+    entity, page, ...(status ? { status } : {}), ...(customer ? { customer } : {}), ...listBranchArg(list.view),
+  }), [entity, page, status, customer, list.view]);
   const { data, isLoading, isFetching, isError, refetch } = useGetDepositsQuery(params);
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
@@ -55,7 +57,7 @@ export function DepositsTab({ entity, currency }: { entity: string; currency?: s
 
   const columns: Column<CustomerDeposit>[] = [
     { header: "Customer", cell: (d) => <span className="font-medium text-gray-01">{d.customer_name} <span className="text-gray-05">{d.customer_code}</span></span> },
-    ...(branches.show ? [{ header: "Branch", cell: (d: CustomerDeposit) => branches.name(d.branch_id, d.branch_name) }] : []),
+    ...(branches.show && list.view.selected === "all" ? [{ header: "Branch", cell: (d: CustomerDeposit) => branches.name(d.branch_id, d.branch_name) }] : []),
     { header: "Invoice", cell: (d) => <span className="tabular-nums text-gray-05">{d.invoice_number}</span> },
     { header: "Amount", align: "right", cell: (d) => <Money kobo={d.amount} currency={currency} align="right" /> },
     { header: "Left on", cell: (d) => <span className="tabular-nums">{d.claim_opened_on ? dates.day(d.claim_opened_on) : "-"}</span> },
@@ -69,6 +71,7 @@ export function DepositsTab({ entity, currency }: { entity: string; currency?: s
           <select value={status} onChange={(e) => { setStatus(e.target.value as DepositStatus | ""); setPage(1); }} className={selectCls} aria-label="Status">
             {STATUSES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </select>
+          <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
           <div className="w-64 max-w-full">
             <CustomerPicker entity={entity} value={customer} onChange={(v) => { setCustomer(v); setPage(1); }} placeholder="Any customer" />
           </div>

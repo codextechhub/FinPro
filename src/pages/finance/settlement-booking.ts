@@ -21,9 +21,12 @@
  * - the line is dated before a payment it claims to settle (money cannot leave
  *   clearing before it entered it).
  *
- * The server also checks what the form cannot see: that each payment is still
- * waiting in clearing, belongs to the bank account's branch, and was not held
- * by the platform. Its refusal is shown as it words it.
+ * The server also checks that each payment is still waiting in clearing,
+ * belongs to the bank account's branch, and was not held by the platform. The
+ * branch is checked here first: both the line and each payment name their
+ * branch, so the dialog offers only the payments of the line's own branch
+ * (`paymentsForLine`). Anything else is the server's refusal, shown as it words
+ * it.
  */
 
 import { calendarDayOf } from "../../utils/dates";
@@ -77,6 +80,19 @@ export function settlementProblem(
       : `The line is dated before payment ${late.reference} was received.`;
   }
   return null;
+}
+
+/**
+ * The payments a bank line may settle: those of the line's own branch, since a
+ * settlement books in its bank account's branch. Ikeja's GTBank line is offered
+ * Ikeja's payments, never Lekki's. A line or a payment that does not name its
+ * branch (an older server) leaves the list as it is.
+ */
+export function paymentsForLine<T extends Pick<SettlementRow, "branch_id">>(
+  line: Pick<UnmatchedBankLine, "branch_id">, payments: readonly T[],
+): T[] {
+  if (line.branch_id == null) return [...payments];
+  return payments.filter((p) => p.branch_id === undefined || p.branch_id === line.branch_id);
 }
 
 /** The waiting payments a line could settle: confirmed collections still in clearing. */

@@ -417,6 +417,8 @@ export interface Customer {
   balance?: number;
   balance_naira?: string;
   account_status?: CustomerAccountStatus;
+  /** On the list: how many customers it pays for as a payer, counting only those the reader can see. */
+  pays_for_count?: number;
 }
 
 // Header KPI totals computed over ALL rows (so they stay accurate while the list

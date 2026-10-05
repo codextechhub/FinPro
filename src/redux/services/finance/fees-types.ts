@@ -69,6 +69,29 @@ export interface DeferredIncomeRelease {
   journal_id: number;
 }
 
+/**
+ * One release journal as the release list shows it, newest first. `can_reverse`
+ * is true for a release not yet reversed whose month is still open: the ones
+ * the undo form would reverse (it reverses every release of that month).
+ */
+export interface DeferredIncomeReleaseRow {
+  id: number;
+  branch_id: number | null;
+  branch_name: string | null;
+  date: string;
+  /** `YYYY-MM`. */
+  month: string;
+  period_id: number | null;
+  period_name: string | null;
+  period_status: string | null;
+  amount: number;
+  journal_id: number;
+  journal_number: string | null;
+  reversed: boolean;
+  reversed_at: string | null;
+  can_reverse: boolean;
+}
+
 export interface DeferredIncomeReleaseResult {
   up_to: string;
   releases: DeferredIncomeRelease[];

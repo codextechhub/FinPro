@@ -5,7 +5,8 @@
  * Mrs Adeyemi, bursar for Lekki only, reads the same panel and changes nothing.
  * Moving to direct is refused in the panel while Lekki's collection account is
  * not set up with the provider, naming Lekki. A collection account's Settings
- * tab says whether it is set up and offers to create its subaccount.
+ * tab says whether it is set up, under which subaccount code, and offers to
+ * create its subaccount.
  */
 
 import { act } from "react";
@@ -31,10 +32,13 @@ vi.mock("@/hooks/use-permissions", () => ({
   }),
 }));
 
-const account = (id: number, name: string, ready: boolean) => ({ id, name, bank_name: "Zenith", subaccount_ready: ready, subaccount_provider: ready ? "PAYSTACK" : null });
+const account = (id: number, name: string, ready: boolean) => ({
+  id, name, bank_name: "Zenith", subaccount_ready: ready, subaccount_provider: ready ? "PAYSTACK" : null,
+  subaccount_code: ready ? `ACCT_${name.split(" ")[0].toLowerCase()}` : null,
+});
 
 vi.mock("@/redux/services/payments/payments-api", () => ({
-  useGetCustodySettingsQuery: () => ({
+  useGetCustodySettingsQuery: (_args: unknown, options?: { skip?: boolean }) => options?.skip ? { data: undefined, isLoading: false, isError: false } : ({
     data: {
       data: {
         settings: {
@@ -141,6 +145,34 @@ describe("A collection account's subaccount", () => {
     });
     await act(async () => { [...document.body.querySelectorAll("button")].find((b) => b.textContent === "Create")!.click(); });
     expect(mocks.saveSubaccount).toHaveBeenCalledWith({ entity: "BSS", bank_account: 12, settlement_bank_code: "057" });
+  });
+
+  it("names the subaccount code and the bank's code once it is set up", () => {
+    mocks.lekkiReady = true;
+    act(() => root.render(<CollectionSubaccountBlock entity="BSS" account={{ ...lekki, gateway_subaccount_code: "ACCT_lekki", gateway_subaccount_provider: "PAYSTACK", settlement_bank_code: "057" }} />));
+    expect(container.textContent).toContain("Set up with Paystack");
+    expect(container.textContent).toContain("Subaccount ACCT_lekki, bank code 057.");
+  });
+
+  it("shows a whole-school reader without the payments settings key the route from the account itself", () => {
+    mocks.held = new Set();
+    act(() => root.render(<CollectionSubaccountBlock entity="BSS" account={{ ...lekki, gateway_subaccount_code: "ACCT_lekki", gateway_subaccount_provider: "PAYSTACK", settlement_bank_code: "057" }} />));
+    expect(container.textContent).toContain("Set up with Paystack");
+    expect(container.textContent).toContain("Subaccount ACCT_lekki, bank code 057.");
+    expect(button("Create subaccount")).toBeUndefined();
+  });
+
+  it("is absent for a reader who may read neither the settings nor the account's route", () => {
+    mocks.held = new Set();
+    act(() => root.render(<CollectionSubaccountBlock entity="BSS" account={lekki} />));
+    expect(container.textContent).toBe("");
+  });
+
+  it("names each branch's subaccount code in the Online payments panel", () => {
+    mocks.lekkiReady = true;
+    act(() => root.render(<OnlinePaymentsPanel entityCode="BSS" />));
+    expect(container.textContent).toContain("Subaccount ACCT_ikeja");
+    expect(container.textContent).toContain("Subaccount ACCT_lekki");
   });
 
   it("says nothing on an account that is not a collection account", () => {

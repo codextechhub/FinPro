@@ -57,7 +57,7 @@ import { P } from "../../permissions";
 import { printPayrollSchedule } from "../../utils/finance-print";
 import { openLinePayslip } from "../../utils/payroll-documents";
 import { PersonPicker } from "../../components/workflow/person-picker";
-import { withPayAliases } from "./payroll-access";
+import { nextTermsLine } from "./payroll-terms";
 import { fieldRefusals } from "./payroll-refusals";
 import { SalaryRecordDrawer } from "./payroll-record";
 import { LineItems, PayeWorkingView } from "./payroll-working";
@@ -873,7 +873,15 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
   const openRecord = (id: number) => { const row = all.find((e) => e.id === id); if (row) setViewing(row); };
 
   const cols: Column<EmployeeSalary>[] = [
-    { header: "Employee", cell: (e) => <span className="font-medium text-gray-01">{e.name}</span> },
+    { header: "Employee", cell: (e) => {
+      const next = nextTermsLine(e, { money: (kobo) => formatMoney(kobo, currency), day: (iso) => dates.day(iso), multiBranch });
+      return (
+        <span className="block min-w-0">
+          <span className="font-medium text-gray-01">{e.name}</span>
+          {next ? <span className="block font-mont text-[11px] text-blue-700">{next}</span> : null}
+        </span>
+      );
+    } },
     { header: "Structure", cell: (e) => e.structure_name ? <span className={cn(PILL, "bg-blue-50 text-blue-700")}>{e.structure_name}</span> : <span className="font-mont text-[11px] text-gray-05">Flat</span> },
     ...(showBranch ? [{ header: "Branch", cell: (e: EmployeeSalary) => <BranchCell salary={e} /> }] : []),
     { header: "Cost center", cell: (e) => <span className="tabular-nums text-gray-05">{e.cost_center || "-"}</span> },
@@ -1082,8 +1090,8 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, showB
   const isLoading = creating || updating;
   const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [refused, setRefused] = useState<Record<string, string>>({});
-  const plainAccess = useFieldAccess(SALARY, salary);
-  const access = useMemo(() => withPayAliases(plainAccess), [plainAccess]);
+  // The server lists residence_state, pfa and structure as read-only where the figure they change is.
+  const access = useFieldAccess(SALARY, salary);
   const mode = { creating: !salary };
   const grossOpen = !access.isReadOnly("gross_amount", mode);
   // A breakdown worked out from a figure the user cannot see would show it, or show zero.

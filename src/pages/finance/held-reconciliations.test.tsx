@@ -2,7 +2,8 @@
  * The held-money checks are platform screens: a reader with no platform key
  * (every school user) is told so and shown nothing. A platform reader sees the
  * daily checks and the "balance swept" setting; turning the setting on or off
- * needs a reason, and a reader who may only view cannot change it.
+ * needs a reason, and a reader who may only view cannot change it. The sweeps
+ * the check counted show with the setting, to any provider key holder.
  */
 
 import { act } from "react";
@@ -36,7 +37,10 @@ vi.mock("@/redux/services/payments/payments-api", () => ({
     data: { data: { balance_swept: false, source: "default", updated_at: null, tolerance_kobo: 0, sweeps: { count: 0, total: 0, latest_settled_at: null } } },
     isLoading: false, isError: false, refetch: vi.fn(),
   }),
-  useGetPlatformProviderSweepsQuery: () => ({ data: { data: [] }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
+  useGetPlatformProviderSweepsQuery: () => ({
+    data: { data: [{ id: 1, provider: "PAYSTACK", settlement_id: "STL-77", amount: 25_000_000, currency: "NGN", settled_at: "2026-10-02T09:00:00Z", recorded_on: "2026-10-03" }] },
+    isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
+  }),
   useUpdatePlatformProviderSettingsMutation: () => [mocks.update, { isLoading: false }],
 }));
 
@@ -87,6 +91,8 @@ describe("Held reconciliations", () => {
     expect(container.textContent).toContain("Default (off)");
     expect((container.querySelector('[aria-label="Paystack balance swept automatically"]') as HTMLButtonElement).disabled).toBe(true);
     expect(container.textContent).toContain("You have read-only access.");
+    expect(container.textContent).toContain("Sweeps counted");
+    expect(container.textContent).toContain("STL-77");
   });
 
   it("asks for a reason before turning sweeping on", async () => {

@@ -3,6 +3,10 @@
  * pay brought forward into the tax year, their voluntary deductions and their
  * tax year so far.
  *
+ * The header says when today's terms began and, where a change is dated
+ * ahead, what it is and from when (`payroll-terms.ts`), its figures only as far
+ * as the reader may read them.
+ *
  * Everything here is reached through the record, so it follows the record's
  * branch: the branch paying the person today reads it, and a move dated ahead
  * hands it over on its date. Every figure follows the reader's Field Access on
@@ -40,6 +44,7 @@ import { P } from "../../permissions";
 import { useDates } from "../../lib/display-prefs";
 import { openSalaryTaxSummary } from "../../utils/payroll-documents";
 import { fieldRefusals } from "./payroll-refusals";
+import { nextTermsLine, termsSinceLine } from "./payroll-terms";
 import {
   useCreateEmployeeDeductionMutation, useCreatePayBroughtForwardMutation, useDeletePayBroughtForwardMutation,
   useGetEmployeeDeductionsQuery, useGetPayBroughtForwardQuery, useGetPayrollDeductionTypesQuery,
@@ -123,7 +128,10 @@ export function SalaryRecordDrawer({ salary, entity, currency, multiBranch, canP
   onEdit?: (salary: EmployeeSalary) => void;
 }) {
   const [section, setSection] = useState<Section>("history");
+  const dates = useDates();
   if (!salary) return null;
+  const since = termsSinceLine(salary, { day: (iso) => dates.day(iso), today: dates.today() });
+  const next = nextTermsLine(salary, { money: (kobo) => formatMoney(kobo, currency), day: (iso) => dates.day(iso), multiBranch }, ["gross_amount", "paye_amount", "pension_amount"]);
   return (
     <DetailDrawer open onOpenChange={(open) => (open ? undefined : onClose())}
       title={salary.name}
@@ -135,6 +143,12 @@ export function SalaryRecordDrawer({ salary, entity, currency, multiBranch, canP
         {onEdit ? <Button onClick={() => onEdit(salary)} className="gap-1.5"><Pencil className="size-4" /> Edit</Button> : null}
       </>}>
       <div className="space-y-4">
+        {since || next ? (
+          <div className="space-y-1">
+            {since ? <p className="font-mont text-xs text-gray-05">{`Today's pay terms: ${since.charAt(0).toLowerCase()}${since.slice(1)}`}</p> : null}
+            {next ? <p role="note" className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 font-mont text-xs text-blue-900">{next}</p> : null}
+          </div>
+        ) : null}
         <TabStrip items={SECTIONS} value={section} onChange={setSection} variant="underline" ariaLabel="Salary record sections" className="w-full gap-1" buttonClassName="px-3 py-2 font-semibold" />
         {section === "history" ? <HistoryPanel salary={salary} entity={entity} currency={currency} multiBranch={multiBranch} /> : null}
         {section === "earlier" ? <EarlierPayPanel salary={salary} entity={entity} currency={currency} /> : null}

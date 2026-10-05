@@ -17,8 +17,8 @@
  *   it on or off needs a reason, which the audit trail keeps. The tolerance is
  *   shown here read-only; it is changed in Settings, Advanced catalogue.
  * - The sweeps the check counted, listed under the setting. The server serves
- *   them to platform settlement readers, so the list shows to a reader holding
- *   both a provider key and the settlement view key.
+ *   them to anyone holding either provider key or the settlement view key, so
+ *   the list shows wherever the setting does.
  */
 
 import { useState, type ReactNode } from "react";
@@ -55,7 +55,7 @@ export function HeldReconciliationsTab() {
   }
   return (
     <div className="space-y-6">
-      {canProvider ? <ProviderSettingsCard showSweeps={canChecks} /> : null}
+      {canProvider ? <ProviderSettingsCard /> : null}
       {canChecks ? <ChecksList /> : null}
     </div>
   );
@@ -153,7 +153,7 @@ function CheckDrawer({ row, onClose }: { row: HeldReconciliation | null; onClose
   );
 }
 
-function ProviderSettingsCard({ showSweeps }: { showSweeps: boolean }) {
+function ProviderSettingsCard() {
   const dates = useDates();
   const { can } = useCan();
   const canUpdate = can(P.PAY_UPDATE_PLATFORM_PROVIDER);
@@ -202,7 +202,7 @@ function ProviderSettingsCard({ showSweeps }: { showSweeps: boolean }) {
       )}
       {!canUpdate ? <p className="font-mont text-[11px] text-gray-05">You have read-only access.</p> : null}
 
-      {showSweeps ? <SweepsTable /> : null}
+      <SweepsTable />
 
       {next !== null && settings ? (
         <ConfirmActionModal open onOpenChange={(open) => { if (!open) { setNext(null); setReason(""); } }}

@@ -20,6 +20,7 @@ import type {
   CustomerCreditTransfer,
   CustomerDeposit,
   DeferredIncomeReleaseResult,
+  DeferredIncomeReleaseRow,
   DeferredIncomeSummary,
   DepositForfeitResult,
   DepositStatus,
@@ -42,6 +43,9 @@ const qs = (p: object) => generateQueryString(p as Record<string, string | numbe
 /** Everything a posting that moves receivables can change on screen. */
 const LEDGER_TAGS = ["FinanceReports", "FinanceJournals", "FinanceInvoices", "FinanceCustomers"] as const;
 
+/** `?branch=`: one branch the reader works in, or the rows not yet given one. */
+type BranchArg = { branch?: number | "unassigned" };
+
 export const feesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // Receivables policy (whole-school writes only)
@@ -57,7 +61,7 @@ export const feesApi = baseApi.injectEndpoints({
     }),
 
     // Deferred income
-    getDeferredIncome: builder.query<ApiEnvelope<DeferredIncomeSummary>, { entity: string }>({
+    getDeferredIncome: builder.query<ApiEnvelope<DeferredIncomeSummary>, { entity: string } & BranchArg>({
       query: (params) => ({ url: `/finance/deferred-income/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceDeferredIncome"],
     }),
@@ -65,13 +69,20 @@ export const feesApi = baseApi.injectEndpoints({
       query: ({ entity, ...body }) => ({ url: `/finance/deferred-income/release/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceDeferredIncome", "FinancePeriods", ...LEDGER_TAGS],
     }),
+    getDeferredIncomeReleases: builder.query<
+      PaginatedEnvelope<DeferredIncomeReleaseRow>,
+      { entity: string; page?: number; page_size?: number; period?: number; month?: string; reversed?: "true" | "false" } & BranchArg
+    >({
+      query: (params) => ({ url: `/finance/deferred-income/releases/${qs(params)}`, method: "GET" }),
+      providesTags: ["FinanceDeferredIncome"],
+    }),
     reverseDeferredIncome: builder.mutation<ApiEnvelope<{ period: number; reversed: number }>, { entity: string; period: number }>({
       query: ({ entity, ...body }) => ({ url: `/finance/deferred-income/reverse/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceDeferredIncome", "FinancePeriods", ...LEDGER_TAGS],
     }),
 
     // Doubtful-debt provision
-    getProvisions: builder.query<PaginatedEnvelope<DoubtfulDebtProvision>, { entity: string; page?: number }>({
+    getProvisions: builder.query<PaginatedEnvelope<DoubtfulDebtProvision>, { entity: string; page?: number } & BranchArg>({
       query: (params) => ({ url: `/finance/provisions/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceProvisions"],
     }),
@@ -91,7 +102,7 @@ export const feesApi = baseApi.injectEndpoints({
     // Customer deposits
     getDeposits: builder.query<
       PaginatedEnvelope<CustomerDeposit>,
-      { entity: string; page?: number; status?: DepositStatus; customer?: string }
+      { entity: string; page?: number; status?: DepositStatus; customer?: string } & BranchArg
     >({
       query: (params) => ({ url: `/finance/deposits/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceDeposits"],
@@ -116,7 +127,7 @@ export const feesApi = baseApi.injectEndpoints({
 
     // Credit transfers between customers (always approval-gated)
     getCreditTransfers: builder.query<
-      PaginatedEnvelope<CustomerCreditTransfer>, { entity: string; page?: number; status?: string; customer?: string }
+      PaginatedEnvelope<CustomerCreditTransfer>, { entity: string; page?: number; status?: string; customer?: string } & BranchArg
     >({
       query: (params) => ({ url: `/finance/credit-transfers/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceCreditTransfers"],
@@ -178,7 +189,7 @@ export const feesApi = baseApi.injectEndpoints({
     }),
 
     // Payments from a payer
-    getPayerPayments: builder.query<PaginatedEnvelope<PayerPayment>, { entity: string; page?: number; payer?: string; status?: string }>({
+    getPayerPayments: builder.query<PaginatedEnvelope<PayerPayment>, { entity: string; page?: number; payer?: string; status?: string } & BranchArg>({
       query: (params) => ({ url: `/finance/payer-payments/${qs(params)}`, method: "GET" }),
       providesTags: ["FinancePayerPayments"],
     }),
@@ -206,6 +217,7 @@ export const {
   useGetReceivablesSettingsQuery,
   useUpdateReceivablesSettingsMutation,
   useGetDeferredIncomeQuery,
+  useGetDeferredIncomeReleasesQuery,
   useReleaseDeferredIncomeMutation,
   useReverseDeferredIncomeMutation,
   useGetProvisionsQuery,

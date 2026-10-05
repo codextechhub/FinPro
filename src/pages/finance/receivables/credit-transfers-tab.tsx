@@ -33,6 +33,7 @@ import {
 } from "@/redux/services/finance/fees-api";
 import type { CustomerCreditTransfer } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
+import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
 
@@ -40,11 +41,12 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
   const dates = useDates();
   const { can } = useCan();
   const branches = useBranchColumn();
+  const list = useListBranch();
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<CustomerCreditTransfer | null>(null);
-  const params = useMemo(() => ({ entity, page, ...(status ? { status } : {}) }), [entity, page, status]);
+  const params = useMemo(() => ({ entity, page, ...(status ? { status } : {}), ...listBranchArg(list.view) }), [entity, page, status, list.view]);
   const { data, isLoading, isFetching, isError, refetch } = useGetCreditTransfersQuery(params);
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
@@ -54,7 +56,7 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
     { header: "Ref", cell: (t) => <span className="font-semibold tabular-nums">{t.document_number}</span> },
     { header: "From", cell: (t) => <span className="font-medium text-gray-01">{t.from_customer_name}</span> },
     { header: "To", cell: (t) => <span className="font-medium text-gray-01">{t.to_customer_name}</span> },
-    ...(branches.show ? [{ header: "Branch", cell: (t: CustomerCreditTransfer) => branches.name(t.branch_id) }] : []),
+    ...(branches.show && list.view.selected === "all" ? [{ header: "Branch", cell: (t: CustomerCreditTransfer) => branches.name(t.branch_id) }] : []),
     { header: "Amount", align: "right", cell: (t) => <Money kobo={t.amount} currency={currency} align="right" /> },
     { header: "Date", cell: (t) => <span className="tabular-nums">{dates.day(t.transfer_date)}</span> },
     { header: "Status", cell: (t) => <StatusPill status={t.status} /> },
@@ -63,13 +65,16 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectCls} aria-label="Status">
-          <option value="">All statuses</option>
-          <option value="DRAFT">Draft</option>
-          <option value="PENDING_APPROVAL">Awaiting approval</option>
-          <option value="POSTED">Posted</option>
-          <option value="REVERSED">Voided</option>
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectCls} aria-label="Status">
+            <option value="">All statuses</option>
+            <option value="DRAFT">Draft</option>
+            <option value="PENDING_APPROVAL">Awaiting approval</option>
+            <option value="POSTED">Posted</option>
+            <option value="REVERSED">Voided</option>
+          </select>
+          <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
+        </div>
         {can(P.FIN_CREATE_CREDIT_TRANSFER) ? (
           <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New transfer</Button>
         ) : null}

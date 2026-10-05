@@ -97,7 +97,6 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { EmployeeDrawer, GeneratedRunNotice, NewRunDrawer, PayDrawer, PreviousPayMissingBanner, RunDrawer, canPrintPayslip, offeredStructures, salaryChanges, statutoryTotals, withSequences } from "./payroll";
-import { withPayAliases } from "./payroll-access";
 import { resolveFieldAccess } from "@/components/finance-ui";
 import type { EmployeeSalary, PayrollRun } from "@/redux/services/finance/ops-types";
 
@@ -364,7 +363,8 @@ const aisha: EmployeeSalary = {
   tax_id: "", pension_pin: "", annual_rent: 0, paye_override: null, paye_override_reason: "",
 } as EmployeeSalary;
 
-const PAYE_READ_ONLY = { "finance.salary": { hidden: [], read_only: ["annual_rent", "paye_amount", "paye_override", "paye_override_reason", "tax_id"], open_on_create: [] } };
+// As the server sends it: the state of residence follows PAYE's write switch, so it is listed read-only with it.
+const PAYE_READ_ONLY = { "finance.salary": { hidden: [], read_only: ["annual_rent", "paye_amount", "paye_override", "paye_override_reason", "tax_id", "residence_state"], open_on_create: [] } };
 
 describe("a salary record's statutory details", () => {
   const flat = { name: "Aisha Bello", structure: null, gross_amount: 30_000_000, paye_amount: 0, pension_amount: 0 };
@@ -374,12 +374,21 @@ describe("a salary record's statutory details", () => {
       .toEqual({ residence_state: "OG", pfa: 9, pension_pin: "PEN100", tax_id: "TIN-1", annual_rent: 120_000_000 });
   });
 
-  it("keeps a new state out of the body when PAYE may not be changed", () => {
-    const access = withPayAliases(resolveFieldAccess(PAYE_READ_ONLY, "finance.salary"));
+  it("keeps a new state out of the body when the server lists it read-only with PAYE", () => {
+    const access = resolveFieldAccess(PAYE_READ_ONLY, "finance.salary");
     expect(access.isReadOnly("residence_state")).toBe(true);
+    expect(access.isHidden("residence_state")).toBe(false);
     expect(access.isReadOnly("pfa")).toBe(false);
     expect(salaryChanges(aisha, { ...flat, name: "Aisha Bello-Okoro", residence_state: "OG", pfa: 9 }, true, access, editing))
       .toEqual({ name: "Aisha Bello-Okoro", pfa: 9 });
+  });
+
+  it("greys the structure and the pension administrator from the record's own read-only list", () => {
+    const record = { ...aisha, _read_only_fields: ["components", "structure", "pension_amount", "pfa"] } as EmployeeSalary;
+    const access = resolveFieldAccess({}, "finance.salary", record);
+    expect(access.isReadOnly("structure")).toBe(true);
+    expect(access.isReadOnly("pfa")).toBe(true);
+    expect(access.isReadOnly("residence_state")).toBe(false);
   });
 
   it("sends an override with its reason, and a clearing without one", () => {

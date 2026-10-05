@@ -7,7 +7,8 @@
  * sees the journal before it posts: Dr bank (what arrived), Dr bank charges
  * (the fee), Cr gateway clearing (the payments). A pick the figures cannot
  * explain is answered here, in the dialog, rather than by a refusal; see
- * settlement-booking.ts.
+ * settlement-booking.ts. Only the payments of the line's own branch are
+ * offered, because the settlement books in the bank account's branch.
  */
 
 import { useMemo, useState } from "react";
@@ -20,7 +21,7 @@ import { formatMoney } from "@/utils/money";
 import { useBookSettlementMutation } from "@/redux/services/payments/payments-api";
 import type { SettlementRow, UnmatchedBankLine } from "@/redux/services/payments/payments-types";
 import { useDates } from "../../lib/display-prefs";
-import { settlementFigures, settlementProblem } from "./settlement-booking";
+import { paymentsForLine, settlementFigures, settlementProblem } from "./settlement-booking";
 
 export interface BookSettlementTarget {
   line: UnmatchedBankLine;
@@ -45,9 +46,10 @@ export function BookSettlementModal({ target, payments, bankName, entity, curren
   const { line } = target;
 
   // Ticked payments first, then the rest by when they were confirmed.
-  const listed = useMemo(() => [...payments].sort((a, b) =>
+  const listed = useMemo(() => paymentsForLine(target.line, payments).sort((a, b) =>
     Number(target.picked.includes(b.gateway_id)) - Number(target.picked.includes(a.gateway_id))
-    || String(a.confirmed_at ?? "").localeCompare(String(b.confirmed_at ?? ""))), [payments, target.picked]);
+    || String(a.confirmed_at ?? "").localeCompare(String(b.confirmed_at ?? ""))), [payments, target.line, target.picked]);
+  const otherBranches = listed.length < payments.length && line.branch_name;
   const chosen = listed.filter((p) => picked.has(p.gateway_id));
   const figures = settlementFigures(line, chosen);
   const problem = settlementProblem(line, chosen, dates.prefs.timeZone, postingDate || undefined);
@@ -107,8 +109,13 @@ export function BookSettlementModal({ target, payments, bankName, entity, curren
               ))}
             </ul>
           ) : (
-            <p className="font-mont text-xs text-gray-05">No online payments are waiting in gateway clearing.</p>
+            <p className="font-mont text-xs text-gray-05">
+              {otherBranches ? `No online payments of ${line.branch_name} are waiting in gateway clearing.` : "No online payments are waiting in gateway clearing."}
+            </p>
           )}
+          {otherBranches ? (
+            <p className="mt-1.5 font-mont text-[11px] text-gray-05">{`Only ${line.branch_name}'s payments are listed: a settlement books in its bank account's branch.`}</p>
+          ) : null}
         </div>
 
         <label className="block font-mont text-xs font-medium text-black-01">

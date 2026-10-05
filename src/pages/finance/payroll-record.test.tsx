@@ -50,7 +50,7 @@ vi.mock("../../lib/display-prefs", async (importOriginal) => {
 vi.mock("../../utils/payroll-documents", () => ({ openSalaryTaxSummary: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { EarlierPayForm, EarlierPayPanel, HistoryPanel, earlierPayChanges, isNilRecord, pendingVersions } from "./payroll-record";
+import { EarlierPayForm, EarlierPayPanel, HistoryPanel, SalaryRecordDrawer, earlierPayChanges, isNilRecord, pendingVersions } from "./payroll-record";
 import type { EmployeeSalary } from "@/redux/services/finance/ops-types";
 import type { PayBroughtForward, SalaryVersion } from "@/redux/services/finance/payroll-types";
 
@@ -218,5 +218,29 @@ describe("pay history", () => {
     expect(headers).not.toContain("Branch");
     expect(headers).not.toContain("Gross");
     expect(document.body.textContent).toContain("New terms take effect on");
+  });
+});
+
+describe("today's terms and the next change, at the top of the record", () => {
+  it("says since when today's pay runs, and the raise ahead with its figures", () => {
+    const record = {
+      ...AISHA, gross_amount: 30_000_000, terms_effective_from: "2026-01-01",
+      next_terms: { effective_from: "2027-01-01", branch_id: 19, branch_name: "Ikeja Branch", gross_amount: 32_000_000, paye_amount: 3_000_000, pension_amount: 2_560_000 },
+    } as EmployeeSalary;
+    act(() => root.render(<SalaryRecordDrawer salary={record} entity="BSS" multiBranch canPrintSummary onClose={() => undefined} />));
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Today's pay terms: since");
+    expect(text).toContain("₦320,000.00 gross, ₦30,000.00 PAYE, ₦25,600.00 pension");
+  });
+
+  it("names only the date of a change whose figures the reader may not read", () => {
+    const record = {
+      ...AISHA, terms_effective_from: "2026-01-01",
+      next_terms: { effective_from: "2027-01-01", branch_id: 19, branch_name: "Ikeja Branch" },
+    } as EmployeeSalary;
+    act(() => root.render(<SalaryRecordDrawer salary={record} entity="BSS" multiBranch canPrintSummary onClose={() => undefined} />));
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("New pay terms from");
+    expect(text).not.toContain("₦");
   });
 });

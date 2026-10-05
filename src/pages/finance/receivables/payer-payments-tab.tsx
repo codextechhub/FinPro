@@ -41,6 +41,7 @@ import type {
   PayerPayment, PayerPaymentPlan, PayerPaymentSplit, PayerPlanShare,
 } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
+import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
 import {
   amountsFromPlan, emptyPayerPaymentForm, inputKey, manualTotals, needsManualAmounts, payerPaymentInput,
   type PayerPaymentFormState,
@@ -61,11 +62,13 @@ export function PayerPaymentsTab({ entity, currency }: { entity: string; currenc
   const dates = useDates();
   const { can } = useCan();
   const branches = useBranchColumn();
+  const list = useListBranch();
   const [payer, setPayer] = useState("");
   const [page, setPage] = useState(1);
   const [recording, setRecording] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
-  const params = useMemo(() => ({ entity, page, ...(payer ? { payer } : {}) }), [entity, page, payer]);
+  // A branch's list holds what it received and what holds a share for it, so "Received at" stays.
+  const params = useMemo(() => ({ entity, page, ...(payer ? { payer } : {}), ...listBranchArg(list.view) }), [entity, page, payer, list.view]);
   const { data, isLoading, isFetching, isError, refetch } = useGetPayerPaymentsQuery(params);
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
@@ -85,6 +88,7 @@ export function PayerPaymentsTab({ entity, currency }: { entity: string; currenc
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="flex flex-wrap items-end gap-2">
+          <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
           <div className="w-64 max-w-full">
             <CustomerPicker entity={entity} value={payer} onChange={(v) => { setPayer(v); setPage(1); }} placeholder="Any payer" />
           </div>

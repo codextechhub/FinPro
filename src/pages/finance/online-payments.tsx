@@ -19,9 +19,12 @@
  * is paid: Mrs Adeyemi, bursar for Lekki only, sees the panel but changes
  * nothing, and is told why. The server enforces both.
  *
- * The provider issues a subaccount code when an account is set up. The server
- * does not return that code yet, so the screens say whether an account is set
- * up and with which provider, not the code itself.
+ * The provider issues a subaccount code when an account is set up; the screens
+ * name it beside "Set up with Paystack" so a bursar can match it against the
+ * provider's own dashboard. The custody settings carry it for their readers,
+ * and a bank account carries it (with the bank's settlement code) for a
+ * whole-school reader or a holder of `payments.settings.view`, so the Settings
+ * tab shows it to whoever may read the route money takes.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -241,9 +244,22 @@ function BranchAccounts({ branches, canSetUp, onSetUp }: { branches: CustodyBran
 }
 
 function SubaccountStatus({ account }: { account: CustodyCollectionAccount }) {
-  return account.subaccount_ready
-    ? <PolicyBadge kind="configured">Set up with {providerInfo(account.subaccount_provider ?? "PAYSTACK").label}</PolicyBadge>
-    : <PolicyBadge kind="default">Not set up with the provider</PolicyBadge>;
+  if (!account.subaccount_ready) return <PolicyBadge kind="default">Not set up with the provider</PolicyBadge>;
+  return (
+    <span className="inline-flex flex-col items-start gap-0.5 sm:items-end">
+      <PolicyBadge kind="configured">Set up with {providerInfo(account.subaccount_provider ?? "PAYSTACK").label}</PolicyBadge>
+      {account.subaccount_code ? <span className="font-mont text-[11px] tabular-nums text-gray-05">Subaccount {account.subaccount_code}</span> : null}
+    </span>
+  );
+}
+
+/**
+ * "Subaccount ACCT_8f4k2m, bank code 058": the provider's handles for a
+ * collection account, from whichever read carries them; null when neither does.
+ */
+export function subaccountDetail(code: string | null | undefined, bankCode: string | null | undefined): string | null {
+  if (!code) return null;
+  return bankCode ? `Subaccount ${code}, bank code ${bankCode}.` : `Subaccount ${code}.`;
 }
 
 /**
@@ -292,23 +308,27 @@ export function SubaccountSetupModal({ entity, account, branchName, onClose }: {
 
 /**
  * A collection account's line in its Settings tab: whether it is set up with
- * the provider, and the action that sets it up. Absent on an account that is
- * not a branch's collection account, and for a reader who may not read the
- * payment settings.
+ * the provider, under which subaccount code, and the action that sets it up.
+ * Absent on an account that is not a branch's collection account, and for a
+ * reader who may read neither the payment settings nor the account's route.
  */
 export function CollectionSubaccountBlock({ entity, account }: { entity: string; account: BankAccount }) {
   const { can } = useCan();
-  if (!account.is_primary_collection || !can(P.PAY_VIEW_PAYMENT_SETTINGS)) return null;
-  return <CollectionSubaccountLine entity={entity} account={account} />;
+  const readsSettings = can(P.PAY_VIEW_PAYMENT_SETTINGS);
+  const readsRoute = "gateway_subaccount_code" in account;
+  if (!account.is_primary_collection || !(readsSettings || readsRoute)) return null;
+  return <CollectionSubaccountLine entity={entity} account={account} readsSettings={readsSettings} />;
 }
 
-function CollectionSubaccountLine({ entity, account }: { entity: string; account: BankAccount }) {
+function CollectionSubaccountLine({ entity, account, readsSettings }: { entity: string; account: BankAccount; readsSettings: boolean }) {
   const write = useCustodyWrite();
   const [open, setOpen] = useState(false);
-  const query = useGetCustodySettingsQuery({ entity });
+  const query = useGetCustodySettingsQuery({ entity }, { skip: !readsSettings });
   const row = (query.data?.data?.branches ?? []).find((b) => b.collection_account?.id === account.id);
   const known = row?.collection_account;
-  const ready = !!known?.subaccount_ready;
+  const ready = known ? known.subaccount_ready : !!account.gateway_subaccount_code;
+  const provider = known?.subaccount_provider || account.gateway_subaccount_provider || "PAYSTACK";
+  const detail = subaccountDetail(account.gateway_subaccount_code || known?.subaccount_code, account.settlement_bank_code);
   return (
     <div className="rounded-md border border-white-02 bg-white p-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -318,9 +338,10 @@ function CollectionSubaccountLine({ entity, account }: { entity: string; account
             <p className="font-medium text-gray-01">Online payments</p>
             <p className="mt-0.5 leading-5 text-gray-05">
               {query.isLoading ? "Reading the provider setup." : ready
-                ? `Set up with ${providerInfo(known?.subaccount_provider ?? "PAYSTACK").label}. When the school takes payments directly, ${row?.branch_name ?? "this branch"}'s online payments settle into this account.`
+                ? `Set up with ${providerInfo(provider).label}. When the school takes payments directly, ${row?.branch_name ?? "this branch"}'s online payments settle into this account.`
                 : "Not set up with the payment provider. A branch must be set up before the school can take payments directly."}
             </p>
+            {ready && detail ? <p className="mt-0.5 tabular-nums text-gray-01">{detail}</p> : null}
           </div>
         </div>
         {write.may ? (

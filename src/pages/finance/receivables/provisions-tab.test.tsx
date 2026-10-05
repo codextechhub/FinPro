@@ -7,6 +7,7 @@
  * figures are named, and the journal recap is the net of the branch lines.
  */
 import { act } from "react";
+import { MemoryRouter } from "react-router";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FINANCE_PERMISSION_REGISTRY, type PermissionCode } from "../../../permissions";
@@ -73,7 +74,7 @@ const render = (wholeSchool: boolean, ...keys: string[]) => {
   mocks.wholeSchool = wholeSchool;
   mocks.held = new Set(["finance.provision.view", ...keys]);
   mocks.rows = [RUN];
-  act(() => root.render(<ProvisionsTab entity="BSS" currency="NGN" />));
+  act(() => root.render(<MemoryRouter><ProvisionsTab entity="BSS" currency="NGN" /></MemoryRouter>));
   return container.textContent ?? "";
 };
 

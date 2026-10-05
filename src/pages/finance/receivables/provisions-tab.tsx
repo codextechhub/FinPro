@@ -33,6 +33,7 @@ import {
 } from "@/redux/services/finance/fees-api";
 import type { DoubtfulDebtProvision, ProvisionLine } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, bandLabel, bpsToPercent, useBranchColumn } from "./fees-parts";
+import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
 
 const th = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const td = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
@@ -50,10 +51,12 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
   const dates = useDates();
   const { can } = useCan();
   const { wholeSchool } = useReaderReach();
+  const list = useListBranch();
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<DoubtfulDebtProvision | null>(null);
-  const { data, isLoading, isFetching, isError, refetch } = useGetProvisionsQuery({ entity, page });
+  // A run names no branch; a branch's list keeps the runs with a line for it.
+  const { data, isLoading, isFetching, isError, refetch } = useGetProvisionsQuery({ entity, page, ...listBranchArg(list.view) });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
   const open = selected ? rows.find((r) => r.id === selected.id) ?? selected : null;
@@ -69,7 +72,10 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-mont text-xs text-gray-05">One journal per branch, worked out from each branch&apos;s aged debts.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
+          <p className="font-mont text-xs text-gray-05">One journal per branch, worked out from each branch&apos;s aged debts.</p>
+        </div>
         {wholeSchool && can(P.FIN_CREATE_PROVISION) ? (
           <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New provision run</Button>
         ) : null}
