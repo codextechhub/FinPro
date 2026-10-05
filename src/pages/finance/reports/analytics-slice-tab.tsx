@@ -17,6 +17,7 @@ import { useGetAnalyticsSliceQuery } from "@/redux/services/finance/reports-api"
 import { useGetPeriodsQuery, useGetDimensionsQuery } from "@/redux/services/finance/setup-api";
 import { toArray } from "@/redux/services/finance/api-types";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
+import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const TYPE_STYLE: Record<string, string> = {
@@ -42,7 +43,9 @@ export function AnalyticsSliceReport({ entity, currency }: { entity: string; cur
   const [period, setPeriod] = useState("");
   const [acctType, setAcctType] = useState("");
 
-  const { data: periodsData } = useGetPeriodsQuery({ entity });
+  const [showArchived] = useShowArchived();
+
+  const { data: periodsData } = useGetPeriodsQuery({ entity, ...includeArchivedArg(showArchived) });
   const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 

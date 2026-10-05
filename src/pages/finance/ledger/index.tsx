@@ -26,6 +26,7 @@ import { DirectEntryDrawer } from "./direct-entry-drawer";
 import { JournalDetailDrawer } from "./journal-detail-drawer";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { useDates } from "../../../lib/display-prefs";
 import { presetRange } from "../../../utils/date-presets";
 
@@ -55,6 +56,7 @@ export default function GeneralLedgerPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [directOpen, setDirectOpen] = useState(false);
   const { can } = useCan();
+  const [showArchived] = useShowArchived();
   useActionParam("new", can(P.FIN_POST_DIRECT_ENTRY), () => setDirectOpen(true));
 
   const range = preset === "custom" ? custom : presetRange(preset, dates.today());
@@ -67,7 +69,7 @@ export default function GeneralLedgerPage() {
   }), [entity, source, range.from, range.to, search]);
 
   const { data, isLoading, isFetching, isError, refetch } = useGetJournalsQuery(
-    { ...filters, page, ...(status ? { status } : {}) }, { skip: !entity },
+    { ...filters, page, ...(status ? { status } : {}), ...includeArchivedArg(showArchived) }, { skip: !entity },
   );
   const summaryQ = useGetJournalSummaryQuery(filters, { skip: !entity });
   const summary = summaryQ.data?.data;
@@ -122,6 +124,7 @@ export default function GeneralLedgerPage() {
             <p className="mt-0.5 font-mont text-xs text-gray-05">The general ledger - every financial mutation lands here as a balanced Dr/Cr posting.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <ShowArchivedToggle entity={entity} />
             {/* The screen lists one row per ENTRY; the postings dataset produces
                 one row per LINE, so the row count in the drawer will exceed what
                 is on screen. That is the dataset a trial balance needs. */}

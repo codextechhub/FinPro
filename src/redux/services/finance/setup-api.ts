@@ -58,6 +58,12 @@ type CloseOverride = { force?: false; reason?: never } | { force: true; reason: 
  */
 type CalendarBranchArg = { branch?: number };
 
+/**
+ * The months of an archived fiscal year are left out of the calendar reads
+ * unless this asks for them; see `use-archived-years.ts`.
+ */
+type IncludeArchivedArg = { include_archived?: "true" };
+
 /** The body fields that name the branch: none when no branch is given. */
 const branchBody = (branch: number | undefined) => (branch != null ? { branch } : {});
 
@@ -111,13 +117,13 @@ export const setupApi = baseApi.injectEndpoints({
     }),
     // Shared report pickers stay bounded but newest-first, so current periods do
     // not disappear behind the oldest 25 rows after several years of history.
-    getPeriods: b.query<PaginatedEnvelope<FiscalPeriod>, { entity: string; status?: string; year?: number }>({
+    getPeriods: b.query<PaginatedEnvelope<FiscalPeriod>, { entity: string; status?: string; year?: number } & IncludeArchivedArg>({
       query: (p) => ({ url: `/finance/periods/${qs({ ...p, recent: "true", page_size: 100 })}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),
     // The close workbench reads exactly one complete fiscal calendar (4 or 12
     // rows), never the entity's unbounded lifetime history.
-    getFiscalYearPeriods: b.query<ApiEnvelope<FiscalPeriod[]>, { entity: string; year: number } & CalendarBranchArg>({
+    getFiscalYearPeriods: b.query<ApiEnvelope<FiscalPeriod[]>, { entity: string; year: number } & CalendarBranchArg & IncludeArchivedArg>({
       query: (p) => ({ url: `/finance/periods/${qs({ ...p, all: "true" })}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),

@@ -54,6 +54,7 @@ import {
   ChannelsCard, DASH_COLORS, KpiTile, PayersCard, PostingsCard, UpcomingCard, YearCloseStrip,
 } from "./dashboard-cards";
 import { useDates } from "../../lib/display-prefs";
+import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 
 const F = routesPath.PROTECTED.FINANCE;
 
@@ -114,12 +115,16 @@ export default function FinanceDashboard() {
   // period (which would 404) or a window those books do not offer.
   const [picked, setPicked] = useState<{ entity: string; period: string; window: string }>({ entity: "", period: "", window: "" });
 
-  const periodsQ = useGetPeriodsQuery({ entity: entity! }, { skip: !entity });
+  const [showArchived] = useShowArchived();
+  const periodsQ = useGetPeriodsQuery({ entity: entity!, ...includeArchivedArg(showArchived) }, { skip: !entity });
   const periods = toArray(periodsQ.data?.data);
 
   const mine = picked.entity === entity;
+  // A pinned period is "<fiscal year>:<period number>": the list spans several
+  // years, and a period number alone names a month of the latest year.
   const period = mine ? picked.period : "";
-  const periodValid = period !== "" && periods.some((p) => String(p.period_no) === period);
+  const periodValid = period !== "" && periods.some((p) => `${p.fiscal_year}:${p.period_no}` === period);
+  const [pinnedYear, pinnedNo] = period.split(":");
   const windowKey = mine ? picked.window : "";
   // The other views of the same books each open to anyone holding a key behind
   // one of their cards; the chosen view lives in the URL (?view=).
@@ -130,7 +135,7 @@ export default function FinanceDashboard() {
   const asked = params.get("view");
   const tab: DashboardView = asked === "receivables" && canReceivables ? "receivables"
     : asked === "spend" && canSpend ? "spend" : "overview";
-  const args = { entity: entity!, ...(periodValid ? { period } : {}), ...(windowKey ? { window: windowKey } : {}) };
+  const args = { entity: entity!, ...(periodValid ? { fiscal_year: Number(pinnedYear), period: Number(pinnedNo) } : {}), ...(windowKey ? { window: windowKey } : {}) };
   const overviewQ = useGetFinanceDashboardQuery(args, { skip: !entity || tab !== "overview" });
   const receivablesQ = useGetReceivablesDashboardQuery(args, { skip: !entity || tab !== "receivables" });
   const spendQ = useGetSpendDashboardQuery(args, { skip: !entity || tab !== "spend" });
@@ -198,13 +203,14 @@ export default function FinanceDashboard() {
                 onChange={(w) => setPicked({ entity: entity!, period, window: w })}
                 variant="pill-compact" ariaLabel="Figures for" />
             )}
+            <ShowArchivedToggle entity={entity} />
             {periods.length > 0 && (
               <select value={period} aria-label="As of period"
                 onChange={(e) => setPicked({ entity: entity!, period: e.target.value, window: windowKey })}
                 className="h-8 rounded-md border border-white-02 bg-white px-2 font-mont text-xs font-medium text-gray-01">
                 <option value="">Today</option>
                 {periods.map((p) => (
-                  <option key={p.id} value={p.period_no}>End of {p.name}</option>
+                  <option key={p.id} value={`${p.fiscal_year}:${p.period_no}`}>End of {p.name}</option>
                 ))}
               </select>
             )}

@@ -74,6 +74,7 @@ export const REPORTS_SECTIONS = [
   "changes-in-equity",
   "analytics",
   "periods",
+  "seals",
 ] as const;
 export type ReportsSection = (typeof REPORTS_SECTIONS)[number];
 export const DEFAULT_REPORTS_SECTION: ReportsSection = "trial-balance";

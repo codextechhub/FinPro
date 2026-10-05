@@ -343,6 +343,9 @@ export interface FiscalYear {
   start_date: string;
   end_date: string;
   status: string;
+  /** Put away: left out of pickers and lists unless asked for. Absent from an older server. */
+  is_archived?: boolean;
+  archived_at?: string | null;
 }
 
 export interface Budget {

@@ -22,6 +22,7 @@ import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { TrialBalanceRow } from "@/redux/services/finance/reports-types";
 import { toArray } from "@/redux/services/finance/api-types";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
+import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const TYPE_STYLE: Record<string, string> = {
@@ -53,7 +54,9 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
   const [acctType, setAcctType] = useState("");
   const [compare, setCompare] = useState(false);
 
-  const { data: periodsData } = useGetPeriodsQuery({ entity });
+  const [showArchived] = useShowArchived();
+
+  const { data: periodsData } = useGetPeriodsQuery({ entity, ...includeArchivedArg(showArchived) });
   const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 

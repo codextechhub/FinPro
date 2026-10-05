@@ -10,7 +10,7 @@ import {
   Coins, Percent, Layers, ReceiptText, Users, CreditCard, FileMinus, Undo2,
   CalendarClock, BadgePercent, BellRing, ListChecks, Landmark, Wallet,
   PiggyBank, Boxes, Scale, TrendingUp, ArrowLeftRight, GitBranch, ScrollText,
-  CircleDollarSign, Send, Settings, AlertTriangle,
+  CircleDollarSign, Send, Settings, AlertTriangle, ShieldCheck,
 } from "lucide-react";
 import type { ConsoleNavGroup } from "@/components/finance-ui/console-nav";
 import { routesPath } from "@/routes/routes-path";
@@ -86,6 +86,7 @@ export const financeNav: ConsoleNavGroup[] = [
       { title: "Cash Flow", url: `${F.REPORTS}/cash-flow`, icon: ArrowLeftRight, permissions: [P.FIN_VIEW_REPORTS] },
       { title: "Changes in Equity", url: `${F.REPORTS}/changes-in-equity`, icon: GitBranch, permissions: [P.FIN_VIEW_REPORTS] },
       { title: "Cost & Dimension Analysis", url: `${F.REPORTS}/analytics`, icon: Layers, permissions: [P.FIN_VIEW_REPORTS] },
+      { title: "Sealed Figures", url: `${F.REPORTS}/seals`, icon: ShieldCheck, permissions: [P.FIN_VIEW_SEALS] },
       { title: "Audit Trail", url: F.AUDIT, icon: ScrollText, permissions: [P.FIN_VIEW_AUDIT] },
     ],
   },

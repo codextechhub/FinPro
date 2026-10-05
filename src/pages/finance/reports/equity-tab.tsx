@@ -20,6 +20,7 @@ import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { EquityColumn } from "@/redux/services/finance/reports-types";
 import { toArray } from "@/redux/services/finance/api-types";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
+import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 
 function Select({ value, onChange, children, className }: { value: string; onChange: (v: string) => void; children: ReactNode; className?: string }) {
   return (
@@ -37,7 +38,9 @@ const colLabel = (c: EquityColumn) => (c.key === "retained_earnings" ? "Current 
 export function EquityReport({ entity, currency }: { entity: string; currency?: string | null }) {
   const [period, setPeriod] = useState("");   // "" = year to date, else fiscal period id
 
-  const { data: periodsData } = useGetPeriodsQuery({ entity });
+  const [showArchived] = useShowArchived();
+
+  const { data: periodsData } = useGetPeriodsQuery({ entity, ...includeArchivedArg(showArchived) });
   const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 

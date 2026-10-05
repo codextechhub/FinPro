@@ -66,6 +66,11 @@ export const CHECK_LABELS: Record<string, string> = {
   trial_balance_balanced: "Trial balance balanced",
   no_draft_journals: "No draft journals",
   depreciation_posted: "Depreciation posted",
+  depreciation_posted_for_year: "Depreciation posted for the year",
+  deferred_income_released: "Deferred income released",
+  gateway_clearing_current: "Collections in clearing",
+  inter_branch_balanced: "Inter-branch balance agrees",
+  sealed_figures_unchanged: "Sealed figures unchanged",
 };
 
 export const checklistLabel = (name: string, fallback: (value: string) => string) =>

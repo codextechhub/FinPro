@@ -21,7 +21,7 @@
  *   21 tax, 22 payrollrun, 23 budget, 24 fixedasset, 25 audit, 26 customer,
  *   27 feestructure, 28 payment, 29 pettycashvoucher, 30 salary, 31 writeoff,
  *   32 settings; 33 entity, 34 account and 35 period hold the renumbered codes
- *   described below; 36 fiscalyear.
+ *   described below; 36 fiscalyear; 49 seal.
  *
  *   Procurement (70): 01 category, 02 vendor, 03 catalog_item, 04 contract,
  *   05 requisition, 06 rfq, 07 quotation, 08 purchase_order, 09 goods_receipt,
@@ -57,6 +57,9 @@ export const P = {
   FIN_APPROVE_BUDGET: "202305",
   FIN_CANCEL_PAYMENT_PLAN: "200928",
   FIN_CLOSE_PERIOD: "200324",
+  FIN_FORCE_CLOSE_PERIOD: "200344",  // close a month or year over failing checks, with a reason
+  FIN_ARCHIVE_FISCAL_YEAR: "203645",  // put a closed year away, and bring it back
+  FIN_VIEW_SEALS: "204901",  // verify the sealed figures of closed months and years
   FIN_CREATE_ACCOUNT: "200202",
   FIN_CREATE_BANK_ACCOUNT: "201802",
   FIN_CREATE_BUDGET: "202302",
@@ -274,6 +277,9 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "200342": "finance.period.reopen",
   "200343": "finance.period.lock",
   "203642": "finance.fiscalyear.reopen",
+  "200344": "finance.period.force_close",
+  "203645": "finance.fiscalyear.archive",
+  "204901": "finance.seal.view",
   "200414": "finance.journal.reverse",
   "200430": "finance.journal.submit",
   "200502": "finance.invoice.create",

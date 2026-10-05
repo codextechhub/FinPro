@@ -56,6 +56,8 @@ import { DEFAULT_FINANCE_SETTINGS_SECTION, type FinanceSettingsSection } from ".
 import { FeeDuePolicyPanel, financeSettingsSections, setupSections } from "@xvs/finance/host";
 import { FinanceShell } from "./finance-shell";
 import { EntitiesTab } from "./setup/entities-tab";
+import { CalendarRulePanel, RecordKeepingPanel } from "./settings-records";
+import { useSettingsWriteAccess } from "@/components/finance-ui/settings-write-access";
 
 const F = routesPath.PROTECTED.FINANCE;
 
@@ -68,7 +70,7 @@ const F = routesPath.PROTECTED.FINANCE;
 const SECTIONS: (ConsoleSettingsSection & { key: FinanceSettingsSection })[] = [
   { key: "overview", title: "Overview", description: "Configuration health", icon: Settings2 },
   { key: "entities", title: "Entities", description: "Sets of books", icon: Building2, group: "books" },
-  { key: "fiscal-calendar", title: "Fiscal calendar", description: "Years and periods", icon: CalendarRange, group: "books" },
+  { key: "fiscal-calendar", title: "Fiscal calendar", description: "Years, periods and records", icon: CalendarRange, group: "books" },
   { key: "accounting", title: "Accounting defaults", description: "Posting account map", icon: BookOpenCheck, group: "books" },
   { key: "reference-data", title: "Reference data", description: "Codes and dimensions", icon: ListTree, group: "books" },
   { key: "documents", title: "Documents", description: "Collections and policies", icon: FileCog, group: "billing" },
@@ -132,7 +134,7 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
       >
         {activeSection === "overview" ? <Overview entity={active.entity} sections={sections} /> : null}
         {activeSection === "entities" ? <Entities /> : null}
-        {activeSection === "fiscal-calendar" ? <FiscalCalendar entity={active.entity} /> : null}
+        {activeSection === "fiscal-calendar" ? <FiscalCalendar entity={active.entity} entityCode={active.code} /> : null}
         {/* Keyed on the entity: unsaved mapping edits are per-entity, so switching
             the active entity must discard them rather than carry them across and
             offer to save one entity's account map into another's books. */}
@@ -155,7 +157,7 @@ const OVERVIEW_CARDS: Record<Exclude<FinanceSettingsSection, "overview">, {
   tone?: "ready" | "attention";
 }> = {
   entities: { description: "Create and review the independent sets of books owned by this tenant.", status: "Available", tone: "ready" },
-  "fiscal-calendar": { description: "Open fiscal years, manage posting periods and control the close.", status: "Configured", tone: "ready" },
+  "fiscal-calendar": { description: "How the next fiscal year opens, how long records are kept, and the close workbench.", status: "Configured", tone: "ready" },
   accounting: { description: "Review the control accounts currently resolved by finance posting services.", status: "Review", tone: "attention" },
   documents: { description: "Manage collection defaults, reminders, fee structures and document policies.", status: "Mixed" },
   "banking-cash": { description: "Set automatic reconciliation and receipt-allocation defaults.", status: "Configurable", tone: "ready" },
@@ -221,14 +223,16 @@ function Entities() {
   );
 }
 
-function FiscalCalendar({ entity }: { entity: ReturnType<typeof useActiveEntity>["entity"] }) {
+function FiscalCalendar({ entity, entityCode }: { entity: ReturnType<typeof useActiveEntity>["entity"]; entityCode: string | null }) {
   return (
     <div className="space-y-5">
       <SettingsSectionHeader
         title="Fiscal calendar"
-        description="Fiscal years and posting periods are administered in the close workbench. New entities can start monthly or quarterly calendars on a chosen month and day."
+        description="How the next fiscal year opens and how long the books are kept. Fiscal years and posting periods themselves are administered in the close workbench."
         action={entity ? <Button asChild variant="outline"><Link to={`${F.SETUP}/periods`}>Open period workbench</Link></Button> : undefined}
       />
+      <CalendarRulePanel entityCode={entityCode} />
+      <RecordKeepingPanel entityCode={entityCode} />
       <SettingsPanel title="Current scope">
         <SettingsRow icon={Building2} label="Entity" description="The calendar belongs to one set of books and cannot be shared across entities." value={entity ? `${entity.code} · ${entity.name}` : "Not selected"} />
         <SettingsRow icon={CalendarRange} label="Period control" description="Open periods accept postings. Closed and locked periods are protected by the backend posting guard." badge={<PolicyBadge kind="enforced" />} />
@@ -241,7 +245,7 @@ function FiscalCalendar({ entity }: { entity: ReturnType<typeof useActiveEntity>
 function AccountingDefaults({ entityCode }: { entityCode: string | null }) {
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.FIN_VIEW_SETTINGS);
-  const canUpdate = hasPermission(P.FIN_UPDATE_SETTINGS);
+  const { canUpdate, readOnlyNote } = useSettingsWriteAccess(P.FIN_UPDATE_SETTINGS);
   const query = useGetFinanceAccountSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
   const [update, updateState] = useUpdateFinanceAccountSettingsMutation();
   const [changes, setChanges] = useState<Record<string, string | null>>({});
@@ -262,7 +266,7 @@ function AccountingDefaults({ entityCode }: { entityCode: string | null }) {
       <SettingsSectionHeader
         title="Accounting defaults"
         description="Map stable posting roles to active accounts in this entity. Posting services use these mappings immediately after a successful save."
-        action={<div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link to={`${F.SETUP}/accounts`}>Open chart</Link></Button><Button onClick={save} disabled={!canUpdate || !hasChanges || updateState.isLoading}><Save className="mr-2 size-4" />{updateState.isLoading ? "Saving" : "Save changes"}</Button></div>}
+        action={<div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link to={`${F.SETUP}/accounts`}>Open chart</Link></Button>{canUpdate ? <Button onClick={save} disabled={!hasChanges || updateState.isLoading}><Save className="mr-2 size-4" />{updateState.isLoading ? "Saving" : "Save changes"}</Button> : null}</div>}
       />
       {!canView ? (
         <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read these mappings." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel>
@@ -291,7 +295,7 @@ function AccountingDefaults({ entityCode }: { entityCode: string | null }) {
           })}
         </SettingsPanel>
       )}
-      {canView && !canUpdate ? <p className="font-mont text-xs text-gray-05">You have read-only access. Finance settings update permission is required to save.</p> : null}
+      {canView && readOnlyNote ? <p className="font-mont text-xs text-gray-05">{readOnlyNote}</p> : null}
       {canView && payload ? <SettingsAuditHistory rows={payload.history} /> : null}
     </div>
   );
@@ -300,7 +304,7 @@ function AccountingDefaults({ entityCode }: { entityCode: string | null }) {
 function DocumentSettings({ entityCode }: { entityCode: string | null }) {
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.FIN_VIEW_SETTINGS);
-  const canUpdate = hasPermission(P.FIN_UPDATE_SETTINGS);
+  const { canUpdate, readOnlyNote } = useSettingsWriteAccess(P.FIN_UPDATE_SETTINGS);
   const query = useGetFinanceDocumentSettingsQuery(
     { entity: entityCode! }, { skip: !entityCode || !canView },
   );
@@ -308,7 +312,7 @@ function DocumentSettings({ entityCode }: { entityCode: string | null }) {
   return (
     <div className="space-y-5">
       <SettingsSectionHeader title="Documents and collections" description="Configuration that shapes customer-facing documents, collections and follow-up behavior." />
-      {!canView ? <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read document policy." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading document policy" description="Reading the selected entity's billing defaults." /></SettingsPanel> : <FinanceDocumentForm key={`${entityCode}-${payload.settings.updated_at}-${payload.settings.primary_collection_bank_account?.id ?? "auto"}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} />}
+      {!canView ? <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read document policy." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading document policy" description="Reading the selected entity's billing defaults." /></SettingsPanel> : <FinanceDocumentForm key={`${entityCode}-${payload.settings.updated_at}-${payload.settings.primary_collection_bank_account?.id ?? "auto"}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
       <SettingsPanel title="Related controls">
         <SettingsRow icon={ReceiptText} label="Document numbering" description="Numbers use the concurrency-safe tenant sequence. Entity reporting codes do not change the live sequence." badge={<PolicyBadge kind="enforced" />} />
         <SettingsRow icon={CircleDollarSign} label="Fee structures" description="Maintain reusable fee definitions and generate customer invoices from them." value={<Link className="text-primary hover:underline" to={`${F.RECEIVABLES}/fee-structures`}>Open</Link>} />
@@ -318,7 +322,7 @@ function DocumentSettings({ entityCode }: { entityCode: string | null }) {
   );
 }
 
-function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate }: { entityCode: string; values: FinanceDocumentSettingsValues; consumers: Record<string, SettingConsumer>; history: FinanceAuditLog[]; canUpdate: boolean }) {
+function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate, readOnlyNote }: { entityCode: string; values: FinanceDocumentSettingsValues; consumers: Record<string, SettingConsumer>; history: FinanceAuditLog[]; canUpdate: boolean; readOnlyNote: string | null }) {
   const [dueDays, setDueDays] = useState(String(values.default_invoice_due_days));
   const [narration, setNarration] = useState(values.default_invoice_narration);
   const [autoPost, setAutoPost] = useState(values.auto_post_manual_invoices);
@@ -362,7 +366,7 @@ function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate
       </div>
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Post manual invoices immediately</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, a manual invoice is priced and kept as a draft unless the user explicitly chooses to post.</p><SettingsConsumer consumer={consumers.auto_post_manual_invoices} /></div><Switch checked={autoPost} onCheckedChange={setAutoPost} disabled={!canUpdate} aria-label="Post manual invoices immediately" /></div>
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Allow customer opening balances</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, customer creation and edits reject non-zero opening balances.</p><SettingsConsumer consumer={consumers.allow_customer_opening_balances} /></div><Switch checked={openingBalances} onCheckedChange={setOpeningBalances} disabled={!canUpdate} aria-label="Allow customer opening balances" /></div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? (targetValid ? "Use a whole number from 0 to 365 days." : "Use a whole-number target from 1 to 100.") : canUpdate ? "Only changed values are written to audit history." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save document policy"}</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? (targetValid ? "Use a whole number from 0 to 365 days." : "Use a whole-number target from 1 to 100.") : readOnlyNote ?? "Only changed values are written to audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save document policy"}</Button> : null}</div>
     </SettingsPanel>
     <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;
@@ -371,7 +375,7 @@ function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate
 function BankingCashPolicy({ entityCode }: { entityCode: string | null }) {
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.FIN_VIEW_SETTINGS);
-  const canUpdate = hasPermission(P.FIN_UPDATE_SETTINGS);
+  const { canUpdate, readOnlyNote } = useSettingsWriteAccess(P.FIN_UPDATE_SETTINGS);
   const query = useGetFinanceBankingSettingsQuery(
     { entity: entityCode! }, { skip: !entityCode || !canView },
   );
@@ -379,7 +383,7 @@ function BankingCashPolicy({ entityCode }: { entityCode: string | null }) {
   return (
     <div className="space-y-5">
       <SettingsSectionHeader title="Banking and cash policy" description="Set reconciliation, receipt allocation and petty-cash alert defaults for the selected entity." />
-      {!canView ? <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read banking policy." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading banking policy" description="Reading the selected entity's reconciliation and allocation defaults." /></SettingsPanel> : <BankingCashForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} />}
+      {!canView ? <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read banking policy." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading banking policy" description="Reading the selected entity's reconciliation and allocation defaults." /></SettingsPanel> : <BankingCashForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
       <SettingsPanel title="How defaults are applied">
         <SettingsRow icon={RotateCcw} label="Explicit workbench choices win" description="A user-supplied reconciliation window, grouping choice, or receipt strategy overrides these defaults for that operation." badge={<PolicyBadge kind="enforced">Override allowed</PolicyBadge>} />
         <SettingsRow icon={ShieldCheck} label="Matching does not post new money" description="Automatic reconciliation links existing statement and ledger evidence. It does not create an adjusting journal unless a separate authorized action does so." badge={<PolicyBadge kind="enforced" />} />
@@ -389,7 +393,7 @@ function BankingCashPolicy({ entityCode }: { entityCode: string | null }) {
   );
 }
 
-function BankingCashForm({ entityCode, values, consumers, history, canUpdate }: { entityCode: string; values: FinanceBankingSettingsValues; consumers: Record<string, SettingConsumer>; history: FinanceAuditLog[]; canUpdate: boolean }) {
+function BankingCashForm({ entityCode, values, consumers, history, canUpdate, readOnlyNote }: { entityCode: string; values: FinanceBankingSettingsValues; consumers: Record<string, SettingConsumer>; history: FinanceAuditLog[]; canUpdate: boolean; readOnlyNote: string | null }) {
   const [toleranceDays, setToleranceDays] = useState(String(values.default_bank_reconciliation_tolerance_days));
   const [groupMatches, setGroupMatches] = useState(values.default_group_reconciliation_matches);
   const [allocationStrategy, setAllocationStrategy] = useState(values.default_receipt_allocation_strategy);
@@ -426,7 +430,7 @@ function BankingCashForm({ entityCode, values, consumers, history, canUpdate }: 
         <label className="font-mont text-xs font-semibold text-gray-01">Petty cash low-balance threshold (%)<Input className="mt-2 bg-white" type="number" min="0" max="100" step="0.01" value={pettyCashThreshold} onChange={(event) => setPettyCashThreshold(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Flags a fund for replenishment when live cash on hand reaches or falls below this share of its imprest float.</span><SettingsConsumer consumer={consumers.petty_cash_low_balance_threshold_bps} /></label>
       </div>
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Allow grouped automatic matches</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">Lets one bank statement line match a uniquely determined group of ledger lines with the same total.</p><SettingsConsumer consumer={consumers.default_group_reconciliation_matches} /></div><Switch checked={groupMatches} onCheckedChange={setGroupMatches} disabled={!canUpdate} aria-label="Allow grouped automatic matches" /></div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use 0 to 30 days and a threshold from 0 to 100%." : canUpdate ? "Only effective changes are written to audit history." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save banking policy"}</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use 0 to 30 days and a threshold from 0 to 100%." : readOnlyNote ?? "Only effective changes are written to audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save banking policy"}</Button> : null}</div>
     </SettingsPanel>
     <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;

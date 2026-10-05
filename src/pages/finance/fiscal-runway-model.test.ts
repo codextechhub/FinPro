@@ -75,3 +75,61 @@ describe("dayCount", () => {
     expect(dayCount(0)).toBe("0 days");
   });
 });
+
+describe("a gap between two fiscal years", () => {
+  // Bright Star: FY2026 ends 31 Dec 2026, FY2027 starts 1 Feb 2027.
+  const january = { start: "2027-01-01", end: "2027-01-31" };
+
+  it("names the uncovered stretch while the calendar is otherwise healthy", () => {
+    const notice = fiscalRunwayNotice(
+      runway({ today: "2026-10-05", days_remaining: 87, first_uncovered_date: "2027-01-01", gaps: [january] }), asIs,
+    );
+
+    expect(notice?.tone).toBe("warning");
+    expect(notice?.title).toBe("The fiscal calendar has a gap");
+    expect(notice?.body).toContain("2027-01-01 to 2027-01-31");
+    expect(notice?.body).toContain("nothing dated in that stretch can post");
+  });
+
+  it("names the gap, not the calendar's end, when the break is near", () => {
+    const notice = fiscalRunwayNotice(
+      runway({ status: "EXPIRING", today: "2026-12-01", days_remaining: 30, calendar_end: "2027-12-31", first_uncovered_date: "2027-01-01", gaps: [january] }), asIs,
+    );
+
+    expect(notice?.title).toBe("The fiscal calendar has a gap");
+    expect(notice?.body).not.toContain("2027-12-31");
+  });
+
+  it("says today is inside the gap once it is", () => {
+    const notice = fiscalRunwayNotice(
+      runway({ status: "EXPIRED", today: "2027-01-10", days_remaining: -10, calendar_end: "2027-12-31", first_uncovered_date: "2027-01-10", gaps: [january] }), asIs,
+    );
+
+    expect(notice?.tone).toBe("critical");
+    expect(notice?.title).toBe("Today falls in a gap in the fiscal calendar - nothing can post");
+    expect(notice?.body).toContain("2027-01-01 to 2027-01-31");
+  });
+
+  it("ignores a gap already behind today", () => {
+    const notice = fiscalRunwayNotice(
+      runway({ today: "2028-03-01", gaps: [january] }), asIs,
+    );
+
+    expect(notice).toBeNull();
+  });
+});
+
+describe("a gap read from a dashboard that lists no gaps", () => {
+  it("names where the gap starts when the first uncovered day comes before the calendar's end", () => {
+    const notice = fiscalRunwayNotice(
+      runway({ days_remaining: 87, calendar_end: "2027-12-31", first_uncovered_date: "2027-01-01" }), asIs,
+    );
+
+    expect(notice?.title).toBe("The fiscal calendar has a gap");
+    expect(notice?.body).toContain("the days from 2027-01-01 until the next fiscal year starts");
+  });
+
+  it("says nothing when the first uncovered day is the day after the calendar ends", () => {
+    expect(fiscalRunwayNotice(runway({ first_uncovered_date: "2027-01-01" }), asIs)).toBeNull();
+  });
+});

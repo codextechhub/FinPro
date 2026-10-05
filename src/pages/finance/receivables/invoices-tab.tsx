@@ -24,6 +24,7 @@ import { InvoiceDetailDrawer } from "./invoice-detail-drawer";
 import { BatchGenerateModal } from "./batch-generate-modal";
 import { NewInvoiceDrawer } from "./new-invoice-drawer";
 import { useDates } from "../../../lib/display-prefs";
+import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 
 const TABS = [
   { key: "", label: "All" }, { key: "draft", label: "Draft" }, { key: "issued", label: "Issued" },
@@ -91,7 +92,8 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
   const { can } = useCan();
   useActionParam("new", can(P.FIN_CREATE_INVOICE), () => setNewOpen(true));
 
-  const params = useMemo(() => ({ entity, page, ...(bucket ? { bucket } : {}), ...(search ? { search } : {}) }), [entity, page, bucket, search]);
+  const [showArchived] = useShowArchived();
+  const params = useMemo(() => ({ entity, page, ...(bucket ? { bucket } : {}), ...(search ? { search } : {}), ...includeArchivedArg(showArchived) }), [entity, page, bucket, search, showArchived]);
   const { data, isLoading, isFetching, isError, refetch } = useGetInvoicesQuery(params);
   const summaryQ = useGetInvoiceSummaryQuery({ entity, ...(search ? { search } : {}) });
   const summary = summaryQ.data?.data;
@@ -166,6 +168,7 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
           <Input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); setPage(1); }} placeholder="Search invoice no / customer" className="h-9 w-full pl-8 font-mont text-sm" />
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <ShowArchivedToggle entity={entity} />
           {/* Screen params, not export filter ids: the backend binding is what knows `bucket=overdue` is a due-date window. */}
           <QuickExportButton
             screen="finance.invoices"

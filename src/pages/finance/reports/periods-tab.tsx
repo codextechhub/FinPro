@@ -8,9 +8,12 @@
 
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import {
+  Archive,
+  ArchiveRestore,
   ArrowRight,
   Building2,
   CalendarDays,
@@ -36,7 +39,8 @@ import {
   StatusPill,
   hasReason,
 } from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { Can, useCan } from "@/components/finance-ui/can";
+import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { EmptyState, ErrorState, ForbiddenState, LoadingState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,14 +58,23 @@ import {
   useStartFiscalYearMutation,
 } from "@/redux/services/finance/setup-api";
 import { useGetFiscalYearsQuery } from "@/redux/services/finance/ops-api";
-import { toArray } from "@/redux/services/finance/api-types";
-import type { FiscalPeriod } from "@/redux/services/finance/setup-types";
 import {
+  useArchiveFiscalYearMutation,
+  useGetRecordRetentionSettingsQuery,
+  useUnarchiveFiscalYearMutation,
+} from "@/redux/services/finance/records-api";
+import { toArray } from "@/redux/services/finance/api-types";
+import type { FiscalPeriod, ChecklistItem } from "@/redux/services/finance/setup-types";
+import { routesPath } from "@/routes/routes-path";
+import {
+  archiveReadiness,
   periodActionLabel,
   summarizePeriods,
   yearCloseState,
+  type ArchiveReadiness,
   type YearCloseState,
 } from "./periods-model";
+import { BranchMonthStates, BranchYearStates } from "./branch-close-states";
 import {
   actionBranch,
   actionBranchReady,
@@ -127,7 +140,12 @@ function CalendarBranchQuestion({ calendar, value, onChange, hint }: {
   );
 }
 
-type YearAction = { kind: "close" | "reopen"; id: number; year: number };
+/**
+ * A year-end act awaiting its confirm. Closing and re-opening name the branch
+ * whose year moves; archiving and unarchiving put the school's whole year away
+ * or bring it back, so they name no branch and always ask why.
+ */
+type YearAction = { kind: "close" | "reopen" | "archive" | "unarchive"; id: number; year: number };
 
 /**
  * Fiscal close workbench for one ledger entity.
@@ -146,6 +164,10 @@ export function PeriodsTab({ entity, headerSlot }: {
 }) {
   const calendar = useCalendarBranch();
   const { wholeSchool } = useReaderReach();
+  const { can } = useCan();
+  const dates = useDates();
+  const [showArchived] = useShowArchived();
+  const archivedArg = includeArchivedArg(showArchived);
   const readArg = calendar.readBranch != null ? { branch: calendar.readBranch } : {};
   const {
     data: fiscalYearData,
@@ -153,7 +175,7 @@ export function PeriodsTab({ entity, headerSlot }: {
     isError: fiscalYearsFailed,
     error: fiscalYearsError,
     refetch: refetchFiscalYears,
-  } = useGetFiscalYearsQuery({ entity, ...readArg }, { skip: calendar.isLoading });
+  } = useGetFiscalYearsQuery({ entity, ...readArg, ...archivedArg }, { skip: calendar.isLoading });
   const fiscalYears = useMemo(
     () => [...toArray(fiscalYearData?.data)].sort((a, b) => b.year - a.year),
     [fiscalYearData],
@@ -168,7 +190,7 @@ export function PeriodsTab({ entity, headerSlot }: {
     isError: periodsFailed,
     error: periodsError,
     refetch: refetchPeriods,
-  } = useGetFiscalYearPeriodsQuery(activeYear && !calendar.isLoading ? { entity, year: activeYear, ...readArg } : skipToken);
+  } = useGetFiscalYearPeriodsQuery(activeYear && !calendar.isLoading ? { entity, year: activeYear, ...readArg, ...archivedArg } : skipToken);
   const periods = useMemo(
     () => [...(Array.isArray(periodData?.data) ? periodData.data : [])]
       .sort((a, b) => a.start_date.localeCompare(b.start_date)),
@@ -184,7 +206,20 @@ export function PeriodsTab({ entity, headerSlot }: {
   const [yearReason, setYearReason] = useState("");
   const [closeYear, { isLoading: closingYear }] = useCloseFiscalYearMutation();
   const [reopenYear, { isLoading: reopeningYear }] = useReopenFiscalYearMutation();
-  const yearBusy = closingYear || reopeningYear;
+  const [archiveYear, { isLoading: archivingYear }] = useArchiveFiscalYearMutation();
+  const [unarchiveYear, { isLoading: unarchivingYear }] = useUnarchiveFiscalYearMutation();
+  const yearBusy = closingYear || reopeningYear || archivingYear || unarchivingYear;
+
+  // Archiving binds every branch, so it is offered on the school's own state
+  // only: to a whole-school holder of the key, under All branches or at a
+  // school with one branch. The minimum age comes from the record-keeping
+  // settings when the reader may read them; otherwise the server judges it.
+  const mayArchive = wholeSchool && can(P.FIN_ARCHIVE_FISCAL_YEAR) && calendar.readBranch == null;
+  const retentionQ = useGetRecordRetentionSettingsQuery(
+    { entity },
+    { skip: !mayArchive || !can(P.FIN_VIEW_SETTINGS) },
+  );
+  const minAgeYears = retentionQ.data?.data?.archive_min_age_years ?? null;
 
   const latestFiscalYear = fiscalYears[0] ?? null;
   const latestStart = latestFiscalYear?.start_date
@@ -225,7 +260,11 @@ export function PeriodsTab({ entity, headerSlot }: {
     if (!yearAction) return;
     const branchArg = yearTarget != null ? { branch: yearTarget } : {};
     try {
-      if (yearAction.kind === "close") {
+      if (yearAction.kind === "archive" || yearAction.kind === "unarchive") {
+        const act = yearAction.kind === "archive" ? archiveYear : unarchiveYear;
+        const response = await act({ id: yearAction.id, entity, reason: yearReason.trim() }).unwrap();
+        toast.success(response.message || `Fiscal year ${yearAction.year} ${yearAction.kind}d.`);
+      } else if (yearAction.kind === "close") {
         const response = await closeYear({ id: yearAction.id, entity, ...branchArg }).unwrap();
         const netIncome = response.data?.net_income?.naira;
         toast.success(
@@ -281,11 +320,12 @@ export function PeriodsTab({ entity, headerSlot }: {
             className={selectCls}
           >
             {fiscalYears.map((year) => (
-              <option key={year.id} value={year.year}>FY {year.year} · {humanize(year.status)}</option>
+              <option key={year.id} value={year.year}>FY {year.year} · {humanize(year.status)}{year.is_archived ? " · Archived" : ""}</option>
             ))}
           </select>
         </label>
       ) : null}
+      <ShowArchivedToggle entity={entity} className="h-9" />
       <Can permission={P.FIN_CREATE_PERIOD}>
         <Button onClick={() => setCreating(true)} className="h-9 flex-1 gap-1.5 font-mont text-xs font-semibold sm:flex-none">
           <Plus className="size-3.5" /> New fiscal year
@@ -294,7 +334,19 @@ export function PeriodsTab({ entity, headerSlot }: {
     </div>
   );
 
-  const yearCopy = yearAction?.kind === "reopen"
+  const yearCopy = yearAction?.kind === "archive"
+    ? {
+      title: `Archive fiscal year ${yearAction.year}?`,
+      description: `FY ${yearAction.year} leaves the year pickers, the period pickers and the document lists for every branch. Nothing is deleted: tick "Show archived years" to read and report on it again. Bills still unpaid stay in the lists.`,
+      text: "Archive year",
+    }
+    : yearAction?.kind === "unarchive"
+      ? {
+        title: `Unarchive fiscal year ${yearAction.year}?`,
+        description: `FY ${yearAction.year} comes back into the pickers and lists for every branch. It stays closed: re-open it afterwards if a month needs correcting.`,
+        text: "Unarchive year",
+      }
+      : yearAction?.kind === "reopen"
     ? {
       title: `Re-open fiscal year ${yearAction.year}${yearScope}?`,
       description: calendar.applies
@@ -309,6 +361,11 @@ export function PeriodsTab({ entity, headerSlot }: {
         : `Posts the formal year-end journal, clears income and expense balances into Retained Earnings, and seals FY ${yearAction?.year ?? ""}. Period locks remain unchanged.`,
       text: "Close fiscal year",
     };
+
+  const yearActionWhole = yearAction?.kind === "archive" || yearAction?.kind === "unarchive";
+  const archive: ArchiveReadiness | null = activeFiscalYear && mayArchive
+    ? archiveReadiness(activeFiscalYear, minAgeYears, dates.today())
+    : null;
 
   return (
     <div data-guide="finance-periods.workbench" className="min-w-0 space-y-5">
@@ -355,10 +412,18 @@ export function PeriodsTab({ entity, headerSlot }: {
             fiscalYearId={activeFiscalYear.id}
             openCount={summary.open}
             mayReopenYear={wholeSchool}
+            isArchived={!!activeFiscalYear.is_archived}
+            archive={archive}
             branchName={calendar.applies && calendar.readBranch != null ? calendarBranchName(calendar, calendar.readBranch) : null}
             onCloseYear={() => openYearAction({ kind: "close", id: activeFiscalYear.id, year: activeFiscalYear.year })}
             onReopenYear={() => openYearAction({ kind: "reopen", id: activeFiscalYear.id, year: activeFiscalYear.year })}
+            onArchiveYear={() => openYearAction({ kind: "archive", id: activeFiscalYear.id, year: activeFiscalYear.year })}
+            onUnarchiveYear={() => openYearAction({ kind: "unarchive", id: activeFiscalYear.id, year: activeFiscalYear.year })}
           />
+
+          {calendar.applies && calendar.selected === "all" ? (
+            <BranchYearStates entity={entity} yearId={activeFiscalYear.id} branches={calendar.choices} archived={archivedArg} />
+          ) : null}
 
           <section data-guide="finance-periods.periods">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
@@ -389,6 +454,8 @@ export function PeriodsTab({ entity, headerSlot }: {
         yearShut={yearShut}
         calendar={calendar}
         status={selectedPeriod?.status}
+        year={activeYear}
+        includeArchived={showArchived}
         onClose={() => setSelected(null)}
       />
 
@@ -407,12 +474,24 @@ export function PeriodsTab({ entity, headerSlot }: {
         title={yearCopy.title}
         description={yearCopy.description}
         confirmText={yearCopy.text}
-        destructive={yearAction?.kind === "close"}
+        destructive={yearAction?.kind === "close" || yearAction?.kind === "archive"}
         loading={yearBusy}
-        confirmDisabled={!actionBranchReady(calendar, yearBranch) || (yearAction?.kind === "reopen" && !hasReason(yearReason))}
+        confirmDisabled={yearActionWhole
+          ? !hasReason(yearReason)
+          : !actionBranchReady(calendar, yearBranch) || (yearAction?.kind === "reopen" && !hasReason(yearReason))}
         onConfirm={doYearAction}
       >
-        {calendar.mustAsk || yearAction?.kind === "reopen" ? (
+        {yearActionWhole ? (
+          <ReasonField
+            value={yearReason}
+            onChange={setYearReason}
+            disabled={yearBusy}
+            placeholder={yearAction?.kind === "archive"
+              ? "For example: FY 2027 is finished and audited; it no longer needs to sit in the lists"
+              : "For example: the tax office is reviewing FY 2027"}
+            hint="Kept on the audit trail with your name."
+          />
+        ) : calendar.mustAsk || yearAction?.kind === "reopen" ? (
           <div className="space-y-4">
             <CalendarBranchQuestion
               calendar={calendar}
@@ -498,6 +577,11 @@ function FiscalYearOverview({
  * because it cannot be re-opened. `status` is the year as
  * the workbench reads it: one branch's year when a branch is chosen, the
  * school's under All branches.
+ *
+ * A closed year a school no longer works in can be archived (`archive`, null
+ * when the reader may not archive). An archived year must be unarchived before
+ * it can be re-opened, so its Re-open is disabled with that said beside it,
+ * and Unarchive is offered in its place.
  */
 function YearCloseReadiness({
   state,
@@ -506,9 +590,13 @@ function YearCloseReadiness({
   fiscalYearId,
   openCount,
   mayReopenYear,
+  isArchived,
+  archive,
   branchName,
   onCloseYear,
   onReopenYear,
+  onArchiveYear,
+  onUnarchiveYear,
 }: {
   state: YearCloseState;
   status: string;
@@ -516,27 +604,65 @@ function YearCloseReadiness({
   fiscalYearId: number;
   openCount: number;
   mayReopenYear: boolean;
+  isArchived: boolean;
+  archive: ArchiveReadiness | null;
   branchName: string | null;
   onCloseYear: () => void;
   onReopenYear: () => void;
+  onArchiveYear: () => void;
+  onUnarchiveYear: () => void;
 }) {
+  const dates = useDates();
   if (state === "SEALED") {
+    const archiveNote = archive?.kind === "too-recent"
+      ? `FY ${year} can be archived from ${dates.day(archive.from)}.`
+      : null;
     return (
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-green-01/25 bg-green-01/5 p-4">
-        <CheckCircle2 className="size-5 shrink-0 text-green-01" />
+        {isArchived
+          ? <Archive className="size-5 shrink-0 text-gray-05" />
+          : <CheckCircle2 className="size-5 shrink-0 text-green-01" />}
         <div className="min-w-0 flex-1">
-          <p className="font-mont text-sm font-semibold text-gray-01">Fiscal year {year} is sealed{branchName ? ` for ${branchName}` : ""}</p>
-          <p className="mt-0.5 font-mont text-xs text-gray-05">
-            {status === "LOCKED"
-              ? "The year is locked and cannot be re-opened."
-              : "The year-end journal has been posted. Individual closed periods may now be locked when required."}
+          <p className="font-mont text-sm font-semibold text-gray-01">
+            Fiscal year {year} is {isArchived ? "archived" : "sealed"}{branchName ? ` for ${branchName}` : ""}
           </p>
+          <p className="mt-0.5 font-mont text-xs text-gray-05">
+            {isArchived
+              ? "It is left out of pickers and lists until \"Show archived years\" is ticked. Unarchive it before re-opening it."
+              : status === "LOCKED"
+                ? "The year is locked and cannot be re-opened."
+                : "The year-end journal has been posted. Individual closed periods may now be locked when required."}
+          </p>
+          {archiveNote ? <p className="mt-0.5 font-mont text-xs text-gray-05">{archiveNote}</p> : null}
         </div>
-        {status === "CLOSED" && mayReopenYear ? (
-          <Can permission={P.FIN_REOPEN_FISCAL_YEAR}>
-            <Button variant="outline" onClick={onReopenYear} disabled={!fiscalYearId} className="w-full sm:w-auto">Re-open year</Button>
-          </Can>
-        ) : null}
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {status === "CLOSED" && mayReopenYear ? (
+            <Can permission={P.FIN_REOPEN_FISCAL_YEAR}>
+              <Button
+                variant="outline"
+                onClick={onReopenYear}
+                disabled={!fiscalYearId || isArchived}
+                title={isArchived ? `Unarchive FY ${year} before re-opening it.` : undefined}
+                className="w-full sm:w-auto"
+              >Re-open year</Button>
+            </Can>
+          ) : null}
+          {archive?.kind === "archived" ? (
+            <Button variant="outline" onClick={onUnarchiveYear} className="w-full gap-1.5 sm:w-auto">
+              <ArchiveRestore className="size-4" /> Unarchive year
+            </Button>
+          ) : archive ? (
+            <Button
+              variant="outline"
+              onClick={onArchiveYear}
+              disabled={archive.kind !== "ready"}
+              title={archiveNote ?? undefined}
+              className="w-full gap-1.5 sm:w-auto"
+            >
+              <Archive className="size-4" /> Archive year
+            </Button>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -578,6 +704,11 @@ function YearCloseReadiness({
       </Can>
     </div>
   );
+}
+
+/** The sealed-figures check, when it says something moved: the verify screen explains what. */
+function sealsLink(item: ChecklistItem): boolean {
+  return item.name === "sealed_figures_unchanged" && !item.passed;
 }
 
 function PeriodCard({ period, selected, onClick }: { period: FiscalPeriod; selected: boolean; onClick: () => void }) {
@@ -692,7 +823,9 @@ function StartFiscalYearModal({
   );
 }
 
-type PeriodAction = "soft-close" | "close" | "reopen" | "lock";
+type PeriodAction = "soft-close" | "close" | "force" | "reopen" | "lock";
+
+const F = routesPath.PROTECTED.FINANCE;
 
 /**
  * One period's checklist and its lifecycle actions.
@@ -708,7 +841,15 @@ type PeriodAction = "soft-close" | "close" | "reopen" | "lock";
  * chosen, the checklist runs against that branch and every action sends it;
  * under All branches each action asks which branch in its confirm dialog. The
  * checklist reports the school's status for the month, so a branch's own
- * status arrives as `status`, read from the branch's period list.
+ * status arrives as `status`, read from the branch's period list. Under All
+ * branches at a school with several, the drawer also lists each branch's own
+ * state for the month, so a month held open by one branch says which.
+ *
+ * Forcing a close: when a check that blocks the close fails, a holder of
+ * `finance.period.force_close` may close the month anyway. It is its own act,
+ * with its own key and a required reason, and the server keeps the reason and
+ * the overridden checks on the audit trail. Without the key no force is
+ * offered.
  */
 export function PeriodCloseDrawer({
   id,
@@ -717,6 +858,8 @@ export function PeriodCloseDrawer({
   yearShut = null,
   calendar = ONE_BRANCH_CALENDAR,
   status: listedStatus,
+  year = null,
+  includeArchived = false,
   onClose,
 }: {
   id: number | null;
@@ -725,9 +868,13 @@ export function PeriodCloseDrawer({
   yearShut?: { year: number; status: string } | null;
   calendar?: CalendarBranch;
   status?: FiscalPeriod["status"];
+  /** The fiscal year the month belongs to, for the per-branch rows. */
+  year?: number | null;
+  includeArchived?: boolean;
   onClose: () => void;
 }) {
   const dates = useDates();
+  const { can } = useCan();
   const { data, isLoading, isError, error, refetch } = useGetPeriodChecklistQuery(
     id ? { id, entity, ...(calendar.readBranch != null ? { branch: calendar.readBranch } : {}) } : skipToken,
   );
@@ -758,9 +905,10 @@ export function PeriodCloseDrawer({
     chooseAction(null);
     onClose();
   };
-  const doClose = async (soft: boolean) => {
+  const doClose = async (soft: boolean, forced = false) => {
     try {
-      const response = await close({ id: id!, entity, soft, ...branchArg }).unwrap();
+      const override = forced ? { force: true as const, reason: reason.trim() } : {};
+      const response = await close({ id: id!, entity, soft, ...branchArg, ...override }).unwrap();
       toast.success(closeOutcomeMessage(period?.name, response.data?.checklist?.items));
       closeDrawer();
     } catch { /* central */ }
@@ -782,10 +930,12 @@ export function PeriodCloseDrawer({
   const confirm = () => {
     if (action === "soft-close") void doClose(true);
     else if (action === "close") void doClose(false);
+    else if (action === "force") void doClose(false, true);
     else if (action === "reopen") void doReopen();
     else if (action === "lock") void doLock();
   };
   const several = calendar.applies;
+  const blockers = failedBlockers(items);
   const confirmCopy: Record<PeriodAction, { title: string; description: string; text: string; destructive?: boolean; branchHint: string }> = {
     "soft-close": {
       title: `Soft-close ${period?.name ?? "period"}${scope}?`,
@@ -799,6 +949,15 @@ export function PeriodCloseDrawer({
         + (several ? " The school's month closes once every branch has closed it." : ""),
       text: "Run period close",
       branchHint: "The close steps run against this branch's entries.",
+    },
+    force: {
+      title: `Force close ${period?.name ?? "period"}${scope}?`,
+      description: `Closes the month although ${blockers.length === 1 ? "one check that blocks the close fails" : `${blockers.length} checks that block the close fail`}. `
+        + "The checks you override and your reason are kept on the audit trail with your name."
+        + (several ? " The school's month closes once every branch has closed it." : ""),
+      text: "Force close",
+      destructive: true,
+      branchHint: "Only this branch's month is closed.",
     },
     reopen: {
       title: `Re-open ${period?.name ?? "period"}${scope}?`,
@@ -853,6 +1012,16 @@ export function PeriodCloseDrawer({
                 >Lock period</Button>
               </Can>
             ) : null}
+            {canClose && blockers.length > 0 ? (
+              <Can permission={P.FIN_FORCE_CLOSE_PERIOD}>
+                <Button
+                  variant="outline"
+                  onClick={() => chooseAction("force")}
+                  disabled={busy}
+                  className="w-full border-destructive/40 text-destructive hover:bg-destructive/5 sm:w-auto"
+                >Force close</Button>
+              </Can>
+            ) : null}
             {canClose ? (
               <Can permission={P.FIN_CLOSE_PERIOD}>
                 {status === "OPEN" ? (
@@ -903,18 +1072,29 @@ export function PeriodCloseDrawer({
 
             {/* Why the close is refused, said once at the top. Warnings are
                 deliberately not counted here - they never stop a close. */}
-            {failedBlockers(items).length > 0 ? (
+            {blockers.length > 0 ? (
               <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3">
                 <X className="mt-0.5 size-4 shrink-0 text-destructive" />
                 <p className="font-mont text-xs leading-5 text-gray-05">
                   <span className="font-semibold text-destructive">
-                    {failedBlockers(items).length === 1
+                    {blockers.length === 1
                       ? "One check must pass before this period can close."
-                      : `${failedBlockers(items).length} checks must pass before this period can close.`}
+                      : `${blockers.length} checks must pass before this period can close.`}
                   </span>{" "}
                   Anything marked "Warning only" below will not stop it.
+                  {canClose && can(P.FIN_FORCE_CLOSE_PERIOD) ? " You may force the close with a reason." : ""}
                 </p>
               </div>
+            ) : null}
+
+            {several && calendar.selected === "all" && year != null && period ? (
+              <BranchMonthStates
+                entity={entity}
+                year={year}
+                periodId={period.id}
+                branches={calendar.choices}
+                archived={includeArchived ? { include_archived: "true" } : {}}
+              />
             ) : null}
 
             <div>
@@ -957,6 +1137,11 @@ export function PeriodCloseDrawer({
                           ) : null}
                         </div>
                         {item.detail ? <p className="mt-1 break-words font-mont text-xs leading-5 text-gray-05">{item.detail}</p> : null}
+                        {sealsLink(item) && can(P.FIN_VIEW_SEALS) ? (
+                          <Link to={`${F.REPORTS}/seals`} className="mt-1 inline-block font-mont text-xs font-semibold text-primary hover:underline">
+                            Verify sealed figures
+                          </Link>
+                        ) : null}
                         {severity === "warning" ? (
                           <p className="mt-1 font-mont text-[11px] leading-5 text-amber-700">This does not stop the close. It is here so the figure is seen first.</p>
                         ) : null}
@@ -978,10 +1163,10 @@ export function PeriodCloseDrawer({
         confirmText={activeCopy?.text}
         destructive={activeCopy?.destructive}
         loading={busy}
-        confirmDisabled={!actionBranchReady(calendar, branchChoice) || (action === "reopen" && !hasReason(reason))}
+        confirmDisabled={!actionBranchReady(calendar, branchChoice) || ((action === "reopen" || action === "force") && !hasReason(reason))}
         onConfirm={confirm}
       >
-        {calendar.mustAsk || action === "reopen" ? (
+        {calendar.mustAsk || action === "reopen" || action === "force" ? (
           <div className="space-y-4">
             <CalendarBranchQuestion
               calendar={calendar}
@@ -989,12 +1174,24 @@ export function PeriodCloseDrawer({
               onChange={setBranchChoice}
               hint={activeCopy?.branchHint ?? ""}
             />
-            {action === "reopen" ? (
+            {action === "force" ? (
+              <div className="rounded-md border border-red-200 bg-red-50/60 p-3">
+                <p className="font-mont text-xs font-semibold text-gray-01">Checks you are overriding</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 font-mont text-xs text-gray-05">
+                  {blockers.map((item) => (
+                    <li key={item.name}>{checklistLabel(item.name, humanize)}{item.detail ? `: ${item.detail}` : ""}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {action === "reopen" || action === "force" ? (
               <ReasonField
                 value={reason}
                 onChange={setReason}
                 disabled={busy}
-                placeholder="For example: a supplier bill dated in this month arrived after the close"
+                placeholder={action === "force"
+                  ? "For example: the bank statement for March is late and the accountant has agreed the balance"
+                  : "For example: a supplier bill dated in this month arrived after the close"}
                 hint="Kept on the audit trail with your name."
               />
             ) : null}
