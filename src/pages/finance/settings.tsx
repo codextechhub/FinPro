@@ -17,6 +17,7 @@ import {
   Save,
   Settings2,
   CalendarClock,
+  Wallet,
   ShieldCheck,
   Workflow,
 } from "lucide-react";
@@ -56,6 +57,7 @@ import { DEFAULT_FINANCE_SETTINGS_SECTION, type FinanceSettingsSection } from ".
 import { FeeDuePolicyPanel, financeSettingsSections, setupSections } from "@xvs/finance/host";
 import { FinanceShell } from "./finance-shell";
 import { EntitiesTab } from "./setup/entities-tab";
+import { PayrollSettingsPanel } from "./payroll-settings";
 
 const F = routesPath.PROTECTED.FINANCE;
 
@@ -74,6 +76,7 @@ const SECTIONS: (ConsoleSettingsSection & { key: FinanceSettingsSection })[] = [
   { key: "documents", title: "Documents", description: "Collections and policies", icon: FileCog, group: "billing" },
   { key: "fees", title: "Fee due dates", description: "When fee bills fall due", icon: CalendarClock, group: "billing" },
   { key: "banking-cash", title: "Banking and cash", description: "Matching and allocation", icon: Banknote, group: "billing" },
+  { key: "payroll", title: "Payroll", description: "PAYE, deductions and payslips", icon: Wallet },
   { key: "approvals", title: "Approvals", description: "Finance workflows", icon: Workflow },
 ];
 
@@ -142,6 +145,7 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
         {activeSection === "reference-data" ? <ReferenceData /> : null}
         {activeSection === "approvals" ? <Approvals /> : null}
         {activeSection === "fees" ? <FeeDuePolicyPanel /> : null}
+        {activeSection === "payroll" ? <PayrollSettingsPanel key={active.code ?? "no-entity"} entityCode={active.code} /> : null}
       </ConsoleSettingsLayout>
     </FinanceShell>
   );
@@ -165,6 +169,7 @@ const OVERVIEW_CARDS: Record<Exclude<FinanceSettingsSection, "overview">, {
   "reference-data": { description: "Maintain the chart of accounts, tax codes and the other shared reference data.", status: "Available", tone: "ready" },
   approvals: { description: "Review approval templates for journals, refunds and write-offs.", status: "Shared workflow" },
   fees: { description: "Choose when fee bills fall due once they are raised.", status: "Configurable", tone: "ready" },
+  payroll: { description: "Choose how PAYE is worked out, which deductions apply, how payslips reach staff and how earlier pay is handled.", status: "Configurable", tone: "ready" },
 };
 
 function Overview({ entity, sections }: {

@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   wholeSchool: true,
   branchIds: null as number[] | null,
   run: null as unknown,
+  openPayslip: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -54,6 +55,24 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useGeneratePayrollRunMutation: () => [vi.fn(), { isLoading: false }],
   useCreatePayrollRunMutation: () => [vi.fn(), { isLoading: false }],
 }));
+vi.mock("@/redux/services/finance/payroll-api", () => ({
+  useGetPayrollTaxStatesQuery: () => ({ data: { data: [
+    { id: 1, country: "NG", code: "LA", name: "Lagos", authority_name: "LIRS", is_active: true },
+    { id: 2, country: "NG", code: "OG", name: "Ogun", authority_name: "OGIRS", is_active: true },
+  ] } }),
+  useGetPensionFundAdministratorsQuery: () => ({ data: { data: [{ id: 9, code: "STANBIC", name: "Stanbic IBTC Pension", is_active: true }] } }),
+  useGetPayslipContentQuery: () => ({ data: undefined, isLoading: false }),
+  useGetPreviousPayMissingQuery: () => ({ data: undefined }),
+}));
+vi.mock("../../utils/payroll-documents", () => ({ openLinePayslip: mocks.openPayslip }));
+vi.mock("../../components/workflow/person-picker", () => ({
+  PersonPicker: (props: { onChange: (id: string) => void }) => <button type="button" data-person-picker onClick={() => props.onChange("77")}>Pick Aisha</button>,
+}));
+vi.mock("@/components/ui/date-picker-input", () => ({
+  DatePickerInput: (props: { value?: string; onChange?: (event: { target: { value: string } }) => void }) => (
+    <input value={props.value ?? ""} onChange={(event) => props.onChange?.({ target: { value: event.target.value } })} />
+  ),
+}));
 vi.mock("@/redux/services/finance/reports-api", () => ({}));
 vi.mock("@/redux/services/tenants-api", () => ({ useGetBranchOptionsQuery: () => ({ data: { data: [] } }) }));
 vi.mock("../../host", async (importOriginal) => ({
@@ -67,6 +86,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   CostCenterPicker: () => null,
   PostingDateField: () => null,
   useRaisingBranchChoice: () => ({ raising: { ask: false }, value: "", setValue: vi.fn(), reset: vi.fn(), ready: true, body: () => ({}) }),
+  useReaderBranchLens: () => ({ applies: true, pinnedBranch: null, branch: "all", choices: [], isLoading: false }),
   RaisingBranchChoiceField: () => null,
   BankAccountPicker: (props: { documentBranchId?: number | null; onChange: (v: string) => void; placeholder?: string }) => {
     mocks.pickers.push(props);
@@ -76,7 +96,9 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { EmployeeDrawer, NewRunDrawer, PayDrawer, RunDrawer, offeredStructures, salaryChanges, withSequences } from "./payroll";
+import { EmployeeDrawer, GeneratedRunNotice, NewRunDrawer, PayDrawer, PreviousPayMissingBanner, RunDrawer, canPrintPayslip, offeredStructures, salaryChanges, statutoryTotals, withSequences } from "./payroll";
+import { withPayAliases } from "./payroll-access";
+import { resolveFieldAccess } from "@/components/finance-ui";
 import type { EmployeeSalary, PayrollRun } from "@/redux/services/finance/ops-types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -325,5 +347,198 @@ describe("the order numbers a structure is saved with", () => {
   it("renumbers from 0 once a line is added or moved", () => {
     expect(withSequences([line(1), line(2), line(0)]).map((l) => l.sequence)).toEqual([0, 1, 2]);
     expect(withSequences([line(2), line(1)]).map((l) => l.sequence)).toEqual([0, 1]);
+  });
+});
+
+/**
+ * Aisha's record at Ikeja. A bursar with full access sets her state of
+ * residence, pension administrator, PIN, tax ID and rent; a role that may read
+ * pay but not change PAYE sees her state greyed and never sends one; an
+ * override needs its reason, and clearing it sends the clearing alone.
+ */
+const aisha: EmployeeSalary = {
+  id: 31, name: "Aisha Bello", structure_id: null, structure_name: null, employee_id: 77,
+  branch_id: 19, branch_name: "Ikeja Branch", gross_amount: 30_000_000, paye_amount: 0,
+  pension_amount: 0, net_amount: 30_000_000, cost_center: null, is_active: true,
+  residence_state: "LA", residence_state_name: "Lagos", pfa_id: null, pfa_name: null,
+  tax_id: "", pension_pin: "", annual_rent: 0, paye_override: null, paye_override_reason: "",
+} as EmployeeSalary;
+
+const PAYE_READ_ONLY = { "finance.salary": { hidden: [], read_only: ["annual_rent", "paye_amount", "paye_override", "paye_override_reason", "tax_id"], open_on_create: [] } };
+
+describe("a salary record's statutory details", () => {
+  const flat = { name: "Aisha Bello", structure: null, gross_amount: 30_000_000, paye_amount: 0, pension_amount: 0 };
+
+  it("sends the details that changed for a role that may change pay", () => {
+    expect(salaryChanges(aisha, { ...flat, residence_state: "OG", pfa: 9, pension_pin: "PEN100", tax_id: "TIN-1", annual_rent: 120_000_000 }, true, mayChangePay, editing))
+      .toEqual({ residence_state: "OG", pfa: 9, pension_pin: "PEN100", tax_id: "TIN-1", annual_rent: 120_000_000 });
+  });
+
+  it("keeps a new state out of the body when PAYE may not be changed", () => {
+    const access = withPayAliases(resolveFieldAccess(PAYE_READ_ONLY, "finance.salary"));
+    expect(access.isReadOnly("residence_state")).toBe(true);
+    expect(access.isReadOnly("pfa")).toBe(false);
+    expect(salaryChanges(aisha, { ...flat, name: "Aisha Bello-Okoro", residence_state: "OG", pfa: 9 }, true, access, editing))
+      .toEqual({ name: "Aisha Bello-Okoro", pfa: 9 });
+  });
+
+  it("sends an override with its reason, and a clearing without one", () => {
+    expect(salaryChanges(aisha, { ...flat, paye_override: 2_000_000, paye_override_reason: "Tax office direction" }, true, mayChangePay, editing))
+      .toEqual({ paye_override: 2_000_000, paye_override_reason: "Tax office direction" });
+    const overridden = { ...aisha, paye_override: 2_000_000, paye_override_reason: "Tax office direction" } as EmployeeSalary;
+    expect(salaryChanges(overridden, { ...flat, paye_override: null, paye_override_reason: "" }, true, mayChangePay, editing))
+      .toEqual({ paye_override: null });
+    expect(salaryChanges(overridden, { ...flat, paye_override: 2_000_000, paye_override_reason: "Corrected direction" }, true, mayChangePay, editing))
+      .toEqual({ paye_override: 2_000_000, paye_override_reason: "Corrected direction" });
+  });
+});
+
+describe("EmployeeDrawer moves and refusals", () => {
+  const select = (label: string) => [...document.body.querySelectorAll("label")].find((l) => l.textContent?.startsWith(label))?.querySelector("select") as HTMLSelectElement;
+  const setValue = (element: HTMLInputElement | HTMLSelectElement, value: string) => {
+    const proto = element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(element, value);
+    element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }));
+  };
+  const branches = [{ id: 19, name: "Ikeja Branch", code: 1, is_main: true, status: "ACTIVE" }, { id: 20, name: "Lekki Branch", code: 2, is_main: false, status: "ACTIVE" }];
+  const saveButton = () => [...document.body.querySelectorAll("button")].find((b) => b.textContent?.includes("Save changes") || b.textContent?.includes("Add employee"))!;
+
+  it("sends a branch move with the day it takes effect", async () => {
+    mocks.fieldAccess = {};
+    mocks.update.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Updated." }) });
+    act(() => root.render(<EmployeeDrawer open salary={aisha} entity="BSS" branches={branches} onClose={() => undefined} />));
+    act(() => setValue(select("Branch"), "20"));
+    const date = [...document.body.querySelectorAll("label")].find((l) => l.textContent?.startsWith("Takes effect on"))!.querySelector("input")!;
+    act(() => setValue(date, "2026-09-01"));
+    expect(document.body.textContent).toContain("Ikeja Branch keeps paying them until");
+    await act(async () => { saveButton().click(); });
+    expect(mocks.update.mock.calls.at(-1)![0]).toEqual({ id: 31, entity: "BSS", branch: 20, effective_from: "2026-09-01" });
+  });
+
+  it("greys the state of residence for a role that may not change PAYE", () => {
+    mocks.fieldAccess = PAYE_READ_ONLY;
+    act(() => root.render(<EmployeeDrawer open salary={aisha} entity="BSS" branches={branches} onClose={() => undefined} />));
+    expect(field("residence_state")!.disabled).toBe(true);
+    expect(field("pfa")!.disabled).toBe(false);
+    expect(field("tax_id")!.disabled).toBe(true);
+  });
+
+  it("keeps the refusal of a second record for somebody already paid in view", async () => {
+    mocks.fieldAccess = {};
+    const message = "Aisha Bello is already on the payroll at Ikeja Branch. Each person is paid by one branch: to move them, change the branch on their existing salary record instead of adding another.";
+    mocks.create.mockReturnValue({ unwrap: () => Promise.reject({ status: 400, data: { error: { code: "REQUEST_ERROR", detail: { employee: [message] } } } }) });
+    act(() => root.render(<EmployeeDrawer open salary={null} entity="BSS" branches={branches} onClose={() => undefined} />));
+    act(() => (document.body.querySelector("[data-person-picker]") as HTMLButtonElement).click());
+    const name = [...document.body.querySelectorAll("label")].find((l) => l.textContent?.startsWith("Employee name"))!.querySelector("input")!;
+    act(() => setValue(name, "Aisha Bello"));
+    const gross = field("gross_amount")!.querySelector("input")!;
+    act(() => setValue(gross, "300000"));
+    act(() => setValue(select("Branch"), "20"));
+    await act(async () => { saveButton().click(); });
+    expect(mocks.create.mock.calls.at(-1)![0]).toMatchObject({ entity: "BSS", employee: 77, branch: 20, name: "Aisha Bello" });
+    expect(document.body.querySelector('[role="alert"]')?.textContent).toBe(message);
+  });
+});
+
+describe("what a generated run warns about", () => {
+  const run = { ...SEPT, id: 9, document_number: "PR-9" };
+
+  it("names the joiners with no earlier pay recorded", () => {
+    act(() => root.render(<GeneratedRunNotice run={{ ...run, previous_pay_missing: ["Bayo Ade", "Kemi Oke"], skipped: [] }} onOpen={() => undefined} onDismiss={() => undefined} />));
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("2 people on it joined after January with no earlier pay recorded");
+    expect(text).toContain("Bayo Ade, Kemi Oke");
+  });
+
+  it("counts them without names for a reader who may not read names", () => {
+    act(() => root.render(<GeneratedRunNotice run={{ ...run, previous_pay_missing: [null], skipped: [] }} onOpen={() => undefined} onDismiss={() => undefined} />));
+    expect(document.body.textContent).toContain("1 person on it joined after January");
+    expect(document.body.textContent).not.toContain("null");
+  });
+
+  it("says nothing when there is nothing to say", () => {
+    act(() => root.render(<GeneratedRunNotice run={{ ...run, previous_pay_missing: [], skipped: [] }} onOpen={() => undefined} onDismiss={() => undefined} />));
+    expect(document.body.textContent).toBe("");
+  });
+});
+
+describe("the earlier-pay list above the roster", () => {
+  it("lists each person with their branch and first month, and opens their record", () => {
+    const onOpen = vi.fn();
+    act(() => root.render(<PreviousPayMissingBanner multiBranch onOpen={onOpen} missing={{ tax_year: 2026, required: false, people: [{ salary_id: 31, name: "Bayo Ade", branch_id: 19, branch_name: "Ikeja Branch", first_month: 4 }] }} />));
+    expect(document.body.textContent).toContain("Ikeja Branch · first paid April");
+    act(() => [...document.body.querySelectorAll("button")].find((b) => b.textContent === "Bayo Ade")!.click());
+    expect(onOpen).toHaveBeenCalledWith(31);
+  });
+
+  it("leaves the branch out at a school with one branch, and says a run is refused when required", () => {
+    act(() => root.render(<PreviousPayMissingBanner multiBranch={false} onOpen={() => undefined} missing={{ tax_year: 2026, required: true, people: [{ salary_id: 31, name: "Bayo Ade", branch_id: 19, branch_name: "Ikeja Branch", first_month: 4 }] }} />));
+    expect(document.body.textContent).not.toContain("Ikeja Branch");
+    expect(document.body.textContent).toContain("a run that includes them is refused");
+  });
+});
+
+/** Aisha's April line: PAYE worked out with Unity Schools' three months counted. */
+const APRIL_LINE = {
+  id: 51, line_no: 1, employee_id: 77, salary_id: 31, employee_name: "Aisha Bello", gross_amount: 30_000_000, paye_amount: 9_533_000,
+  pension_amount: 2_400_000, net_amount: 17_317_000, other_deductions_amount: 750_000, employer_contributions_amount: 3_600_000,
+  components: [], cost_center: null, branch_id: 19, branch_name: "Ikeja Branch", paye_source: "COMPUTED" as const,
+  items: [
+    { id: 1, kind: "DEDUCTION" as const, code: "PAYE" as const, label: "PAYE", amount: 9_533_000, basis_amount: 0, rate_bps: 0, deduction_type_id: null, liability_account_id: 1, expense_account_id: null },
+    { id: 2, kind: "DEDUCTION" as const, code: "NHF" as const, label: "National Housing Fund", amount: 750_000, basis_amount: 30_000_000, rate_bps: 250, deduction_type_id: null, liability_account_id: 2, expense_account_id: null },
+    { id: 3, kind: "EMPLOYER" as const, code: "NSITF" as const, label: "NSITF employee compensation", amount: 300_000, basis_amount: 30_000_000, rate_bps: 100, deduction_type_id: null, liability_account_id: 3, expense_account_id: 4 },
+    { id: 4, kind: "EMPLOYER" as const, code: "ITF" as const, label: "ITF training levy", amount: 300_000, basis_amount: 30_000_000, rate_bps: 100, deduction_type_id: null, liability_account_id: 5, expense_account_id: 6 },
+  ],
+  tax_basis: {
+    month: 4, table: { id: 1, country: "NG", tax_year: 2026, revision: 1, name: "NG PAYE 2026" },
+    inputs: { gross_this_month: 30_000_000, taxable_this_month: 30_000_000, pension_this_month: 2_400_000, nhf_this_month: 750_000, annual_rent: 0, gross_before: 0, taxable_before: 0, pension_before: 0, nhf_before: 0, paye_before: 0 },
+    brought_forward: { gross: 90_000_000, taxable_pay: 90_000_000, paye: 4_500_000, pension: 0, nhf: 0, employer_name: "Unity Schools Ltd" },
+    reliefs: [], taxable_to_date: 120_000_000, relief_to_date: 0, chargeable_to_date: 120_000_000,
+    tax_to_date: 14_033_000, excess_withheld: 0, paye_this_month: 9_533_000,
+  },
+};
+
+describe("a run's lines", () => {
+  afterEach(() => { mocks.run = null; mocks.openPayslip.mockReset(); });
+
+  it("shows NHF, NSITF and ITF, how PAYE was worked out, and prints the server's payslip", () => {
+    mocks.fieldAccess = {};
+    mocks.run = { ...SEPT, other_deductions_total: 750_000, employer_contributions_total: 3_600_000, lines: [APRIL_LINE] };
+    act(() => root.render(<RunDrawer runId={7} entity="BSS" onClose={() => undefined} />));
+    const text = () => document.body.textContent ?? "";
+    expect(text()).toContain("Other deductions (NHF, voluntary)");
+    expect(text()).toContain("NSITF");
+    act(() => [...document.body.querySelectorAll("button")].find((b) => b.textContent === "Details")!.click());
+    expect(text()).toContain("National Housing Fund");
+    expect(text()).toContain("2.5% of");
+    expect(text()).toContain("Earlier this tax year with Unity Schools Ltd");
+    expect(text()).toContain("NG PAYE 2026 · month 4 of 12");
+    act(() => [...document.body.querySelectorAll("button")].find((b) => b.textContent?.includes("Payslip"))!.click());
+    expect(mocks.openPayslip).toHaveBeenCalledWith("BSS", 7, 51);
+  });
+
+  it("hides the PAYE column, its working and the payslip from a role that may not read PAYE", () => {
+    mocks.fieldAccess = { "finance.payrollrun": { hidden: ["paye_amount", "tax_basis"], read_only: [], open_on_create: [] } };
+    const { paye_amount: _paye, tax_basis: _basis, ...line } = APRIL_LINE;
+    mocks.run = { ...SEPT, lines: [line] };
+    act(() => root.render(<RunDrawer runId={7} entity="BSS" onClose={() => undefined} />));
+    const headers = [...document.body.querySelectorAll("th")].map((th) => th.textContent);
+    expect(headers).not.toContain("PAYE");
+    expect(buttonLabels().some((label) => label.includes("Payslip"))).toBe(false);
+    act(() => [...document.body.querySelectorAll("button")].find((b) => b.textContent === "Details")!.click());
+    expect(document.body.textContent).not.toContain("How PAYE was worked out");
+  });
+
+  it("sums the statutory items of the lines held", () => {
+    expect(statutoryTotals([APRIL_LINE, APRIL_LINE])).toEqual([
+      { code: "NHF", label: "NHF", amount: 1_500_000 },
+      { code: "NSITF", label: "NSITF", amount: 600_000 },
+      { code: "ITF", label: "ITF", amount: 600_000 },
+    ]);
+  });
+
+  it("offers a payslip only to a role that reads every figure on it", () => {
+    expect(canPrintPayslip(resolveFieldAccess({}, "finance.payrollrun"))).toBe(true);
+    expect(canPrintPayslip(resolveFieldAccess({ "finance.payrollrun": { hidden: ["components"] } }, "finance.payrollrun"))).toBe(false);
   });
 });

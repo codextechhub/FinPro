@@ -20,9 +20,17 @@
  * officer opens such a run through their own branch's share and is shown that
  * part alone, with nothing to post, pay or void (isBranchPartOfWholeSchoolRun).
  *
- * Honest adaptations: deductions route only to PAYE/pension (the two payables the GL
- * has) - other deduction types (loans/union) are a noted backend expansion.
- * PAYE/pension are remitted via Tax Remittance.
+ * PAYE is worked out by the server from the national tax table, cumulatively
+ * over the tax year, unless the school supplies it (Finance Settings, Payroll).
+ * Each line carries its deductions and the employer's contributions (pension,
+ * NHF, NSITF, ITF, voluntary deductions) and how its PAYE was worked out, shown
+ * under the line's Details. A payslip is the server's own PDF, never one laid
+ * out in the browser, so the bursar's copy and the person's agree.
+ *
+ * A roster row opens the person's salary record (payroll-record.tsx): its dated
+ * history, earlier pay brought forward into the tax year, voluntary deductions
+ * and tax year. People who joined after January with no earlier pay recorded
+ * are listed above the roster, and named again when a run is generated.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -35,7 +43,7 @@ import { routesPath } from "@/routes/routes-path";
 import { useGetTrialBalanceQuery } from "@/redux/services/finance/reports-api";
 import { useGetBranchOptionsQuery, type BranchOption } from "@/redux/services/tenants-api";
 import { FinanceShell } from "./finance-shell";
-import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, useFieldAccess, fieldWriteErrors, toArray, type Column, type FieldAccess, type FieldErrors, type ReadOnlyOptions, type TabStripItem, PostingDateField, BankAccountPicker, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
+import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, useFieldAccess, fieldWriteErrors, toArray, type Column, type FieldAccess, type FieldErrors, type ReadOnlyOptions, type TabStripItem, PostingDateField, BankAccountPicker, RaisingBranchChoiceField, useRaisingBranchChoice, useReaderBranchLens,} from "@/components/finance-ui";
 import { useReaderReach } from "../../host";
 import { isBranchPartOfWholeSchoolRun, isPartlyPaid, mayCancelRun, sharesOf, singleJournalBranch, unassignedStaffRefusal, unpaidShares } from "./payroll-shares";
 import { EmptyState } from "@/components/finance-ui/states";
@@ -46,7 +54,19 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
-import { printPayrollSchedule, printPayslip } from "../../utils/finance-print";
+import { printPayrollSchedule } from "../../utils/finance-print";
+import { openLinePayslip } from "../../utils/payroll-documents";
+import { PersonPicker } from "../../components/workflow/person-picker";
+import { withPayAliases } from "./payroll-access";
+import { fieldRefusals } from "./payroll-refusals";
+import { SalaryRecordDrawer } from "./payroll-record";
+import { LineItems, PayeWorkingView } from "./payroll-working";
+import { PayslipContentView } from "./payslip-view";
+import {
+  useGetPayrollTaxStatesQuery, useGetPensionFundAdministratorsQuery, useGetPayslipContentQuery, useGetPreviousPayMissingQuery,
+} from "@/redux/services/finance/payroll-api";
+import type { GeneratedPayrollRun, PreviousPayMissing } from "@/redux/services/finance/payroll-types";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   useGetPayrollRunsQuery, useGetPayrollSummaryQuery, useGetPayrollRunQuery, usePostPayrollRunMutation,
   useCancelPayrollRunMutation, usePayPayrollRunMutation, useCreatePayrollRunMutation, useGeneratePayrollRunMutation,
@@ -85,9 +105,9 @@ const FIGURES: readonly (readonly [Figure, string])[] = [
 /** The figures this user may see, in display order. */
 const visibleFigures = (access: FieldAccess, only?: readonly Figure[]) =>
   FIGURES.filter(([name]) => (!only || only.includes(name)) && !access.isHidden(name));
-/** Everything a payslip prints; it is offered only when all of it is visible. */
-const PAYSLIP_FIELDS = ["employee_name", "gross_amount", "paye_amount", "pension_amount", "net_amount"];
-const canPrintPayslip = (access: FieldAccess) => PAYSLIP_FIELDS.every((name) => !access.isHidden(name));
+/** Everything a payslip prints; the server refuses one unless all of it is visible, so it is offered only then. */
+const PAYSLIP_FIELDS = ["employee_name", "gross_amount", "paye_amount", "pension_amount", "net_amount", "components"];
+export const canPrintPayslip = (access: Pick<FieldAccess, "isHidden">) => PAYSLIP_FIELDS.every((name) => !access.isHidden(name));
 function Kpi({ label, value, hint, danger }: { label: string; value: string; hint?: string; danger?: boolean }) {
   return (
     <div className="rounded-md bg-white p-4 ring-1 ring-white-02">
@@ -162,7 +182,7 @@ export default function PayrollPage() {
         <div data-guide="finance-payroll.heading">
           <div className="flex items-center gap-1.5">
             <h1 className="font-mont text-lg font-semibold text-gray-01">Payroll</h1>
-            <InfoHint ariaLabel="About payroll runs">A payroll run computes gross, PAYE, pension and net for every employee, then posts one journal - Dr salary expense; Cr PAYE payable, Cr pension payable, Cr net-wages payable. Paying it clears net-wages payable against the bank.</InfoHint>
+            <InfoHint ariaLabel="About payroll runs">A payroll run works out gross, PAYE, pension, NHF, any voluntary deductions and net for every employee, and the school's own pension, NSITF and ITF on top. Posting it records the salary cost and what is owed to staff, to each state's revenue service and to each pension administrator, branch by branch. Paying it clears what is owed to staff against the bank.</InfoHint>
           </div>
           <p className="mt-0.5 font-mont text-xs text-gray-05">Monthly salary runs and payslips, generated from the employee roster.</p>
         </div>
@@ -192,6 +212,7 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
   const dates = useDates();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const [generated, setGenerated] = useState<GeneratedPayrollRun | null>(null);
   const { can } = useCan();
   useActionParam("new", can(P.FIN_CREATE_PAYROLL), () => setCreating(true));
   const [page, setPage] = useState(1);
@@ -222,7 +243,7 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
     { header: "Payment date", cell: (r) => <span className="tabular-nums text-gray-05">{dates.day(r.pay_date)}</span> },
     { header: "Employees", align: "right", cell: (r) => <span className="tabular-nums text-gray-05">{r.lines.length}</span> },
     { header: "Total gross", align: "right", cell: (r) => <Money kobo={r.gross_total} currency={currency} align="right" /> },
-    { header: "Deductions", align: "right", cell: (r) => <Money kobo={r.paye_total + r.pension_total} currency={currency} align="right" /> },
+    { header: "Deductions", align: "right", cell: (r) => <Money kobo={r.paye_total + r.pension_total + (r.other_deductions_total ?? 0)} currency={currency} align="right" /> },
     { header: "Net pay", align: "right", cell: (r) => <Money kobo={r.net_total} currency={currency} align="right" /> },
     { header: "Status", cell: (r) => <RunPill status={isPartlyPaid(r) ? "PART_PAID" : r.run_status} /> },
   ];
@@ -246,6 +267,8 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
         </Can>
       </div>
 
+      {generated ? <GeneratedRunNotice run={generated} onOpen={() => setSelectedId(generated.id)} onDismiss={() => setGenerated(null)} /> : null}
+
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(r) => setSelectedId(r.id)}
         page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
@@ -253,13 +276,48 @@ function RunsTab({ entity, currency }: { entity: string; currency?: string | nul
 
       <RunDrawer runId={selectedId} entity={entity} currency={currency} onClose={() => setSelectedId(null)} />
       <NewRunDrawer open={creating} onClose={() => setCreating(false)} entity={entity} currency={currency}
-        perBranch={s?.payroll_scope === "PER_BRANCH"} />
+        perBranch={s?.payroll_scope === "PER_BRANCH"} onGenerated={setGenerated} />
+    </div>
+  );
+}
+
+/**
+ * What a run just generated from the roster left off and warns about: people a
+ * live run of the month already pays, and people who joined after January with
+ * no earlier pay recorded, whose PAYE counts nothing earned before they joined
+ * until it is recorded. Names are left out for a reader who may not read them,
+ * and the count still shows.
+ */
+export function GeneratedRunNotice({ run, onOpen, onDismiss }: { run: GeneratedPayrollRun; onOpen: () => void; onDismiss: () => void }) {
+  const missing = run.previous_pay_missing ?? [];
+  const skipped = run.skipped ?? [];
+  if (!missing.length && !skipped.length) return null;
+  const named = (names: (string | null)[]) => names.filter((name): name is string => !!name);
+  return (
+    <div role="status" className="space-y-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 font-mont text-xs leading-5 text-amber-900">
+      <p className="font-semibold">{`${run.document_number} was generated.`}</p>
+      {missing.length ? (
+        <p>
+          {`${missing.length} ${missing.length === 1 ? "person" : "people"} on it joined after January with no earlier pay recorded, so their PAYE counts nothing earned before they joined`}
+          {named(missing).length ? `: ${named(missing).join(", ")}` : ""}
+          {". To count it, cancel this draft, record it on their salary record under Earlier pay (zeros if there was no previous employer), and generate the run again."}
+        </p>
+      ) : null}
+      {skipped.length ? (
+        <p>
+          {`${skipped.length} ${skipped.length === 1 ? "person was" : "people were"} left off because another run already pays them for this month`}
+          {skipped.some((row) => row.name) ? `: ${skipped.map((row) => row.name ? `${row.name} (${row.run})` : null).filter(Boolean).join(", ")}` : ""}.
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-3">
+        <button type="button" onClick={onOpen} className="font-semibold underline underline-offset-2">Open the run</button>
+        <button type="button" onClick={onDismiss} className="underline underline-offset-2">Dismiss</button>
+      </div>
     </div>
   );
 }
 
 export function RunDrawer({ runId, entity, currency, onClose }: { runId: number | null; entity: string; currency?: string | null; onClose: () => void }) {
-  const dates = useDates();
   const [paying, setPaying] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const { data } = useGetPayrollRunQuery(runId != null ? { id: runId, entity } : skipToken);
@@ -279,6 +337,13 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
   const showName = !access.isHidden("employee_name");
   const figures = visibleFigures(access);
   const payslips = canPrintPayslip(access);
+  // The pay breakdown switch covers a line's items and its two extra totals.
+  const breakdown = !access.isHidden("components");
+  const working = !access.isHidden("paye_amount");
+  const showOther = breakdown && r.lines.some((l) => (l.other_deductions_amount ?? 0) > 0);
+  const showEmployer = breakdown && r.lines.some((l) => (l.employer_contributions_amount ?? 0) > 0);
+  const hasDetails = (l: PayrollLine) => (breakdown && (l.items?.length ?? 0) > 0) || (working && !!l.paye_source);
+  const statutory = breakdown ? statutoryTotals(r.lines) : [];
 
   const doPost = async () => {
     setUnassigned(null);
@@ -322,6 +387,13 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
             <Metric label="Net" kobo={r.net_total} currency={currency} />
             <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Status</p><div className="mt-1.5"><RunPill status={status} /></div></div>
           </div>
+          {(r.other_deductions_total ?? 0) > 0 || (r.employer_contributions_total ?? 0) > 0 ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Metric label="Other deductions (NHF, voluntary)" kobo={r.other_deductions_total ?? 0} currency={currency} />
+              <Metric label="Employer contributions (pension, NSITF, ITF)" kobo={r.employer_contributions_total ?? 0} currency={currency} />
+            </div>
+          ) : null}
+          {statutory.length ? <StatutoryTotals totals={statutory} currency={currency} /> : null}
 
           {refusal ? (
             <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
@@ -343,28 +415,29 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
           {showName || figures.length ? (
             <div>
               <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Payslips · {r.lines.length}</p>
-              <div className="overflow-hidden rounded-md border border-white-02">
-                <table className="w-full border-collapse">
+              <div className="overflow-x-auto rounded-md border border-white-02">
+                <table className="w-full min-w-[560px] border-collapse">
                   <thead><tr>
                     {showName ? <th className={thCls}>Employee</th> : null}
                     {showLineBranch ? <th className={thCls}>Branch</th> : null}
                     {figures.map(([name, label]) => <th key={name} className={cn(thCls, "text-right")}>{label}</th>)}
-                    {payslips ? <th className={thCls} /> : null}
+                    {showOther ? <th className={cn(thCls, "text-right")}>Other deductions</th> : null}
+                    {showEmployer ? <th className={cn(thCls, "text-right")}>Employer</th> : null}
+                    <th className={thCls} />
                   </tr></thead>
                   <tbody>
                     {r.lines.map((l) => (
-                      <tr key={l.id}>
+                      <LineRow key={l.id} line={l} columns={(showName ? 1 : 0) + (showLineBranch ? 1 : 0) + figures.length + (showOther ? 1 : 0) + (showEmployer ? 1 : 0) + 1}
+                        expandable={hasDetails(l)} breakdown={breakdown} working={working} currency={currency}
+                        payslip={payslips ? () => void openLinePayslip(entity, r.id, l.id) : null}>
                         {showName ? <td className={tdCls}>{l.employee_name || "-"}</td> : null}
                         {showLineBranch ? <td className={cn(tdCls, "text-gray-05")}>{l.branch_name || "No branch yet"}</td> : null}
                         {figures.map(([name]) => (
                           <td key={name} className={cn(tdCls, "text-right tabular-nums", name === "net_amount" && "font-medium")}><Money kobo={l[name] ?? 0} currency={currency} align="right" /></td>
                         ))}
-                        {payslips ? (
-                          <td className={cn(tdCls, "text-right")}>
-                            <button type="button" onClick={() => printPayslip(r, l, currency, dates.prefs)} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Payslip</button>
-                          </td>
-                        ) : null}
-                      </tr>
+                        {showOther ? <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={l.other_deductions_amount ?? 0} currency={currency} align="right" /></td> : null}
+                        {showEmployer ? <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={l.employer_contributions_amount ?? 0} currency={currency} align="right" /></td> : null}
+                      </LineRow>
                     ))}
                   </tbody>
                 </table>
@@ -391,8 +464,74 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
   );
 }
 
+/**
+ * One person's row on a run, with a Details row under it: the line's
+ * deductions and the employer's contributions, and how its PAYE was worked out.
+ * Each part is there only when the reader's switches show it.
+ */
+function LineRow({ line, columns, expandable, breakdown, working, currency, payslip, children }: {
+  line: PayrollLine; columns: number; expandable: boolean; breakdown: boolean; working: boolean;
+  currency?: string | null; payslip: (() => void) | null; children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <tr>
+        {children}
+        <td className={cn(tdCls, "whitespace-nowrap text-right")}>
+          <span className="inline-flex items-center gap-3">
+            {expandable ? (
+              <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="font-mont text-[11px] font-medium text-primary hover:underline">{open ? "Hide" : "Details"}</button>
+            ) : null}
+            {payslip ? (
+              <button type="button" onClick={payslip} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Payslip</button>
+            ) : null}
+          </span>
+        </td>
+      </tr>
+      {open ? (
+        <tr>
+          <td colSpan={columns} className="border-t border-white-02 bg-gray-03/30 px-3 py-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {breakdown && line.items?.length ? <LineItems items={line.items} currency={currency} /> : null}
+              {working && line.paye_source ? (
+                <div>
+                  <p className="mb-2 font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">How PAYE was worked out</p>
+                  <PayeWorkingView line={line} currency={currency} />
+                </div>
+              ) : null}
+            </div>
+          </td>
+        </tr>
+      ) : null}
+    </>
+  );
+}
+
+/** The run's NHF, employer pension, NSITF and ITF, summed from the lines the reader holds. */
+export function statutoryTotals(lines: PayrollLine[]): { code: string; label: string; amount: number }[] {
+  const codes = [["NHF", "NHF"], ["EMPLOYER_PENSION", "Employer pension"], ["NSITF", "NSITF"], ["ITF", "ITF"]] as const;
+  return codes
+    .map(([code, label]) => ({
+      code, label,
+      amount: lines.reduce((sum, line) => sum + (line.items ?? []).filter((item) => item.code === code).reduce((s, item) => s + item.amount, 0), 0),
+    }))
+    .filter((row) => row.amount > 0);
+}
+
+function StatutoryTotals({ totals, currency }: { totals: { code: string; label: string; amount: number }[]; currency?: string | null }) {
+  return (
+    <div className="flex flex-wrap gap-x-5 gap-y-1 rounded-md border border-white-02 bg-white px-3 py-2 font-mont text-xs">
+      {totals.map((row) => (
+        <span key={row.code} className="text-gray-05">{row.label} <span className="font-medium tabular-nums text-black-01">{formatMoney(row.amount, currency)}</span></span>
+      ))}
+    </div>
+  );
+}
+
 /** Each branch's share of a run posted one journal per branch, and whether it is paid. */
 function BranchShares({ shares, currency }: { shares: PayrollRunBranchShare[]; currency?: string | null }) {
+  const showEmployer = shares.some((share) => (share.employer_contributions_total ?? 0) > 0);
   return (
     <div>
       <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">By branch · {shares.length}</p>
@@ -402,6 +541,7 @@ function BranchShares({ shares, currency }: { shares: PayrollRunBranchShare[]; c
             <th className={thCls}>Branch</th>
             <th className={cn(thCls, "text-right")}>Gross</th>
             <th className={cn(thCls, "text-right")}>Net</th>
+            {showEmployer ? <th className={cn(thCls, "text-right")}>Employer</th> : null}
             <th className={thCls}>Status</th>
           </tr></thead>
           <tbody>
@@ -410,6 +550,7 @@ function BranchShares({ shares, currency }: { shares: PayrollRunBranchShare[]; c
                 <td className={tdCls}>{share.branch_name}</td>
                 <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={share.gross_total} currency={currency} align="right" /></td>
                 <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={share.net_total} currency={currency} align="right" /></td>
+                {showEmployer ? <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={share.employer_contributions_total ?? 0} currency={currency} align="right" /></td> : null}
                 <td className={tdCls}><RunPill status={share.status === "POSTED" ? "AWAITING" : share.status} /></td>
               </tr>
             ))}
@@ -511,7 +652,7 @@ const WHOLE_SCHOOL = "all";
  * asked which, if they cover several); at a per-branch school they are offered their
  * own branches and never "the whole school".
  */
-export function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { open: boolean; onClose: () => void; entity: string; currency?: string | null; perBranch: boolean }) {
+export function NewRunDrawer({ open, onClose, entity, currency, perBranch, onGenerated }: { open: boolean; onClose: () => void; entity: string; currency?: string | null; perBranch: boolean; onGenerated?: (run: GeneratedPayrollRun) => void }) {
   const { wholeSchool } = useReaderReach();
   const [mode, setMode] = useState("roster");
   const [payDate, setPayDate] = useState("");
@@ -557,6 +698,7 @@ export function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { o
       if (activeMode === "roster") {
         const res = await generate({ entity, pay_date: payDate, period_label: periodLabel.trim() || undefined, ...branchArg }).unwrap();
         toast.success(res.message || "Run generated.");
+        onGenerated?.(res.data);
       } else {
         const res = await create({ entity, pay_date: payDate, period_label: periodLabel.trim() || undefined, ...branchArg,
           lines: validLines.map((l) => access.writableOnly({ employee_name: l.employee_name.trim(), gross_amount: l.gross, paye_amount: l.paye, pension_amount: l.pension }, { creating: true })) }).unwrap();
@@ -631,7 +773,7 @@ export function NewRunDrawer({ open, onClose, entity, currency, perBranch }: { o
             {asksForScope && !scopeChoice
               ? <>Choose what this run covers to see who it would pay.</>
               : covered.length > 0
-              ? <>This will raise a draft run for the <span className="font-medium text-gray-01">{covered.length}</span> active employee(s){coverageLabel ? <> at <span className="font-medium text-gray-01">{coverageLabel}</span></> : null}, copying each one's standard gross, PAYE and pension. Review, then post.</>
+              ? <>This will raise a draft run for the <span className="font-medium text-gray-01">{covered.length}</span> active employee(s){coverageLabel ? <> at <span className="font-medium text-gray-01">{coverageLabel}</span></> : null}, working out each one's PAYE, pension and other deductions from their pay terms for the month. Nobody already paid for the month is put on it. Review, then post.</>
               : <>No active employees{coverageLabel ? <> at <span className="font-medium text-gray-01">{coverageLabel}</span></> : <> on the roster yet</>}. Add them under <span className="font-medium text-gray-01">Employee salaries</span>{manualAllowed ? ", or switch to Manual" : ""}.</>}
           </p>
         ) : (
@@ -674,11 +816,15 @@ function BranchCell({ salary }: { salary: EmployeeSalary }) {
 
 function EmployeesTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const { can } = useCan();
+  const dates = useDates();
   const [searchInput, setSearchInput] = useState("");
   const [branchFilter, setBranchFilter] = useState("");
   const [editing, setEditing] = useState<EmployeeSalary | "new" | null>(null);
+  const [viewing, setViewing] = useState<EmployeeSalary | null>(null);
   const { data, isLoading, isFetching, isError, refetch } = useGetEmployeeSalariesQuery({ entity });
   const all = useMemo(() => toArray(data?.data), [data]);
+  // At a school with one branch the branch is the same on every row, so it is not shown.
+  const multiBranch = useReaderBranchLens().applies;
 
   // The branches this caller may work in, from the tenant rather than from the
   // rows. Reading them off the roster only ever offered branches that already had
@@ -686,6 +832,7 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
   const { data: branchData } = useGetBranchOptionsQuery();
   const branches = useMemo(() => toArray(branchData?.data), [branchData]);
   const unassignedCount = useMemo(() => all.filter((e) => e.branch_id == null).length, [all]);
+  const showBranch = multiBranch || unassignedCount > 0;
 
   // A filter must not outlive what it filters on. Assigning the last unassigned
   // person removes the "Unassigned" option, and a <select> whose value matches
@@ -706,20 +853,25 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
   }, [all, searchInput, branchFilter, filterStillExists]);
 
   const access = useFieldAccess(SALARY);
+  const lineAccess = useFieldAccess(PAYROLL_LINE);
   const [remove] = useDeleteEmployeeSalaryMutation();
-  const doRemove = async (id: number) => { try { await remove({ id, entity }).unwrap(); toast.success("Employee removed."); } catch { /* central */ } };
+  const doRemove = async (id: number) => { try { await remove({ id, entity }).unwrap(); toast.success("Employee removed. They stay on the roster as inactive, with their history."); } catch { /* central */ } };
+  const year = Number(dates.today().slice(0, 4));
+  const missingQ = useGetPreviousPayMissingQuery({ entity, year });
+  const missing = missingQ.data?.data;
+  const openRecord = (id: number) => { const row = all.find((e) => e.id === id); if (row) setViewing(row); };
 
   const cols: Column<EmployeeSalary>[] = [
     { header: "Employee", cell: (e) => <span className="font-medium text-gray-01">{e.name}</span> },
     { header: "Structure", cell: (e) => e.structure_name ? <span className={cn(PILL, "bg-blue-50 text-blue-700")}>{e.structure_name}</span> : <span className="font-mont text-[11px] text-gray-05">Flat</span> },
-    { header: "Branch", cell: (e) => <BranchCell salary={e} /> },
+    ...(showBranch ? [{ header: "Branch", cell: (e: EmployeeSalary) => <BranchCell salary={e} /> }] : []),
     { header: "Cost center", cell: (e) => <span className="tabular-nums text-gray-05">{e.cost_center || "-"}</span> },
     ...visibleFigures(access).map(([name, label]): Column<EmployeeSalary> => ({ header: label, align: "right", cell: (e) => <Money kobo={e[name] ?? 0} currency={currency} align="right" /> })),
     { header: "Status", cell: (e) => <span className={cn(PILL, e.is_active ? "bg-green-01/10 text-green-01" : "bg-gray-03/60 text-gray-05")}>{e.is_active ? "Active" : "Inactive"}</span> },
     { header: "", align: "right", cell: (e) => (can(P.FIN_UPDATE_SALARY) || can(P.FIN_DELETE_SALARY)) ? (
       <span className="inline-flex items-center gap-2">
-        {can(P.FIN_UPDATE_SALARY) ? <button type="button" onClick={() => setEditing(e)} className="text-gray-05 hover:text-primary" aria-label="Edit"><Pencil className="size-3.5" /></button> : null}
-        {can(P.FIN_DELETE_SALARY) ? <button type="button" onClick={() => doRemove(e.id)} className="text-gray-05 hover:text-destructive" aria-label="Remove"><Trash2 className="size-3.5" /></button> : null}
+        {can(P.FIN_UPDATE_SALARY) ? <button type="button" onClick={(event) => { event.stopPropagation(); setEditing(e); }} className="text-gray-05 hover:text-primary" aria-label="Edit"><Pencil className="size-3.5" /></button> : null}
+        {can(P.FIN_DELETE_SALARY) && e.is_active ? <button type="button" onClick={(event) => { event.stopPropagation(); void doRemove(e.id); }} className="text-gray-05 hover:text-destructive" aria-label="Remove"><Trash2 className="size-3.5" /></button> : null}
       </span>
     ) : null },
   ];
@@ -727,12 +879,12 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="relative">
+        <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
-          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search employee" className="h-9 w-64 bg-white pl-8 font-mont" />
+          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search employee" className="h-9 w-full bg-white pl-8 font-mont" />
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {branches.length || unassignedCount ? (
+          {showBranch && (branches.length > 1 || unassignedCount) ? (
             <Select value={branchFilter} onChange={setBranchFilter} className="h-9 w-52 bg-white">
               <option value="">All branches</option>
               {branches.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
@@ -757,12 +909,47 @@ function EmployeesTab({ entity, currency }: { entity: string; currency?: string 
         </div>
       ) : null}
 
+      {missing?.people.length ? <PreviousPayMissingBanner missing={missing} multiBranch={multiBranch} onOpen={openRecord} /> : null}
+
       <DataTable columns={cols} rows={rows} rowKey={(e) => e.id}
-        loading={isLoading || isFetching} error={isError} onRetry={refetch}
+        loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={setViewing}
         emptyTitle={searchInput || branchFilter ? "No matching employees" : "No employees yet"}
         emptyMessage={searchInput || branchFilter ? "Try a different search or branch." : "Add employees to generate payroll runs from the roster."} />
 
-      <EmployeeDrawer open={editing !== null} salary={editing === "new" ? null : editing} entity={entity} currency={currency} branches={branches} onClose={() => setEditing(null)} />
+      <EmployeeDrawer open={editing !== null} salary={editing === "new" ? null : editing} entity={entity} currency={currency} branches={branches} showBranch={showBranch} onClose={() => setEditing(null)} />
+      <SalaryRecordDrawer salary={viewing ? all.find((e) => e.id === viewing.id) ?? viewing : null} entity={entity} currency={currency}
+        multiBranch={multiBranch} canPrintSummary={canPrintPayslip(lineAccess)} onClose={() => setViewing(null)}
+        onEdit={can(P.FIN_UPDATE_SALARY) ? (salary) => { setViewing(null); setEditing(salary); } : undefined} />
+    </div>
+  );
+}
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/**
+ * Who joined after January with no earlier pay recorded, from the server's
+ * list for this tax year. Their PAYE counts nothing earned before they joined
+ * until it is recorded, so a previous employer's tax goes uncounted. Where the
+ * school requires earlier pay, a run that would pay them is refused instead.
+ * Bayo, straight from university, is recorded as zeros and drops off.
+ */
+export function PreviousPayMissingBanner({ missing, multiBranch, onOpen }: { missing: PreviousPayMissing; multiBranch: boolean; onOpen: (salaryId: number) => void }) {
+  return (
+    <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5" data-testid="previous-pay-missing">
+      <p className="font-mont text-[13px] font-semibold text-amber-900">{`Earlier pay still to record for ${missing.tax_year}`}</p>
+      <p className="mt-0.5 font-mont text-xs leading-5 text-amber-900">
+        {missing.required
+          ? "These people joined after January. This school requires their earlier pay before they are paid, so a run that includes them is refused until it is recorded (zeros if there was no previous employer)."
+          : "These people joined after January. Until their earlier pay is recorded, PAYE counts nothing they earned before joining. Record zeros for anyone with no previous employer."}
+      </p>
+      <ul className="mt-1.5 space-y-0.5">
+        {missing.people.map((person) => (
+          <li key={person.salary_id} className="flex flex-wrap items-center gap-x-2 font-mont text-xs text-amber-900">
+            <button type="button" onClick={() => onOpen(person.salary_id)} className="font-semibold underline underline-offset-2">{person.name}</button>
+            <span>{[multiBranch ? person.branch_name ?? "No branch yet" : null, `first paid ${MONTHS[person.first_month - 1] ?? person.first_month}`].filter(Boolean).join(" · ")}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -793,6 +980,23 @@ export function offeredStructures(all: SalaryStructure[], currentId: string): Sa
   return all.filter((s) => s.is_active || String(s.id) === currentId);
 }
 
+/** What a roster edit form holds, by the body key each value is sent under. */
+export interface SalaryFormFields {
+  name: string;
+  cost_center?: string;
+  structure: number | null;
+  gross_amount: number;
+  paye_amount?: number;
+  pension_amount?: number;
+  residence_state?: string | null;
+  pfa?: number | null;
+  tax_id?: string;
+  pension_pin?: string;
+  annual_rent?: number;
+  paye_override?: number | null;
+  paye_override_reason?: string;
+}
+
 /**
  * The body an edit to a roster row sends: only the fields that changed, and
  * only those the reader may change.
@@ -801,10 +1005,13 @@ export function offeredStructures(all: SalaryStructure[], currentId: string): Sa
  * record back would ask to change pay the reader may only read. A bursar whose
  * role shows Tunde's pay but cannot change it corrects his name and sends the
  * name alone; the structure, gross and statutory figures stay out of the body.
+ * A field the reader may not read is absent from the row, so it is never
+ * compared and never sent. An override's reason travels with it: a changed
+ * reason alone resends the override, which the server needs to accept it.
  */
 export function salaryChanges(
   salary: EmployeeSalary,
-  fields: { name: string; cost_center?: string; structure: number | null; gross_amount: number; paye_amount?: number; pension_amount?: number },
+  fields: SalaryFormFields,
   active: boolean,
   access: Pick<FieldAccess, "writableOnly">,
   mode: ReadOnlyOptions,
@@ -812,16 +1019,29 @@ export function salaryChanges(
   const stored: Record<string, unknown> = {
     name: salary.name, cost_center: salary.cost_center || undefined, structure: salary.structure_id ?? null,
     gross_amount: salary.gross_amount, paye_amount: salary.paye_amount, pension_amount: salary.pension_amount,
+    residence_state: salary.residence_state ?? null, pfa: salary.pfa_id ?? null,
+    tax_id: salary.tax_id ?? "", pension_pin: salary.pension_pin ?? "", annual_rent: salary.annual_rent ?? 0,
+    paye_override: salary.paye_override ?? null, paye_override_reason: salary.paye_override_reason ?? "",
   };
   const changed = Object.fromEntries(
     Object.entries(fields).filter(([key, value]) => value !== undefined && value !== stored[key]),
-  ) as Partial<typeof fields>;
+  ) as Partial<SalaryFormFields>;
+  if ("paye_override_reason" in changed && !("paye_override" in changed)) changed.paye_override = fields.paye_override ?? null;
+  if ("paye_override" in changed && changed.paye_override != null) changed.paye_override_reason = fields.paye_override_reason ?? "";
+  if ("paye_override" in changed && changed.paye_override == null) delete changed.paye_override_reason;
   return { ...access.writableOnly(changed, mode), ...(active !== salary.is_active ? { is_active: active } : {}) };
 }
 
-export function EmployeeDrawer({ open, salary, entity, currency, branches, onClose }:{ open: boolean; salary: EmployeeSalary | null; entity: string; currency?: string | null; branches: BranchOption[]; onClose: () => void }) {
+export function EmployeeDrawer({ open, salary, entity, currency, branches, showBranch = branches.length > 0, onClose }: {
+  open: boolean; salary: EmployeeSalary | null; entity: string; currency?: string | null; branches: BranchOption[];
+  /** Whether the school has a branch dimension to show: several branches, or someone without one. */
+  showBranch?: boolean;
+  onClose: () => void;
+}) {
   const isEdit = !!salary;
+  const dates = useDates();
   const [name, setName] = useState("");
+  const [person, setPerson] = useState("");
   const [branchId, setBranchId] = useState("");
   const [structureId, setStructureId] = useState("");
   const [gross, setGross] = useState(0);
@@ -829,14 +1049,30 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
   const [pension, setPension] = useState(0);
   const [costCenter, setCostCenter] = useState("");
   const [active, setActive] = useState(true);
+  const [effectiveFrom, setEffectiveFrom] = useState("");
+  const [reason, setReason] = useState("");
+  const [state, setState] = useState("");
+  const [pfa, setPfa] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [pin, setPin] = useState("");
+  const [rent, setRent] = useState(0);
+  const [overrideOn, setOverrideOn] = useState(false);
+  const [override, setOverride] = useState(0);
+  const [overrideReason, setOverrideReason] = useState("");
   // Every structure, so a person on a retired one keeps it; only active ones are offered.
   const { data: structData } = useGetSalaryStructuresQuery({ entity }, { skip: !open });
   const structures = useMemo(() => offeredStructures(toArray(structData?.data), structureId), [structData, structureId]);
+  const { data: stateData } = useGetPayrollTaxStatesQuery({ country: "NG" }, { skip: !open });
+  const states = useMemo(() => toArray(stateData?.data).filter((row) => row.is_active || row.code === state), [stateData, state]);
+  const { data: pfaData } = useGetPensionFundAdministratorsQuery({}, { skip: !open });
+  const pfas = useMemo(() => toArray(pfaData?.data).filter((row) => row.is_active || String(row.id) === pfa), [pfaData, pfa]);
   const [create, { isLoading: creating }] = useCreateEmployeeSalaryMutation();
   const [update, { isLoading: updating }] = useUpdateEmployeeSalaryMutation();
   const isLoading = creating || updating;
   const [denied, setDenied] = useState<FieldErrors | null>(null);
-  const access = useFieldAccess(SALARY, salary);
+  const [refused, setRefused] = useState<Record<string, string>>({});
+  const plainAccess = useFieldAccess(SALARY, salary);
+  const access = useMemo(() => withPayAliases(plainAccess), [plainAccess]);
   const mode = { creating: !salary };
   const grossOpen = !access.isReadOnly("gross_amount", mode);
   // A breakdown worked out from a figure the user cannot see would show it, or show zero.
@@ -849,8 +1085,16 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
   if (open && seededFor !== seedKey) {
     setSeededFor(seedKey);
     setDenied(null);
-    if (salary) { setName(salary.name); setBranchId(salary.branch_id ? String(salary.branch_id) : ""); setStructureId(salary.structure_id ? String(salary.structure_id) : ""); setGross(salary.gross_amount ?? 0); setPaye(salary.paye_amount ?? 0); setPension(salary.pension_amount ?? 0); setCostCenter(salary.cost_center ?? ""); setActive(salary.is_active); }
-    else { setName(""); setBranchId(""); setStructureId(""); setGross(0); setPaye(0); setPension(0); setCostCenter(""); setActive(true); }
+    setRefused({});
+    setPerson(""); setEffectiveFrom(""); setReason("");
+    if (salary) {
+      setName(salary.name); setBranchId(salary.branch_id ? String(salary.branch_id) : ""); setStructureId(salary.structure_id ? String(salary.structure_id) : ""); setGross(salary.gross_amount ?? 0); setPaye(salary.paye_amount ?? 0); setPension(salary.pension_amount ?? 0); setCostCenter(salary.cost_center ?? ""); setActive(salary.is_active);
+      setState(salary.residence_state ?? ""); setPfa(salary.pfa_id ? String(salary.pfa_id) : ""); setTaxId(salary.tax_id ?? ""); setPin(salary.pension_pin ?? ""); setRent(salary.annual_rent ?? 0);
+      setOverrideOn(salary.paye_override != null); setOverride(salary.paye_override ?? 0); setOverrideReason(salary.paye_override_reason ?? "");
+    } else {
+      setName(""); setBranchId(""); setStructureId(""); setGross(0); setPaye(0); setPension(0); setCostCenter(""); setActive(true);
+      setState(""); setPfa(""); setTaxId(""); setPin(""); setRent(0); setOverrideOn(false); setOverride(0); setOverrideReason("");
+    }
   }
   if (!open && seededFor !== null) setSeededFor(null);
 
@@ -862,41 +1106,74 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
   // pinned to a single branch, so sending it unchanged would move people.
   const branchChanged = String(salary?.branch_id ?? "") !== branchId;
   const branchPatch = branchChanged ? { branch: branchId ? Number(branchId) : null } : {};
+  const overrideField = access.isHidden("paye_override", mode) ? undefined : (overrideOn ? override : null);
+  const overrideMissingReason = overrideOn && !access.isReadOnly("paye_override", mode) && !overrideReason.trim();
+  const linkable = !isEdit || salary?.employee_id == null;
+  const chosenBranch = branches.find((b) => String(b.id) === branchId)?.name;
+  const movesBranch = isEdit && branchChanged && !!branchId;
 
   const submit = async () => {
     setDenied(null);
+    setRefused({});
     try {
       // In flat mode the manual figures are sent; with a structure they're derived server-side.
-      const fields = {
-        name: name.trim(), cost_center: costCenter || undefined,
-        structure: structure ? structure.id : (null as number | null), gross_amount: gross,
-        ...(structure ? {} : { paye_amount: paye, pension_amount: pension }),
+      const statutory = {
+        residence_state: state || null, pfa: pfa ? Number(pfa) : null, tax_id: taxId.trim(), pension_pin: pin.trim(),
+        annual_rent: rent, paye_override: overrideField, paye_override_reason: overrideOn ? overrideReason.trim() : "",
       };
+      const visibleStatutory = Object.fromEntries(Object.entries(statutory).filter(([key]) => !access.isHidden(key, mode))) as Partial<typeof statutory>;
+      const fields: SalaryFormFields = {
+        name: name.trim(), cost_center: costCenter || undefined,
+        structure: structure ? structure.id : null, gross_amount: gross,
+        ...(structure ? {} : { paye_amount: paye, pension_amount: pension }),
+        ...visibleStatutory,
+      };
+      const dated = { ...(effectiveFrom ? { effective_from: effectiveFrom } : {}), ...(reason.trim() ? { reason: reason.trim() } : {}) };
       if (isEdit && salary) {
         const r = await update({
           id: salary.id, entity, ...salaryChanges(salary, fields, active, access, mode), ...branchPatch,
+          ...(person ? { employee: Number(person) } : {}), ...dated,
         }).unwrap();
         toast.success(r.message || "Updated.");
       } else {
-        const sent = access.writableOnly({ ...fields, structure: structure ? structure.id : undefined }, mode);
-        const r = await create({ entity, ...sent, name: fields.name, ...(branchId ? { branch: Number(branchId) } : {}) }).unwrap();
+        // A new record holds nothing for a key left out, so blanks are not sent.
+        const filled = Object.fromEntries(Object.entries({ ...fields, structure: structure ? structure.id : undefined })
+          .filter(([, value]) => value !== undefined && value !== null && value !== "")) as Partial<SalaryFormFields>;
+        const sent = access.writableOnly(filled, mode);
+        const r = await create({
+          entity, ...sent, name: fields.name, ...(branchId ? { branch: Number(branchId) } : {}),
+          ...(person ? { employee: Number(person) } : {}),
+        } as Parameters<typeof create>[0]).unwrap();
         toast.success(r.message || "Employee added.");
       }
       onClose();
-    } catch (error) { setDenied(fieldWriteErrors(error)); }
+    } catch (error) {
+      setDenied(fieldWriteErrors(error));
+      setRefused(fieldRefusals(error));
+    }
   };
 
   return (
     <DetailDrawer open={open} onOpenChange={(o) => (o ? undefined : onClose())}
-      title={isEdit ? "Edit employee salary" : "Add employee"} description="Standard monthly pay used to generate runs."
+      title={isEdit ? "Edit employee salary" : "Add employee"} description="Standard monthly pay and the details PAYE and pension need."
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !name.trim() || (grossOpen && gross <= 0)} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Saving…" : isEdit ? "Save changes" : "Add employee"}</Button>
+        <Button disabled={isLoading || !name.trim() || (grossOpen && gross <= 0) || overrideMissingReason} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Saving…" : isEdit ? "Save changes" : "Add employee"}</Button>
       </>}>
       <div className="space-y-4">
-        <FormField label="Employee name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="h-9 bg-white" /></FormField>
-        {branches.length ? (
+        {refused.employee ? (
+          <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">{refused.employee}</p>
+        ) : null}
+        {linkable ? (
+          <div>
+            <PersonPicker id="payroll-person" label="Staff member" value={person} activeOnly placeholder="Search staff (optional)"
+              onChange={(id) => { setPerson(id); setRefused({}); }} />
+            <p className="mt-1 font-mont text-[11px] text-gray-05">Links this record to their account, so they can read their own payslips. Each person has one salary record.</p>
+          </div>
+        ) : null}
+        <FormField label="Employee name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder={person ? "Taken from their account if left blank" : "Full name"} className="h-9 bg-white" /></FormField>
+        {showBranch && branches.length ? (
           <div>
             <FormField label="Branch">
               <Select value={branchId} onChange={setBranchId}>
@@ -904,22 +1181,24 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
                 {branches.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
               </Select>
             </FormField>
-            <p className="mt-1 font-mont text-[11px] text-gray-05">The branch this person is paid from. Everyone needs one before the school can switch to per-branch payroll.</p>
+            <p className="mt-1 font-mont text-[11px] text-gray-05">{isEdit
+              ? "To move this person, change the branch here; their record and history go with them. Each person is paid by one branch."
+              : "The branch this person is paid from. Everyone needs one before the school can switch to per-branch payroll."}</p>
           </div>
         ) : null}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <AccessField access={access} name="gross_amount" label="Gross (monthly)" required={grossOpen} creating={mode.creating} errors={denied}><MoneyInput valueKobo={gross} onChangeKobo={setGross} currency={currency} className="[&_input]:h-9" /></AccessField>
           <FormField label="Cost center"><CostCenterPicker entity={entity} value={costCenter} onChange={setCostCenter} /></FormField>
         </div>
-        <div>
+        <AccessField access={access} name="structure" creating={mode.creating} errors={denied}>
           <FormField label="Salary structure">
             <Select value={structureId} onChange={setStructureId}>
               <option value="">Flat (manual PAYE / pension)</option>
               {structures.map((s) => <option key={s.id} value={s.id}>{s.is_active ? s.name : `${s.name} (retired)`}</option>)}
             </Select>
           </FormField>
-          {showBreakdown ? <p className="mt-1 font-mont text-[11px] text-gray-05">{structure ? "PAYE, pension and net are derived from the structure applied to gross." : "Flat - enter PAYE and pension manually below."}</p> : null}
-        </div>
+          {showBreakdown ? <p className="mt-1 font-mont text-[11px] text-gray-05">{structure ? "Earnings are split by the structure. Where PAYE is computed, each run works out PAYE and pension from the tax table." : "Flat - the PAYE and pension below are used where the school supplies its own PAYE."}</p> : null}
+        </AccessField>
 
         {structure && derived ? showBreakdown ? (
           <div className="rounded-md border border-white-02 bg-white">
@@ -953,6 +1232,65 @@ export function EmployeeDrawer({ open, salary, entity, currency, branches, onClo
             ) : null}
           </>
         )}
+
+        <div className="space-y-3 rounded-md border border-white-02 bg-white p-3">
+          <p className="font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">Tax and pension</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <AccessField access={access} name="residence_state" creating={mode.creating} errors={denied}>
+              <FormField label="State of residence">
+                <Select value={state} onChange={setState}>
+                  <option value="">Their branch&apos;s state</option>
+                  {states.map((row) => <option key={row.id} value={row.code}>{row.name}</option>)}
+                </Select>
+              </FormField>
+            </AccessField>
+            <AccessField access={access} name="tax_id" label="Tax ID" creating={mode.creating} errors={denied}>
+              <Input value={taxId} maxLength={32} onChange={(e) => setTaxId(e.target.value)} className="h-9 bg-white" />
+            </AccessField>
+            <AccessField access={access} name="pfa" creating={mode.creating} errors={denied}>
+              <FormField label="Pension administrator">
+                <Select value={pfa} onChange={setPfa}>
+                  <option value="">Not chosen</option>
+                  {pfas.map((row) => <option key={row.id} value={String(row.id)}>{row.name}</option>)}
+                </Select>
+              </FormField>
+            </AccessField>
+            <AccessField access={access} name="pension_pin" label="Pension PIN" creating={mode.creating} errors={denied}>
+              <Input value={pin} maxLength={32} onChange={(e) => setPin(e.target.value)} className="h-9 bg-white" />
+            </AccessField>
+            <AccessField access={access} name="annual_rent" label="Annual rent (for rent relief)" creating={mode.creating} errors={denied}>
+              <MoneyInput valueKobo={rent} onChangeKobo={setRent} currency={currency} className="[&_input]:h-9" />
+            </AccessField>
+          </div>
+          <p className="font-mont text-[11px] text-gray-05">PAYE is paid to the state they live in, and pension to their administrator.</p>
+          <AccessField access={access} name="paye_override" creating={mode.creating} errors={denied}>
+            <label className="flex items-center gap-2 font-mont text-xs text-gray-01">
+              <input type="checkbox" checked={overrideOn} onChange={(e) => setOverrideOn(e.target.checked)} className="accent-primary" /> Set their PAYE by hand
+            </label>
+            {overrideOn ? (
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <FormField label="PAYE each month" required><MoneyInput valueKobo={override} onChangeKobo={setOverride} currency={currency} className="[&_input]:h-9" /></FormField>
+                <FormField label="Reason" required><Input value={overrideReason} maxLength={255} onChange={(e) => setOverrideReason(e.target.value)} placeholder="e.g. Tax office direction" className="h-9 bg-white" /></FormField>
+                <p className="font-mont text-[11px] text-gray-05 sm:col-span-2">Used in place of the computed PAYE on every run until it is cleared. The change and its reason go in the audit trail.</p>
+              </div>
+            ) : null}
+          </AccessField>
+        </div>
+
+        {isEdit ? (
+          <div className="space-y-3 rounded-md border border-white-02 bg-white p-3">
+            <p className="font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">When pay changes take effect</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FormField label="Takes effect on"><DatePickerInput value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} /></FormField>
+              <FormField label="Reason for the change"><Input value={reason} maxLength={255} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Promotion" className="h-9 bg-white" /></FormField>
+            </div>
+            <p className="font-mont text-[11px] leading-5 text-gray-05">
+              {movesBranch && effectiveFrom
+                ? `${salary?.branch_name ?? "Their current branch"} keeps paying them until ${dates.day(effectiveFrom)}; from that day ${chosenBranch ?? "the new branch"} pays them and holds their record.`
+                : "Applies to a change of branch, structure, pay, cost centre or state. Left empty, it applies from the first month not yet paid. A date ahead changes nothing until that day."}
+            </p>
+          </div>
+        ) : null}
         {isEdit ? <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active (included in generated runs)</label> : null}
       </div>
     </DetailDrawer>
@@ -1151,7 +1489,7 @@ function PayslipsTab({ entity, currency }: { entity: string; currency?: string |
     ...visibleFigures(access, ["gross_amount", "net_amount"]).map(([name, label]): Column<PayslipRow> => ({ header: label, align: "right", cell: ({ line }) => <Money kobo={line[name] ?? 0} currency={currency} align="right" /> })),
     { header: "Status", cell: ({ run }) => <RunPill status={run.run_status} /> },
     ...(payslips ? [{ header: "", align: "right" as const, cell: ({ run, line }: PayslipRow) => (
-      <button type="button" onClick={(e) => { e.stopPropagation(); printPayslip(run, line, currency, dates.prefs); }} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> Print</button>
+      <button type="button" onClick={(e) => { e.stopPropagation(); void openLinePayslip(entity, run.id, line.id); }} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline"><Printer className="size-3" /> PDF</button>
     ) }] : []),
   ];
 
@@ -1168,7 +1506,7 @@ function PayslipsTab({ entity, currency }: { entity: string; currency?: string |
         loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={opensBreakdown ? setSelected : undefined}
         emptyTitle={searchInput ? "No matching payslips" : "No payslips yet"}
         emptyMessage={searchInput ? "Try a different search." : "Generate and post a payroll run to produce payslips."} />
-      <PayslipDrawer row={selected} access={access} currency={currency} onClose={() => setSelected(null)} />
+      <PayslipDrawer row={selected} entity={entity} access={access} currency={currency} onClose={() => setSelected(null)} />
     </div>
   );
 }
@@ -1219,20 +1557,32 @@ function PayslipBreakdown({ line, access, currency }: { line: PayrollLine; acces
   );
 }
 
-function PayslipDrawer({ row, access, currency, onClose }: { row: PayslipRow | null; access: FieldAccess; currency?: string | null; onClose: () => void }) {
+/**
+ * One payslip. A reader who sees every figure on it gets the server's own
+ * payslip, with this employer's year to date and any earlier pay kept apart,
+ * and its PDF; anyone else gets the figures they may see, and no PDF.
+ */
+function PayslipDrawer({ row, entity, access, currency, onClose }: { row: PayslipRow | null; entity: string; access: FieldAccess; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
+  const whole = canPrintPayslip(access);
+  const { data: contentData, isLoading } = useGetPayslipContentQuery(row && whole ? { entity, runId: row.run.id, lineId: row.line.id } : skipToken);
   if (!row) return null;
   const { run, line } = row;
   const metrics = visibleFigures(access, ["gross_amount", "net_amount"]);
+  const content = contentData?.data;
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
       title={(!access.isHidden("employee_name") && line.employee_name) || "Payslip"} description={`${run.period_label || "-"} · ${run.document_number} · paid ${dates.day(run.pay_date)}`}
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" onClick={onClose}>Close</Button>
-        {canPrintPayslip(access) ? <Button onClick={() => printPayslip(run, line, currency, dates.prefs)} className="gap-1.5"><Printer className="size-4" /> Print payslip</Button> : null}
+        {whole ? <Button onClick={() => void openLinePayslip(entity, run.id, line.id)} className="gap-1.5"><Printer className="size-4" /> Payslip PDF</Button> : null}
       </>}>
-      <div className="space-y-4">
+      {whole ? (
+        isLoading ? <p className="font-mont text-xs text-gray-05">Loading the payslip…</p>
+          : content ? <PayslipContentView content={content} />
+          : <p className="font-mont text-xs text-gray-05">This payslip could not be read.</p>
+      ) : <div className="space-y-4">
         {metrics.length ? (
           <div className="grid grid-cols-2 gap-3">
             {metrics.map(([name, label]) => <Metric key={name} label={name === "net_amount" ? "Net pay" : label} kobo={line[name] ?? 0} currency={currency} />)}
@@ -1240,7 +1590,7 @@ function PayslipDrawer({ row, access, currency, onClose }: { row: PayslipRow | n
         ) : null}
         <PayslipBreakdown line={line} access={access} currency={currency} />
         {line.cost_center ? <p className="font-mont text-[11px] text-gray-05">Cost center · {line.cost_center}</p> : null}
-      </div>
+      </div>}
     </DetailDrawer>
   );
 }
@@ -1289,7 +1639,7 @@ function StatutoryTab({ entity, currency }: { entity: string; currency?: string 
         <Kpi label="Pension payable (all posted runs)" value={formatMoney(kpis.pension, currency)} hint="Remit to the PFA" />
         <Kpi label="Posted runs" value={String(runs.length)} />
       </div>
-      <p className="font-mont text-xs text-gray-05">Filing-ready PAYE & pension schedules per posted run - click a row for the per-employee breakdown and remittance status. The liabilities are settled under Tax Remittance.</p>
+      <p className="font-mont text-xs text-gray-05">PAYE and pension schedules for each posted run - click a row for the per-employee breakdown and remittance status. The returns themselves, one per state and one per pension administrator with the people behind each, are filed and paid under Tax Remittance, which also has the annual PAYE return.</p>
       <DataTable columns={cols} rows={runs} rowKey={(r) => r.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(r) => setSelected(r)}
         emptyTitle="No statutory returns yet" emptyMessage="Post a payroll run to raise PAYE and pension liabilities to file." />

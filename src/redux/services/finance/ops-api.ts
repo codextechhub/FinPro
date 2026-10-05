@@ -32,6 +32,7 @@ import type {
   BudgetFiling,
   BudgetRollup,
 } from "./ops-types";
+import type { GeneratedPayrollRun, SalaryStatutoryBody } from "./payroll-types";
 import type { ImportBatch } from "@/redux/services/dashboard/import-types";
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
 
@@ -302,7 +303,7 @@ export const opsApi = baseApi.injectEndpoints({
     // `branch` is omitted for a whole-school run, and omitted entirely for a
     // caller pinned to one branch - the backend stamps theirs, and naming a
     // different one is refused rather than silently retargeted.
-    generatePayrollRun: b.mutation<ApiEnvelope<PayrollRun>, { entity: string; pay_date: string; period_label?: string; narration?: string; branch?: number }>({
+    generatePayrollRun: b.mutation<ApiEnvelope<GeneratedPayrollRun>, { entity: string; pay_date: string; period_label?: string; narration?: string; branch?: number }>({
       query: ({ entity, ...body }) => ({ url: `/finance/payroll-runs/generate/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePayroll"],
     }),
@@ -314,7 +315,9 @@ export const opsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/employee-salaries/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePayroll"],
     }),
-    createEmployeeSalary: b.mutation<ApiEnvelope<EmployeeSalary>, { entity: string; name: string; gross_amount: number; structure?: number; paye_amount?: number; pension_amount?: number; cost_center?: string; branch?: number | null }>({
+    // `employee` links the row to a person's account, which is what lets the
+    // server refuse a second active row for somebody already paid elsewhere.
+    createEmployeeSalary: b.mutation<ApiEnvelope<EmployeeSalary>, { entity: string; name: string; employee?: number } & SalaryStatutoryBody & { gross_amount?: number; structure?: number; paye_amount?: number; pension_amount?: number; cost_center?: string; branch?: number | null; effective_from?: string }>({
       query: ({ entity, ...body }) => ({ url: `/finance/employee-salaries/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePayroll"],
     }),
@@ -322,7 +325,10 @@ export const opsApi = baseApi.injectEndpoints({
     // key's presence as "retarget this row", and for a branch-pinned caller a
     // blank one means their own branch, so sending it unchanged would move
     // people nobody asked to move.
-    updateEmployeeSalary: b.mutation<ApiEnvelope<EmployeeSalary>, { id: number; entity: string; name?: string; gross_amount?: number; structure?: number | null; paye_amount?: number; pension_amount?: number; cost_center?: string; is_active?: boolean; branch?: number | null }>({
+    // A change to pay terms (branch, structure, figures, cost centre, state) is
+    // written as a dated version from `effective_from`, or from the first month
+    // not yet paid when it is left out; `reason` is kept on that version.
+    updateEmployeeSalary: b.mutation<ApiEnvelope<EmployeeSalary>, { id: number; entity: string; name?: string; employee?: number; gross_amount?: number; structure?: number | null; paye_amount?: number; pension_amount?: number; cost_center?: string; is_active?: boolean; branch?: number | null; effective_from?: string; reason?: string } & SalaryStatutoryBody>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/employee-salaries/${id}/${qs({ entity })}`, method: "PATCH", body }),
       invalidatesTags: ["FinancePayroll"],
     }),

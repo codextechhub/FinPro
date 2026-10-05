@@ -26,6 +26,7 @@ import {
 } from "@/redux/services/finance/ops-api";
 import type { TaxFiling } from "@/redux/services/finance/ops-types";
 import { useDates } from "../../../lib/display-prefs";
+import { AnnualPayeReturnDrawer, RemittanceSchedulePanel } from "./payroll-returns";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 
@@ -56,6 +57,7 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [newFiling, setNewFiling] = useState(false);
   const [newObligation, setNewObligation] = useState(false);
+  const [annualReturn, setAnnualReturn] = useState(false);
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const { data, isLoading, isFetching, isError, refetch } = useGetTaxFilingsQuery({ entity, page, ...(status ? { filing_status: status } : {}) });
@@ -92,6 +94,7 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
         </Select>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={() => printTaxFilingPack(rows, currency, dates.prefs)} disabled={!rows.length} className="gap-1.5"><Printer className="size-4" /> Filing pack</Button>
+          <Button variant="outline" onClick={() => setAnnualReturn(true)} className="gap-1.5"><FileCheck2 className="size-4" /> Annual PAYE return</Button>
           <Can permission={P.FIN_CREATE_TAX}>
             <Button variant="outline" onClick={() => setNewObligation(true)} className="gap-1.5"><Plus className="size-4" /> New obligation</Button>
           </Can>
@@ -109,6 +112,7 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
       <FilingDrawer filingId={selectedId} filings={rows} entity={entity} currency={currency} onClose={() => setSelectedId(null)} />
       <NewFilingDrawer open={newFiling} onClose={() => setNewFiling(false)} entity={entity} />
       <NewObligationDrawer open={newObligation} onClose={() => setNewObligation(false)} entity={entity} />
+      <AnnualPayeReturnDrawer open={annualReturn} entity={entity} currency={currency} onClose={() => setAnnualReturn(false)} />
     </div>
   );
 }
@@ -185,6 +189,8 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
               <Step state={paid ? "done" : filed ? "current" : "todo"} title="Paid / remitted" sub={paid ? "Remitted in full" : f.amount_paid > 0 ? `Part-paid · ${formatMoney(f.balance_due, currency)} left` : "Awaiting payment"} />
             </div>
           </div>
+
+          <RemittanceSchedulePanel filing={f} entity={entity} currency={currency} />
 
           {!paid ? (
             <div>

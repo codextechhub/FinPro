@@ -2,7 +2,6 @@ import type {
   BankAccount,
   BankStatementLine,
   ExpenseClaim,
-  PayrollLine,
   PayrollRun,
   TaxFiling,
 } from "../redux/services/finance/ops-types";
@@ -186,41 +185,6 @@ export function buildPayrollSchedulePrintDocument(
   };
 }
 
-export function buildPayslipPrintDocument(
-  run: PayrollRun,
-  line: PayrollLine,
-  currency: string | null | undefined,
-  prefs: DisplayPrefs,
-): FinancePrintDocument {
-  const money = (amount?: number) => formatMoney(amount ?? 0, currency);
-  const components = line.components ?? [];
-  const rows: PrintRow[] = components.length
-    ? [
-        { className: "section", cells: [cell("Earnings", undefined, 2)] },
-        ...components.filter((component) => component.kind === "EARNING").map((component) => ({ cells: [cell(component.name), cell(money(component.amount), "r")] })),
-        { className: "subtotal", cells: [cell("Gross pay"), cell(money(line.gross_amount), "r")] },
-        { className: "section", cells: [cell("Deductions", undefined, 2)] },
-        ...components.filter((component) => component.kind === "DEDUCTION").map((component) => ({ cells: [cell(`${component.name} (${component.statutory_type})`), cell(`− ${money(component.amount)}`, "r")] })),
-        { className: "total", cells: [cell("Net pay"), cell(money(line.net_amount), "r")] },
-      ]
-    : [
-        { cells: [cell("Gross pay"), cell(money(line.gross_amount), "r")] },
-        { cells: [cell("PAYE (income tax)"), cell(`− ${money(line.paye_amount)}`, "r")] },
-        { cells: [cell("Pension"), cell(`− ${money(line.pension_amount)}`, "r")] },
-        { className: "total", cells: [cell("Net pay"), cell(money(line.net_amount), "r")] },
-      ];
-  return {
-    title: `Payslip - ${line.employee_name || "-"}`,
-    bodyClass: "narrow",
-    windowFeatures: "width=560,height=720",
-    blocks: [
-      { kind: "heading", level: 1, text: "Payslip" },
-      { kind: "text", className: "sub", text: `${line.employee_name || "-"} · ${run.period_label || ""} · ${run.document_number} · paid ${formatDay(run.pay_date, prefs)}` },
-      { kind: "table", rows },
-    ],
-  };
-}
-
 export function buildBankReconciliationPrintDocument(input: {
   account: BankAccount;
   currency?: string | null;
@@ -342,9 +306,6 @@ export function buildTaxFilingPackPrintDocument(
 
 export const printPayrollSchedule = (run: PayrollRun, kind: "PAYE" | "PENSION", currency: string | null | undefined, prefs: DisplayPrefs) =>
   openFinancePrintDocument(buildPayrollSchedulePrintDocument(run, kind, currency, prefs));
-
-export const printPayslip = (run: PayrollRun, line: PayrollLine, currency: string | null | undefined, prefs: DisplayPrefs) =>
-  openFinancePrintDocument(buildPayslipPrintDocument(run, line, currency, prefs));
 
 export const printBankReconciliation = (input: Parameters<typeof buildBankReconciliationPrintDocument>[0]) =>
   openFinancePrintDocument(buildBankReconciliationPrintDocument(input));
