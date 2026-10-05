@@ -522,7 +522,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/finance/tax-filings/${id}/unfile/${qs({ entity })}`, method: "POST" }),
       invalidatesTags: ["FinanceTax", "FinanceJournals"],
     }),
-    payTaxFiling: b.mutation<ApiEnvelope<TaxFiling>, { id: number; entity: string; bank_account: string; pay_date: string; amount?: number }>({
+    payTaxFiling: b.mutation<ApiEnvelope<TaxFiling>, { id: number; entity: string; bank_account: string; pay_date: string; amount?: number; branch?: number }>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/tax-filings/${id}/pay/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceTax", "FinanceJournals", "FinanceReports"],
     }),

@@ -149,6 +149,8 @@ export interface Requisition {
   id: number;
   document_number: string;
   status: string;
+  branch_id?: number | null;
+  branch_name?: string | null;
   approval_state: string;
   title: string;
   request_date: string;
@@ -282,6 +284,8 @@ export interface GRNLine {
   accepted_qty: string;
   rejected_qty: string;
   expected_qty: string;
+  /** Sent back to the vendor through goods returns; absent from servers that do not report it. */
+  returned_qty?: string;
   unit_price: number;
   value_amount: number;
 }
@@ -294,6 +298,8 @@ export interface GoodsReceipt {
   vendor_code: string;
   vendor_name: string;
   received_by_name: string;
+  branch_id?: number | null;
+  branch_name?: string | null;
   purchase_order_id: number | null;
   purchase_order_number: string | null;
   received_date: string;
@@ -381,6 +387,11 @@ export interface VendorInvoice {
   payment_status: string;
   display_status: string;
   is_overdue: boolean;
+  /** The bill's branch, which its corrections and payments inherit. */
+  branch_id?: number | null;
+  branch_name?: string | null;
+  /** Carried in as an unpaid bill from before the books went live. */
+  is_opening?: boolean;
   vendor_id: number;
   vendor_code: string;
   vendor_name: string;
@@ -395,6 +406,8 @@ export interface VendorInvoice {
   total: number;
   total_naira: string;
   amount_paid: number;
+  /** Settled by vendor credit notes rather than by payment. */
+  amount_credited?: number;
   balance_due: number;
   journal_id: number | null;
   lines: VendorInvoiceLine[];
@@ -451,6 +464,8 @@ export interface VendorPaymentEligibleInvoice {
   invoice_date: string;
   due_date: string | null;
   total: number;
+  /** The bill's VAT, which withholding tax is not charged on. Absent from servers that do not send it. */
+  tax_total?: number;
   amount_paid: number;
   balance_due: number;
   payment_status: string;
@@ -481,6 +496,11 @@ export interface VendorPayment {
   bank_account_name: string | null;
   wht_tax_code_id: number | null;
   wht_tax_code_value: string | null;
+  /**
+   * How the WHT figure was arrived at: COMPUTED from the WHT code, or ENTERED by
+   * a person (a partial rate, an exemption). Absent from servers that do not report it.
+   */
+  wht_source?: "COMPUTED" | "ENTERED" | "";
   reference: string;
   narration: string;
   journal_id: number | null;
@@ -627,6 +647,29 @@ export interface Rfq {
   /** The branch the RFQ is raised for; its deadlines are read in that branch's zone. */
   branch_id?: number | null;
   branch_name?: string | null;
+  /** Present when several branches buy together on this RFQ; null otherwise. */
+  shared_sourcing?: RfqSharedSourcing | null;
+}
+
+/** One requisition line's place on a shared RFQ line, and the branch it buys for. */
+export interface RfqSharedAllocation {
+  rfq_line_id: number;
+  requisition_line_id: number;
+  requisition_id: number;
+  requisition_number: string;
+  branch_id: number;
+  branch_name: string;
+  quantity: string;
+}
+
+/**
+ * Several branches buying on one RFQ. Award raises one purchase order per branch,
+ * so each branch receives, owes and reports its own share. The list row carries
+ * the branches only; the detail adds the allocations.
+ */
+export interface RfqSharedSourcing {
+  participant_branches: { id: number; name: string }[];
+  allocations?: RfqSharedAllocation[];
 }
 
 // Detail record (superset of the list row).
@@ -833,4 +876,99 @@ export interface ProcurementSettingsPayload {
   settings: ProcurementSettingsValues;
   consumers: Record<string, SettingConsumer>;
   history: FinanceAuditLog[];
+}
+
+// ── Payables corrections ─────────────────────────────────────────────────────
+
+/** One credited slice of a bill line. */
+export interface VendorCreditNoteLine {
+  id: number;
+  line_no: number;
+  invoice_line_id: number | null;
+  description: string;
+  quantity: string | null;
+  net_amount: number;
+  tax_amount: number;
+}
+
+/** Where a credit note's value went: its own bill first, then later bills of its branch. */
+export interface VendorCreditNoteAllocation {
+  id: number;
+  vendor_invoice_id: number;
+  document_number: string;
+  amount: number;
+  effective_date: string;
+}
+
+/**
+ * A supplier credit note (VC-) against one posted bill. It reduces what the bill
+ * still owes; what the bill no longer owes (a paid bill) stays as the branch's
+ * credit with the vendor, `advance_remaining`, until applied to later bills.
+ */
+export interface VendorCreditNote {
+  id: number;
+  document_number: string;
+  status: string;
+  approval_state: string;
+  branch_id: number | null;
+  branch_name: string | null;
+  vendor_id: number;
+  vendor_code: string;
+  vendor_name: string;
+  vendor_invoice_id: number;
+  vendor_invoice_number: string;
+  note_date: string;
+  vendor_reference: string;
+  reason: string;
+  subtotal: number;
+  tax_total: number;
+  total: number;
+  allocated_amount: number;
+  advance_remaining: number;
+  journal_id: number | null;
+  workflow_instance_id?: string | null;
+  lines?: VendorCreditNoteLine[];
+  allocations?: VendorCreditNoteAllocation[];
+}
+
+/** What a credit note credits: the whole bill, a gross amount, or named bill lines. */
+export type VendorCreditInstruction =
+  | { full: true }
+  | { amount: number }
+  | { lines: { invoice_line: number; quantity?: number; net_amount?: number }[] };
+
+export interface GoodsReturnLine {
+  id: number;
+  line_no: number;
+  grn_line_id: number;
+  description: string;
+  quantity: string;
+  value_amount: number;
+}
+
+/** A posted return of goods (RV-) to the vendor against one receipt. */
+export interface GoodsReturn {
+  id: number;
+  document_number: string;
+  status: string;
+  branch_id: number | null;
+  vendor_id: number;
+  grn_id: number;
+  grn_number: string;
+  return_date: string;
+  reason: string;
+  total_value: number;
+  journal_id: number | null;
+  lines: GoodsReturnLine[];
+}
+
+/** One unpaid supplier bill carried in when the books began. */
+export interface OpeningBillRow {
+  vendor: string;
+  invoice_date: string;
+  due_date?: string;
+  vendor_reference?: string;
+  amount: number;
+  branch?: number;
+  narration?: string;
 }

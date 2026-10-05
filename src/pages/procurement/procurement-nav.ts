@@ -29,7 +29,7 @@ export const procurementNav: ConsoleNavGroup[] = [
       { title: "Requisitions", url: R.REQUISITIONS, icon: FileText, permissions: [P.PROC_VIEW_REQUISITIONS] },
       { title: "Purchase Orders", url: R.PURCHASE_ORDERS, icon: ShoppingCart, permissions: [P.PROC_VIEW_PURCHASE_ORDERS] },
       { title: "Goods Receipts", url: R.GOODS_RECEIPTS, icon: PackageCheck, permissions: [P.PROC_VIEW_GOODS_RECEIPTS] },
-      { title: "Vendor Invoices", url: R.VENDOR_INVOICES, icon: ReceiptText, permissions: [P.PROC_VIEW_VENDOR_INVOICES] },
+      { title: "Vendor Invoices", url: R.VENDOR_INVOICES, icon: ReceiptText, permissions: [P.PROC_VIEW_VENDOR_INVOICES], resources: ["procurement.vendor_credit_note"] },
       { title: "Vendor Payments", url: R.VENDOR_PAYMENTS, icon: Banknote, permissions: [P.PROC_VIEW_VENDOR_PAYMENTS] },
       // Frozen workflow snapshots can delegate a vote to a user who does not
       // currently hold the source RBAC key, so eligibility is enforced by the

@@ -21,12 +21,14 @@
  *   21 tax, 22 payrollrun, 23 budget, 24 fixedasset, 25 audit, 26 customer,
  *   27 feestructure, 28 payment, 29 pettycashvoucher, 30 salary, 31 writeoff,
  *   32 settings; 33 entity, 34 account and 35 period hold the renumbered codes
- *   described below; 36 fiscalyear.
+ *   described below; 36 fiscalyear; 45 banktransaction, 46 banktransfer.
  *
  *   Procurement (70): 01 category, 02 vendor, 03 catalog_item, 04 contract,
  *   05 requisition, 06 rfq, 07 quotation, 08 purchase_order, 09 goods_receipt,
  *   10 vendor_invoice, 11 vendor_payment, 12 approval, 13 stock, 14 report,
- *   15 vendor_assessment, 16 settings, 17 competition, 18 analytics.
+ *   15 vendor_assessment, 16 settings, 17 competition, 18 analytics,
+ *   19 vendor_credit_note. A bill's `import_opening` takes 18, the import
+ *   action, because carrying in opening bills is the bill's only import.
  *
  *   Payments (80): 01 collection, 02 virtual_account, 03 payout, 04 report,
  *   05 payout_batch, 06 webhook, 07 unattributed_webhook.
@@ -60,6 +62,12 @@ export const P = {
   FIN_CLOSE_PERIOD: "200324",
   FIN_CREATE_ACCOUNT: "200202",
   FIN_CREATE_BANK_ACCOUNT: "201802",
+  FIN_CREATE_BANK_TRANSACTION: "204502",
+  FIN_CREATE_BANK_TRANSFER: "204602",
+  FIN_REVERSE_BANK_TRANSACTION: "204514",
+  FIN_REVERSE_BANK_TRANSFER: "204614",
+  FIN_VIEW_BANK_TRANSACTIONS: "204501",
+  FIN_VIEW_BANK_TRANSFERS: "204601",
   FIN_CREATE_BUDGET: "202302",
   FIN_CREATE_CONCESSION: "200802",
   FIN_CREATE_COST_CENTER: "201602",
@@ -253,6 +261,16 @@ export const P = {
   PROC_VIEW_VENDORS: "700201",
   PROC_VIEW_VENDOR_INVOICES: "701001",
   PROC_VIEW_VENDOR_PAYMENTS: "701101",
+  PROC_ALLOCATE_VENDOR_CREDIT_NOTE: "701920",
+  PROC_CREATE_VENDOR_CREDIT_NOTE: "701902",
+  PROC_IMPORT_OPENING_VENDOR_INVOICES: "701018",
+  PROC_POST_VENDOR_CREDIT_NOTE: "701913",
+  PROC_RETURN_GOODS_RECEIPT: "700914",
+  PROC_REVERSE_VENDOR_CREDIT_NOTE: "701914",
+  PROC_SUBMIT_VENDOR_CREDIT_NOTE: "701930",
+  PROC_UPDATE_VENDOR_CREDIT_NOTE: "701903",
+  PROC_VIEW_VENDOR_CREDIT_NOTES: "701901",
+  PROC_VOID_VENDOR_INVOICE: "701014",
   VIEW_AUDIT: "101801",  // view audit events and entity trails
   PUBLISH_WORKFLOW_TEMPLATE: "600162",  // publish an approval route, such as the ready-made petty cash return route
   VIEW_WORKFLOW_TEMPLATES: "600101",  // browse approval workflow templates
@@ -404,6 +422,22 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "701031": "procurement.vendor_invoice.match",
   "701047": "procurement.vendor_invoice.override_variance",
   "701049": "procurement.vendor_invoice.attach",
+  "204501": "finance.banktransaction.view",
+  "204502": "finance.banktransaction.create",
+  "204514": "finance.banktransaction.reverse",
+  "204601": "finance.banktransfer.view",
+  "204602": "finance.banktransfer.create",
+  "204614": "finance.banktransfer.reverse",
+  "700914": "procurement.goods_receipt.reverse",
+  "701014": "procurement.vendor_invoice.reverse",
+  "701018": "procurement.vendor_invoice.import_opening",
+  "701901": "procurement.vendor_credit_note.view",
+  "701902": "procurement.vendor_credit_note.create",
+  "701903": "procurement.vendor_credit_note.update",
+  "701913": "procurement.vendor_credit_note.post",
+  "701914": "procurement.vendor_credit_note.reverse",
+  "701920": "procurement.vendor_credit_note.allocate",
+  "701930": "procurement.vendor_credit_note.submit",
   "701102": "procurement.vendor_payment.create",
   "701103": "procurement.vendor_payment.update",
   "701113": "procurement.vendor_payment.post",

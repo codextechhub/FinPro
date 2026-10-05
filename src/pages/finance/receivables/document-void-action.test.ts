@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { P } from "../../../permissions";
-import { DOCUMENT_VOID_CONFIG, voidDocumentLabel } from "./document-void-config";
+import { DOCUMENT_VOID_CONFIG, isVoidableDocument, voidDocumentLabel } from "./document-void-config";
 
 describe("document void actions", () => {
   it("routes every supported document to its own endpoint and reverse permission", () => {
@@ -23,5 +23,11 @@ describe("document void actions", () => {
     expect(voidDocumentLabel("CREDIT_NOTE")).toBe("note");
     expect(voidDocumentLabel("INVOICE")).toBe("invoice");
     expect(voidDocumentLabel("PAYMENT", "CREDIT")).toBe("receipt");
+  });
+
+  it("recognises only the customer documents it voids", () => {
+    expect(isVoidableDocument("INVOICE")).toBe(true);
+    expect(isVoidableDocument("VENDOR_INVOICE")).toBe(false);
+    expect(isVoidableDocument("INTER_BRANCH_TRANSFER")).toBe(false);
   });
 });

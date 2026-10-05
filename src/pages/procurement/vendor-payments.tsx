@@ -29,8 +29,10 @@ import {
   useAllocateVendorAdvanceMutation,
   useReverseVendorPaymentMutation, useSubmitVendorPaymentMutation,
   useAttachVendorPaymentFileMutation, useDeleteVendorPaymentFileMutation,
-  useUpdateVendorPaymentMutation,
+  useUpdateVendorPaymentMutation, useGetVendorsQuery, useGetVendorInvoicesQuery,
 } from "@/redux/services/procurement/procurement-api";
+import { useGetTaxCodesQuery } from "@/redux/services/finance/setup-api";
+import { computedWht, whtSourceLabel } from "./withholding-tax";
 import type {
   VendorPayment, VendorPaymentEligibleInvoice,
 } from "@/redux/services/procurement/procurement-types";
@@ -181,7 +183,7 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
         />
         {tab === "overview" && <div className="space-y-5">
           {payment.approval_state === "PENDING" && <section className="rounded-md border border-amber-200 bg-amber-50 p-4"><p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>{canVote && <><Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" loading={voting} onClick={() => vote("APPROVED")}><Check className="size-4" /> Approve</Button><Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button><Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button></div></>}</section>}
-          <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Payment reference" value={payment.reference} /><Field label="Vendor" value={payment.vendor_name || payment.vendor_code} /><Field label="Payment date" value={dates.day(payment.payment_date)} /><Field label="Method" value={payment.method.replaceAll("_", " ")} /><Field label="Bank account" value={payment.bank_account_name || payment.payment_account_name || payment.payment_code} /><Field label="WHT code" value={payment.wht_tax_code_value} /><Field label="Gross settled" value={formatMoney(payment.gross_amount, currency)} /><Field label="WHT withheld" value={formatMoney(payment.wht_amount, currency)} /><Field label="Net cash paid" value={formatMoney(payment.net_amount, currency)} /><Field label="Allocated to bills" value={formatMoney(payment.allocated_amount, currency)} />{payment.status === "POSTED" && payment.advance_remaining > 0 && <Field label="Paid in advance" value={formatMoney(payment.advance_remaining, currency)} />}</dl>
+          <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Payment reference" value={payment.reference} /><Field label="Vendor" value={payment.vendor_name || payment.vendor_code} /><Field label="Payment date" value={dates.day(payment.payment_date)} /><Field label="Method" value={payment.method.replaceAll("_", " ")} /><Field label="Bank account" value={payment.bank_account_name || payment.payment_account_name || payment.payment_code} /><Field label="WHT code" value={payment.wht_tax_code_value} /><Field label="Gross settled" value={formatMoney(payment.gross_amount, currency)} /><Field label="WHT withheld" value={<WhtFigure amount={payment.wht_amount} source={payment.wht_source} currency={currency} />} /><Field label="Net cash paid" value={formatMoney(payment.net_amount, currency)} /><Field label="Allocated to bills" value={formatMoney(payment.allocated_amount, currency)} />{payment.status === "POSTED" && payment.advance_remaining > 0 && <Field label="Paid in advance" value={formatMoney(payment.advance_remaining, currency)} />}</dl>
           {payment.narration && <div className="rounded-md border border-white-02 p-4"><p className="font-mont text-[11px] text-gray-05">Narration</p><p className="mt-1 font-mont text-sm">{payment.narration}</p></div>}
         </div>}
         {tab === "invoices" && <AllocationTable payment={payment} currency={currency} />}
@@ -228,11 +230,21 @@ function PaymentForm({ entity, currency, initial, onClose }: { entity: string; c
   const [bank, setBank] = useState(initial?.bank_account_id ? String(initial.bank_account_id) : "");
   const [reference, setReference] = useState(initial?.reference || "");
   const [narration, setNarration] = useState(initial?.narration || "");
-  const [wht, setWht] = useState(initial?.wht_amount || 0);
+  // A figure the person typed. Null means "work it out from the WHT code", and
+  // then nothing is sent, so the server computes it (see withholding-tax.ts).
+  const [typedWht, setTypedWht] = useState<number | null>(initial?.wht_source === "ENTERED" ? initial.wht_amount : null);
   const [whtCode, setWhtCode] = useState(initial?.wht_tax_code_value || "");
+  const { data: vendorRows } = useGetVendorsQuery({ entity, page_size: 100 });
+  const vendorWhtCode = (code: string) => toArray(vendorRows?.data).find((v) => v.code === code)?.default_wht_tax_code_value || "";
+  const { data: taxCodeRows } = useGetTaxCodesQuery({ entity });
+  const whtRate = toArray(taxCodeRows?.data).find((t) => t.code === whtCode)?.rate_bps ?? 0;
   const [amounts, setAmounts] = useState<Record<number, number>>(() => Object.fromEntries((initial?.allocations || []).map((row) => [row.vendor_invoice_id, row.amount])));
   const { data, isLoading: invoicesLoading } = useGetVendorPaymentEligibleInvoicesQuery({ entity, ...(vendor ? { vendor } : {}) }, { skip: !vendor });
   const invoices = toArray(data?.data);
+  // The VAT on each bill, which WHT is not charged on. Read from the eligible
+  // rows where the server sends it, else from the vendor's posted bills.
+  const { data: postedBills } = useGetVendorInvoicesQuery({ entity, vendor, page_size: 100, status: "POSTED" }, { skip: !vendor || invoices.every((invoice) => invoice.tax_total != null) });
+  const billVat = (id: number) => invoices.find((invoice) => invoice.id === id)?.tax_total ?? toArray(postedBills?.data).find((bill) => bill.id === id)?.tax_total ?? 0;
   const [create, { isLoading: creating }] = useCreateVendorPaymentMutation();
   const [update, { isLoading: updating }] = useUpdateVendorPaymentMutation();
   const [submit, { isLoading: submitting }] = useSubmitVendorPaymentMutation();
@@ -243,11 +255,21 @@ function PaymentForm({ entity, currency, initial, onClose }: { entity: string; c
     allocations.map((row) => invoices.find((invoice) => invoice.id === row.vendor_invoice)?.branch_id ?? null),
     multiBranch,
   );
+  const workedOut = computedWht({
+    gross,
+    rateBps: whtRate,
+    bills: allocations.map((row) => ({ total: invoices.find((invoice) => invoice.id === row.vendor_invoice)?.total ?? row.amount, tax_total: billVat(row.vendor_invoice), amount: row.amount })),
+  });
+  const wht = typedWht ?? workedOut;
+  // With no code chosen the server would fall back to the vendor's own, so a
+  // cleared code is sent as an explicit nil figure rather than left to that.
+  const clearedVendorCode = !whtCode && !!vendorWhtCode(vendor);
+  const whtToSend = typedWht ?? (clearedVendorCode ? 0 : undefined);
   const loading = creating || updating || submitting;
   const canSave = !!vendor && !!paymentDate && !!bank && allocations.length > 0 && gross > 0 && wht <= gross && !mixedBranches;
   const save = async (andSubmit: boolean) => {
     if (!canSave) return;
-    const body = { entity, vendor, payment_date: paymentDate, method, bank_account: Number(bank), wht_amount: wht, wht_tax_code: whtCode || undefined, reference: reference.trim() || undefined, narration: narration.trim() || undefined, allocations };
+    const body = { entity, vendor, payment_date: paymentDate, method, bank_account: Number(bank), wht_amount: whtToSend, wht_tax_code: whtCode || (initial ? null : undefined), reference: reference.trim() || undefined, narration: narration.trim() || undefined, allocations };
     try {
       const response = initial ? await update({ id: initial.id, ...body }).unwrap() : await create(body).unwrap();
       if (andSubmit) await submit({ id: response.data.id, entity }).unwrap();
@@ -255,16 +277,22 @@ function PaymentForm({ entity, currency, initial, onClose }: { entity: string; c
       onClose();
     } catch { /* central */ }
   };
-  const setVendorAndReset = (value: string) => { setVendor(value); setAmounts({}); };
+  const setVendorAndReset = (value: string) => { setVendor(value); setAmounts({}); setWhtCode(vendorWhtCode(value)); setTypedWht(null); };
   return <DetailDrawer open onOpenChange={(open) => !open && onClose()} title={initial ? `Edit ${initial.document_number}` : "New Payment"} description="Disburse against approved and posted invoices" widthClass="sm:max-w-[720px]" footer={<><Button variant="outline" disabled={loading} onClick={onClose}>Cancel</Button><Button variant="outline" loading={loading} disabled={!canSave} onClick={() => save(false)}>Save Draft</Button><Button loading={loading} disabled={!canSave} onClick={() => save(true)}>{initial ? "Save & Submit" : "Create & Submit"}</Button></>}>
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={setVendorAndReset} /></FormField><FormField label="Method" required><select value={method} onChange={(event) => setMethod(event.target.value)} className="h-9 w-full rounded-md border bg-white px-3 font-mont text-sm">{["BANK_TRANSFER", "CHEQUE", "CASH", "CARD"].map((value) => <option key={value} value={value}>{value.replaceAll("_", " ")}</option>)}</select></FormField><PostingDateField label="Payment date" entity={entity} value={paymentDate} onChange={setPaymentDate} /><FormField label="Pay from" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={paymentBranch} disabled={mixedBranches} /></FormField><FormField label="Reference"><Input value={reference} onChange={(event) => setReference(event.target.value)} className="bg-white" /></FormField><FormField label="WHT code"><TaxCodePicker entity={entity} value={whtCode} onChange={setWhtCode} placeholder="No WHT code" /></FormField></div>
       <FormField label="Narration"><Textarea value={narration} onChange={(event) => setNarration(event.target.value)} className="min-h-20 bg-white" /></FormField>
       <section><div className="mb-2 flex items-center justify-between gap-3"><div><p className="font-mont text-xs font-semibold text-gray-01">Outstanding invoices</p><p className="mt-0.5 font-mont text-[11px] text-gray-05">Select the exact liability amounts the approver should review.</p></div><span className="font-mont text-sm font-semibold tabular-nums">{formatMoney(gross, currency)}</span></div>{mixedBranches ? <p role="alert" className="mb-2 font-mont text-[11px] leading-5 text-destructive">These bills belong to different branches. A payment settles one branch&rsquo;s bills from that branch&rsquo;s account, so pay each branch&rsquo;s bills separately.</p> : null}{!vendor ? <EmptyPanel>Select a vendor to load posted unpaid invoices.</EmptyPanel> : invoicesLoading ? <LoadingState rows={4} /> : invoices.length ? <div className="space-y-2">{invoices.map((invoice) => <InvoiceAllocationRow key={invoice.id} invoice={invoice} amount={amounts[invoice.id] || 0} currency={currency} onChange={(amount) => setAmounts((current) => ({ ...current, [invoice.id]: Math.min(amount, invoice.balance_due) }))} />)}</div> : <EmptyPanel>This vendor has no posted invoices with an outstanding balance.</EmptyPanel>}</section>
-      <div className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-3"><Field label="Gross settled" value={formatMoney(gross, currency)} /><div><p className="font-mont text-[11px] text-gray-05">WHT withheld</p><MoneyInput valueKobo={wht} onChangeKobo={setWht} currency={currency} /></div><Field label="Net cash paid" value={formatMoney(Math.max(0, gross - wht), currency)} /></div>
+      <div className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-3"><Field label="Gross settled" value={formatMoney(gross, currency)} /><div><p className="font-mont text-[11px] text-gray-05">WHT withheld</p><MoneyInput valueKobo={wht} onChangeKobo={setTypedWht} currency={currency} /><p className="mt-1 font-mont text-[11px] leading-5 text-gray-05">{typedWht === null ? (whtRate ? "Worked out from the WHT code on the bills net of VAT." : "No WHT code, so nothing is withheld.") : <>Entered by hand. <button type="button" className="font-medium text-primary underline-offset-2 hover:underline" onClick={() => setTypedWht(null)}>Work it out again</button></>}</p></div><Field label="Net cash paid" value={formatMoney(Math.max(0, gross - wht), currency)} /></div>
       <PostingRecap title="Live posting preview" currency={currency} dr={[{ code: "AP", name: "Accounts payable", amount: gross }]} cr={[{ code: "BANK", name: "Selected bank account", amount: Math.max(0, gross - wht) }, ...(wht ? [{ code: "WHT", name: "Withholding tax payable", amount: wht }] : [])]} helper="No invoice balance changes until the approved payment is posted." />
     </div>
   </DetailDrawer>;
+}
+
+/** A payment's WHT, with how it was arrived at where the server says. */
+function WhtFigure({ amount, source, currency }: { amount: number; source?: string | null; currency?: string | null }) {
+  const label = whtSourceLabel(source);
+  return <span className="inline-flex flex-wrap items-baseline gap-x-2">{formatMoney(amount, currency)}{label ? <span className="font-mont text-[11px] font-normal text-gray-05">{label}</span> : null}</span>;
 }
 
 /**

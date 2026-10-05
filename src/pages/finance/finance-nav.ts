@@ -53,7 +53,7 @@ export const financeNav: ConsoleNavGroup[] = [
   {
     label: "Operations",
     items: [
-      { title: "Bank Accounts", url: F.BANKING, icon: Landmark, permissions: [P.FIN_VIEW_BANK_ACCOUNTS] },
+      { title: "Bank Accounts", url: F.BANKING, icon: Landmark, permissions: [P.FIN_VIEW_BANK_ACCOUNTS], resources: ["finance.banktransaction", "finance.banktransfer"] },
       { title: "Bank Reconciliation", url: F.BANK_RECON, icon: Scale, permissions: [P.FIN_VIEW_BANK_ACCOUNTS] },
       { title: "Expense Claims", url: `${F.EXPENSES}/claims`, icon: Wallet, permissions: [P.FIN_VIEW_EXPENSE_CLAIMS] },
       { title: "Petty Cash", url: `${F.EXPENSES}/petty-cash`, icon: Coins, permissions: [P.FIN_VIEW_PETTY_CASH], resources: ["finance.pettycashvoucher"] },

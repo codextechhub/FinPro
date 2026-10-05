@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import {
-  CheckCircle2, ChevronRight, Clock3, FilePenLine, FileText, Info, Mail, PackageCheck,
+  Ban, CheckCircle2, ChevronRight, Clock3, FilePenLine, FileText, Info, Mail, PackageCheck,
   Plus, Printer, ReceiptText, Search, Send, ShoppingCart,
 } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -42,6 +42,9 @@ import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
+import { ReasonField } from "@/components/finance-ui/reason-field";
+import { useCancelPurchaseOrderMutation } from "@/redux/services/procurement/payables-corrections-api";
+import { SOURCE_DOCUMENT_ID_PARAM } from "@/lib/source-document-route";
 
 const STATUS_TABS = [
   { label: "All", value: "" },
@@ -215,6 +218,19 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
   const money = (value: number) => formatMoney(value, currency);
   const approvalPending = po?.status === "PENDING_APPROVAL" || po?.approval_state === "PENDING";
   const draftEditable = po?.status === "DRAFT" && !approvalPending;
+  const cancellable = !!po && !["CANCELLED", "REVERSED"].includes(po.status) && !approvalPending;
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelOrder, { isLoading: cancelling }] = useCancelPurchaseOrderMutation();
+  const doCancel = async () => {
+    if (!po || !cancelReason.trim()) return;
+    try {
+      const r = await cancelOrder({ id: po.id, entity, reason: cancelReason.trim() }).unwrap();
+      toast.success(r.message || "Purchase order cancelled.");
+      setCancelOpen(false);
+      setCancelReason("");
+    } catch { /* The server names the correction: return the goods, void the bill or credit it. */ }
+  };
 
   const submitForApproval = async () => {
     if (!po) return;
@@ -263,6 +279,7 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
     {draftEditable && <Can permission={P.PROC_UPDATE_PURCHASE_ORDER}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
     {approvalPending && <span className="font-mont text-xs text-gray-05">Locked while approval is pending</span>}
     {draftEditable && <Can permission={P.PROC_SUBMIT_PURCHASE_ORDER}><Button loading={submitting} onClick={() => setConfirmApproval(true)}><Send className="size-4" /> Submit for Approval</Button></Can>}
+    {cancellable && <Can permission={P.PROC_UPDATE_PURCHASE_ORDER}><Button variant="outline-dest" onClick={() => setCancelOpen(true)}><Ban className="size-4" /> Cancel order</Button></Can>}
   </>}>
     {isLoading ? <LoadingState rows={7} /> : isError || !po ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3"><StatusPill status={po.display_status} /><p className="font-mont text-lg font-semibold tabular-nums text-black-01">{money(po.total)}</p></div>
@@ -299,8 +316,8 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
           <div className="border-t border-white-02 px-3 py-3 text-right font-semibold tabular-nums">{money(line.net_amount + line.tax_amount)}</div>
         </div>)}
       </div></div> : <EmptyBlock text="No line items were added." />)}
-      {tab === "receipts" && (po.receipt_documents.length ? <div className="overflow-hidden rounded-md border border-white-02"><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 bg-[#F1F1F1] px-3 py-2 font-mont text-[11px] font-semibold text-gray-01"><span>Receipt</span><span>Date</span><span>Status</span></div>{po.receipt_documents.map((receipt) => <button type="button" key={receipt.id} onClick={() => openRoute(routesPath.PROTECTED.PROCUREMENT.GOODS_RECEIPTS)} className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-3 border-t border-white-02 px-3 py-3 text-left font-mont text-xs hover:bg-gray-50"><span className="font-semibold text-primary">{receipt.document_number}<span className="ml-2 font-normal text-gray-05">{receipt.item_count} item{receipt.item_count === 1 ? "" : "s"}</span></span><span>{dates.day(receipt.received_date)}</span><StatusPill status={receipt.status} /></button>)}</div> : <EmptyBlock text="No goods receipts have been posted against this purchase order." />)}
-      {tab === "invoices" && (po.invoice_documents.length ? <div className="overflow-hidden rounded-md border border-white-02"><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 bg-[#F1F1F1] px-3 py-2 font-mont text-[11px] font-semibold text-gray-01"><span>Invoice</span><span>Amount</span><span>Status</span></div>{po.invoice_documents.map((invoice) => <button type="button" key={invoice.id} onClick={() => openRoute(routesPath.PROTECTED.PROCUREMENT.VENDOR_INVOICES)} className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-3 border-t border-white-02 px-3 py-3 text-left font-mont text-xs hover:bg-gray-50"><span className="font-semibold text-primary">{invoice.document_number}<span className="ml-2 font-normal text-gray-05">{dates.day(invoice.invoice_date)}</span></span><span className="font-semibold tabular-nums">{money(invoice.total)}</span><StatusPill status={invoice.status} /></button>)}</div> : <EmptyBlock text="No vendor invoices are linked to this purchase order." />)}
+      {tab === "receipts" && (po.receipt_documents.length ? <div className="overflow-hidden rounded-md border border-white-02"><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 bg-[#F1F1F1] px-3 py-2 font-mont text-[11px] font-semibold text-gray-01"><span>Receipt</span><span>Date</span><span>Status</span></div>{po.receipt_documents.map((receipt) => <button type="button" key={receipt.id} onClick={() => openRoute(`${routesPath.PROTECTED.PROCUREMENT.GOODS_RECEIPTS}?${SOURCE_DOCUMENT_ID_PARAM}=${receipt.id}`)} className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-3 border-t border-white-02 px-3 py-3 text-left font-mont text-xs hover:bg-gray-50"><span className="font-semibold text-primary">{receipt.document_number}<span className="ml-2 font-normal text-gray-05">{receipt.item_count} item{receipt.item_count === 1 ? "" : "s"}</span></span><span>{dates.day(receipt.received_date)}</span><StatusPill status={receipt.status} /></button>)}</div> : <EmptyBlock text="No goods receipts have been posted against this purchase order." />)}
+      {tab === "invoices" && (po.invoice_documents.length ? <div className="overflow-hidden rounded-md border border-white-02"><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 bg-[#F1F1F1] px-3 py-2 font-mont text-[11px] font-semibold text-gray-01"><span>Invoice</span><span>Amount</span><span>Status</span></div>{po.invoice_documents.map((invoice) => <button type="button" key={invoice.id} onClick={() => openRoute(`${routesPath.PROTECTED.PROCUREMENT.VENDOR_INVOICES}?${SOURCE_DOCUMENT_ID_PARAM}=${invoice.id}`)} className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-3 border-t border-white-02 px-3 py-3 text-left font-mont text-xs hover:bg-gray-50"><span className="font-semibold text-primary">{invoice.document_number}<span className="ml-2 font-normal text-gray-05">{dates.day(invoice.invoice_date)}</span></span><span className="font-semibold tabular-nums">{money(invoice.total)}</span><StatusPill status={invoice.status} /></button>)}</div> : <EmptyBlock text="No vendor invoices are linked to this purchase order." />)}
       {tab === "approval" && (workflow?.stage_instances.length ? <div className="space-y-3">{workflow.stage_instances.map((stage) => <section key={stage.id} className="rounded-md border border-white-02 p-3"><div className="flex items-center justify-between gap-3"><p className="font-mont text-sm font-semibold">{stage.stage_label}</p><StatusPill status={stage.status} /></div>{stage.actions.length ? <div className="mt-3 space-y-2">{stage.actions.filter((action) => !action.is_reversal_of).map((action) => <div key={action.id} className="border-t border-white-02 pt-2 font-mont text-xs"><p><span className="font-semibold">{name(action.actor)}</span> · {action.action.toLowerCase()}</p><p className="mt-0.5 text-gray-05">{action.comment || "No comment"}</p></div>)}</div> : <p className="mt-2 font-mont text-xs text-gray-05">No decision recorded for this stage.</p>}</section>)}</div> : <EmptyBlock text={po.status === "DRAFT" ? "Submit this draft to begin its approval trail." : "No approval trail is available."} />)}
       {tab === "email" && (po.email_deliveries?.length ? <div className="space-y-3">{po.email_deliveries.map((delivery) => <section key={delivery.id} className="rounded-md border border-white-02 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-mont text-sm font-semibold">{delivery.source === "AUTOMATIC" ? "Automatic after approval" : delivery.source === "RETRY" ? "Retry" : "Manual send"}</p><p className="mt-1 font-mont text-[11px] text-gray-05">Requested by {delivery.requested_by_name} · {dates.dateTime(delivery.created_at)}</p></div><StatusPill status={delivery.status} /></div><div className="mt-3 grid grid-cols-2 gap-2 rounded bg-gray-50 p-2 font-mont text-xs"><span className="text-gray-05">Recipients</span><span className="text-right font-semibold">{delivery.recipient_count}</span><span className="text-gray-05">BCC recipients</span><span className="text-right font-semibold">{delivery.bcc_count}</span></div>{delivery.buyer_message && <p className="mt-3 whitespace-pre-wrap font-mont text-xs leading-5 text-gray-05">{delivery.buyer_message}</p>}{delivery.failure_reason && <div className="mt-3 rounded border border-red-200 bg-red-50 p-2 font-mont text-xs text-red-700">{delivery.failure_reason}</div>}{delivery.status === "FAILED" && canVendorEmail && <div className="mt-3 flex justify-end"><Button size="sm" variant="outline" onClick={() => openEmail(delivery)}>Retry Email</Button></div>}</section>)}</div> : <EmptyBlock text={po.can_email_vendor ? "This approved purchase order has not been emailed yet." : "Email Vendor becomes available after the purchase order is fully approved."} />)}
     </div>}
@@ -314,6 +331,12 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
     </ConfirmActionModal>}
     {po && <ConfirmActionModal open={emailOpen} onOpenChange={(open) => { setEmailOpen(open); if (!open) setRetryDelivery(null); }} title={retryDelivery ? "Retry vendor email?" : "Email this purchase order to the vendor?"} description="A new audited delivery will be queued with the current approved PO attached as a PDF." confirmText={retryDelivery ? "Retry Email" : "Send Email"} onConfirm={deliverEmail} loading={sendingEmail || retryingEmail} confirmDisabled={previewLoading || previewError || !emailPreview?.recipients.length}>
       <EmailDetails preview={emailPreview} loading={previewLoading} error={previewError} message={emailMessage} onMessageChange={setEmailMessage} />
+    </ConfirmActionModal>}
+    {po && <ConfirmActionModal open={cancelOpen} onOpenChange={setCancelOpen} title={`Cancel ${po.document_number}?`} description="Withdraws a commitment nobody will fulfil. The vendor is not emailed: tell them yourself if the order already reached them." confirmText="Cancel order" destructive loading={cancelling} confirmDisabled={!cancelReason.trim()} onConfirm={doCancel}>
+      <div className="space-y-3">
+        {(po.receipt_documents.length > 0 || po.invoice_documents.length > 0) && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 font-mont text-xs leading-5 text-amber-900">An order with goods received or a bill against it is corrected first: return the goods on their receipt, then void the bill while nothing is paid on it, or credit it in full with a credit note.</div>}
+        <ReasonField value={cancelReason} onChange={setCancelReason} label="Why the order is cancelled" placeholder="e.g. Supplier cannot deliver before term starts" />
+      </div>
     </ConfirmActionModal>}
     {noApproverDialog}
   </DetailDrawer>;

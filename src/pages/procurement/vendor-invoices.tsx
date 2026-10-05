@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 
 import { useActionParam } from "@/hooks/use-action-param";
 import {
-  AlertTriangle, Check, ChevronRight, CircleDollarSign, Clock3, FilePenLine,
-  FileText, History, List, Paperclip, Plus, Printer, RotateCcw, Search, Send, X,
+  AlertTriangle, Ban, Check, ChevronRight, CircleDollarSign, Clock3, FileMinus, FilePenLine,
+  FileText, History, List, Paperclip, Plus, Printer, RotateCcw, Search, Send, Upload, X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,7 +16,7 @@ import {
   DataTable, DetailDrawer, ErrorState, FormField, InfoHint, LineEditor,
   LoadingState, PostingRecap, StatCard, StatusPill, TabStrip, emptyLine, toApiLines, toArray,
   useActiveEntity, type Column, type DocLine, type TabStripItem,
-  PostingDateField,} from "@/components/finance-ui";
+  PostingDateField, ConfirmActionModal,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../host";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,10 @@ import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
+import { useVoidVendorInvoiceMutation } from "@/redux/services/procurement/payables-corrections-api";
+import { BillCreditNotes, CreditNoteForm, CreditNotesView } from "./vendor-credit-notes";
+import { OpeningBillsDrawer } from "./opening-bills-drawer";
+import { billCorrection } from "./bill-correction";
 
 const TABS = [
   ["All", ""], ["Draft", "DRAFT"], ["Under Review", "PENDING_APPROVAL"],
@@ -69,8 +74,15 @@ const TABS = [
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["lines", "Line Items", List],
   ["match", "3-Way Match", Check], ["payments", "Payment History", CircleDollarSign],
+  ["credits", "Credit Notes", FileMinus],
   ["attachments", "Attachments", Paperclip], ["activity", "Activity", History],
 ] as const;
+
+/** The two lists this screen holds; `?view=credit-notes` opens the second. */
+const VIEW_ITEMS: TabStripItem<string>[] = [
+  { value: "bills", label: "Bills" },
+  { value: "credit-notes", label: "Credit notes" },
+];
 
 /** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
 const STATUS_TAB_ITEMS: TabStripItem<string>[] = TABS.map(([label, value]) => ({ value, label }));
@@ -88,9 +100,34 @@ function EmptyPanel({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-32 items-center justify-center rounded-md border border-dashed border-white-02 px-4 text-center font-mont text-xs text-gray-05">{children}</div>;
 }
 
+/**
+ * Vendor Invoices: supplier bills, and beside them the credit notes that correct
+ * them. The view lives in the address (`?view=credit-notes`) so an approval link
+ * can open a credit note, and a reader who may see credit notes but not bills
+ * lands on them.
+ */
 export default function VendorInvoicesPage() {
-  const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
+  const { can } = useCan();
+  const [params, setParams] = useSearchParams();
+  const canBills = can(P.PROC_VIEW_VENDOR_INVOICES);
+  const canNotes = can(P.PROC_VIEW_VENDOR_CREDIT_NOTES);
+  const view = (params.get("view") === "credit-notes" && canNotes) || (!canBills && canNotes) ? "credit-notes" : "bills";
+  const switcher = canBills && canNotes ? <TabStrip items={VIEW_ITEMS} value={view} onChange={(next) => setParams((current) => { const nextParams = new URLSearchParams(current); if (next === "bills") nextParams.delete("view"); else nextParams.set("view", next); nextParams.delete("document"); return nextParams; })} variant="pill" ariaLabel="Bills or credit notes" /> : null;
+  if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its vendor invoices." /></PageShell></ProcurementShell>;
+  if (view === "credit-notes") {
+    return <ProcurementShell>
+      <PageShell className="space-y-5 text-black-01">
+        <header className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-1.5"><h1 className="font-mont text-lg font-semibold text-gray-01">Vendor Invoices</h1><InfoHint ariaLabel="About vendor credit notes">A credit note lowers what a posted bill owes. On a bill already paid, the credit stays with the vendor for the same branch&rsquo;s later bills.</InfoHint></div><p className="mt-0.5 font-mont text-xs text-gray-05">Credit notes correcting posted supplier bills.</p></div>{switcher}</header>
+        <CreditNotesView entity={entity} currency={currency} />
+      </PageShell>
+    </ProcurementShell>;
+  }
+  return <BillsView entity={entity} currency={currency} switcher={switcher} />;
+}
+
+function BillsView({ entity, currency, switcher }: { entity: string; currency?: string | null; switcher: React.ReactNode }) {
+  const dates = useDates();
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -99,20 +136,21 @@ export default function VendorInvoicesPage() {
   // A link from an approval names the record to open; it opens here.
   useSourceDocumentParam(setSelectedId);
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const { can } = useCan();
   useActionParam("new", can(P.PROC_CREATE_VENDOR_INVOICE), () => setCreating(true));
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => window.clearTimeout(timer);
   }, [search]);
-  const params = useMemo(() => ({ entity: entity!, page, ...(status ? { display_status: status } : {}), ...(debouncedSearch ? { search: debouncedSearch } : {}) }), [entity, page, status, debouncedSearch]);
-  const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetVendorInvoicesQuery(params, { skip: !entity });
-  const { data: summaryData, isLoading: summaryLoading } = useGetVendorInvoiceSummaryQuery({ entity: entity! }, { skip: !entity });
+  const params = useMemo(() => ({ entity, page, ...(status ? { display_status: status } : {}), ...(debouncedSearch ? { search: debouncedSearch } : {}) }), [entity, page, status, debouncedSearch]);
+  const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetVendorInvoicesQuery(params);
+  const { data: summaryData, isLoading: summaryLoading } = useGetVendorInvoiceSummaryQuery({ entity });
   const rows = toArray(data?.data);
   const summary = summaryData?.data;
   const money = (value: number) => formatMoney(value, currency);
   const columns: Column<VendorInvoice>[] = [
-    { header: "Invoice #", cell: (invoice) => <div className="min-w-36"><p className="font-mont text-sm font-semibold text-primary">{invoice.document_number}</p><p className="mt-1 text-[11px] text-gray-05">{invoice.vendor_reference || "No vendor reference"}</p></div> },
+    { header: "Invoice #", cell: (invoice) => <div className="min-w-36"><p className="font-mont text-sm font-semibold text-primary">{invoice.document_number}</p><p className="mt-1 text-[11px] text-gray-05">{invoice.is_opening ? "Opening balance" : invoice.vendor_reference || "No vendor reference"}</p></div> },
     { header: "Vendor", cell: (invoice) => <div className="min-w-32"><p className="font-semibold">{invoice.vendor_name || invoice.vendor_code}</p><p className="mt-0.5 text-[11px] text-gray-05">{invoice.vendor_code}</p></div> },
     { header: "PO Ref", cell: (invoice) => invoice.purchase_order_number || "Direct" },
     { header: "Due Date", cell: (invoice) => dates.day(invoice.due_date) },
@@ -121,10 +159,9 @@ export default function VendorInvoicesPage() {
     { header: "Status", cell: (invoice) => <div className="flex flex-wrap gap-1"><StatusPill status={invoice.status} />{invoice.display_status !== invoice.status && <StatusPill status={invoice.display_status} />}</div> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
-  if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its vendor invoices." /></PageShell></ProcurementShell>;
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
-      <header data-guide="procurement-vendor-invoices.heading" className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-1.5"><h1 className="font-mont text-lg font-semibold text-gray-01">Vendor Invoices</h1><InfoHint ariaLabel="About vendor invoices">Supplier bills remain drafts until matched, approved, and posted to Accounts Payable.</InfoHint></div><p className="mt-0.5 font-mont text-xs text-gray-05">Review three-way matches, approval, settlement, and overdue exposure.</p></div><div className="flex flex-wrap items-center gap-2"><QuickExportButton screen="procurement.vendor_invoices" params={{ status, search: debouncedSearch }} entity={entity} typeface="geist" defaultName="Vendor invoices" /><Can permission={P.PROC_CREATE_VENDOR_INVOICE}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> Record Invoice</Button></Can></div></header>
+      <header data-guide="procurement-vendor-invoices.heading" className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-1.5"><h1 className="font-mont text-lg font-semibold text-gray-01">Vendor Invoices</h1><InfoHint ariaLabel="About vendor invoices">Supplier bills remain drafts until matched, approved, and posted to Accounts Payable.</InfoHint></div><p className="mt-0.5 font-mont text-xs text-gray-05">Review three-way matches, approval, settlement, and overdue exposure.</p></div><div className="flex flex-wrap items-center gap-2">{switcher}<Can permission={P.PROC_IMPORT_OPENING_VENDOR_INVOICES}><Button variant="outline" onClick={() => setImporting(true)}><Upload className="size-4" /> Opening bills</Button></Can><QuickExportButton screen="procurement.vendor_invoices" params={{ status, search: debouncedSearch }} entity={entity} typeface="geist" defaultName="Vendor invoices" /><Can permission={P.PROC_CREATE_VENDOR_INVOICE}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> Record Invoice</Button></Can></div></header>
       <div data-guide="procurement-vendor-invoices.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {summaryLoading || !summary ? <div className={cn(INFORMATION_CARD_SURFACE, "col-span-full rounded-md")}><LoadingState rows={2} /></div> : <>
           <StatCard label="Under Review" value={summary.under_review.count} icon={Clock3} tone="amber" />
@@ -151,6 +188,7 @@ export default function VendorInvoicesPage() {
     </PageShell>
     <InvoiceDrawer key={selectedId ?? "closed"} id={selectedId} entity={entity} currency={currency} onClose={() => setSelectedId(null)} />
     {creating && <InvoiceForm entity={entity} currency={currency} onClose={() => setCreating(false)} />}
+    {importing && <OpeningBillsDrawer entity={entity} currency={currency} onClose={() => setImporting(false)} />}
   </ProcurementShell>;
 }
 
@@ -173,6 +211,14 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
   const [post, { isLoading: posting }] = usePostVendorInvoiceMutation();
   const [attachFile, { isLoading: attaching }] = useAttachVendorInvoiceFileMutation();
   const [removeFile, { isLoading: removingFile }] = useDeleteVendorInvoiceFileMutation();
+  const [voidBill, { isLoading: voidingBill }] = useVoidVendorInvoiceMutation();
+  const [crediting, setCrediting] = useState(false);
+  const [voidOpen, setVoidOpen] = useState(false);
+  const correction = invoice ? billCorrection(invoice, currency) : null;
+  const doVoid = async () => {
+    if (!invoice) return;
+    try { const response = await voidBill({ id: invoice.id, entity }).unwrap(); toast.success(response.message || "Vendor invoice voided."); setVoidOpen(false); } catch { /* central */ }
+  };
   const attachmentRows = useDocumentAttachmentRows("vendor-invoice", invoice, entity, tab === "attachments");
   const activeStage = useMemo(() => (workflow?.stage_instances || []).filter((stage) => stage.status === "ACTIVE").at(-1), [workflow]);
   const canVote = !!activeStage && workflow?.status === "IN_PROGRESS" && activeStage.eligible_approvers.some((approver) => sameId(approver.user, uid) && approver.attempt === activeStage.attempt) && !activeStage.actions.some((action) => sameId(action.actor, uid) && !action.reversed_at && !action.is_reversal_of && action.attempt === activeStage.attempt);
@@ -204,6 +250,8 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
       {editable && <Can permission={P.PROC_SUBMIT_VENDOR_INVOICE}><Button loading={submitting} onClick={() => action("submit")}><Send className="size-4" /> Submit for Approval</Button></Can>}
       {postEligible && !blockingVariance && <Can permission={P.PROC_POST_VENDOR_INVOICE}><Button loading={posting} onClick={() => action("post")}><Send className="size-4" /> Post Invoice</Button></Can>}
       {postEligible && blockingVariance && <InvoiceVarianceOverrideAction reference={invoice.document_number} onConfirm={() => action("override")} />}
+      {correction?.creditable && <Can permission={P.PROC_CREATE_VENDOR_CREDIT_NOTE}><Button variant="outline" onClick={() => setCrediting(true)}><FileMinus className="size-4" /> Credit note</Button></Can>}
+      {correction?.posted && <Can permission={P.PROC_VOID_VENDOR_INVOICE}><Button variant="outline-dest" onClick={() => setVoidOpen(true)}><Ban className="size-4" /> Void</Button></Can>}
     </>}>
       {isLoading ? <LoadingState rows={8} /> : isError || !invoice ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={invoice.status} /><StatusPill status={invoice.approval_state} /><StatusPill status={invoice.match_status} /><StatusPill status={invoice.payment_status} />{invoice.is_overdue && <StatusPill status="OVERDUE" />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(invoice.total, currency)}</p></div>
@@ -218,12 +266,13 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
         />
         {tab === "overview" && <div className="space-y-5">
           {invoice.approval_state === "PENDING" && <section className="rounded-md border border-amber-200 bg-amber-50 p-4"><p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>{canVote && <><Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" loading={voting} onClick={() => vote("APPROVED")}><Check className="size-4" /> Approve</Button><Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button><Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button></div></>}</section>}
-          <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Vendor invoice #" value={invoice.vendor_reference} /><Field label="Internal invoice #" value={invoice.document_number} /><Field label="Vendor" value={invoice.vendor_name || invoice.vendor_code} /><Field label="PO reference" value={invoice.purchase_order_number || "Direct invoice"} /><Field label="Invoice date" value={dates.day(invoice.invoice_date)} /><Field label="Due date" value={dates.day(invoice.due_date)} /><Field label="Subtotal" value={formatMoney(invoice.subtotal, currency)} /><Field label="Tax" value={formatMoney(invoice.tax_total, currency)} /><Field label="Paid" value={formatMoney(invoice.amount_paid, currency)} /><Field label="Balance due" value={formatMoney(invoice.balance_due, currency)} /></dl>
+          <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Vendor invoice #" value={invoice.vendor_reference} /><Field label="Internal invoice #" value={invoice.document_number} /><Field label="Vendor" value={invoice.vendor_name || invoice.vendor_code} /><Field label="PO reference" value={invoice.purchase_order_number || "Direct invoice"} /><Field label="Invoice date" value={dates.day(invoice.invoice_date)} /><Field label="Due date" value={dates.day(invoice.due_date)} /><Field label="Subtotal" value={formatMoney(invoice.subtotal, currency)} /><Field label="Tax" value={formatMoney(invoice.tax_total, currency)} /><Field label="Paid" value={formatMoney(invoice.amount_paid, currency)} />{!!invoice.amount_credited && <Field label="Credited" value={formatMoney(invoice.amount_credited, currency)} />}<Field label="Balance due" value={formatMoney(invoice.balance_due, currency)} />{invoice.is_opening && <Field label="Carried in" value="Opening balance from before go-live" />}</dl>
           <InvoicePostingRecap invoice={invoice} currency={currency} />
         </div>}
         {tab === "lines" && (invoice.lines.length ? <div className="overflow-x-auto rounded-md border border-white-02"><table className="min-w-[580px] w-full"><thead><tr>{["Description", "Qty", "Unit price", "Tax", "Total"].map((label) => <th key={label} className="bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01">{label}</th>)}</tr></thead><tbody>{invoice.lines.map((line) => <tr key={line.id}><td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold">{line.description}</td><td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{formatQuantity(line.quantity)}</td><td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{formatMoney(line.unit_price, currency)}</td><td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{formatMoney(line.tax_amount, currency)}</td><td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold tabular-nums">{formatMoney(line.net_amount + line.tax_amount, currency)}</td></tr>)}</tbody></table></div> : <EmptyPanel>No invoice lines were recorded.</EmptyPanel>)}
         {tab === "match" && <MatchPanel invoice={invoice} currency={currency} />}
         {tab === "payments" && (invoice.payments?.length ? <div className="space-y-2">{invoice.payments.map((payment) => <div key={payment.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 rounded-md border border-white-02 p-3"><div><p className="font-mont text-sm font-semibold">{payment.document_number}</p><p className="mt-1 font-mont text-xs text-gray-05">{dates.day(payment.payment_date)} · {payment.status}</p></div><p className="font-mont text-sm font-semibold tabular-nums">{formatMoney(payment.amount, currency)}</p></div>)}</div> : <EmptyPanel>No payment has been allocated to this invoice.</EmptyPanel>)}
+        {tab === "credits" && <BillCreditNotes bill={invoice} entity={entity} currency={currency} />}
         {tab === "attachments" && <DocumentAttachments
           attachments={attachmentRows}
           documentIsDraft={invoice.status === "DRAFT"}
@@ -241,6 +290,19 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
       {noApproverDialog}
     </DetailDrawer>
     {invoice && editing && <InvoiceForm entity={entity} currency={currency} initial={invoice} onClose={() => setEditing(false)} />}
+    {invoice && crediting && <CreditNoteForm entity={entity} currency={currency} bill={invoice} onClose={() => setCrediting(false)} onCreated={() => setTab("credits")} />}
+    {invoice && correction && <ConfirmActionModal
+      open={voidOpen}
+      onOpenChange={setVoidOpen}
+      title={correction.voidable ? `Void ${invoice.document_number}?` : `${invoice.document_number} cannot be voided`}
+      description={correction.voidable
+        ? "Reverses the bill's posting and gives the purchase order back its billed quantities. The bill stays in history as voided."
+        : correction.voidRefusal ?? undefined}
+      confirmText={correction.voidable ? "Void bill" : "Raise a credit note"}
+      destructive={correction.voidable}
+      loading={voidingBill}
+      onConfirm={correction.voidable ? doVoid : () => { setVoidOpen(false); setCrediting(true); }}
+    />}
   </>;
 }
 
