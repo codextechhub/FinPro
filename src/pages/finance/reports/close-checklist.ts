@@ -66,7 +66,32 @@ export const CHECK_LABELS: Record<string, string> = {
   trial_balance_balanced: "Trial balance balanced",
   no_draft_journals: "No draft journals",
   depreciation_posted: "Depreciation posted",
+  inter_branch_balanced: "Branches agree on what they owe each other",
 };
 
 export const checklistLabel = (name: string, fallback: (value: string) => string) =>
   CHECK_LABELS[name] ?? fallback(name);
+
+/**
+ * A row's detail in the reader's words.
+ *
+ * The inter-branch check names branches by id and amounts in kobo ("branches 3
+ * and 5 disagree: 100000000 kobo on one side and 95000000 kobo on the other"),
+ * so this one row is reworded with the branches' names and naira: "Ikeja and
+ * Lekki disagree: N1,000,000.00 on one side and N950,000.00 on the other".
+ * Every other row, and any wording this does not recognise, is shown as sent.
+ */
+export function checklistDetail(
+  item: CloseChecklistItem,
+  { branchName, money }: { branchName: (id: number) => string | undefined; money: (kobo: number) => string },
+): string {
+  const detail = item.detail ?? "";
+  if (item.name !== "inter_branch_balanced") return detail;
+  return detail
+    .replace(/branches (\d+) and (\d+) disagree/g, (whole, a: string, b: string) => {
+      const first = branchName(Number(a));
+      const second = branchName(Number(b));
+      return first && second ? `${first} and ${second} disagree` : whole;
+    })
+    .replace(/(-?\d+) kobo/g, (_whole, kobo: string) => money(Number(kobo)));
+}

@@ -142,6 +142,20 @@ describe("what a reader is offered", () => {
     expect(consoleOffersScreens(financeNav, reader())).toBe(false);
   });
 
+  it("offers Between Branches only at a school with more than one branch", () => {
+    const bursar = reader("finance.interbranch.view", "finance.payment.view");
+    const between = (multiBranch?: boolean) =>
+      visibleConsoleNav(financeNav, { ...bursar, multiBranch }).find((g) => g.label === "Between Branches");
+
+    expect(between(true)?.items.map((i) => i.title)).toEqual([
+      "Inter-branch Transfers", "Inter-branch Balances", "Held Receipts", "Recharges", "Shared Cost Rules",
+    ]);
+    // Sunrise Academy runs one branch: the whole group is absent, not empty.
+    expect(between(false)).toBeUndefined();
+    // A caller that cannot tell keeps the screens hidden.
+    expect(between(undefined)).toBeUndefined();
+  });
+
   it("drops a group whose every screen is closed rather than showing an empty heading", () => {
     const labels = visibleConsoleNav(financeNav, reader("finance.invoice.view")).map((g) => g.label);
     expect(labels).toEqual([undefined, "Receivables"]);

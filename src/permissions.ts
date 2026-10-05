@@ -21,7 +21,9 @@
  *   21 tax, 22 payrollrun, 23 budget, 24 fixedasset, 25 audit, 26 customer,
  *   27 feestructure, 28 payment, 29 pettycashvoucher, 30 salary, 31 writeoff,
  *   32 settings; 33 entity, 34 account and 35 period hold the renumbered codes
- *   described below; 36 fiscalyear.
+ *   described below; 36 fiscalyear; 55 interbranch (transfers between a
+ *   school's branches, with its own actions 52 request, 53 transfer,
+ *   54 confirm and 55 recharge).
  *
  *   Procurement (70): 01 category, 02 vendor, 03 catalog_item, 04 contract,
  *   05 requisition, 06 rfq, 07 quotation, 08 purchase_order, 09 goods_receipt,
@@ -151,6 +153,12 @@ export const P = {
   FIN_VIEW_FEE_STRUCTURES: "202701",
   FIN_VIEW_FIXED_ASSETS: "202401",
   FIN_VIEW_FX_RATES: "201401",
+  FIN_VIEW_INTERBRANCH: "205501",
+  FIN_REQUEST_INTERBRANCH: "205552",
+  FIN_TRANSFER_INTERBRANCH: "205553",
+  FIN_CONFIRM_INTERBRANCH: "205554",
+  FIN_RECHARGE_INTERBRANCH: "205555",
+  FIN_REVERSE_INTERBRANCH: "205514",
   FIN_VIEW_INVOICES: "200501",
   FIN_VIEW_JOURNALS: "200401",
   FIN_VIEW_PAYMENTS: "202801",
@@ -274,6 +282,12 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "200342": "finance.period.reopen",
   "200343": "finance.period.lock",
   "203642": "finance.fiscalyear.reopen",
+  "205501": "finance.interbranch.view",
+  "205552": "finance.interbranch.request",
+  "205553": "finance.interbranch.transfer",
+  "205554": "finance.interbranch.confirm",
+  "205555": "finance.interbranch.recharge",
+  "205514": "finance.interbranch.reverse",
   "200414": "finance.journal.reverse",
   "200430": "finance.journal.submit",
   "200502": "finance.invoice.create",

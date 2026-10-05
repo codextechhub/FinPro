@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  checklistSeverity, closeOutcomeMessage, failedBlockers, failedWarnings,
+  checklistDetail, checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers, failedWarnings,
 } from "./close-checklist";
 import type { CloseChecklistItem } from "@/redux/services/finance/setup-types";
 
@@ -68,5 +68,42 @@ describe("close outcome message", () => {
   it("falls back when a warning carries no detail", () => {
     expect(closeOutcomeMessage("Aug 2026", [item({ passed: false, blocking: false, detail: "" })]))
       .toBe("Closed Aug 2026. One check is worth a look.");
+  });
+});
+
+/**
+ * Bright Star closes September with Ikeja (branch 3) and Lekki (branch 5) still
+ * disagreeing about a transfer Lekki never confirmed. The check names them by id
+ * and counts in kobo; the reader sees the branches and naira.
+ */
+describe("the inter-branch close check", () => {
+  const names: Record<number, string> = { 3: "Ikeja", 5: "Lekki" };
+  const words = {
+    branchName: (id: number) => names[id],
+    money: (kobo: number) => `N${(kobo / 100).toFixed(2)}`,
+  };
+
+  it("has a label of its own", () => {
+    expect(checklistLabel("inter_branch_balanced", (v) => v)).toBe("Branches agree on what they owe each other");
+  });
+
+  it("names the branches and the amounts in naira", () => {
+    const row = item({
+      name: "inter_branch_balanced", passed: false, blocking: true,
+      detail: "branches 3 and 5 disagree: 100000000 kobo on one side and 95000000 kobo on the other; the inter-branch account nets to 5000000 kobo, not zero",
+    });
+    expect(checklistDetail(row, words)).toBe(
+      "Ikeja and Lekki disagree: N1000000.00 on one side and N950000.00 on the other; the inter-branch account nets to N50000.00, not zero",
+    );
+  });
+
+  it("keeps the ids when a branch is not in the list", () => {
+    const row = item({ name: "inter_branch_balanced", passed: false, detail: "branches 3 and 9 disagree: 100 kobo on one side and 0 kobo on the other" });
+    expect(checklistDetail(row, words)).toBe("branches 3 and 9 disagree: N1.00 on one side and N0.00 on the other");
+  });
+
+  it("leaves every other check's detail as sent", () => {
+    const row = item({ name: "ap_reconciled", passed: false, detail: "sub-ledger 1234500 vs control 1234000 kobo" });
+    expect(checklistDetail(row, words)).toBe("sub-ledger 1234500 vs control 1234000 kobo");
   });
 });

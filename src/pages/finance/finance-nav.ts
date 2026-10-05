@@ -1,8 +1,10 @@
 /**
  * Finance console sidebar, grouped into labelled sections (Ledger & Setup,
- * Receivables, Operations, Payments, Reports & Close). Items are flat leaves,
- * each a real route, gated by the view permission its landing list requires;
- * see console-nav.ts for the rules. Dashboard is pinned above the first group.
+ * Receivables, Operations, Between Branches, Payments, Reports & Close). Items
+ * are flat leaves, each a real route, gated by the view permission its landing
+ * list requires; see console-nav.ts for the rules. Dashboard is pinned above
+ * the first group. Between Branches is offered only at a school with more than
+ * one branch (`multiBranch`).
  */
 
 import {
@@ -10,13 +12,15 @@ import {
   Coins, Percent, Layers, ReceiptText, Users, CreditCard, FileMinus, Undo2,
   CalendarClock, BadgePercent, BellRing, ListChecks, Landmark, Wallet,
   PiggyBank, Boxes, Scale, TrendingUp, ArrowLeftRight, GitBranch, ScrollText,
-  CircleDollarSign, Send, Settings, AlertTriangle,
+  CircleDollarSign, Send, Settings, AlertTriangle, ArrowRightLeft, HandCoins, Split, Handshake,
 } from "lucide-react";
 import type { ConsoleNavGroup } from "@/components/finance-ui/console-nav";
 import { routesPath } from "@/routes/routes-path";
 import { P } from "../../permissions";
+import { INTER_BRANCH_PATH } from "./console-sections";
 
 const F = routesPath.PROTECTED.FINANCE;
+const IB = INTER_BRANCH_PATH;
 
 export const financeNav: ConsoleNavGroup[] = [
   { items: [{ title: "Dashboard", url: F.INDEX, icon: LayoutDashboard }] },
@@ -61,6 +65,17 @@ export const financeNav: ConsoleNavGroup[] = [
       { title: "Budgets & Forecasts", url: `${F.BUDGETS}/budgets`, icon: PiggyBank, permissions: [P.FIN_VIEW_BUDGETS] },
       { title: "Fixed Assets", url: `${F.BUDGETS}/assets`, icon: Boxes, permissions: [P.FIN_VIEW_FIXED_ASSETS] },
       { title: "Tax Remittance", url: `${F.BUDGETS}/tax`, icon: Percent, permissions: [P.FIN_VIEW_TAX] },
+    ],
+  },
+
+  {
+    label: "Between Branches",
+    items: [
+      { title: "Inter-branch Transfers", url: `${IB}/transfers`, icon: ArrowRightLeft, permissions: [P.FIN_VIEW_INTERBRANCH], resources: ["finance.interbranch"], multiBranch: true },
+      { title: "Inter-branch Balances", url: `${IB}/balances`, icon: Scale, permissions: [P.FIN_VIEW_INTERBRANCH], multiBranch: true },
+      { title: "Held Receipts", url: `${IB}/held-receipts`, icon: HandCoins, permissions: [P.FIN_VIEW_PAYMENTS], multiBranch: true },
+      { title: "Recharges", url: `${IB}/recharges`, icon: Split, permissions: [P.FIN_VIEW_INTERBRANCH], multiBranch: true },
+      { title: "Shared Cost Rules", url: `${IB}/cost-rules`, icon: Handshake, permissions: [P.FIN_VIEW_INTERBRANCH], multiBranch: true },
     ],
   },
 

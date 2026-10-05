@@ -34,6 +34,9 @@ export interface ConsoleNavChild {
   permissions?: PermissionCode[];
   /** Backend resources ("finance.salary") used on this screen beyond `permissions`. */
   resources?: string[];
+  /** A screen about branches dealing with each other, offered only where the
+   *  school runs more than one branch (see `ConsoleNavGate.multiBranch`). */
+  multiBranch?: boolean;
 }
 
 export interface ConsoleNavItem extends ConsoleNavChild {
@@ -57,10 +60,19 @@ export interface ConsoleNavGroup {
 export interface ConsoleNavGate {
   hasAnyPermission: (...codes: PermissionCode[]) => boolean;
   hasModuleAccess: (...prefixes: string[]) => boolean;
+  /**
+   * Whether the school runs more than one branch. A `multiBranch` screen
+   * opens only when this is `true`: at Sunrise Academy, with one branch, there
+   * is no other branch to send money to, so Inter-branch Transfers is not in
+   * the menu at all. A caller that does not know leaves it out, and such
+   * screens stay hidden rather than appearing at a school that cannot use them.
+   */
+  multiBranch?: boolean;
 }
 
 /** Whether a screen opens for this reader. */
 export function navEntryOpen(entry: ConsoleNavChild, gate: ConsoleNavGate): boolean {
+  if (entry.multiBranch && gate.multiBranch !== true) return false;
   return !entry.permissions?.length || gate.hasAnyPermission(...entry.permissions);
 }
 
@@ -94,10 +106,12 @@ export function visibleConsoleNav(nav: ConsoleNavGroup[], gate: ConsoleNavGate):
  * would land on a page with nothing of theirs on it.
  */
 export function consoleOffersScreens(nav: ConsoleNavGroup[], gate: ConsoleNavGate): boolean {
-  const offers = (entry: ConsoleNavChild) =>
-    entry.permissions?.length
+  const offers = (entry: ConsoleNavChild) => {
+    if (entry.multiBranch && gate.multiBranch !== true) return false;
+    return entry.permissions?.length
       ? gate.hasAnyPermission(...entry.permissions)
       : !!entry.resources?.some((resource) => gate.hasModuleAccess(`${resource}.`));
+  };
   return nav.some((group) =>
     group.items.some((item) => (item.children?.length ? item.children.some(offers) : offers(item))),
   );

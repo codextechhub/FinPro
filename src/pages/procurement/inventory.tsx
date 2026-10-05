@@ -6,7 +6,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowLeftRight, Banknote, Boxes, ChevronRight, FilePenLine, FileText,
-  History, MapPin, PackageMinus, PackageX, Plus, Search, SlidersHorizontal,
+  History, MapPin, PackageMinus, PackageX, Plus, Search, SlidersHorizontal, Truck,
 } from "lucide-react";
 
 import { ProcurementShell } from "./procurement-shell";
@@ -14,7 +14,7 @@ import {
   AccountPicker, CostCenterPicker, DataTable, DetailDrawer, EmptyState, ErrorState, FormDrawer, FormField,
   LoadingState, Money, MoneyInput, PostingRecap, Segmented, StatCard, StatusPill, TabStrip, toArray,
   useActiveEntity, type Column, type RecapRow, type TabStripItem,
-  PostingDateField,} from "@/components/finance-ui";
+  PostingDateField, useReaderBranchLens,} from "@/components/finance-ui";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ import { P } from "../../permissions";
 import {
   useGetStockItemsQuery, useGetStockItemQuery, useGetStockSummaryQuery,
   useGetStockMovementsQuery, useCreateStockItemMutation, useUpdateStockItemMutation,
-  useIssueStockMutation, useAdjustStockMutation, useGetStockBalancesQuery,
+  useIssueStockMutation, useAdjustStockMutation, useGetStockBalancesQuery, useTransferStockMutation,
 } from "@/redux/services/procurement/procurement-ext-api";
 import type { StockItem, StockItemDetail, StockMovement } from "@/redux/services/procurement/procurement-types";
 import { formatMoney } from "@/utils/money";
@@ -68,7 +68,7 @@ const DETAIL_TABS = [
 ] as const;
 
 const MOVEMENT_TABS = [
-  ["All", ""], ["Receipt", "RECEIPT"], ["Issue", "ISSUE"], ["Adjustment", "ADJUSTMENT"],
+  ["All", ""], ["Receipt", "RECEIPT"], ["Issue", "ISSUE"], ["Adjustment", "ADJUSTMENT"], ["Transfer", "TRANSFER"],
 ] as const;
 
 /** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
@@ -223,6 +223,8 @@ function StockItemDrawer({ id, entity, currency, onClose }: { id: number | null;
   const [editing, setEditing] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const { applies: multiBranch } = useReaderBranchLens();
   const { data, isLoading, isError, refetch } = useGetStockItemQuery({ id: id!, entity }, { skip: id == null });
   const item = data?.data;
 
@@ -236,6 +238,9 @@ function StockItemDrawer({ id, entity, currency, onClose }: { id: number | null;
         <Can permission={P.PROC_UPDATE_STOCK}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>
         <Can permission={P.PROC_ISSUE_STOCK}><Button variant="outline" onClick={() => setIssuing(true)}><PackageMinus className="size-4" /> Issue</Button></Can>
         <Can permission={P.PROC_ADJUST_STOCK}><Button variant="outline" onClick={() => setAdjusting(true)}><SlidersHorizontal className="size-4" /> Adjust</Button></Can>
+        {multiLocation || multiBranch ? (
+          <Can permission={P.PROC_ISSUE_STOCK}><Button variant="outline" onClick={() => setTransferring(true)}><Truck className="size-4" /> Transfer</Button></Can>
+        ) : null}
       </>}
     >
       {isLoading ? <LoadingState rows={8} /> : isError || !item ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
@@ -279,6 +284,7 @@ function StockItemDrawer({ id, entity, currency, onClose }: { id: number | null;
     {item && editing && <StockItemForm entity={entity} initial={item} onClose={() => setEditing(false)} />}
     {item && issuing && <IssueDrawer entity={entity} currency={currency} item={item} onClose={() => setIssuing(false)} />}
     {item && adjusting && <AdjustDrawer entity={entity} currency={currency} item={item} onClose={() => setAdjusting(false)} />}
+    {item && transferring && <TransferStockDrawer entity={entity} currency={currency} item={item} onClose={() => setTransferring(false)} />}
   </>;
 }
 
@@ -607,6 +613,90 @@ function AdjustDrawer({ entity, currency, item, onClose }: { entity: string; cur
         <FormField label="Narration"><Input value={narration} onChange={(e) => setNarration(e.target.value)} className="bg-white" /></FormField>
       </div>
       <PostingRecap title="Journal preview" dr={dr} cr={cr} currency={currency} helper={isIncrease ? "Write-up: debits the inventory asset and credits the adjustment account." : "Shrinkage: debits the adjustment account and credits the inventory asset."} />
+    </FormDrawer>
+  );
+}
+
+// ── Transfer drawer (store to store at the sending store's average) ──────────
+/**
+ * Move stock from one store to another at the sending store's moving-average
+ * cost. Between two branches' stores, the receiving branch owes the cost
+ * through the inter-branch account (Lekki owes Ikeja N15,000 for 50 exercise
+ * books at N300); between two stores of one branch nothing posts.
+ *
+ * A reader lists only their own branch's stores, so a store at another branch
+ * is named by its code; the server accepts any live store of the books.
+ */
+function TransferStockDrawer({ entity, currency, item, onClose }: { entity: string; currency?: string | null; item: StockItemDetail; onClose: () => void }) {
+  const loc = useMovementLocation(entity, item);
+  const onHand = loc.onHand;
+  const [qty, setQty] = useState("");
+  const [movementDate, setMovementDate] = useState("");
+  const [toStore, setToStore] = useState("");
+  const [toCode, setToCode] = useState("");
+  const [reference, setReference] = useState("");
+  const [narration, setNarration] = useState("");
+  const [transfer, { isLoading }] = useTransferStockMutation();
+
+  const q = Number(qty);
+  const qtyValid = Number.isFinite(q) && q > 0 && q <= onHand;
+  const value = onHand > 0 && qtyValid ? Math.round((loc.stockValue * q) / onHand) : 0;
+  const others = loc.locations.filter((l) => String(l.id) !== (loc.multi ? loc.locationId : String(loc.locations[0]?.id ?? "")));
+  const target = toCode.trim() || toStore;
+  const sameStore = !!toStore && toStore === loc.locationId;
+  const canSubmit = qtyValid && !!target && !sameStore && loc.ready;
+
+  const save = async () => {
+    if (!canSubmit) return;
+    try {
+      const r = await transfer({
+        id: item.id, entity, quantity: q, to_location: toCode.trim() || Number(toStore),
+        ...(loc.multi ? { location: Number(loc.locationId) } : {}),
+        movement_date: movementDate || undefined,
+        reference: reference.trim() || undefined, narration: narration.trim() || undefined,
+      }).unwrap();
+      toast.success(r.data?.inter_branch_transfer_id
+        ? "Stock transferred. The receiving branch owes the cost between branches."
+        : r.message || "Stock transferred.");
+      onClose();
+    } catch { /* central */ }
+  };
+
+  return (
+    <FormDrawer
+      open onOpenChange={(o) => !isLoading && !o && onClose()}
+      title="Transfer stock" description={`Move ${item.code} to another store at its moving-average cost.`}
+      widthClass="sm:max-w-lg" onSubmit={save} submitText="Transfer" loading={isLoading} canSubmit={canSubmit}
+    >
+      {loc.multi && (
+        <FormField label="From store" required>
+          <StockLocationPicker locations={loc.locations} value={loc.locationId} onChange={loc.setLocationId} isRequired />
+        </FormField>
+      )}
+      {others.length ? (
+        <FormField label="To store">
+          <StockLocationPicker locations={others} value={toStore} onChange={(v) => { setToStore(v); setToCode(""); }} />
+        </FormField>
+      ) : null}
+      <FormField label={others.length ? "Or the code of a store at another branch" : "Code of the receiving store"} required={!others.length}>
+        <Input value={toCode} onChange={(e) => { setToCode(e.target.value); if (e.target.value) setToStore(""); }} placeholder="e.g. LEK-MAIN" className="bg-white" />
+      </FormField>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <FormField label="Quantity" required>
+          <Input type="number" min="0" value={qty} onChange={(e) => setQty(e.target.value)} className="bg-white tabular-nums" />
+          <span className="mt-1 block font-mont text-[11px] text-gray-05">Up to {fmtQty(String(onHand))} available{loc.multi ? " here" : ""}</span>
+        </FormField>
+        <PostingDateField label="Movement date" entity={entity} value={movementDate} onChange={setMovementDate} />
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <FormField label="Reference"><Input value={reference} onChange={(e) => setReference(e.target.value)} className="bg-white" /></FormField>
+        <FormField label="Narration"><Input value={narration} onChange={(e) => setNarration(e.target.value)} className="bg-white" /></FormField>
+      </div>
+      <div className={cn(INFORMATION_CARD_SURFACE, "space-y-1 p-3")}>
+        <p className="font-mont text-xs text-gray-05">Value moved</p>
+        <p className="font-mont text-base font-semibold tabular-nums">{formatMoney(value, currency)}</p>
+        <p className="font-mont text-[11px] leading-5 text-gray-05">Between two branches' stores the receiving branch owes this to the sending branch. Between two stores of one branch nothing is booked.</p>
+      </div>
     </FormDrawer>
   );
 }

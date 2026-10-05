@@ -27,6 +27,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { routesPath } from "@/routes/routes-path";
 import { visibleConsoleNav, type ConsoleNavGroup, type ConsoleNavItem } from "./console-nav";
 import { revealActiveSidebarItem } from "./sidebar-navigation";
+import { useReaderBranchLens } from "./raising-branch";
 
 /**
  * Each console page mounts its own shell, so the sidebar remounts on every
@@ -39,6 +40,7 @@ const scrollByConsole = new Map<string, number>();
 export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavGroup[] }) {
   const location = useLocation().pathname;
   const { hasAnyPermission, hasModuleAccess } = usePermissions();
+  const { applies: multiBranch } = useReaderBranchLens();
   const scrollRef = useRef<HTMLDivElement>(null);
   const isCollapsed = useSidebar().state === "collapsed";
 
@@ -52,7 +54,7 @@ export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavG
     revealActiveSidebarItem(el, remembered);
   }, [title, location]);
 
-  const visibleNav = visibleConsoleNav(nav, { hasAnyPermission, hasModuleAccess });
+  const visibleNav = visibleConsoleNav(nav, { hasAnyPermission, hasModuleAccess, multiBranch });
 
   // Find the single best-matching leaf URL (longest URL whose path is a prefix
   // of the current location). This prevents a shorter sibling URL from also

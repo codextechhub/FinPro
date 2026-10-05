@@ -3,12 +3,14 @@
  * paid / Open invoices) and tabs: Transactions · Statement · Contact. The Customer
  * Statement is a printable statement-of-account document (entity letterhead,
  * customer + period, a debit/credit ledger with opening + closing balance) with
- * Print and Send-to-customer actions. Footer: Run reminders · Record payment.
+ * Print and Send-to-customer actions. Footer: Run reminders · Record payment,
+ * and Move to another branch for a whole-school reader at a school with several
+ * branches (the customer's whole open balance; see move-balance-drawer.tsx).
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { ArrowLeftRight, ScrollText, User, BellRing, CreditCard, Printer, Receipt } from "lucide-react";
+import { ArrowLeftRight, ScrollText, User, BellRing, CreditCard, Printer, Receipt, Users } from "lucide-react";
 import { DetailDrawer, DocumentEmailAction, Money, ConfirmActionModal, FormField, TabStrip, useActiveEntity, type TabStripItem } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState, EmptyState } from "@/components/finance-ui/states";
@@ -23,6 +25,8 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { Customer, CustomerDetail } from "@/redux/services/finance/ar-types";
 import { CustomerReceiptModal } from "./customer-receipt-modal";
+import { MoveBalanceDrawer } from "../inter-branch/move-balance-drawer";
+import { useInterBranchReader } from "../inter-branch/use-inter-branch";
 import { useDates } from "../../../lib/display-prefs";
 
 const TABS = [
@@ -81,6 +85,10 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
   const c = d?.customer;
   const s = d?.summary;
   const owes = (s?.current_balance.kobo ?? 0) > 0;   // footer actions only when owed
+  const reader = useInterBranchReader();
+  const [moving, setMoving] = useState(false);
+  // Moving binds two branches' books, so the server keeps it for a whole-school reader.
+  const offerMove = reader.applies && reader.reach.wholeSchool && reader.keys.transfer;
 
   const sendReminder = async () => {
     if (!c) return;
@@ -109,14 +117,19 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
       title={c ? c.name : "Customer"}
       description={c ? `${c.code}${c.billing_email ? ` · ${c.billing_email}` : ""}` : undefined}
       widthClass="sm:max-w-3xl"
-      footer={c && owes ? (
-        <div className="flex w-full items-center justify-end gap-2">
+      footer={c && (owes || offerMove) ? (
+        <div className="flex w-full flex-wrap items-center justify-end gap-2">
+          {offerMove ? (
+            <Button variant="outline" onClick={() => setMoving(true)} className="gap-1.5"><Users className="size-4" /> Move to another branch</Button>
+          ) : null}
+          {owes ? <>
           <Can permission={P.FIN_SEND_DUNNING}>
             <Button variant="outline" onClick={() => setRemindOpen(true)} className="gap-1.5"><BellRing className="size-4" /> Run reminders</Button>
           </Can>
           <Can permission={P.FIN_RECORD_PAYMENT}>
             <Button onClick={() => setReceiptOpen(true)} className="gap-1.5"><CreditCard className="size-4" /> Record payment</Button>
           </Can>
+          </> : null}
         </div>
       ) : undefined}
     >
@@ -193,6 +206,9 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
             loading={reminding}
             onConfirm={sendReminder}
           />
+          {moving ? (
+            <MoveBalanceDrawer entity={entity} currency={currency} reader={reader} customerCode={c.code} onClose={() => setMoving(false)} />
+          ) : null}
         </>
       )}
     </DetailDrawer>
