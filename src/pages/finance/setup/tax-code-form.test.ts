@@ -8,7 +8,6 @@ const taxCode: TaxCode = {
   name: "VAT 7.5%",
   treatment: "STANDARD",
   rate_bps: 750,
-  treatment: "STANDARD",
   is_recoverable: false,
   collected_account: "2210",
   paid_account: "1210",

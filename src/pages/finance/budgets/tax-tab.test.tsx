@@ -5,7 +5,8 @@
  * the share's branch, so Ikeja's ₦80,000 is paid from Ikeja's bank and Lekki's
  * from Lekki's. Filing with a ₦25,000 penalty asks which branch bears it, and
  * left on the default it is shared by each branch's share of the tax. A school
- * with one branch is asked neither.
+ * with one branch is asked neither. Mrs Adeyemi, Lekki's own bursar, is not
+ * offered filing at all: the server keeps it for the whole school.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   pay: vi.fn(),
   file: vi.fn(),
   bankBranch: [] as unknown[],
+  wholeSchool: true,
 }));
 
 vi.mock("@/redux/services/finance/ops-api", () => ({
@@ -32,7 +34,11 @@ vi.mock("@/redux/services/finance/tax-api", () => ({
   useFileTaxReturnMutation: () => [mocks.file, { isLoading: false }],
   usePayTaxShareMutation: () => [mocks.pay, { isLoading: false }],
   useReverseTaxRemittanceMutation: () => [vi.fn(), { isLoading: false }],
-  useGetTaxFilingScheduleQuery: () => ({ data: undefined, isLoading: false, isFetching: false, isError: false }),
+}));
+
+vi.mock("./payroll-returns", () => ({
+  AnnualPayeReturnDrawer: () => null,
+  RemittanceSchedulePanel: () => null,
 }));
 
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
@@ -55,7 +61,7 @@ vi.mock("@/hooks/use-permissions", () => ({
 
 vi.mock("../../../host", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useReaderReach: () => ({ wholeSchool: true, branchIds: null, covers: () => true }),
+  useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.wholeSchool ? null : [2], covers: () => mocks.wholeSchool }),
 }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -91,6 +97,7 @@ beforeEach(() => {
   mocks.pay.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Remitted." }) });
   mocks.file.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Filed." }) });
   mocks.bankBranch = [];
+  mocks.wholeSchool = true;
 });
 
 afterEach(async () => {
@@ -169,5 +176,15 @@ describe("filing with a penalty", () => {
     await click(submit);
 
     expect(mocks.file).toHaveBeenCalledWith(expect.objectContaining({ adjustment_amount: 2500000, adjustment_account: "6100", adjustment_branch: 1 }));
+  });
+});
+
+describe("a branch's own bursar", () => {
+  it("is not offered filing, which changes every branch's return", async () => {
+    mocks.wholeSchool = false;
+    mocks.filing = { ...base, filing_status: "DRAFT", filed_at: null, branch_breakdown: [share(2, "Lekki", 4_000_000)] };
+    await openReturn();
+    expect(button("Mark as filed")).toBeUndefined();
+    expect(button("New filing")).toBeUndefined();
   });
 });
