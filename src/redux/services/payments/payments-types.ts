@@ -407,9 +407,21 @@ export interface CustodyBranch {
   held_balance: number;
 }
 
+/**
+ * The custody settings as the server answers them. A holder of
+ * `payments.settings.view` gets every field; a holder of `payments.payout.view`
+ * alone gets the short answer, `{ settings: { mode } }`, with no other setting
+ * and no branches. Read a full answer through `isFullCustodyPayload`.
+ */
 export interface CustodyPayload {
+  settings: Pick<CustodySettings, "mode"> & Partial<CustodySettings>;
+  /** The branches in the reader's reach; absent from the short answer. */
+  branches?: CustodyBranch[];
+}
+
+/** The whole answer, which the Online payments panel needs. */
+export interface FullCustodyPayload {
   settings: CustodySettings;
-  /** The branches in the reader's reach. */
   branches: CustodyBranch[];
 }
 

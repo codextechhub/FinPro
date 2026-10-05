@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { branchesNotReady, custodyChange, firstOfNextMonth, wholeDaysIn } from "./custody-model";
+import { branchesNotReady, custodyChange, firstOfNextMonth, isFullCustodyPayload, wholeDaysIn } from "./custody-model";
 
 describe("firstOfNextMonth", () => {
   it("is the first of the following month, across a year end", () => {
@@ -55,5 +55,20 @@ describe("wholeDaysIn", () => {
     expect(wholeDaysIn("8", 1, 7)).toBeNull();
     expect(wholeDaysIn("2.5", 1, 7)).toBeNull();
     expect(wholeDaysIn("", 1, 7)).toBeNull();
+  });
+});
+
+describe("isFullCustodyPayload", () => {
+  it("tells the panel's whole answer from a payout reader's short one", () => {
+    const full = {
+      settings: {
+        mode: "HELD" as const, stored_mode: "HELD" as const, effective_from: null, pending_mode: null,
+        pending_from: null, pending_note: null, settlement_interval_days: 1, clearing_stale_days: 7, updated_at: null,
+      },
+      branches: [],
+    };
+    expect(isFullCustodyPayload(full)).toBe(true);
+    expect(isFullCustodyPayload({ settings: { mode: "HELD" } })).toBe(false);
+    expect(isFullCustodyPayload(undefined)).toBe(false);
   });
 });

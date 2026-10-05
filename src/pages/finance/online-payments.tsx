@@ -45,7 +45,7 @@ import type {
   CustodyBranch,
   CustodyCollectionAccount,
   CustodyMode,
-  CustodyPayload,
+  FullCustodyPayload,
   UpdateCustodyPayload,
 } from "@/redux/services/payments/payments-types";
 import type { BankAccount } from "@/redux/services/finance/ops-types";
@@ -58,6 +58,7 @@ import {
   CUSTODY_MODES,
   SETTLEMENT_INTERVAL_DAYS,
   branchesNotReady,
+  isFullCustodyPayload,
   custodyChange,
   custodyModeLabel,
   wholeDaysIn,
@@ -83,8 +84,8 @@ export function OnlinePaymentsPanel({ entityCode }: { entityCode: string | null 
   if (!canView || !entityCode) return null;
   return (
     <SettingsPanel title="Online payments" description="Who holds the school's online payments before they reach each branch's bank, and each branch's account at the payment provider.">
-      {query.isLoading || !payload ? (
-        <SettingsRow label={query.isError ? "Could not read the online payments settings" : "Loading online payments"} description={query.isError ? "Try again in a moment." : "Reading the custody setting and each branch's collection account."} />
+      {query.isLoading || !isFullCustodyPayload(payload) ? (
+        <SettingsRow label={query.isError || payload ? "Could not read the online payments settings" : "Loading online payments"} description={query.isError || payload ? "Try again in a moment." : "Reading the custody setting and each branch's collection account."} />
       ) : (
         <CustodyForm key={payload.settings.updated_at ?? "default"} entity={entityCode} payload={payload} />
       )}
@@ -92,7 +93,7 @@ export function OnlinePaymentsPanel({ entityCode }: { entityCode: string | null 
   );
 }
 
-function CustodyForm({ entity, payload }: { entity: string; payload: CustodyPayload }) {
+function CustodyForm({ entity, payload }: { entity: string; payload: FullCustodyPayload }) {
   const dates = useDates();
   const write = useCustodyWrite();
   const { settings, branches } = payload;

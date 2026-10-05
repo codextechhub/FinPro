@@ -17,7 +17,13 @@
  * a change still waiting; choosing the mode already waiting keeps its date.
  */
 
-import type { CustodyBranch, CustodyMode, CustodySettings } from "@/redux/services/payments/payments-types";
+import type {
+  CustodyBranch,
+  CustodyMode,
+  CustodyPayload,
+  CustodySettings,
+  FullCustodyPayload,
+} from "@/redux/services/payments/payments-types";
 
 export const CUSTODY_MODES: { value: CustodyMode; label: string; detail: string }[] = [
   {
@@ -41,6 +47,15 @@ export function firstOfNextMonth(today: string): string {
   const year = m === 12 ? y + 1 : y;
   const month = m === 12 ? 1 : m + 1;
   return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+/**
+ * Whether the server gave the whole custody answer. A reader who holds
+ * `payments.payout.view` but not `payments.settings.view` gets the mode alone,
+ * which is enough for a menu and not enough for the panel.
+ */
+export function isFullCustodyPayload(payload: CustodyPayload | null | undefined): payload is FullCustodyPayload {
+  return !!payload && Array.isArray(payload.branches) && payload.settings.stored_mode !== undefined;
 }
 
 /** The branches whose collection account is missing or not set up with the provider. */
