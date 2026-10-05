@@ -11,6 +11,7 @@ import { TransactionsTab } from "./transactions-tab";
 import { WebhooksTab } from "./webhooks-tab";
 import { HeldSettlementsTab, PlatformHeldSettlementsTab } from "./held-settlements-tab";
 import { HeldReconciliationsTab } from "./held-reconciliations";
+import { HeldCustodyScreen } from "./online-payments";
 import { useActiveEntity } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { PageShell } from "@/components/layout/page-shell";
@@ -33,7 +34,9 @@ const HEADINGS: Record<PaymentsSection, { label: string; subtitle: string }> = {
  * The platform's screens read every school at once and take no ledger entity:
  * Held Reconciliations always, and Held Settlements for a reader holding the
  * platform settlement key. A school's Held Settlements is its own list and
- * needs its books like every other tab.
+ * needs its books like every other tab. Payouts and Batches pay out of money
+ * the platform holds, so at a school whose custody is DIRECT they show a notice
+ * instead (see HeldCustodyScreen).
  */
 export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
   section?: PaymentsSection;
@@ -60,7 +63,7 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
         ) : section === "held-settlements" ? (
           <HeldSettlementsTab entity={entity!} currency={currency} />
         ) : section === "batches" ? (
-          <BatchesTab entity={entity!} currency={currency} />
+          <HeldCustodyScreen entity={entity!}><BatchesTab entity={entity!} currency={currency} /></HeldCustodyScreen>
         ) : section === "settlement" ? (
           <SettlementTab entity={entity!} currency={currency} />
         ) : section === "transactions" ? (
@@ -68,7 +71,7 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
         ) : section === "webhooks" ? (
           <WebhooksTab entity={entity!} currency={currency} />
         ) : (
-          <PayoutsTab entity={entity!} currency={currency} />
+          <HeldCustodyScreen entity={entity!}><PayoutsTab entity={entity!} currency={currency} /></HeldCustodyScreen>
         )}
       </PageShell>
     </FinanceShell>

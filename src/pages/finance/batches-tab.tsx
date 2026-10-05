@@ -37,7 +37,6 @@ import type { PayoutBatchSummary, PayoutInstruction, PayoutBatchItemPayload } fr
 import type { Vendor } from "@/redux/services/procurement/procurement-types";
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
 import { useDates } from "../../lib/display-prefs";
-import { DirectModePayoutsNote, useDirectCustody } from "./online-payments";
 import { showBlobPreview } from "../../components/finance-ui/file-preview-dialog";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
@@ -84,7 +83,6 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 }
 
 export function BatchesTab({ entity, currency }: { entity: string; currency?: string | null }) {
-  const direct = useDirectCustody(entity);
   const dates = useDates();
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<number | null>(() => (
@@ -110,7 +108,6 @@ export function BatchesTab({ entity, currency }: { entity: string; currency?: st
 
   return (
     <div className="space-y-5">
-      {direct ? <DirectModePayoutsNote /> : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Batches" value={String(s?.total ?? 0)} foot="Total" />
         <KpiCard label="Queued value" value={formatMoney(s?.queued.kobo ?? 0, currency)} foot="Draft + processing" />
@@ -120,11 +117,9 @@ export function BatchesTab({ entity, currency }: { entity: string; currency?: st
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button variant="outline" disabled title="CSV import is coming soon" className="gap-1.5"><Upload className="size-4" /> Upload CSV</Button>
-        {direct ? null : (
-          <Can permission={P.PAY_CREATE_PAYOUT}>
-            <Button onClick={() => setBuilding(true)} className="gap-1.5"><Plus className="size-4" /> Build batch</Button>
-          </Can>
-        )}
+        <Can permission={P.PAY_CREATE_PAYOUT}>
+          <Button onClick={() => setBuilding(true)} className="gap-1.5"><Plus className="size-4" /> Build batch</Button>
+        </Can>
       </div>
 
       <DataTable columns={columns} rows={rows} rowKey={(b) => b.id}

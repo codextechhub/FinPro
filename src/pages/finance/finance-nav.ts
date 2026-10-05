@@ -94,8 +94,9 @@ export const financeNav: ConsoleNavGroup[] = [
     items: [
       { title: "Collections", url: F.COLLECTIONS, icon: CircleDollarSign, permissions: [P.PAY_VIEW_COLLECTIONS] },
       { title: "Virtual Accounts", url: `${F.COLLECTIONS}/virtual-accounts`, icon: Landmark, permissions: [P.PAY_VIEW_VIRTUAL_ACCOUNTS] },
-      { title: "Payouts", url: `${F.PAYMENTS}/payouts`, icon: Send, permissions: [P.PAY_VIEW_PAYOUTS] },
-      { title: "Batches", url: `${F.PAYMENTS}/batches`, icon: Layers, permissions: [P.PAY_VIEW_PAYOUTS], resources: ["payments.payout_batch"] },
+      // Paid out of money the platform holds, so absent where a school's custody is DIRECT.
+      { title: "Payouts", url: `${F.PAYMENTS}/payouts`, icon: Send, permissions: [P.PAY_VIEW_PAYOUTS], heldCustody: true },
+      { title: "Batches", url: `${F.PAYMENTS}/batches`, icon: Layers, permissions: [P.PAY_VIEW_PAYOUTS], resources: ["payments.payout_batch"], heldCustody: true },
       { title: "Settlement", url: `${F.PAYMENTS}/settlement`, icon: ArrowLeftRight, permissions: [P.PAY_VIEW_PAYMENT_REPORTS], resources: ["payments.settlement"] },
       // A school reads what the platform paid its branches; a platform operator
       // reads every school's settlements and puts them forward for approval.

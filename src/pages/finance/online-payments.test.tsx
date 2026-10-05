@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   saveSubaccount: vi.fn(),
   lekkiReady: false,
+  mode: "HELD" as "HELD" | "DIRECT",
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -37,7 +38,7 @@ vi.mock("@/redux/services/payments/payments-api", () => ({
     data: {
       data: {
         settings: {
-          mode: "HELD", stored_mode: "HELD", effective_from: null, pending_mode: null, pending_from: null, pending_note: null,
+          mode: mocks.mode, stored_mode: mocks.mode, effective_from: null, pending_mode: null, pending_from: null, pending_note: null,
           settlement_interval_days: 1, clearing_stale_days: 7, updated_at: null,
         },
         branches: [
@@ -62,7 +63,7 @@ vi.mock("../../lib/display-prefs", () => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { CollectionSubaccountBlock, OnlinePaymentsPanel } from "./online-payments";
+import { CollectionSubaccountBlock, HeldCustodyScreen, OnlinePaymentsPanel } from "./online-payments";
 import type { BankAccount } from "@/redux/services/finance/ops-types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -74,6 +75,7 @@ beforeEach(() => {
   mocks.held = new Set(["800801", "800803"]);
   mocks.wholeSchool = true;
   mocks.lekkiReady = false;
+  mocks.mode = "HELD";
   mocks.update.mockReset();
   mocks.update.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Saved." }) });
   mocks.saveSubaccount.mockReset();
@@ -144,5 +146,19 @@ describe("A collection account's subaccount", () => {
   it("says nothing on an account that is not a collection account", () => {
     act(() => root.render(<CollectionSubaccountBlock entity="BSS" account={{ ...lekki, is_primary_collection: false }} />));
     expect(container.textContent).toBe("");
+  });
+});
+
+describe("a payout screen reached by its address", () => {
+  it("shows the screen where the platform holds the school's money", () => {
+    act(() => root.render(<HeldCustodyScreen entity="BSS"><p>Payouts workbench</p></HeldCustodyScreen>));
+    expect(container.textContent).toContain("Payouts workbench");
+  });
+
+  it("shows only the notice where payments go straight to each branch's bank", () => {
+    mocks.mode = "DIRECT";
+    act(() => root.render(<HeldCustodyScreen entity="BSS"><p>Payouts workbench</p></HeldCustodyScreen>));
+    expect(container.textContent).not.toContain("Payouts workbench");
+    expect(container.textContent).toContain("Online payouts are not available");
   });
 });

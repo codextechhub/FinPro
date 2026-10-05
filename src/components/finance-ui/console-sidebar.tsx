@@ -28,6 +28,8 @@ import { routesPath } from "@/routes/routes-path";
 import { visibleConsoleNav, type ConsoleNavGroup, type ConsoleNavItem } from "./console-nav";
 import { revealActiveSidebarItem } from "./sidebar-navigation";
 import { useReaderBranchLens } from "./raising-branch";
+import { useCustodyReading } from "./held-custody";
+import { useActiveEntity } from "./use-entity";
 
 /**
  * Each console page mounts its own shell, so the sidebar remounts on every
@@ -37,10 +39,18 @@ import { useReaderBranchLens } from "./raising-branch";
  */
 const scrollByConsole = new Map<string, number>();
 
-export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavGroup[] }) {
+/**
+ * `gateOnCustody` makes the menu follow the school's custody mode: Payouts and
+ * Batches appear only where the platform holds the school's online money (see
+ * held-custody.ts). A host whose books are not a school's leaves it off.
+ */
+export function ConsoleSidebar({ title, nav, gateOnCustody = false }: { title: string; nav: ConsoleNavGroup[]; gateOnCustody?: boolean }) {
   const location = useLocation().pathname;
   const { hasAnyPermission, hasModuleAccess } = usePermissions();
   const { applies: multiBranch } = useReaderBranchLens();
+  const { code: entity } = useActiveEntity();
+  const custodyRead = useCustodyReading(entity, gateOnCustody);
+  const custody = gateOnCustody ? custodyRead : undefined;
   const scrollRef = useRef<HTMLDivElement>(null);
   const isCollapsed = useSidebar().state === "collapsed";
 
@@ -54,7 +64,7 @@ export function ConsoleSidebar({ title, nav }: { title: string; nav: ConsoleNavG
     revealActiveSidebarItem(el, remembered);
   }, [title, location]);
 
-  const visibleNav = visibleConsoleNav(nav, { hasAnyPermission, hasModuleAccess, multiBranch });
+  const visibleNav = visibleConsoleNav(nav, { hasAnyPermission, hasModuleAccess, multiBranch, custody });
 
   // Find the single best-matching leaf URL (longest URL whose path is a prefix
   // of the current location). This prevents a shorter sibling URL from also

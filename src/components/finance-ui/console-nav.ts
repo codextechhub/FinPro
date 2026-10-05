@@ -26,6 +26,7 @@
 
 import type { ElementType } from "react";
 import type { PermissionCode } from "../../permissions";
+import type { CustodyReading } from "./held-custody";
 
 export interface ConsoleNavChild {
   title: string;
@@ -37,6 +38,9 @@ export interface ConsoleNavChild {
   /** A screen about branches dealing with each other, offered only where the
    *  school runs more than one branch (see `ConsoleNavGate.multiBranch`). */
   multiBranch?: boolean;
+  /** A screen that pays out of money the platform holds for the school,
+   *  offered only where custody is HELD (see `ConsoleNavGate.custody`). */
+  heldCustody?: boolean;
 }
 
 export interface ConsoleNavItem extends ConsoleNavChild {
@@ -68,11 +72,27 @@ export interface ConsoleNavGate {
    * screens stay hidden rather than appearing at a school that cannot use them.
    */
   multiBranch?: boolean;
+  /**
+   * The school's custody mode, from a host whose menu depends on it. A
+   * `heldCustody` screen opens only at HELD: at a school whose online payments
+   * go straight to its branches' banks, Payouts and Batches are not in the menu
+   * at all, and UNKNOWN (a reader who may not read the setting, or a read in
+   * flight) hides them too. A host that leaves this out does not gate on
+   * custody, and such screens follow their permissions alone.
+   */
+  custody?: CustodyReading;
+}
+
+/** Whether the school's shape lets a screen appear, before any permission. */
+function entryFitsSchool(entry: ConsoleNavChild, gate: ConsoleNavGate): boolean {
+  if (entry.multiBranch && gate.multiBranch !== true) return false;
+  if (entry.heldCustody && gate.custody !== undefined && gate.custody !== "HELD") return false;
+  return true;
 }
 
 /** Whether a screen opens for this reader. */
 export function navEntryOpen(entry: ConsoleNavChild, gate: ConsoleNavGate): boolean {
-  if (entry.multiBranch && gate.multiBranch !== true) return false;
+  if (!entryFitsSchool(entry, gate)) return false;
   return !entry.permissions?.length || gate.hasAnyPermission(...entry.permissions);
 }
 
@@ -107,7 +127,7 @@ export function visibleConsoleNav(nav: ConsoleNavGroup[], gate: ConsoleNavGate):
  */
 export function consoleOffersScreens(nav: ConsoleNavGroup[], gate: ConsoleNavGate): boolean {
   const offers = (entry: ConsoleNavChild) => {
-    if (entry.multiBranch && gate.multiBranch !== true) return false;
+    if (!entryFitsSchool(entry, gate)) return false;
     return entry.permissions?.length
       ? gate.hasAnyPermission(...entry.permissions)
       : !!entry.resources?.some((resource) => gate.hasModuleAccess(`${resource}.`));

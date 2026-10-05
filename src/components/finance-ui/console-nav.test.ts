@@ -156,6 +156,23 @@ describe("what a reader is offered", () => {
     expect(between(undefined)).toBeUndefined();
   });
 
+  it("offers Payouts and Batches only where the platform holds the school's money", () => {
+    const bursar = reader("payments.payout.view", "payments.report.view");
+    const payouts = (custody?: ConsoleNavGate["custody"]) =>
+      visibleConsoleNav(financeNav, { ...bursar, custody })
+        .flatMap((g) => g.items.map((i) => i.title))
+        .filter((title) => title === "Payouts" || title === "Batches");
+
+    // Bright Star runs HELD: both are offered.
+    expect(payouts("HELD")).toEqual(["Payouts", "Batches"]);
+    // Greenfield runs DIRECT, and a reader who cannot read the mode is treated alike.
+    expect(payouts("DIRECT")).toEqual([]);
+    expect(payouts("UNKNOWN")).toEqual([]);
+    // A host that does not gate on custody follows the permissions alone.
+    expect(payouts(undefined)).toEqual(["Payouts", "Batches"]);
+    expect(consoleOffersScreens(financeNav, { ...reader("payments.payout.view"), custody: "DIRECT" })).toBe(false);
+  });
+
   it("drops a group whose every screen is closed rather than showing an empty heading", () => {
     const labels = visibleConsoleNav(financeNav, reader("finance.invoice.view")).map((g) => g.label);
     expect(labels).toEqual([undefined, "Receivables"]);

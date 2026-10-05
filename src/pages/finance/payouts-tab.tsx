@@ -35,7 +35,6 @@ import { useGetVendorQuery, useGetVendorsQuery } from "@/redux/services/procurem
 import { useGetAccountsQuery } from "@/redux/services/finance/setup-api";
 import type { PayoutInstruction } from "@/redux/services/payments/payments-types";
 import { useDates } from "../../lib/display-prefs";
-import { DirectModePayoutsNote, useDirectCustody } from "./online-payments";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 /** Field Access resource for a payout instruction. */
@@ -73,7 +72,6 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 const accountLine = (p: PayoutInstruction) => [p.beneficiary_bank_code, p.beneficiary_account_number].filter(Boolean).join(" · ");
 
 export function PayoutsTab({ entity, currency }: { entity: string; currency?: string | null }) {
-  const direct = useDirectCustody(entity);
   const dates = useDates();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -108,7 +106,6 @@ export function PayoutsTab({ entity, currency }: { entity: string; currency?: st
 
   return (
     <div className="space-y-5" data-guide="finance-payouts.workbench">
-      {direct ? <DirectModePayoutsNote /> : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-guide="finance-payouts.summary">
         <KpiCard label="Settled (7d)" value={formatMoney(s?.settled7d.kobo ?? 0, currency)} foot="Confirmed disbursements" />
         <KpiCard label="Pending" value={formatMoney(s?.pending.kobo ?? 0, currency)} foot="Awaiting settlement" />
@@ -138,11 +135,9 @@ export function PayoutsTab({ entity, currency }: { entity: string; currency?: st
             typeface="geist"
             defaultName="Payout instructions"
           />
-          {direct ? null : (
-            <Can permission={P.PAY_CREATE_PAYOUT}>
-              <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New payout</Button>
-            </Can>
-          )}
+          <Can permission={P.PAY_CREATE_PAYOUT}>
+            <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New payout</Button>
+          </Can>
         </div>
       </div>
 

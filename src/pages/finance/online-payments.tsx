@@ -24,7 +24,7 @@
  * up and with which provider, not the code itself.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Landmark, Save, ShieldCheck, Wallet } from "lucide-react";
 
@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmActionModal, FormField } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
+import { useCustodyReading } from "@/components/finance-ui/held-custody";
 import { PolicyBadge, SettingsPanel, SettingsRow } from "@/components/settings/settings-layout";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
@@ -335,25 +336,25 @@ function CollectionSubaccountLine({ entity, account }: { entity: string; account
 }
 
 /**
- * Whether the school's online payments settle straight to each branch's bank
- * today, for a reader who may read the payment settings; null when unknown.
- * Payout screens ask it to say up front that online payouts are not offered,
- * instead of letting the reader meet the refusal. A reader who cannot read the
- * settings still meets the server's refusal, which says the same.
+ * A payout screen's body, or a notice in its place where the school's online
+ * payments settle straight to each branch's bank (custody DIRECT).
+ *
+ * A school app's menu leaves Payouts and Batches out at such a school, so this
+ * is met only through a bookmark or a pasted address. A reader who cannot read
+ * the custody setting is shown the screen, and the server's refusal of a
+ * payout says the same thing.
  */
-export function useDirectCustody(entity: string): boolean | null {
-  const { can } = useCan();
-  const canView = can(P.PAY_VIEW_PAYMENT_SETTINGS);
-  const query = useGetCustodySettingsQuery({ entity }, { skip: !canView });
-  const mode = query.data?.data?.settings.mode;
-  return mode ? mode === "DIRECT" : null;
+export function HeldCustodyScreen({ entity, children }: { entity: string; children: ReactNode }) {
+  const custody = useCustodyReading(entity);
+  if (custody === "DIRECT") return <DirectModePayoutsNote />;
+  return <>{children}</>;
 }
 
-/** The note a payout screen shows while payments settle directly. */
+/** The note shown in place of a payout screen while payments settle directly. */
 export function DirectModePayoutsNote() {
   return (
     <p role="status" className="rounded-md bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-800">
-      Online payouts are not available while online payments go straight to each branch&rsquo;s bank. Pay suppliers from the bank and record the payment.
+      Online payouts are not available while online payments go straight to each branch&rsquo;s bank. Pay suppliers from the bank and record the payment. Earlier payouts are listed in the Transactions Log.
     </p>
   );
 }
