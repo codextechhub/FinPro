@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { SCHOOL_WIDE_SETTINGS_NOTE, settingsWriteAccess } from "./settings-write-access";
+import { WHOLE_TENANT_SETTINGS_NOTE, settingsWriteAccess } from "./settings-write-access";
 
 describe("who may save a settings screen", () => {
   it("lets a whole-school holder of the key save", () => {
@@ -14,8 +14,8 @@ describe("who may save a settings screen", () => {
   });
 
   it("keeps a branch-only holder of the key read-only, and says why", () => {
-    expect(settingsWriteAccess(true, false)).toEqual({ canUpdate: false, readOnlyNote: SCHOOL_WIDE_SETTINGS_NOTE });
-    expect(SCHOOL_WIDE_SETTINGS_NOTE).toContain("Only a school-wide administrator can change these settings");
+    expect(settingsWriteAccess(true, false)).toEqual({ canUpdate: false, readOnlyNote: WHOLE_TENANT_SETTINGS_NOTE });
+    expect(WHOLE_TENANT_SETTINGS_NOTE).toContain("Only a school-wide administrator can change these settings");
   });
 
   it("keeps a reader without the key read-only", () => {

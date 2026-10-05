@@ -1,4 +1,4 @@
-import { formatRelativeDate } from "@/utils/relative-date";
+import { formatRelativeDate } from "../../utils/relative-date";
 import type { AuditEventType, WorkflowAuditLog } from "@/redux/services/dashboard/workflow-types";
 import { AUDIT_EVENT_LABEL } from "./workflow-format";
 import { useDates } from "../../lib/display-prefs";

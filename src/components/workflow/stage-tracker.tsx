@@ -1,6 +1,6 @@
 import { Check, X, CornerUpLeft, Clock, SkipForward, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatRelativeDate } from "@/utils/relative-date";
+import { formatRelativeDate } from "../../utils/relative-date";
 import type {
   WorkflowStageInstance,
   WorkflowStageStatus,

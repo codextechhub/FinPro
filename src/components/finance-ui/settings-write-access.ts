@@ -20,7 +20,7 @@ import { useReaderReach } from "../../host";
 import type { PermissionCode } from "../../permissions";
 
 /** Why a settings panel is read-only for a reader who holds its update key. */
-export const SCHOOL_WIDE_SETTINGS_NOTE =
+export const WHOLE_TENANT_SETTINGS_NOTE =
   "Only a school-wide administrator can change these settings, because they apply to every branch. You can read them.";
 
 export interface SettingsWriteAccess {
@@ -31,9 +31,9 @@ export interface SettingsWriteAccess {
 }
 
 /** The pure rule, for tests. */
-export function settingsWriteAccess(holdsKey: boolean, wholeSchool: boolean): SettingsWriteAccess {
+export function settingsWriteAccess(holdsKey: boolean, wholeTenant: boolean): SettingsWriteAccess {
   if (!holdsKey) return { canUpdate: false, readOnlyNote: "You have read-only access." };
-  if (!wholeSchool) return { canUpdate: false, readOnlyNote: SCHOOL_WIDE_SETTINGS_NOTE };
+  if (!wholeTenant) return { canUpdate: false, readOnlyNote: WHOLE_TENANT_SETTINGS_NOTE };
   return { canUpdate: true, readOnlyNote: null };
 }
 
