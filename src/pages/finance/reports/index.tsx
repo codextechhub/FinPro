@@ -12,14 +12,17 @@ import { EquityReport } from "./equity-tab";
 import { TrialBalanceReport } from "./trial-balance-tab";
 import { AnalyticsSliceReport } from "./analytics-slice-tab";
 import { PeriodsTab, PERIODS_DESCRIPTION } from "./periods-tab";
+import { SealsReport, SEALS_DESCRIPTION } from "./seals-tab";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { ShowArchivedToggle } from "@/components/finance-ui/archived-years";
 
 const LABELS: Record<string, string> = {
   "trial-balance": "Trial Balance", "income-statement": "Income Statement (P&L)",
   "balance-sheet": "Balance Sheet", "cash-flow": "Cash Flow",
   "changes-in-equity": "Changes in Equity", analytics: "Cost & Dimension Analysis",
   periods: "Periods & Close",
+  seals: "Sealed Figures",
 };
 
 /**
@@ -35,6 +38,7 @@ const DESCRIPTIONS: Record<string, string> = {
   "changes-in-equity": "How each equity component moved from opening to closing balance.",
   analytics: "Net posted activity per account, sliced by one cost centre or dimension axis.",
   periods: PERIODS_DESCRIPTION,
+  seals: SEALS_DESCRIPTION,
 };
 const AREA_DESCRIPTION = "Financial statements (exportable) and the period-close checklist.";
 
@@ -77,6 +81,8 @@ export default function ReportsPage({ section = DEFAULT_REPORTS_SECTION }: {
           </div>
           {/* Section actions land on the title line; display:contents keeps the slot itself out of the layout. */}
           {section === "periods" ? <div ref={setHeaderSlot} className="contents" /> : null}
+          {/* The statements pick their period from a list that leaves archived years out until asked. */}
+          {section !== "periods" && section !== "seals" ? <ShowArchivedToggle entity={entity} /> : null}
         </div>
         {!entity ? (
           <NoEntityState />
@@ -92,6 +98,8 @@ export default function ReportsPage({ section = DEFAULT_REPORTS_SECTION }: {
           <AnalyticsSliceReport entity={entity} currency={currency} />
         ) : section === "periods" ? (
           <PeriodsTab entity={entity} headerSlot={headerSlot} />
+        ) : section === "seals" ? (
+          <SealsReport entity={entity} currency={currency} />
         ) : (
           <TrialBalanceReport entity={entity} currency={currency} />
         )}

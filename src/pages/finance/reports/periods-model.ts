@@ -50,3 +50,39 @@ export function yearCloseState(
   if (finalPeriod.status === "LOCKED") return "FINAL_LOCKED";
   return "READY";
 }
+
+/**
+ * The first day a closed year may be archived: `minAgeYears` whole years after
+ * it ends (a 29 February end moves to the 28th), as the server counts it.
+ */
+export function earliestArchiveDate(endDate: string, minAgeYears: number): string {
+  const [year, month, day] = endDate.split("-").map(Number);
+  const target = year + minAgeYears;
+  const lastDay = new Date(Date.UTC(target, month, 0)).getUTCDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${target}-${pad(month)}-${pad(Math.min(day, lastDay))}`;
+}
+
+export type ArchiveReadiness =
+  | { kind: "ready" }
+  | { kind: "not-closed" }
+  | { kind: "too-recent"; from: string }
+  | { kind: "archived" };
+
+/**
+ * Whether a fiscal year may be archived today. Only a CLOSED or LOCKED year
+ * may be, and only once `minAgeYears` have passed since it ended, so last
+ * year's comparatives stay at hand. `minAgeYears` is null when the reader may
+ * not read the record-keeping settings; the age is then left to the server.
+ */
+export function archiveReadiness(
+  year: { status: string; end_date: string; is_archived?: boolean },
+  minAgeYears: number | null,
+  today: string,
+): ArchiveReadiness {
+  if (year.is_archived) return { kind: "archived" };
+  if (year.status !== "CLOSED" && year.status !== "LOCKED") return { kind: "not-closed" };
+  if (minAgeYears == null) return { kind: "ready" };
+  const from = earliestArchiveDate(year.end_date, minAgeYears);
+  return today >= from ? { kind: "ready" } : { kind: "too-recent", from };
+}

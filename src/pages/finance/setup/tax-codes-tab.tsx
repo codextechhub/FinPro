@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { P } from "../../../permissions";
 import { useGetTaxCodesQuery, useUpsertTaxCodeMutation } from "@/redux/services/finance/setup-api";
 import type { TaxCode } from "@/redux/services/finance/setup-types";
-import { taxCodeFormValues, taxCodeUpsertPayload } from "./tax-code-form";
+import { taxCodeFormValid, taxCodeFormValues, taxCodeUpsertPayload } from "./tax-code-form";
 import { TAX_TREATMENTS, treatmentLabel } from "../../../utils/tax-treatment";
 import type { TaxTreatment } from "@/redux/services/finance/setup-types";
 
@@ -83,13 +83,13 @@ function TaxCodeModal({ existing, onClose, entity }: { existing: TaxCode | null;
   const [name, setName] = useState(initial.name);
   const [treatment, setTreatment] = useState<TaxTreatment>(initial.treatment);
   const [pct, setPct] = useState(initial.percentage);
+  const standard = treatment === "STANDARD";
   const [recoverable, setRecoverable] = useState(initial.recoverable);
   const [collected, setCollected] = useState(initial.collectedAccount);
   const [paid, setPaid] = useState(initial.paidAccount);
   const [active, setActive] = useState(initial.active);
 
-  const standard = treatment === "STANDARD";
-  const canSubmit = code.trim() !== "" && name.trim() !== "" && (!standard || (pct !== "" && Number(pct) >= 0));
+  const canSubmit = taxCodeFormValid({ code, name, treatment, percentage: pct, recoverable, collectedAccount: collected, paidAccount: paid, active });
 
   const submit = async () => {
     try {

@@ -43,6 +43,7 @@ import {
   type ConsoleSettingsSection,
 } from "@/components/settings/settings-layout";
 import { useActiveEntity } from "@/components/finance-ui";
+import { useSettingsWriteAccess } from "@/components/finance-ui/settings-write-access";
 import { useGetFinanceAccountSettingsQuery } from "@/redux/services/finance/setup-api";
 import { useGetProcurementSettingsQuery, useUpdateProcurementSettingsMutation } from "@/redux/services/procurement/procurement-api";
 import type { ProcurementSettingsValues } from "@/redux/services/procurement/procurement-types";
@@ -146,7 +147,7 @@ function General({ entity, entityCode }: { entity: ReturnType<typeof useActiveEn
   // The same two gates Finance Settings puts on its entities section.
   const canManageEntities = financeSettingsSections.includes("entities") && hasPermission(P.FIN_CREATE_ENTITY);
   const canView = hasPermission(P.PROC_VIEW_SETTINGS);
-  const canUpdate = hasPermission(P.PROC_UPDATE_SETTINGS);
+  const { canUpdate, readOnlyNote } = useSettingsWriteAccess(P.PROC_UPDATE_SETTINGS);
   const query = useGetProcurementSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
   const payload = query.data?.data;
   return (
@@ -156,12 +157,12 @@ function General({ entity, entityCode }: { entity: ReturnType<typeof useActiveEn
         <SettingsRow icon={Building2} label="Ledger entity" description="Every procurement document and journal is isolated to this entity." value={entity ? `${entity.code} · ${entity.name}` : "Not selected"} badge={<PolicyBadge kind="enforced">Shared scope</PolicyBadge>} />
         <SettingsRow icon={BookOpenCheck} label="Reporting currency" description="Purchase amounts post in the selected entity's reporting currency." value={entity?.base_currency ?? "Not selected"} badge={<PolicyBadge kind="default">Inherited</PolicyBadge>} />
       </SettingsPanel>
-      {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading defaults" description="Reading the selected entity's procurement settings." /></SettingsPanel> : <GeneralForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} />}
+      {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading defaults" description="Reading the selected entity's procurement settings." /></SettingsPanel> : <GeneralForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
     </div>
   );
 }
 
-function GeneralForm({ entityCode, values, history, consumers, canUpdate }: { entityCode: string; values: ProcurementSettingsValues; history: FinanceAuditLog[]; consumers: Record<string, SettingConsumer>; canUpdate: boolean }) {
+function GeneralForm({ entityCode, values, history, consumers, canUpdate, readOnlyNote }: { entityCode: string; values: ProcurementSettingsValues; history: FinanceAuditLog[]; consumers: Record<string, SettingConsumer>; canUpdate: boolean; readOnlyNote: string | null }) {
   const [terms, setTerms] = useState(values.default_payment_terms);
   const [address, setAddress] = useState(values.default_delivery_address);
   const [update, state] = useUpdateProcurementSettingsMutation();
@@ -178,7 +179,7 @@ function GeneralForm({ entityCode, values, history, consumers, canUpdate }: { en
         <label className="min-w-0 font-mont text-xs font-semibold text-gray-01">Default payment terms<select className="mt-2 h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={terms} onChange={(event) => setTerms(event.target.value)} disabled={!canUpdate}>{PAYMENT_TERMS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><span className="mt-1 block font-normal leading-5 text-gray-05">Applied to new vendor records.</span><SettingsConsumer consumer={consumers.default_payment_terms} /></label>
         <label className="min-w-0 font-mont text-xs font-semibold text-gray-01">Default delivery address<Textarea className="mt-2 min-h-24 bg-white font-mont text-sm" value={address} onChange={(event) => setAddress(event.target.value)} disabled={!canUpdate} placeholder="Enter the standard receiving location" maxLength={2000} /><span className="mt-1 block font-normal leading-5 text-gray-05">Buyers can still override this on a purchase order.</span><SettingsConsumer consumer={consumers.default_delivery_address} /></label>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{canUpdate ? "Only changed values are recorded in audit history." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save defaults"}</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{readOnlyNote ?? "Only changed values are recorded in audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save defaults"}</Button> : null}</div>
     </SettingsPanel>
     <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;
@@ -188,13 +189,13 @@ function PurchasingPolicy({ entityCode }: { entityCode: string | null }) {
   const wholeBooks = wholeBooksLabel(useIsSchool());
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.PROC_VIEW_SETTINGS);
-  const canUpdate = hasPermission(P.PROC_UPDATE_SETTINGS);
+  const { canUpdate, readOnlyNote } = useSettingsWriteAccess(P.PROC_UPDATE_SETTINGS);
   const query = useGetProcurementSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
   const payload = query.data?.data;
   return (
     <div className="space-y-5">
       <div data-guide="procurement-settings.purchasing"><SettingsSectionHeader title="Purchasing policy" description={`Set ${wholeBooks.toLowerCase()} vendor, requisition and receipt defaults. The backend applies each saved rule to new purchasing activity.`} /></div>
-      {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading purchasing policy" description="Reading the selected entity's procurement controls." /></SettingsPanel> : <PurchasingForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} />}
+      {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading purchasing policy" description="Reading the selected entity's procurement controls." /></SettingsPanel> : <PurchasingForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
       <SettingsPanel title="Always-enforced controls">
         <SettingsRow icon={ClipboardCheck} label="Approved requisition required" description="A purchase order can only be created from an approved requisition in the same entity." badge={<PolicyBadge kind="enforced" />} />
         <SettingsRow icon={BadgeCheck} label="Verified vendor required for payment" description="Vendor payments require an active, KYC-verified vendor that is not on hold." badge={<PolicyBadge kind="enforced" />} />
@@ -204,7 +205,7 @@ function PurchasingPolicy({ entityCode }: { entityCode: string | null }) {
   );
 }
 
-function PurchasingForm({ entityCode, values, history, consumers, canUpdate }: { entityCode: string; values: ProcurementSettingsValues; history: FinanceAuditLog[]; consumers: Record<string, SettingConsumer>; canUpdate: boolean }) {
+function PurchasingForm({ entityCode, values, history, consumers, canUpdate, readOnlyNote }: { entityCode: string; values: ProcurementSettingsValues; history: FinanceAuditLog[]; consumers: Record<string, SettingConsumer>; canUpdate: boolean; readOnlyNote: string | null }) {
   const [kycRequirement, setKycRequirement] = useState(values.vendor_purchase_kyc_requirement);
   const [leadDays, setLeadDays] = useState(String(values.default_requisition_lead_days));
   const [requirePo, setRequirePo] = useState(values.require_purchase_order_for_receipts);
@@ -235,7 +236,7 @@ function PurchasingForm({ entityCode, values, history, consumers, canUpdate }: {
         <label className="font-mont text-xs font-semibold text-gray-01">Default requisition lead days<Input type="number" min="0" max="365" step="1" className="mt-2 bg-white" value={leadDays} onChange={(event) => setLeadDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Sets needed-by from the request date when the requester leaves it blank.</span><SettingsConsumer consumer={consumers.default_requisition_lead_days} /></label>
       </div>
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div className="min-w-0"><p className="font-mont text-sm font-medium text-gray-01">Require a purchase order for goods receipts</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When on, receiving cannot record a vendor delivery without purchase-order evidence.</p><SettingsConsumer consumer={consumers.require_purchase_order_for_receipts} /></div><Switch checked={requirePo} onCheckedChange={setRequirePo} disabled={!canUpdate} aria-label="Require a purchase order for goods receipts" /></div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 0 to 365 days." : canUpdate ? "Only changed values are recorded in audit history." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save purchasing policy"}</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 0 to 365 days." : readOnlyNote ?? "Only changed values are recorded in audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save purchasing policy"}</Button> : null}</div>
     </SettingsPanel>
     <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;
@@ -244,7 +245,7 @@ function PurchasingForm({ entityCode, values, history, consumers, canUpdate }: {
 function SourcingLifecycle({ entityCode }: { entityCode: string | null }) {
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.PROC_VIEW_SETTINGS);
-  const canUpdate = hasPermission(P.PROC_UPDATE_SETTINGS);
+  const { canUpdate, readOnlyNote } = useSettingsWriteAccess(P.PROC_UPDATE_SETTINGS);
   const query = useGetProcurementSettingsQuery(
     { entity: entityCode! }, { skip: !entityCode || !canView },
   );
@@ -252,7 +253,7 @@ function SourcingLifecycle({ entityCode }: { entityCode: string | null }) {
   return (
     <div className="space-y-5">
       <SettingsSectionHeader title="Sourcing and lifecycle" description="Set the default time buyers give vendors to respond, the RFQ alert horizon, and the renewal notice copied to new contracts." />
-      {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading sourcing policy" description="Reading the selected entity's RFQ and contract defaults." /></SettingsPanel> : <SourcingLifecycleForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} />}
+      {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading sourcing policy" description="Reading the selected entity's RFQ and contract defaults." /></SettingsPanel> : <SourcingLifecycleForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
       <SettingsPanel title="How lifecycle defaults behave">
         <SettingsRow icon={Clock3} label="Explicit dates win" description="A response due date entered on an RFQ overrides the default response period for that RFQ." badge={<PolicyBadge kind="enforced">Override allowed</PolicyBadge>} />
         <SettingsRow icon={FileSignature} label="Existing records keep their terms" description="Changing these values does not rewrite existing RFQ due dates or contract renewal windows." badge={<PolicyBadge kind="enforced" />} />
@@ -262,7 +263,7 @@ function SourcingLifecycle({ entityCode }: { entityCode: string | null }) {
   );
 }
 
-function SourcingLifecycleForm({ entityCode, values, history, consumers, canUpdate }: { entityCode: string; values: ProcurementSettingsValues; history: FinanceAuditLog[]; consumers: Record<string, SettingConsumer>; canUpdate: boolean }) {
+function SourcingLifecycleForm({ entityCode, values, history, consumers, canUpdate, readOnlyNote }: { entityCode: string; values: ProcurementSettingsValues; history: FinanceAuditLog[]; consumers: Record<string, SettingConsumer>; canUpdate: boolean; readOnlyNote: string | null }) {
   const [responseDays, setResponseDays] = useState(String(values.default_rfq_response_days));
   const [closingSoonDays, setClosingSoonDays] = useState(String(values.rfq_closing_soon_days));
   const [renewalDays, setRenewalDays] = useState(String(values.contract_renewal_notice_days));
@@ -297,7 +298,7 @@ function SourcingLifecycleForm({ entityCode, values, history, consumers, canUpda
         <label className="font-mont text-xs font-semibold text-gray-01">RFQ closing-soon horizon<Input type="number" min="0" max="365" step="1" className="mt-2 bg-white" value={closingSoonDays} onChange={(event) => setClosingSoonDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Counts issued RFQs due within this many days in the sourcing summary.</span><SettingsConsumer consumer={consumers.rfq_closing_soon_days} /></label>
         <label className="font-mont text-xs font-semibold text-gray-01">Contract renewal notice days<Input type="number" min="0" max="365" step="1" className="mt-2 bg-white" value={renewalDays} onChange={(event) => setRenewalDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Copied to new contracts when no notice window is supplied.</span><SettingsConsumer consumer={consumers.contract_renewal_notice_days} /></label>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 0 to 365 days." : canUpdate ? "Only effective changes are written to audit history." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save lifecycle policy"}</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 0 to 365 days." : readOnlyNote ?? "Only effective changes are written to audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save lifecycle policy"}</Button> : null}</div>
     </SettingsPanel>
     <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;
@@ -306,7 +307,7 @@ function SourcingLifecycleForm({ entityCode, values, history, consumers, canUpda
 function CompetitiveGovernance({ entityCode }: { entityCode: string | null }) {
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.PROC_VIEW_SETTINGS);
-  const canUpdate = hasPermission(P.PROC_UPDATE_SETTINGS);
+  const { canUpdate, readOnlyNote } = useSettingsWriteAccess(P.PROC_UPDATE_SETTINGS);
   const query = useGetProcurementSettingsQuery(
     { entity: entityCode! }, { skip: !entityCode || !canView },
   );
@@ -314,7 +315,7 @@ function CompetitiveGovernance({ entityCode }: { entityCode: string | null }) {
   return (
     <div className="space-y-5">
       <div data-guide="procurement-settings.competition"><SettingsSectionHeader title="Competitive bidding governance" description="Set the minimum market evidence required before an RFQ can be issued or a supplier can be selected." /></div>
-      {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading competitive policy" description="Reading the selected entity's bidding controls." /></SettingsPanel> : <CompetitiveGovernanceForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} />}
+      {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading competitive policy" description="Reading the selected entity's bidding controls." /></SettingsPanel> : <CompetitiveGovernanceForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
       <SettingsPanel title="Exception controls">
         <SettingsRow icon={ShieldCheck} label="Separate override permission" description="Changing settings does not grant exception authority. A user also needs the critical competitive-policy override permission." badge={<PolicyBadge kind="enforced">Critical permission</PolicyBadge>} />
         <SettingsRow icon={FileCheck2} label="Written reason required" description="An RFQ below either minimum cannot proceed until an authorized user supplies a reason for the exception." badge={<PolicyBadge kind="enforced" />} />
@@ -324,7 +325,7 @@ function CompetitiveGovernance({ entityCode }: { entityCode: string | null }) {
   );
 }
 
-function CompetitiveGovernanceForm({ entityCode, values, history, consumers, canUpdate }: { entityCode: string; values: ProcurementSettingsValues; history: FinanceAuditLog[]; consumers: Record<string, SettingConsumer>; canUpdate: boolean }) {
+function CompetitiveGovernanceForm({ entityCode, values, history, consumers, canUpdate, readOnlyNote }: { entityCode: string; values: ProcurementSettingsValues; history: FinanceAuditLog[]; consumers: Record<string, SettingConsumer>; canUpdate: boolean; readOnlyNote: string | null }) {
   const [invitedVendors, setInvitedVendors] = useState(String(values.minimum_rfq_invited_vendors));
   const [submittedBids, setSubmittedBids] = useState(String(values.minimum_submitted_quotations_before_award));
   const [update, state] = useUpdateProcurementSettingsMutation();
@@ -353,7 +354,7 @@ function CompetitiveGovernanceForm({ entityCode, values, history, consumers, can
         <label className="font-mont text-xs font-semibold text-gray-01">Minimum vendors invited<Input type="number" min="1" max="50" step="1" className="mt-2 bg-white" value={invitedVendors} onChange={(event) => setInvitedVendors(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Checked when a draft RFQ is issued. Duplicate invitations do not increase the count.</span><SettingsConsumer consumer={consumers.minimum_rfq_invited_vendors} /></label>
         <label className="font-mont text-xs font-semibold text-gray-01">Minimum submitted quotations<Input type="number" min="1" max="50" step="1" className="mt-2 bg-white" value={submittedBids} onChange={(event) => setSubmittedBids(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Checked when a submitted quotation is awarded and converted into a draft purchase order.</span><SettingsConsumer consumer={consumers.minimum_submitted_quotations_before_award} /></label>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 1 to 50 vendors." : canUpdate ? "Saved minimums apply to the next issue or award decision." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save competitive policy"}</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 1 to 50 vendors." : readOnlyNote ?? "Saved minimums apply to the next issue or award decision."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save competitive policy"}</Button> : null}</div>
     </SettingsPanel>
     <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;
@@ -362,18 +363,18 @@ function CompetitiveGovernanceForm({ entityCode, values, history, consumers, can
 function MatchingPolicy({ entityCode }: { entityCode: string | null }) {
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.PROC_VIEW_SETTINGS);
-  const canUpdate = hasPermission(P.PROC_UPDATE_SETTINGS);
+  const { canUpdate, readOnlyNote } = useSettingsWriteAccess(P.PROC_UPDATE_SETTINGS);
   const query = useGetProcurementSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
   const payload = query.data?.data;
   return (
     <div className="space-y-5">
       <div data-guide="procurement-settings.matching"><SettingsSectionHeader title="Invoice matching" description="Set the entity's allowed quantity and unit-price variance before an invoice is blocked for review." /></div>
-      {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading matching policy" description="Reading the selected entity's tolerances." /></SettingsPanel> : <MatchingForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} />}
+      {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading matching policy" description="Reading the selected entity's tolerances." /></SettingsPanel> : <MatchingForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} history={payload.history} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
     </div>
   );
 }
 
-function MatchingForm({ entityCode, values, history, consumers, canUpdate }: { entityCode: string; values: ProcurementSettingsValues; history: FinanceAuditLog[]; consumers: Record<string, SettingConsumer>; canUpdate: boolean }) {
+function MatchingForm({ entityCode, values, history, consumers, canUpdate, readOnlyNote }: { entityCode: string; values: ProcurementSettingsValues; history: FinanceAuditLog[]; consumers: Record<string, SettingConsumer>; canUpdate: boolean; readOnlyNote: string | null }) {
   const [quantity, setQuantity] = useState(String(values.quantity_tolerance_bps / 100));
   const [price, setPrice] = useState(String(values.price_tolerance_bps / 100));
   const [allowNonPo, setAllowNonPo] = useState(values.allow_non_po_invoices);
@@ -403,7 +404,7 @@ function MatchingForm({ entityCode, values, history, consumers, canUpdate }: { e
         <label className="font-mont text-xs font-semibold text-gray-01">Non-PO spend limit (%)<Input type="number" min="0" max="100" step="1" className="mt-2 bg-white" value={nonPoLimit} onChange={(event) => setNonPoLimit(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">The share of spend the school accepts on bills without a purchase order. The procurement dashboard marks spend above it.</span><SettingsConsumer consumer={consumers.non_po_spend_limit_pct} /></label>
       </div>
       <SettingsRow icon={ShieldCheck} label="Variance override" description="Blocking outcomes still require the dedicated variance-override permission, and every override remains audited." badge={<PolicyBadge kind="enforced" />} />
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Enter values between 0 and 100%; the non-PO limit is a whole number." : canUpdate ? "Saved tolerances affect the next match run." : "You have read-only access."}</p><Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save matching policy"}</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Enter values between 0 and 100%; the non-PO limit is a whole number." : readOnlyNote ?? "Saved tolerances affect the next match run."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save matching policy"}</Button> : null}</div>
     </SettingsPanel>
     <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;

@@ -142,6 +142,12 @@ export interface ProcurementDashboard {
     reference: string;
     actor: string;
     occurred_at: string;
+    /** Under a proxy, "Mrs Bello for Mrs Adeyemi"; absent from an older server. */
+    acted_label?: string | null;
+    real_actor_name?: string | null;
+    proxied_user_name?: string | null;
+    actor_is_exited?: boolean | null;
+    effective_user_is_exited?: boolean | null;
   }[] | null;
   approvals_awaiting_user: {
     workflow_id: string;

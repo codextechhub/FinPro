@@ -190,6 +190,9 @@ export interface ChangesInEquity {
 export interface ReportParams {
   entity: string;
   period?: string | number;
+  /** A fiscal year by its label (2026). With `period`, a period number of 12 or
+   *  less is read within this year rather than the latest. */
+  fiscal_year?: number;
   as_of?: string;
 }
 
@@ -231,6 +234,12 @@ export interface FiscalRunway {
   calendar_end: string | null;    // Last postable day; null when there are no periods at all.
   days_remaining: number | null;  // Negative once it has lapsed; null when there are no periods.
   threshold_days: number;         // The notice window the status was decided against.
+  /** The day the runway was read for, in the school's own zone. Absent from an older server. */
+  today?: string;
+  /** The first day on or after today that no period covers: the day postings start failing. */
+  first_uncovered_date?: string | null;
+  /** Every stretch no period covers between two that are covered, oldest first. */
+  gaps?: { start: string; end: string }[];
 }
 
 /**

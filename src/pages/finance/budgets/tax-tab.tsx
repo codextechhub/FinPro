@@ -22,13 +22,15 @@ import { printTaxFilingPack, taxPeriodLabel } from "../../../utils/finance-print
 import { P } from "../../../permissions";
 import {
   useGetTaxFilingsQuery, useGetTaxFilingSummaryQuery, useGetTaxObligationsQuery, useCreateTaxObligationMutation,
-  useCreateTaxFilingMutation, useFileTaxFilingMutation, useUnfileTaxFilingMutation, usePayTaxFilingMutation,
+  useCreateTaxFilingMutation, useUnfileTaxFilingMutation,
 } from "@/redux/services/finance/ops-api";
-import type { TaxFiling, TaxFilingShare } from "@/redux/services/finance/ops-types";
+import { useFileTaxReturnMutation, useGetTaxFilingQuery, usePayTaxShareMutation } from "@/redux/services/finance/tax-api";
+import type { TaxFiling } from "@/redux/services/finance/ops-types";
+import type { TaxFilingDetail } from "@/redux/services/finance/tax-types";
+import { TaxRemittances, TaxReturnLines, TaxReturnShares, payableShares, penaltyBranches, showsShares } from "./tax-return-detail";
+import { AnnualPayeReturnDrawer, RemittanceSchedulePanel } from "./payroll-returns";
 import { useDates } from "../../../lib/display-prefs";
 import { useReaderReach } from "../../../host";
-import { shareIsPayable, taxShareView } from "./tax-shares";
-import { AnnualPayeReturnDrawer, RemittanceSchedulePanel } from "./payroll-returns";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 
@@ -144,14 +146,20 @@ function Step({ state, title, sub }: { state: "done" | "current" | "todo"; title
   );
 }
 
+/**
+ * One return. The list row opens it at once; the return's own read then
+ * supplies the branch shares, late items and payments the list may carry
+ * stale, and every action reads from that.
+ */
 function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filingId: number | null; filings: TaxFiling[]; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
+  const showBranch = useReaderBranchLens().applies;
   const { wholeSchool } = useReaderReach();
-  const { applies: multiBranch } = useReaderBranchLens();
-  const f = useMemo(() => filings.find((x) => x.id === filingId) ?? null, [filings, filingId]);
+  const detailQ = useGetTaxFilingQuery({ id: filingId ?? 0, entity }, { skip: filingId == null });
+  const listed = useMemo(() => (filings.find((x) => x.id === filingId) ?? null) as TaxFilingDetail | null, [filings, filingId]);
+  const f = (detailQ.data?.data && detailQ.data.data.id === filingId ? detailQ.data.data : listed);
   const [filing, setFiling] = useState(false);
-  // The share a payment settles; null pays the return as one (a one-branch school).
-  const [paying, setPaying] = useState<{ share: TaxFilingShare | null } | null>(null);
+  const [paying, setPaying] = useState(false);
   const [unfiling, setUnfiling] = useState(false);
   const [unfile, { isLoading: unfilingBusy }] = useUnfileTaxFilingMutation();
   const doUnfile = async () => {
@@ -163,8 +171,6 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
 
   const filed = f.filing_status === "FILED" || f.filing_status === "PAID";
   const paid = f.filing_status === "PAID";
-  const shares = taxShareView(f, multiBranch);
-  const canPayAll = f.filing_status === "FILED" && f.balance_due > 0 && (!shares.show || !!shares.single);
   // A filed-but-unpaid return can be reverted to draft; once any cash is remitted the
   // backend refuses, so only offer it while nothing has been paid.
   const canUnfile = f.filing_status === "FILED" && f.amount_paid === 0;
@@ -181,7 +187,7 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
           <div className="flex-1" />
           {f.filing_status === "DRAFT" && wholeSchool ? <Can permission={P.FIN_FILE_TAX}><Button onClick={() => setFiling(true)} className="gap-1.5"><FileCheck2 className="size-4" /> Mark as filed</Button></Can> : null}
           {canUnfile && wholeSchool ? <Can permission={P.FIN_FILE_TAX}><Button variant="outline" disabled={unfilingBusy} onClick={() => setUnfiling(true)} className="gap-1.5"><Undo2 className="size-4" /> Un-file</Button></Can> : null}
-          {canPayAll ? <Can permission={P.FIN_PAY_TAX}><Button onClick={() => setPaying({ share: shares.show ? shares.single : null })} className="gap-1.5"><Banknote className="size-4" /> Pay {shares.show && shares.single ? `${shares.single.label}'s ` : ""}{formatMoney(shares.show && shares.single ? shares.single.balance_due : f.balance_due, currency)}</Button></Can> : null}
+          {f.filing_status === "FILED" ? <Can permission={P.FIN_PAY_TAX}><Button onClick={() => setPaying(true)} className="gap-1.5"><Banknote className="size-4" /> Pay {formatMoney(f.balance_due, currency)}</Button></Can> : null}
         </>}>
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -200,35 +206,9 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
             </div>
           </div>
 
-          {shares.show ? (
-            <div>
-              <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Branch shares</p>
-              <div className="overflow-x-auto rounded-md border border-white-02">
-                <table className="w-full min-w-[520px]">
-                  <thead><tr>{["Branch", "Due", "Paid", "Left", ""].map((label) => <th key={label} className="bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01">{label}</th>)}</tr></thead>
-                  <tbody>{shares.shares.map((share) => <tr key={share.id}>
-                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold">{share.label}</td>
-                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{formatMoney(share.amount_due, currency)}</td>
-                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{formatMoney(share.amount_paid, currency)}</td>
-                    <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{share.balance_due > 0 ? formatMoney(share.balance_due, currency) : <span className={cn(PILL, "bg-green-01/10 text-green-01")}>Paid</span>}</td>
-                    <td className="border-t border-white-02 px-3 py-2 text-right">{f.filing_status === "FILED" && shareIsPayable(share) ? <Can permission={P.FIN_PAY_TAX}><Button size="sm" variant="outline" onClick={() => setPaying({ share })} className="gap-1"><Banknote className="size-3.5" /> Pay</Button></Can> : share.branch_pending && share.balance_due > 0 ? <span className="font-mont text-[11px] text-gray-05">Lines need a branch first</span> : null}</td>
-                  </tr>)}</tbody>
-                </table>
-              </div>
-              <p className="mt-1.5 font-mont text-[11px] text-gray-05">Each branch pays its own share from its own bank account.</p>
-            </div>
-          ) : null}
-
-          {f.remittances?.length ? (
-            <div>
-              <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Payments</p>
-              <div className="space-y-2">{f.remittances.map((r) => <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white-02 px-3 py-2 font-mont text-xs">
-                <span><span className="font-semibold">{dates.day(r.pay_date, r.branch_id)}</span> · {r.bank_account_name}{shares.show && r.branch_name ? ` · ${r.branch_name}` : ""}</span>
-                <span className={cn("tabular-nums", r.is_reversed && "text-gray-05 line-through")}>{formatMoney(r.amount, currency)}</span>
-              </div>)}</div>
-            </div>
-          ) : null}
-
+          <TaxReturnShares filing={f} currency={currency} />
+          <TaxReturnLines filing={f} currency={currency} />
+          <TaxRemittances filing={f} entity={entity} currency={currency} showBranch={showBranch} />
           <RemittanceSchedulePanel filing={f} entity={entity} currency={currency} />
 
           {!paid ? (
@@ -241,7 +221,7 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
       </DetailDrawer>
 
       {filing ? <FileDrawer filing={f} entity={entity} currency={currency} onClose={() => setFiling(false)} /> : null}
-      {paying ? <PayDrawer filing={f} share={paying.share} entity={entity} currency={currency} onClose={() => setPaying(null)} /> : null}
+      {paying ? <PayDrawer filing={f} entity={entity} currency={currency} onClose={() => setPaying(false)} /> : null}
       <ConfirmActionModal
         open={unfiling}
         onOpenChange={setUnfiling}
@@ -256,16 +236,28 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
   );
 }
 
-function FileDrawer({ filing, entity, currency, onClose }: { filing: TaxFiling; entity: string; currency?: string | null; onClose: () => void }) {
+/**
+ * Mark a return as filed. A penalty or adjustment names the branch that bears
+ * it; left on "Shared", it is split by each branch's share of the tax. The
+ * choice is offered only where the return has several branch shares.
+ */
+function FileDrawer({ filing, entity, currency, onClose }: { filing: TaxFilingDetail; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
   const [filedDate, setFiledDate] = useState("");
   const [ref, setRef] = useState("");
   const [adjust, setAdjust] = useState(0);
   const [adjustAccount, setAdjustAccount] = useState("");
-  const [file, { isLoading }] = useFileTaxFilingMutation();
+  const [adjustBranch, setAdjustBranch] = useState("");
+  const bearers = penaltyBranches(filing.branch_breakdown);
+  const askBearer = bearers.length > 1;
+  const [file, { isLoading }] = useFileTaxReturnMutation();
   const submit = async () => {
     try {
-      const r = await file({ id: filing.id, entity, filed_date: filedDate, filing_reference: ref.trim() || undefined, adjustment_amount: adjust || undefined, adjustment_account: adjust ? (adjustAccount || undefined) : undefined }).unwrap();
+      const r = await file({
+        id: filing.id, entity, filed_date: filedDate, filing_reference: ref.trim() || undefined,
+        adjustment_amount: adjust || undefined, adjustment_account: adjust ? (adjustAccount || undefined) : undefined,
+        ...(adjust && askBearer && adjustBranch ? { adjustment_branch: Number(adjustBranch) } : {}),
+      }).unwrap();
       toast.success(r.message || "Filed."); onClose();
     } catch { /* central */ }
   };
@@ -284,37 +276,70 @@ function FileDrawer({ filing, entity, currency, onClose }: { filing: TaxFiling; 
         </div>
         <FormField label="Adjustment / penalty"><MoneyInput valueKobo={adjust} onChangeKobo={setAdjust} currency={currency} className="[&_input]:h-9" /></FormField>
         {adjust ? <FormField label="Adjustment account (expense)" required><AccountPicker entity={entity} value={adjustAccount} onChange={setAdjustAccount} accountType="EXPENSE" postableOnly /></FormField> : null}
+        {adjust && askBearer ? (
+          <FormField label="Branch that bears it">
+            <Select value={adjustBranch} onChange={setAdjustBranch}>
+              <option value="">Shared by each branch's share of the tax</option>
+              {bearers.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+            </Select>
+          </FormField>
+        ) : null}
       </div>
     </DetailDrawer>
   );
 }
 
 /**
- * Pay a filed return, or one branch's share of it. A share is paid only from a
- * bank account of its own branch, so the account list offers only those.
+ * Pay one share of a return from that share's own branch bank account. A
+ * return with several shares asks which, and the amount starts at that share's
+ * outstanding balance; the bank list offers only that branch's accounts. A
+ * return with one share pays it as before.
  */
-function PayDrawer({ filing, share, entity, currency, onClose }: { filing: TaxFiling; share: TaxFilingShare | null; entity: string; currency?: string | null; onClose: () => void }) {
+function PayDrawer({ filing, entity, currency, onClose }: { filing: TaxFilingDetail; entity: string; currency?: string | null; onClose: () => void }) {
+  const shares = payableShares(filing.branch_breakdown);
+  const askShare = showsShares(filing.branch_breakdown) && shares.length > 0;
+  const [shareBranch, setShareBranch] = useState(shares.length === 1 ? String(shares[0].branch_id) : "");
+  const share = shares.find((s) => String(s.branch_id) === shareBranch) ?? null;
+  const due = askShare ? (share?.balance_due ?? 0) : filing.balance_due;
   const [bank, setBank] = useState("");
   const [payDate, setPayDate] = useState("");
-  const owed = share ? share.balance_due : filing.balance_due;
-  const [amount, setAmount] = useState(owed);
-  const [pay, { isLoading }] = usePayTaxFilingMutation();
+  const [amount, setAmount] = useState(due);
+  const [pay, { isLoading }] = usePayTaxShareMutation();
+  const chooseShare = (value: string) => {
+    setShareBranch(value);
+    setBank("");
+    setAmount(shares.find((s) => String(s.branch_id) === value)?.balance_due ?? 0);
+  };
   const submit = async () => {
     try {
-      const r = await pay({ id: filing.id, entity, bank_account: bank, pay_date: payDate, amount: amount !== owed ? amount : undefined, ...(share?.branch_id != null ? { branch: share.branch_id } : {}) }).unwrap();
+      const r = await pay({
+        id: filing.id, entity, bank_account: bank, pay_date: payDate,
+        amount: amount !== due ? amount : undefined,
+        ...(askShare && share?.branch_id != null ? { branch: share.branch_id } : {}),
+      }).unwrap();
       toast.success(r.message || "Remitted."); onClose();
     } catch { /* central */ }
   };
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title={share ? `Pay ${share.label}'s share` : "Remit tax"} description={`${filing.obligation_code} · outstanding ${formatMoney(owed, currency)}`} widthClass="sm:max-w-md"
+      title="Remit tax" description={`${filing.obligation_code} · outstanding ${formatMoney(filing.balance_due, currency)}`} widthClass="sm:max-w-md"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !bank || amount <= 0} onClick={submit} className="gap-1.5"><Banknote className="size-4" />{isLoading ? "Paying…" : `Pay ${formatMoney(amount, currency)}`}</Button>
+        <Button disabled={isLoading || !bank || amount <= 0 || (askShare && !share)} onClick={submit} className="gap-1.5"><Banknote className="size-4" />{isLoading ? "Paying…" : `Pay ${formatMoney(amount, currency)}`}</Button>
       </>}>
       <div className="space-y-4">
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">Remits the liability - Dr {filing.liability_account || filing.obligation_code + " payable"}, Cr bank. Partial payments are allowed; the filing closes once the balance is cleared.</p>
-        <FormField label="Pay from (bank account)" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={share ? share.branch_id : undefined} placeholder={share ? `Select a ${share.label} account` : undefined} /></FormField>
+        {askShare ? (
+          <FormField label="Share to pay" required>
+            <Select value={shareBranch} onChange={chooseShare}>
+              <option value="">Select a branch's share</option>
+              {shares.map((s) => <option key={s.id} value={String(s.branch_id)}>{s.label} · {formatMoney(s.balance_due, currency)} outstanding</option>)}
+            </Select>
+          </FormField>
+        ) : null}
+        <FormField label="Pay from (bank account)" required>
+          <BankAccountPicker entity={entity} value={bank} onChange={setBank} disabled={askShare && !share} documentBranchId={askShare ? share?.branch_id ?? undefined : undefined} />
+        </FormField>
         <div className="grid grid-cols-2 gap-3">
           <PostingDateField
             label="Payment date" entity={entity} value={payDate} onChange={setPayDate}

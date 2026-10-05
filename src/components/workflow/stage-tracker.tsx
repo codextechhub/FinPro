@@ -1,11 +1,12 @@
 import { Check, X, CornerUpLeft, Clock, SkipForward, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatRelativeDate } from "@/utils/relative-date";
+import { formatRelativeDate } from "../../utils/relative-date";
 import type {
   WorkflowStageInstance,
   WorkflowStageStatus,
 } from "@/redux/services/dashboard/workflow-types";
 import { InitialsAvatar, StageStatusBadge } from "./workflow-ui";
+import { proxyLabel, type VoteAttribution } from "./person-flags";
 import { useDates } from "../../lib/display-prefs";
 
 type Resolver = (id?: string | null) => string;
@@ -29,6 +30,9 @@ const VOTE_META: Record<string, { label: string; cls: string; icon: React.ReactN
  * Vertical stage stepper for a workflow instance. Each stage shows its status,
  * eligible approvers (snapshot), and the live votes recorded against the
  * current attempt. Reversed votes are excluded from the live tally.
+ *
+ * A vote cast through a proxy reads "Mrs Bello for Mrs Adeyemi", the server's
+ * own words; an avatar carries the outline of somebody who has left.
  */
 export function StageTracker({
   stages,
@@ -95,11 +99,13 @@ export function StageTracker({
                 <ul className="mt-2 space-y-2">
                   {liveActions.map((a) => {
                     const vm = VOTE_META[a.action];
+                    const people = a as typeof a & VoteAttribution;
+                    const proxied = proxyLabel(people);
                     return (
                       <li key={a.id} className="text-xs">
                         <div className="flex items-center gap-2">
-                          <InitialsAvatar initials={initials(a.actor)} seed={a.actor} size={20} />
-                          <span className="text-black-01">{name(a.actor)}</span>
+                          <InitialsAvatar initials={initials(a.actor)} seed={a.actor} size={20} exited={people.actor_is_exited} />
+                          <span className="text-black-01">{proxied ?? name(a.actor)}</span>
                           {a.on_behalf_of && (
                             <span className="text-gray-01">(for {name(a.on_behalf_of)})</span>
                           )}

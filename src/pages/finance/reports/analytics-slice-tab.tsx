@@ -17,6 +17,8 @@ import { useGetAnalyticsSliceQuery } from "@/redux/services/finance/reports-api"
 import { useGetPeriodsQuery, useGetDimensionsQuery } from "@/redux/services/finance/setup-api";
 import { toArray } from "@/redux/services/finance/api-types";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
+import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
+import { periodParams } from "./period-params";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const TYPE_STYLE: Record<string, string> = {
@@ -42,14 +44,17 @@ export function AnalyticsSliceReport({ entity, currency }: { entity: string; cur
   const [period, setPeriod] = useState("");
   const [acctType, setAcctType] = useState("");
 
-  const { data: periodsData } = useGetPeriodsQuery({ entity });
+  const [showArchived] = useShowArchived();
+
+  const { data: periodsData } = useGetPeriodsQuery({ entity, ...includeArchivedArg(showArchived) });
   const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 
   const { data: dimsData } = useGetDimensionsQuery({ entity });
   const dims = toArray(dimsData?.data).filter((d) => d.is_active);
 
-  const params = { entity, axis, ...(period ? { period } : {}), ...(acctType ? { account_type: acctType } : {}) };
+  const picked = periodParams(periods, period);
+  const params = { entity, axis, ...picked, ...(acctType ? { account_type: acctType } : {}) };
   const { data, isLoading, isFetching, isError, refetch } = useGetAnalyticsSliceQuery(params);
   const sl = data?.data;
 
@@ -97,7 +102,7 @@ export function AnalyticsSliceReport({ entity, currency }: { entity: string; cur
         </div>
         <div className="flex items-center gap-2">
           {(["csv", "xlsx", "pdf"] as const).map((f) => (
-            <button key={f} onClick={() => viewReportExport("/finance/reports/analytics-slice/", { entity, axis, period: period || undefined, account_type: acctType || undefined }, f)}
+            <button key={f} onClick={() => viewReportExport("/finance/reports/analytics-slice/", { entity, axis, ...picked, account_type: acctType || undefined }, f)}
               className="inline-flex items-center gap-1.5 rounded-md border border-white-02 px-2.5 py-1.5 font-mont text-xs font-semibold text-gray-01 hover:border-primary hover:text-primary">
               <Eye className="size-3.5" /> {f.toUpperCase()}
             </button>

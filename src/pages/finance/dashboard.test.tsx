@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   spend: null as unknown,
   lastArgs: null as unknown,
   search: "",
+  periods: [] as unknown[],
 }));
 
 const holds = (code: PermissionCode) => mocks.held.has(FINANCE_PERMISSION_REGISTRY[code]);
@@ -68,7 +69,11 @@ vi.mock("@/redux/services/finance/reports-api", () => ({
 }));
 
 vi.mock("@/redux/services/finance/setup-api", () => ({
-  useGetPeriodsQuery: () => ({ data: { data: [] } }),
+  useGetPeriodsQuery: () => ({ data: { data: mocks.periods } }),
+}));
+
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetFiscalYearsQuery: () => ({ data: { data: [] }, isLoading: false }),
 }));
 
 import FinanceDashboard from "./dashboard";
@@ -318,5 +323,25 @@ describe("Finance overview attention and edge cases", () => {
       "2026-09 close", "Record receipt", "New invoice"]) {
       expect(text).toContain(present);
     }
+  });
+});
+
+describe("pinning the dashboard to a period", () => {
+  it("sends the period's own year beside its number, so March 2025 is not read as March 2026", () => {
+    mocks.periods = [
+      { id: 90, period_no: 3, name: "March 2026", fiscal_year: 2026, start_date: "2026-03-01", end_date: "2026-03-31", status: "OPEN", closed_at: null },
+      { id: 50, period_no: 3, name: "March 2025", fiscal_year: 2025, start_date: "2025-03-01", end_date: "2025-03-31", status: "CLOSED", closed_at: null },
+    ];
+    render(EMPTY);
+    const picker = container.querySelector<HTMLSelectElement>("select[aria-label='As of period']");
+    expect(picker).not.toBeNull();
+    const setValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!;
+    act(() => {
+      setValue.call(picker, "2025:3");
+      picker!.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(mocks.lastArgs).toEqual({ entity: "HOLYCROSS", fiscal_year: 2025, period: 3 });
+    mocks.periods = [];
   });
 });

@@ -15,6 +15,14 @@
  * offers Re-open year to a holder of `finance.fiscalyear.reopen` who covers the
  * whole school, never to a branch's own bursar, with a required reason, and a refusal from the server is left to the central
  * handler so it is shown once.
+ *
+ * Forcing a month's close over a failing check is its own act: offered only to
+ * a holder of `finance.period.force_close`, only while a blocking check fails,
+ * and sent with `force` and the reason typed. Archiving puts a closed year away
+ * for every branch: offered to a whole-school holder of the archive key on the
+ * school's own state, refused before it is old enough, and an archived year is
+ * unarchived before it can be re-opened. Under All branches each branch's own
+ * month and year are listed, so a month held open by one branch says which.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -26,10 +34,13 @@ const mocks = vi.hoisted(() => ({
   closePeriod: vi.fn(),
   closeYear: vi.fn(),
   reopenYear: vi.fn(),
+  archiveYear: vi.fn(),
+  unarchiveYear: vi.fn(),
+  retention: null as null | { archive_min_age_years: number },
   checklist: vi.fn(),
   years: vi.fn(),
   periods: vi.fn(),
-  yearRows: [] as { id: number; year: number; start_date: string; end_date: string; status: string }[],
+  yearRows: [] as { id: number; year: number; start_date: string; end_date: string; status: string; is_archived?: boolean }[],
   periodRows: [] as unknown[],
   denied: new Set<string>(),
   wholeSchool: true,
@@ -55,6 +66,12 @@ vi.mock("@/redux/services/finance/setup-api", () => ({
   useLockPeriodMutation: () => [vi.fn(), { isLoading: false }],
   useReopenPeriodMutation: () => [mocks.reopen, { isLoading: false }],
   useStartFiscalYearMutation: () => [vi.fn(), { isLoading: false }],
+}));
+
+vi.mock("@/redux/services/finance/records-api", () => ({
+  useArchiveFiscalYearMutation: () => [mocks.archiveYear, { isLoading: false }],
+  useUnarchiveFiscalYearMutation: () => [mocks.unarchiveYear, { isLoading: false }],
+  useGetRecordRetentionSettingsQuery: () => ({ data: mocks.retention ? { data: mocks.retention } : undefined }),
 }));
 
 vi.mock("@/redux/services/finance/ops-api", () => ({
@@ -115,6 +132,9 @@ beforeEach(() => {
   mocks.closePeriod.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Closed.", data: {} }) });
   mocks.closeYear.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Fiscal year 2026 closed.", data: {} }) });
   mocks.reopenYear.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Fiscal year 2026 re-opened." }) });
+  mocks.archiveYear.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Fiscal year 2026 archived." }) });
+  mocks.unarchiveYear.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Fiscal year 2026 unarchived." }) });
+  mocks.retention = null;
   mocks.years.mockReset();
   mocks.periods.mockReset();
   mocks.toast.success.mockReset();
@@ -165,6 +185,8 @@ const button = (label: string, scope: ParentNode = document.body) =>
 const dialog = () => Array.from(document.body.querySelectorAll<HTMLElement>("[role='dialog']")).at(-1) ?? null;
 const pageBranchPicker = () => container.querySelector<HTMLSelectElement>("select[aria-label='Branch']");
 const lastArgs = (fn: ReturnType<typeof vi.fn>) => fn.mock.calls.at(-1)?.[0];
+/** The year reads the workbench itself makes, leaving out the archived-years lookup. */
+const yearReads = () => mocks.years.mock.calls.map(([args]) => args).filter((args) => args.include_archived !== "true");
 
 async function click(el: HTMLElement | undefined | null) {
   expect(el).toBeTruthy();
@@ -230,7 +252,7 @@ describe("Harbour Primary, a school with one branch", () => {
     await mountWorkbench("HARBOUR");
 
     expect(pageBranchPicker()).toBeNull();
-    expect(lastArgs(mocks.years)).toEqual({ entity: "HARBOUR" });
+    expect(yearReads().at(-1)).toEqual({ entity: "HARBOUR" });
     expect(lastArgs(mocks.periods)).toEqual({ entity: "HARBOUR", year: 2026 });
     expect(container.textContent).not.toContain("The school's calendar.");
   });
@@ -267,7 +289,7 @@ describe("Bright Star with Lekki chosen", () => {
     await mountWorkbench("BRIGHTSTAR", "?branch=2");
 
     expect(pageBranchPicker()?.value).toBe("2");
-    expect(lastArgs(mocks.years)).toEqual({ entity: "BRIGHTSTAR", branch: 2 });
+    expect(yearReads().at(-1)).toEqual({ entity: "BRIGHTSTAR", branch: 2 });
     expect(lastArgs(mocks.periods)).toEqual({ entity: "BRIGHTSTAR", year: 2026, branch: 2 });
     expect(container.textContent).toContain("Fiscal year 2026 · Lekki");
   });
@@ -287,7 +309,7 @@ describe("Bright Star with Lekki chosen", () => {
     await mountWorkbench("BRIGHTSTAR", "?branch=2");
     await pick(pageBranchPicker(), "1");
 
-    expect(lastArgs(mocks.years)).toEqual({ entity: "BRIGHTSTAR", branch: 1 });
+    expect(yearReads().at(-1)).toEqual({ entity: "BRIGHTSTAR", branch: 1 });
   });
 });
 
@@ -298,7 +320,7 @@ describe("Bright Star under All branches", () => {
     await mountWorkbench("BRIGHTSTAR");
 
     expect(pageBranchPicker()?.value).toBe("all");
-    expect(lastArgs(mocks.years)).toEqual({ entity: "BRIGHTSTAR" });
+    expect(yearReads()).toContainEqual({ entity: "BRIGHTSTAR" });
     expect(container.textContent).toContain("The school's calendar.");
   });
 
@@ -468,5 +490,174 @@ describe("re-opening a fiscal year", () => {
     expect(mocks.toast.error).not.toHaveBeenCalled();
     expect(mocks.toast.success).not.toHaveBeenCalled();
     expect(dialog()?.textContent).toContain("Re-open fiscal year 2026 for Lekki?");
+  });
+});
+
+const FAILING_BANK = { name: "trial_balance_balanced", passed: false, blocking: true, detail: "Debits exceed credits by 5000 kobo" };
+
+function checklistWith(items: unknown[], status = "OPEN") {
+  mocks.checklist.mockReturnValue({
+    data: { data: { period: { ...MARCH, status }, items, done: 0, total: items.length } },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
+}
+
+describe("forcing a month's close over a failing check", () => {
+  it("is offered to a holder of the force key while a blocking check fails", async () => {
+    checklistWith([FAILING_BANK]);
+    await mountDrawer();
+
+    expect(button("Force close")).toBeTruthy();
+    expect(document.body.textContent).toContain("You may force the close with a reason.");
+  });
+
+  it("is not offered without the force key", async () => {
+    checklistWith([FAILING_BANK]);
+    mocks.denied = new Set([P.FIN_FORCE_CLOSE_PERIOD]);
+    await mountDrawer();
+
+    expect(button("Force close")).toBeUndefined();
+    expect(button("Run close steps")).toBeTruthy();
+  });
+
+  it("is not offered when every blocking check passes", async () => {
+    checklistWith([{ ...FAILING_BANK, passed: true }, { name: "no_draft_journals", passed: false, blocking: false, detail: "" }]);
+    await mountDrawer();
+
+    expect(button("Force close")).toBeUndefined();
+  });
+
+  it("names the checks it overrides, needs a reason, and sends force with it", async () => {
+    checklistWith([FAILING_BANK]);
+    await mountDrawer();
+    await click(button("Force close"));
+
+    expect(dialog()?.textContent).toContain("Checks you are overriding");
+    expect(dialog()?.textContent).toContain("Trial balance balanced: Debits exceed credits by 5000 kobo");
+    expect(button("Force close", dialog()!)?.disabled).toBe(true);
+    await typeReason("  The accountant agreed the March bank balance  ");
+    await click(button("Force close", dialog()!));
+
+    expect(mocks.closePeriod).toHaveBeenCalledWith({
+      id: 41, entity: "BRIGHTSTAR", soft: false, force: true,
+      reason: "The accountant agreed the March bank balance",
+    });
+  });
+});
+
+describe("archiving a closed year", () => {
+  const CLOSED_2026 = { ...FY, status: "CLOSED", is_archived: false };
+
+  it("is offered to a whole-school holder of the key once the year is old enough", async () => {
+    mocks.yearRows = [{ ...CLOSED_2026, id: 6, year: 2020, start_date: "2020-01-01", end_date: "2020-12-31" }];
+    mocks.retention = { archive_min_age_years: 2 };
+    await mountWorkbench("HARBOUR");
+    await click(button("Archive year"));
+
+    expect(dialog()?.textContent).toContain("Archive fiscal year 2020?");
+    expect(dialog()?.querySelector("select")).toBeNull();
+    expect(button("Archive year", dialog()!)?.disabled).toBe(true);
+    await typeReason("FY 2020 is audited and finished");
+    await click(button("Archive year", dialog()!));
+
+    expect(mocks.archiveYear).toHaveBeenCalledWith({ id: 6, entity: "HARBOUR", reason: "FY 2020 is audited and finished" });
+  });
+
+  it("says when a year too recent may be archived, and does not offer it yet", async () => {
+    mocks.yearRows = [CLOSED_2026];
+    mocks.retention = { archive_min_age_years: 50 };
+    await mountWorkbench("HARBOUR");
+
+    expect(button("Archive year")?.disabled).toBe(true);
+    expect(container.textContent).toMatch(/FY 2026 can be archived from .*2076/);
+  });
+
+  it("is not offered to a branch's own bursar, nor without the key", async () => {
+    mocks.yearRows = [CLOSED_2026];
+    mocks.wholeSchool = false;
+    await mountWorkbench("HARBOUR");
+    expect(button("Archive year")).toBeUndefined();
+
+    mocks.wholeSchool = true;
+    mocks.denied = new Set([P.FIN_ARCHIVE_FISCAL_YEAR]);
+    await mountWorkbench("HARBOUR");
+    expect(button("Archive year")).toBeUndefined();
+
+  });
+
+  it("is not offered on one branch's view, because the year it archives is the school's", async () => {
+    mocks.yearRows = [CLOSED_2026];
+    atBrightStar();
+    await mountWorkbench("BRIGHTSTAR", "?branch=2");
+
+    expect(button("Archive year")).toBeUndefined();
+  });
+
+  it("unarchives an archived year with a reason, and holds its re-open until then", async () => {
+    mocks.yearRows = [{ ...CLOSED_2026, is_archived: true }];
+    await mountWorkbench("HARBOUR");
+
+    expect(container.textContent).toContain("Fiscal year 2026 is archived");
+    expect(button("Re-open year")?.disabled).toBe(true);
+    await click(button("Unarchive year"));
+    await typeReason("The tax office is reviewing FY 2026");
+    await click(button("Unarchive year", dialog()!));
+
+    expect(mocks.unarchiveYear).toHaveBeenCalledWith({ id: 7, entity: "HARBOUR", reason: "The tax office is reviewing FY 2026" });
+  });
+
+  it("reads archived years and their months once Show archived years is ticked", async () => {
+    mocks.yearRows = [{ ...CLOSED_2026, is_archived: true }];
+    await mountWorkbench("HARBOUR", "?archived=1");
+
+    expect(yearReads()).toEqual([]);
+    expect(lastArgs(mocks.years)).toEqual({ entity: "HARBOUR", include_archived: "true" });
+    expect(lastArgs(mocks.periods)).toEqual({ entity: "HARBOUR", year: 2026, include_archived: "true" });
+    expect(container.textContent).toContain("FY 2026 · CLOSED · Archived");
+  });
+});
+
+describe("each branch's state under All branches", () => {
+  beforeEach(atBrightStar);
+
+  it("lists each branch's year beside the school's", async () => {
+    await mountWorkbench("BRIGHTSTAR");
+
+    expect(yearReads()).toEqual(expect.arrayContaining([
+      { entity: "BRIGHTSTAR", branch: 1 },
+      { entity: "BRIGHTSTAR", branch: 2 },
+    ]));
+    expect(container.textContent).toContain("Each branch's year:");
+  });
+
+  it("lists each branch's own state for a month in the drawer", async () => {
+    mocks.periodRows = [{ ...H1, status: "OPEN" }];
+    checklistWith([], "OPEN");
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <PeriodCloseDrawer
+            id={H1.id}
+            entity="BRIGHTSTAR"
+            finalPeriodOfOpenYear={false}
+            calendar={calendarBranchFor(mocks.lens, null)}
+            year={2026}
+            onClose={() => undefined}
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(mocks.periods).toHaveBeenCalledWith({ entity: "BRIGHTSTAR", year: 2026, branch: 1 });
+    expect(mocks.periods).toHaveBeenCalledWith({ entity: "BRIGHTSTAR", year: 2026, branch: 2 });
+    expect(document.body.textContent).toContain("Each branch");
+  });
+
+  it("is not shown with one branch chosen", async () => {
+    await mountWorkbench("BRIGHTSTAR", "?branch=2");
+
+    expect(container.textContent).not.toContain("Each branch's year:");
   });
 });

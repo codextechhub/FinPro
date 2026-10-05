@@ -72,6 +72,8 @@ export interface JournalListParams {
   date_from?: string;
   date_to?: string;
   search?: string;
+  /** Journals dated in an archived fiscal year are left out unless this asks for them. */
+  include_archived?: "true";
 }
 
 /** One Direct Entry line: an account code with a one-sided kobo amount, and an

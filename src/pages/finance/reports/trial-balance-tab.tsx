@@ -22,6 +22,8 @@ import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { TrialBalanceRow } from "@/redux/services/finance/reports-types";
 import { toArray } from "@/redux/services/finance/api-types";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
+import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
+import { periodParams } from "./period-params";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const TYPE_STYLE: Record<string, string> = {
@@ -53,7 +55,9 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
   const [acctType, setAcctType] = useState("");
   const [compare, setCompare] = useState(false);
 
-  const { data: periodsData } = useGetPeriodsQuery({ entity });
+  const [showArchived] = useShowArchived();
+
+  const { data: periodsData } = useGetPeriodsQuery({ entity, ...includeArchivedArg(showArchived) });
   const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
 
@@ -65,8 +69,9 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
   }, [period, periods]);
   const comparing = compare && !!period && !!priorId;
 
-  const { data, isLoading, isFetching, isError, refetch } = useGetTrialBalanceQuery({ entity, ...(period ? { period } : {}) });
-  const prior = useGetTrialBalanceQuery(comparing ? { entity, period: priorId! } : skipToken);
+  const picked = periodParams(periods, period);
+  const { data, isLoading, isFetching, isError, refetch } = useGetTrialBalanceQuery({ entity, ...picked });
+  const prior = useGetTrialBalanceQuery(comparing ? { entity, ...periodParams(periods, priorId) } : skipToken);
 
   const tb = data?.data;
   const priorNetByCode = useMemo(() => {
@@ -119,7 +124,7 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
         </div>
         <div className="flex items-center gap-2">
           {(["csv", "xlsx", "pdf"] as const).map((f) => (
-            <button key={f} onClick={() => viewReportExport("/finance/reports/trial-balance/", { entity, period: period || undefined }, f)}
+            <button key={f} onClick={() => viewReportExport("/finance/reports/trial-balance/", { entity, ...picked }, f)}
               className="inline-flex items-center gap-1.5 rounded-md border border-white-02 px-2.5 py-1.5 font-mont text-xs font-semibold text-gray-01 hover:border-primary hover:text-primary">
               <Eye className="size-3.5" /> {f.toUpperCase()}
             </button>

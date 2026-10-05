@@ -44,6 +44,8 @@ import {
 import { greeting } from "../finance/dashboard-words";
 import { useServesPath } from "../../lib/host-routes";
 import { useDates } from "../../lib/display-prefs";
+import { exitedOutline, exitedTitle } from "@/components/finance-ui/exited-person";
+import { proxyLabel } from "../../components/workflow/person-flags";
 
 const R = routesPath.PROTECTED.PROCUREMENT;
 type D = Dashboard;
@@ -362,10 +364,10 @@ function ActivityCard({ items, canAudit }: { items: NonNullable<D["recent_activi
         <div className="flex flex-1 flex-col justify-around gap-3">
           {items.map((item) => (
             <div key={item.id} className="flex min-w-0 items-center gap-3">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 font-mont text-[11px] font-semibold text-primary">{initials(item.actor)}</span>
+              <span title={exitedTitle(item.actor_is_exited)} className={cn("flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 font-mont text-[11px] font-semibold text-primary", exitedOutline(item.actor_is_exited))}>{initials(item.actor)}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-mont text-[13px] text-gray-01">{item.summary}</span>
-                <span className="block truncate font-mont text-[11px] text-gray-05">{item.actor} · {ago(item.occurred_at)}</span>
+                <span className="block truncate font-mont text-[11px] text-gray-05">{proxyLabel(item) ?? item.actor} · {ago(item.occurred_at)}</span>
               </span>
             </div>
           ))}

@@ -125,6 +125,7 @@ export default function ManageApprovals() {
           initials={initials(r.requested_by)}
           role={role(r.requested_by)}
           size={22}
+          exited={(r as { requested_by_is_exited?: boolean | null }).requested_by_is_exited}
         />
       ),
     },

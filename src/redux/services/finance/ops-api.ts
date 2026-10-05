@@ -20,6 +20,7 @@ import type {
   ExpenseClaim,
   FixedAsset,
   DepreciationPreview,
+  DepreciationRunResult,
   EmployeeSalary,
   PayrollRun,
   SalaryComponent,
@@ -433,7 +434,8 @@ export const opsApi = baseApi.injectEndpoints({
       providesTags: ["FinanceBudgets"],
     }),
     // With `branch`, each year carries that branch's own status; without it, the school's.
-    getFiscalYears: b.query<ApiEnvelope<FiscalYear[]>, { entity: string; status?: string; branch?: number }>({
+    // Archived years are left out unless `include_archived: "true"` asks for them.
+    getFiscalYears: b.query<ApiEnvelope<FiscalYear[]>, { entity: string; status?: string; branch?: number; include_archived?: "true" }>({
       query: (p) => ({ url: `/finance/fiscal-years/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePeriods"],
     }),
@@ -488,7 +490,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/fixed-assets/run-depreciation/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceFixedAssets"],
     }),
-    runDepreciation: b.mutation<ApiEnvelope<{ journal_id: number; journal_ids?: number[]; period_count?: number; total: number; charge_count: number; asset_count: number }>, { entity: string; up_to_date: string }>({
+    runDepreciation: b.mutation<ApiEnvelope<DepreciationRunResult>, { entity: string; up_to_date: string }>({
       query: ({ entity, ...body }) => ({ url: `/finance/fixed-assets/run-depreciation/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceFixedAssets", "FinanceJournals", "FinanceReports"],
     }),
@@ -528,7 +530,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/finance/tax-filings/${id}/unfile/${qs({ entity })}`, method: "POST" }),
       invalidatesTags: ["FinanceTax", "FinanceJournals"],
     }),
-    payTaxFiling: b.mutation<ApiEnvelope<TaxFiling>, { id: number; entity: string; bank_account: string; pay_date: string; amount?: number; branch?: number }>({
+    payTaxFiling: b.mutation<ApiEnvelope<TaxFiling>, { id: number; entity: string; bank_account: string; pay_date: string; amount?: number }>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/tax-filings/${id}/pay/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceTax", "FinanceJournals", "FinanceReports"],
     }),

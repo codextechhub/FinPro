@@ -5,9 +5,16 @@
  * comparison columns (toggled on when the backend has that data). Money + the
  * comparison figures come straight from the endpoint; export is the real backend
  * CSV/XLSX/PDF.
+ *
+ * The window is year to date, one whole fiscal year, or one month of a year
+ * (see `incomeWindowParams`). A closed year shows its real profit, because the
+ * server never counts the year's closing period, so FY2026 picked in 2027 reads
+ * as it did before the close and FY2027's prior-year column shows it.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
+import type { FiscalPeriod } from "@/redux/services/finance/setup-types";
+import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { Eye } from "lucide-react";
 import { Money } from "@/components/finance-ui";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
@@ -49,16 +56,38 @@ function Variance({ kobo, currency }: { kobo: number; currency?: string | null }
   </span>;
 }
 
+/**
+ * The request for a picked window. The picker's value is "" for year to date,
+ * "fy:2026" for the whole of FY2026, or "p:2026:3" for its third period. A
+ * month is sent as its year and period number, never as a row id: the server
+ * reads a `period` of 12 or less as a period number, so an id that small would
+ * name a month of the latest year instead.
+ */
+export function incomeWindowParams(picked: string): { fiscal_year?: number; period?: number } {
+  const [kind, year, number] = picked.split(":");
+  if (kind === "fy" && year) return { fiscal_year: Number(year) };
+  if (kind === "p" && year && number) return { fiscal_year: Number(year), period: Number(number) };
+  return {};
+}
+
+/** The fiscal years the period list covers, newest first. */
+export function fiscalYearsOf(periods: Pick<FiscalPeriod, "fiscal_year">[]): number[] {
+  return [...new Set(periods.map((p) => p.fiscal_year))].sort((a, b) => b - a);
+}
+
 export function IncomeStatementReport({ entity, currency }: { entity: string; currency?: string | null }) {
-  const [period, setPeriod] = useState("");          // "" = year to date, else fiscal period id
+  const [span, setSpan] = useState("");          // see incomeWindowParams
   const [wantBudget, setWantBudget] = useState(true);
   const [wantPrior, setWantPrior] = useState(true);
+  const [showArchived] = useShowArchived();
 
-  const { data: periodsData } = useGetPeriodsQuery({ entity });
+  const { data: periodsData } = useGetPeriodsQuery({ entity, ...includeArchivedArg(showArchived) });
   const periods = useMemo(() => [...toArray(periodsData?.data)]
     .sort((a, b) => (a.fiscal_year - b.fiscal_year) || (a.period_no - b.period_no)), [periodsData]);
+  const years = useMemo(() => fiscalYearsOf(periods), [periods]);
+  const windowParams = incomeWindowParams(span);
 
-  const { data, isLoading, isFetching, isError, refetch } = useGetIncomeStatementQuery({ entity, ...(period ? { period } : {}) });
+  const { data, isLoading, isFetching, isError, refetch } = useGetIncomeStatementQuery({ entity, ...windowParams });
   const d = data?.data;
 
   if (isLoading) return <LoadingState />;
@@ -67,7 +96,7 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
   const showBudget = d.has_budget && wantBudget;
   const showPrior = d.has_prior_year && wantPrior;
   const colCount = 2 + (showBudget ? 2 : 0) + (showPrior ? 1 : 0);
-  const periodLabel = d.period || (d.fiscal_year ? `${d.fiscal_year} fiscal year` : "Year to date");
+  const periodLabel = d.period || (span.startsWith("fy:") && d.fiscal_year ? `FY ${d.fiscal_year}` : d.fiscal_year ? `${d.fiscal_year} fiscal year` : "Year to date");
 
   const numCell = "px-3 py-2 text-right tabular-nums";
   const muted = "text-gray-05";
@@ -106,16 +135,21 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
       {d.narrowed && <BranchReportNote />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <Select value={period} onChange={setPeriod} className="w-44">
+          <Select value={span} onChange={setSpan} className="w-full sm:w-52">
             <option value="">Year to date</option>
-            {periods.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+            <optgroup label="Whole fiscal year">
+              {years.map((year) => <option key={year} value={`fy:${year}`}>FY {year} (whole year)</option>)}
+            </optgroup>
+            <optgroup label="One period">
+              {periods.map((p) => <option key={p.id} value={`p:${p.fiscal_year}:${p.period_no}`}>{p.name}</option>)}
+            </optgroup>
           </Select>
           {d.has_budget ? <CompareToggle label="vs Budget" checked={wantBudget} onChange={setWantBudget} /> : null}
           {d.has_prior_year ? <CompareToggle label={`vs Prior year${d.prior_fiscal_year ? ` (${d.prior_fiscal_year})` : ""}`} checked={wantPrior} onChange={setWantPrior} /> : null}
         </div>
         <div className="flex items-center gap-2">
           {(["csv", "xlsx", "pdf"] as const).map((f) => (
-            <button key={f} onClick={() => viewReportExport("/finance/reports/income-statement/", { entity, period: period || undefined }, f)}
+            <button key={f} onClick={() => viewReportExport("/finance/reports/income-statement/", { entity, ...windowParams }, f)}
               className="inline-flex items-center gap-1.5 rounded-md border border-white-02 px-2.5 py-1.5 font-mont text-xs font-semibold text-gray-01 hover:border-primary hover:text-primary">
               <Eye className="size-3.5" /> {f.toUpperCase()}
             </button>

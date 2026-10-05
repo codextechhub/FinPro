@@ -162,16 +162,16 @@ export interface FxRate {
   source: string;
 }
 
-/** VAT treatment carried on a tax code. Zero rated and exempt codes charge nothing. */
+/** How a supply is treated for VAT. Only STANDARD carries a rate. */
 export type TaxTreatment = "STANDARD" | "ZERO_RATED" | "EXEMPT";
 
 export interface TaxCode {
   id: number;
   code: string;
   name: string;
-  rate_bps: number;
-  /** How the supply is taxed. Only a STANDARD code carries a rate. */
+  /** Absent from an older server, which treats every code as standard. */
   treatment?: TaxTreatment;
+  rate_bps: number;
   is_recoverable: boolean;
   collected_account: string | null;
   paid_account: string | null;
@@ -214,6 +214,14 @@ export interface FinanceAuditLog {
   before: Record<string, unknown>;
   after: Record<string, unknown>;
   created_at: string;
+  /** Set only for an act done through a proxy: the person who acted, and whom they acted as. */
+  real_actor_name?: string | null;
+  proxied_user_name?: string | null;
+  /** Ready to show: "Ada Obi for Chioma Okafor" under a proxy, else the actor's own name. */
+  acted_label?: string | null;
+  /** The server's flags that the person has left; absent from an older server. */
+  actor_is_exited?: boolean | null;
+  effective_user_is_exited?: boolean | null;
 }
 
 export interface SettingConsumer {

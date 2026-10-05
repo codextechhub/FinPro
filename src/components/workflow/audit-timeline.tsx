@@ -1,7 +1,8 @@
-import { formatRelativeDate } from "@/utils/relative-date";
+import { formatRelativeDate } from "../../utils/relative-date";
 import type { AuditEventType, WorkflowAuditLog } from "@/redux/services/dashboard/workflow-types";
 import { AUDIT_EVENT_LABEL } from "./workflow-format";
 import { useDates } from "../../lib/display-prefs";
+import { proxyLabel, type AuditAttribution } from "./person-flags";
 
 type Resolver = (id?: string | null) => string;
 
@@ -13,7 +14,10 @@ const HIDDEN_EVENTS = new Set<AuditEventType>([
   "ROUTE_EVALUATED",
 ]);
 
-/** Append-only audit log rendered as a vertical timeline (newest first). */
+/**
+ * Append-only audit log rendered as a vertical timeline (newest first). An
+ * entry made through a proxy names both people, "Mrs Bello for Mrs Adeyemi".
+ */
 export function AuditTimeline({
   logs,
   name,
@@ -40,7 +44,7 @@ export function AuditTimeline({
             <p className="text-sm text-black-01">
               {AUDIT_EVENT_LABEL[log.event_type] ?? log.event_type}
               {log.actor && (
-                <span className="text-gray-01"> · {name(log.actor)}</span>
+                <span className="text-gray-01"> · {proxyLabel(log as typeof log & AuditAttribution) ?? name(log.actor)}</span>
               )}
             </p>
             {log.message && <p className="text-xs text-gray-01 mt-0.5">{log.message}</p>}

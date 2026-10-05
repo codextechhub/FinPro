@@ -309,6 +309,8 @@ export interface InvoiceListParams {
   payment_status?: PaymentStatus;
   bucket?: string;
   search?: string;
+  /** Bills dated in an archived fiscal year are left out unless this asks for them; an unpaid one stays either way. */
+  include_archived?: "true";
 }
 
 type ArMoney = { kobo: number; naira: string };

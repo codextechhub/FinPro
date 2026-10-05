@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FiscalPeriod } from "@/redux/services/finance/setup-types";
-import { periodActionLabel, summarizePeriods, yearCloseState } from "./periods-model";
+import { periodActionLabel, summarizePeriods, yearCloseState, archiveReadiness, earliestArchiveDate } from "./periods-model";
 
 function period(period_no: number, status: FiscalPeriod["status"]): FiscalPeriod {
   return {
@@ -58,5 +58,27 @@ describe("fiscal period workbench model", () => {
     ];
 
     expect(yearCloseState("OPEN", unsorted)).toBe("FINAL_LOCKED");
+  });
+});
+
+describe("when a closed year may be archived", () => {
+  it("counts whole years from the year's last day, as the server does", () => {
+    expect(earliestArchiveDate("2027-12-31", 2)).toBe("2029-12-31");
+    expect(earliestArchiveDate("2028-02-29", 1)).toBe("2029-02-28");
+    expect(earliestArchiveDate("2028-02-29", 4)).toBe("2032-02-29");
+  });
+
+  it("archives only a closed or locked year that is old enough", () => {
+    const fy2027 = { status: "CLOSED", end_date: "2027-12-31" };
+
+    expect(archiveReadiness({ ...fy2027, status: "OPEN" }, 2, "2030-02-01")).toEqual({ kind: "not-closed" });
+    expect(archiveReadiness(fy2027, 2, "2029-06-30")).toEqual({ kind: "too-recent", from: "2029-12-31" });
+    expect(archiveReadiness(fy2027, 2, "2030-02-01")).toEqual({ kind: "ready" });
+    expect(archiveReadiness({ ...fy2027, status: "LOCKED" }, 2, "2029-12-31")).toEqual({ kind: "ready" });
+    expect(archiveReadiness({ ...fy2027, is_archived: true }, 2, "2030-02-01")).toEqual({ kind: "archived" });
+  });
+
+  it("leaves the age to the server when the reader cannot read the setting", () => {
+    expect(archiveReadiness({ status: "CLOSED", end_date: "2029-12-31" }, null, "2030-01-15")).toEqual({ kind: "ready" });
   });
 });

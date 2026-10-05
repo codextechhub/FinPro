@@ -239,7 +239,7 @@ function ApprovalRow({
           />
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-gray-01 min-w-0">
-          <InitialsAvatar initials={requesterInitials} seed={item.requested_by} size={18} />
+          <InitialsAvatar initials={requesterInitials} seed={item.requested_by} size={18} exited={(item as { requested_by_is_exited?: boolean | null }).requested_by_is_exited} />
           <span className="truncate text-black-01">{requesterName}</span>
           {requesterRole && (
             <>

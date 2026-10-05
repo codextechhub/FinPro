@@ -23,7 +23,7 @@
  *   32 settings; 33 entity, 34 account and 35 period hold the renumbered codes
  *   described below; 36 fiscalyear; 37 statutory (the national payroll tax
  *   data the platform maintains); 41 credittransfer, 42 deferredincome,
- *   43 provision, 44 deposit, 45 banktransaction, 46 banktransfer;
+ *   43 provision, 44 deposit, 45 banktransaction, 46 banktransfer; 49 seal;
  *   55 interbranch (transfers between a school's branches, with its own
  *   actions 52 request, 53 transfer, 54 confirm and 55 recharge).
  *
@@ -65,6 +65,9 @@ export const P = {
   FIN_APPROVE_BUDGET: "202305",
   FIN_CANCEL_PAYMENT_PLAN: "200928",
   FIN_CLOSE_PERIOD: "200324",
+  FIN_FORCE_CLOSE_PERIOD: "200344",  // close a month or year over failing checks, with a reason
+  FIN_ARCHIVE_FISCAL_YEAR: "203645",  // put a closed year away, and bring it back
+  FIN_VIEW_SEALS: "204901",  // verify the sealed figures of closed months and years
   FIN_CREATE_ACCOUNT: "200202",
   FIN_CREATE_BANK_ACCOUNT: "201802",
   FIN_CREATE_BANK_TRANSACTION: "204502",
@@ -341,6 +344,9 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "205554": "finance.interbranch.confirm",
   "205555": "finance.interbranch.recharge",
   "205514": "finance.interbranch.reverse",
+  "200344": "finance.period.force_close",
+  "203645": "finance.fiscalyear.archive",
+  "204901": "finance.seal.view",
   "200414": "finance.journal.reverse",
   "200430": "finance.journal.submit",
   "200502": "finance.invoice.create",
