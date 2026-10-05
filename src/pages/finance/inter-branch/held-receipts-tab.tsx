@@ -87,11 +87,13 @@ export function HeldReceiptsTab({ entity, currency, reader }: { entity: string; 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <NativeSelect value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Status">
-          <option value="">Held, forwarded and voided</option>
-          <option value="POSTED">Held or forwarded</option>
-          <option value="REVERSED">Voided</option>
-        </NativeSelect>
+        <div className="w-full sm:w-60">
+          <NativeSelect value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Status" className="h-9">
+            <option value="">Held, forwarded and voided</option>
+            <option value="POSTED">Held or forwarded</option>
+            <option value="REVERSED">Voided</option>
+          </NativeSelect>
+        </div>
         {can(P.FIN_RECORD_PAYMENT) ? (
           <Button onClick={() => setRecording(true)} className="gap-1.5"><Plus className="size-4" /> Record money for another branch</Button>
         ) : null}

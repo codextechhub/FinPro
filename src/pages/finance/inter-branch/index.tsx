@@ -5,7 +5,8 @@
  *
  * At a school with one branch there is no other branch to deal with: the menu
  * does not offer these screens, and an address typed by hand says so rather
- * than drawing empty lists.
+ * than drawing empty lists. A reader without the section's view key is told
+ * that, in place of a list the server would refuse.
  */
 
 import { DEFAULT_INTER_BRANCH_SECTION, type InterBranchSection } from "../console-sections";
@@ -20,6 +21,9 @@ import { HeldReceiptsTab } from "./held-receipts-tab";
 import { RechargesTab } from "./recharges-tab";
 import { TransfersTab } from "./transfers-tab";
 import { useInterBranchReader } from "./use-inter-branch";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
+import { useCan } from "@/components/finance-ui/can";
+import { P } from "../../../permissions";
 
 const HEADINGS: Record<InterBranchSection, { title: string; lead: string; hint: string }> = {
   transfers: {
@@ -53,7 +57,10 @@ const HEADINGS: Record<InterBranchSection, { title: string; lead: string; hint: 
 export default function InterBranchPage({ section = DEFAULT_INTER_BRANCH_SECTION }: { section?: InterBranchSection }) {
   const { code: entity, currency } = useActiveEntity();
   const reader = useInterBranchReader();
+  const { can } = useCan();
   const heading = HEADINGS[section];
+  // The same key the menu gates each section on.
+  const canView = section === "held-receipts" ? can(P.FIN_VIEW_PAYMENTS) : reader.keys.view;
 
   return (
     <FinanceShell>
@@ -71,6 +78,8 @@ export default function InterBranchPage({ section = DEFAULT_INTER_BRANCH_SECTION
           <LoadingState rows={6} />
         ) : !reader.applies ? (
           <EmptyState title="One branch" message="This school runs one branch, so there is no other branch to send money to, share costs with or owe." />
+        ) : !canView ? (
+          <EmptyState title={`No ${heading.title.toLowerCase()} access`} message={noAccessMessage(`view ${heading.title.toLowerCase()}`)} />
         ) : section === "balances" ? (
           <BalancesTab entity={entity} currency={currency} />
         ) : section === "held-receipts" ? (

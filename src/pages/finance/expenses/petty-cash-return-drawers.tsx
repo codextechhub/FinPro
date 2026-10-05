@@ -95,6 +95,20 @@ function ReturnSummary({ fund, figures, bankName, currency, floatAfter }: {
   );
 }
 
+/**
+ * Whether the reader has changed anything yet, and a wrapper that marks it.
+ *
+ * A drawer opens with nothing chosen, so its first problem is always "choose a
+ * bank account". Saying that in red before Mrs Okoro has typed a figure reads
+ * as an error she made; the disabled button already says the form is not
+ * ready. The problem shows once she has changed a field.
+ */
+function useTouched(): [boolean, <T>(set: (value: T) => void) => (value: T) => void] {
+  const [touched, setTouched] = useState(false);
+  const touch = <T,>(set: (value: T) => void) => (value: T) => { setTouched(true); set(value); };
+  return [touched, touch];
+}
+
 const APPROVAL_NOTE = "If the school uses an approval route for petty cash returns, this may wait for a second person before it reaches the books.";
 
 /**
@@ -104,6 +118,7 @@ const APPROVAL_NOTE = "If the school uses an approval route for petty cash retur
 export function ReduceFloatDrawer({ fund, entity, currency, onClose, onRaised }: {
   fund: PettyCashFund; entity: string; currency?: string | null; onClose: () => void; onRaised: ReturnRaised;
 }) {
+  const [touched, touch] = useTouched();
   const [counted, setCounted] = useState(fund.current_balance);
   const [newFloat, setNewFloat] = useState(0);
   const [bank, setBank] = useState("");
@@ -143,20 +158,20 @@ export function ReduceFloatDrawer({ fund, entity, currency, onClose, onRaised }:
       <div className="space-y-4">
         <p className={NOTE}>Count the cash in the tin first. Everything above the new float goes back to the bank, and any difference from the books goes to Cash over and short.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Cash counted" required><MoneyInput valueKobo={counted} onChangeKobo={setCounted} currency={currency} className="[&_input]:h-9" /></FormField>
-          <FormField label="New float" required><MoneyInput valueKobo={newFloat} onChangeKobo={setNewFloat} currency={currency} className="[&_input]:h-9" /></FormField>
+          <FormField label="Cash counted" required><MoneyInput valueKobo={counted} onChangeKobo={touch(setCounted)} currency={currency} className="[&_input]:h-9" /></FormField>
+          <FormField label="New float" required><MoneyInput valueKobo={newFloat} onChangeKobo={touch(setNewFloat)} currency={currency} className="[&_input]:h-9" /></FormField>
         </div>
         <p className="-mt-2 font-mont text-[11px] text-gray-05">The books say {formatMoney(fund.current_balance, currency)}. The float is {formatMoney(fund.float_amount, currency)}.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Into bank account" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={fund.branch_id} /></FormField>
+          <FormField label="Into bank account" required><BankAccountPicker entity={entity} value={bank} onChange={touch(setBank)} documentBranchId={fund.branch_id} /></FormField>
           <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
         </div>
         {figures.difference ? (
-          <ReasonField label="Why the count differs" value={reason} onChange={setReason} placeholder="e.g. coins missing" hint="Kept on the return and the audit record." />
+          <ReasonField label="Why the count differs" value={reason} onChange={touch(setReason)} placeholder="e.g. coins missing" hint="Kept on the return and the audit record." />
         ) : null}
         <FormField label="Reference"><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Deposit slip number" className="h-9 bg-white" /></FormField>
         <ReturnSummary fund={fund} figures={figures} bankName={bankName} currency={currency} floatAfter={newFloat} />
-        {problem ? <p className={PROBLEM} role="alert">{problem}</p> : null}
+        {problem && touched ? <p className={PROBLEM} role="alert">{problem}</p> : null}
         <p className="font-mont text-[11px] text-gray-05">{APPROVAL_NOTE}</p>
       </div>
     </DetailDrawer>
@@ -171,6 +186,7 @@ export function CloseFundDrawer({ fund, entity, currency, blockers, onClose, onR
   fund: PettyCashFund; entity: string; currency?: string | null; blockers: string[]; onClose: () => void; onRaised: ReturnRaised;
 }) {
   const dates = useDates();
+  const [touched, touch] = useTouched();
   const [counted, setCounted] = useState(fund.current_balance);
   const [bank, setBank] = useState("");
   const [date, setDate] = useState("");
@@ -215,20 +231,20 @@ export function CloseFundDrawer({ fund, entity, currency, blockers, onClose, onR
         ) : null}
         <p className={NOTE}>Count the cash in the tin. All of it goes back to the bank. After this the fund takes no vouchers, top-ups or float changes until it is reopened.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Cash counted" required><MoneyInput valueKobo={counted} onChangeKobo={setCounted} currency={currency} className="[&_input]:h-9" /></FormField>
+          <FormField label="Cash counted" required><MoneyInput valueKobo={counted} onChangeKobo={touch(setCounted)} currency={currency} className="[&_input]:h-9" /></FormField>
           <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
         </div>
         <p className="-mt-2 font-mont text-[11px] text-gray-05">The books say {formatMoney(fund.current_balance, currency)}.</p>
         {figures.banked > 0 ? (
-          <FormField label="Into bank account" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={fund.branch_id} /></FormField>
+          <FormField label="Into bank account" required><BankAccountPicker entity={entity} value={bank} onChange={touch(setBank)} documentBranchId={fund.branch_id} /></FormField>
         ) : null}
         {figures.difference ? (
-          <ReasonField label="Why the count differs" value={reason} onChange={setReason} placeholder="e.g. coins missing" hint="Kept on the return and the audit record." />
+          <ReasonField label="Why the count differs" value={reason} onChange={touch(setReason)} placeholder="e.g. coins missing" hint="Kept on the return and the audit record." />
         ) : null}
         <FormField label="Reference"><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Deposit slip number" className="h-9 bg-white" /></FormField>
         <ReturnSummary fund={fund} figures={figures} bankName={bankName} currency={currency} floatAfter={0} />
         {date ? <p className="font-mont text-xs text-gray-01">The fund closes on {dates.day(date)}.</p> : null}
-        {problem && !blockers.length ? <p className={PROBLEM} role="alert">{problem}</p> : null}
+        {problem && touched && !blockers.length ? <p className={PROBLEM} role="alert">{problem}</p> : null}
         <p className="font-mont text-[11px] text-gray-05">{APPROVAL_NOTE}</p>
       </div>
     </DetailDrawer>

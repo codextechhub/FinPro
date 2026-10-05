@@ -245,13 +245,13 @@ function RaiseRechargeDrawer({ entity, currency, reader, onClose }: {
       <div className="divide-y divide-white-02 rounded-md border border-white-02">
         {reader.branches.map((b) => (
           <div key={b.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
-            <span className="min-w-0 flex-1 font-mont text-sm text-black-01">{b.name}{b.id === payerId ? <span className="text-gray-05"> (pays)</span> : null}</span>
+            <span className="min-w-0 basis-full font-mont text-sm text-black-01 sm:basis-0 sm:flex-1">{b.name}{b.id === payerId ? <span className="text-gray-05"> (pays)</span> : null}</span>
             <Input
               value={inputs[b.id] ?? ""} inputMode="decimal" aria-label={`${b.name} ${basis === "PERCENTAGES" ? "percent" : "count"}`}
               onChange={(e) => setInputs((prev) => ({ ...prev, [b.id]: e.target.value }))}
               placeholder={basis === "PERCENTAGES" ? "%" : "Count"} className="h-8 w-24 bg-white text-right tabular-nums"
             />
-            <span className="w-32 text-right"><Money kobo={shares[b.id] ?? 0} currency={currency} align="right" /></span>
+            <span className="ml-auto w-32 text-right"><Money kobo={shares[b.id] ?? 0} currency={currency} align="right" /></span>
           </div>
         ))}
       </div>

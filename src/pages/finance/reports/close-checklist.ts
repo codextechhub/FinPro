@@ -41,12 +41,13 @@ export const failedWarnings = (items: CloseChecklistItem[]) =>
 export function closeOutcomeMessage(
   periodName: string | undefined,
   items: CloseChecklistItem[] | undefined,
+  describe: (item: CloseChecklistItem) => string = (item) => item.detail ?? "",
 ): string {
   const name = periodName || "the period";
   const warnings = failedWarnings(items ?? []);
   if (warnings.length === 0) return `Closed ${name}.`;
   if (warnings.length === 1) {
-    return `Closed ${name}. ${warnings[0].detail || "One check is worth a look."}`;
+    return `Closed ${name}. ${describe(warnings[0]) || "One check is worth a look."}`;
   }
   return `Closed ${name} with ${warnings.length} warnings worth a look.`;
 }
@@ -79,23 +80,25 @@ export const checklistLabel = (name: string, fallback: (value: string) => string
 /**
  * A row's detail in the reader's words.
  *
- * The inter-branch check names branches by id and amounts in kobo ("branches 3
- * and 5 disagree: 100000000 kobo on one side and 95000000 kobo on the other"),
- * so this one row is reworded with the branches' names and naira: "Ikeja and
- * Lekki disagree: N1,000,000.00 on one side and N950,000.00 on the other".
- * Every other row, and any wording this does not recognise, is shown as sent.
+ * The server writes amounts in kobo and names branches by id: "sub-ledger
+ * 380650000 vs control 380650000 kobo", "difference 0 kobo", "branches 3 and 5
+ * disagree: 100000000 kobo on one side and 95000000 kobo on the other". Every
+ * row is reworded in naira, both figures of a "sub-ledger X vs control Y" pair
+ * included, and the inter-branch row names the branches: "Ikeja and Lekki
+ * disagree: N1,000,000.00 on one side and N950,000.00 on the other". Wording
+ * this does not recognise is shown as sent.
  */
 export function checklistDetail(
   item: CloseChecklistItem,
   { branchName, money }: { branchName: (id: number) => string | undefined; money: (kobo: number) => string },
 ): string {
-  const detail = item.detail ?? "";
-  if (item.name !== "inter_branch_balanced") return detail;
-  return detail
+  return (item.detail ?? "")
     .replace(/branches (\d+) and (\d+) disagree/g, (whole, a: string, b: string) => {
       const first = branchName(Number(a));
       const second = branchName(Number(b));
       return first && second ? `${first} and ${second} disagree` : whole;
     })
+    .replace(/sub-ledger (-?\d+) vs control (-?\d+) kobo/g, (_whole, sub: string, control: string) =>
+      `sub-ledger ${money(Number(sub))} vs control ${money(Number(control))}`)
     .replace(/(-?\d+) kobo/g, (_whole, kobo: string) => money(Number(kobo)));
 }

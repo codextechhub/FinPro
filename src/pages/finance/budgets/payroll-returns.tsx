@@ -156,8 +156,8 @@ export function AnnualPayeReturnDrawer({ open, entity, currency, onClose }: { op
                   <th className={cn(th, "text-right")}>Pension</th>
                 </tr></thead>
                 <tbody>
-                  {rows.map((row) => (
-                    <tr key={`${row.salary_id ?? row.employee_name}`}>
+                  {rows.map((row, index) => (
+                    <tr key={row.salary_id != null ? `salary-${row.salary_id}` : `line-${index}-${row.employee_name}`}>
                       <td className={td}>
                         {row.employee_name}
                         {row.opening_gross > 0 ? <span className="block text-[11px] text-gray-05">{`Includes ${money(row.opening_gross)} pay and ${money(row.opening_paye)} PAYE before this payroll`}</span> : null}

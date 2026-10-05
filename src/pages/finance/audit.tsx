@@ -114,6 +114,17 @@ export function auditBranchLabel(log: Pick<FinanceAuditLog, "branch_name">): str
 }
 
 /**
+ * What an entry is about, in words. The server names the record's kind by its
+ * model, `JournalEntry` or `DunningPolicy`; the trail reads "Journal entry" and
+ * "Dunning policy", in the column, the entry's detail and the filter alike.
+ */
+export function auditEntityLabel(targetType: string | null | undefined): string {
+  if (!targetType) return "-";
+  const words = targetType.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
  * Who did it, as the Actor column says it. An act done through a proxy names
  * both people, "Mrs Bello for Mrs Adeyemi", in the server's own words;
  * anything else is the actor's email, or System for an automatic posting.
@@ -141,7 +152,7 @@ function AuditDetail({ log }: { log: FinanceAuditLog }) {
           </span>
         </Stat>
         <Stat label="Status"><StatusPill status={log.status} /></Stat>
-        <Stat label="Entity">{log.target_type || "-"}</Stat>
+        <Stat label="Entity">{auditEntityLabel(log.target_type)}</Stat>
         <Stat label="Reference"><span className="font-mono">{log.document_number || (log.target_id ? `#${log.target_id}` : "-")}</span></Stat>
         {log.message ? <div className="col-span-2"><Stat label="Message">{log.message}</Stat></div> : null}
       </div>
@@ -215,7 +226,7 @@ export default function FinanceAuditPage() {
   // renders as a real, dark-text selection - matching the plain dropdowns beside
   // it - instead of a faint placeholder.
   const actionOptions = useMemo(() => [{ value: "", label: "All actions" }, ...(facets?.actions ?? []).map((a) => ({ value: a.value, label: a.label }))], [facets]);
-  const entityOptions = useMemo(() => [{ value: "", label: "All entities" }, ...(facets?.target_types ?? []).map((t) => ({ value: t, label: t }))], [facets]);
+  const entityOptions = useMemo(() => [{ value: "", label: "All entities" }, ...(facets?.target_types ?? []).map((t) => ({ value: t, label: auditEntityLabel(t) }))], [facets]);
   const actorOptions = useMemo(() => [{ value: "", label: "All actors" }, ...(facets?.actors ?? []).map((a) => ({ value: String(a.id), label: a.email }))], [facets]);
 
   const showBranch = useReaderBranchLens().applies;
@@ -235,7 +246,7 @@ export default function FinanceAuditPage() {
       </span>
     ) },
     ...(showBranch ? [{ header: "Branch", cell: (l: FinanceAuditLog) => <span className="text-gray-05">{auditBranchLabel(l)}</span> }] : []),
-    { header: "Entity", cell: (l) => l.target_type || "-" },
+    { header: "Entity", cell: (l) => auditEntityLabel(l.target_type) },
     { header: "Reference", cell: (l) => (
       <span className="font-mono text-xs text-gray-01">{l.document_number || (l.target_id ? `#${l.target_id}` : "-")}</span>
     ) },

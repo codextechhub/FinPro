@@ -100,20 +100,28 @@ export function TransfersTab({ entity, currency, reader }: { entity: string; cur
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <NativeSelect value={filters.value("status")} onChange={(e) => setFilter("status", e.target.value)} aria-label="Stage">
-            {STATUS_FILTERS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-          </NativeSelect>
-          <NativeSelect value={filters.value("kind")} onChange={(e) => setFilter("kind", e.target.value)} aria-label="Kind">
-            <option value="">Any kind</option>
-            {KIND_FILTERS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-          </NativeSelect>
-          <BranchSelect label="Branch" branches={reader.branches} value={branch} onChange={(v) => setFilter("branch", v)} placeholder="Any branch" allowEmpty />
+          <div className="w-full sm:w-48">
+            <NativeSelect value={filters.value("status")} onChange={(e) => setFilter("status", e.target.value)} aria-label="Stage" className="h-9">
+              {STATUS_FILTERS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            </NativeSelect>
+          </div>
+          <div className="w-full sm:w-48">
+            <NativeSelect value={filters.value("kind")} onChange={(e) => setFilter("kind", e.target.value)} aria-label="Kind" className="h-9">
+              <option value="">Any kind</option>
+              {KIND_FILTERS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            </NativeSelect>
+          </div>
+          <div className="w-full sm:w-48">
+            <BranchSelect label="Branch" branches={reader.branches} value={branch} onChange={(v) => setFilter("branch", v)} placeholder="Any branch" allowEmpty className="h-9" />
+          </div>
           {branch ? (
-            <BranchSelect
-              label="With branch" placeholder="With any branch" allowEmpty
-              branches={reader.branches.filter((b) => String(b.id) !== branch)}
-              value={counterparty} onChange={(v) => setFilter("counterparty", v)}
-            />
+            <div className="w-full sm:w-48">
+              <BranchSelect
+                label="With branch" placeholder="With any branch" allowEmpty className="h-9"
+                branches={reader.branches.filter((b) => String(b.id) !== branch)}
+                value={counterparty} onChange={(v) => setFilter("counterparty", v)}
+              />
+            </div>
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">

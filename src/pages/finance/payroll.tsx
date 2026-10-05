@@ -441,7 +441,7 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
                       <LineRow key={l.id} line={l} columns={(showName ? 1 : 0) + (showLineBranch ? 1 : 0) + figures.length + (showOther ? 1 : 0) + (showEmployer ? 1 : 0) + 1}
                         expandable={hasDetails(l)} breakdown={breakdown} working={working} currency={currency}
                         payslip={payslips ? () => void openLinePayslip(entity, r.id, l.id) : null}>
-                        {showName ? <td className={tdCls}>{l.employee_name || "-"}</td> : null}
+                        {showName ? <td className={cn(tdCls, "whitespace-nowrap")}>{l.employee_name || "-"}</td> : null}
                         {showLineBranch ? <td className={cn(tdCls, "text-gray-05")}>{l.branch_name || "No branch yet"}</td> : null}
                         {figures.map(([name]) => (
                           <td key={name} className={cn(tdCls, "text-right tabular-nums", name === "net_amount" && "font-medium")}><Money kobo={l[name] ?? 0} currency={currency} align="right" /></td>
@@ -1741,7 +1741,7 @@ function StatutoryDrawer({ run, entity, access, currency, onClose }: { run: Payr
 function RemitRow({ label, code, outstanding, currency }: { label: string; code: string | null; outstanding: number | null; currency?: string | null }) {
   const settled = outstanding === 0;
   return (
-    <div className="flex items-center justify-between px-3 py-2.5 font-mont text-xs">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2.5 font-mont text-xs">
       <span className="text-black-01">{label}{code ? <span className="ml-1 text-[11px] text-gray-05">· {code}</span> : null}</span>
       {outstanding == null
         ? <span className="text-gray-05">-</span>

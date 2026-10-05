@@ -220,7 +220,7 @@ function ProviderSettingsCard({ showSweeps }: { showSweeps: boolean }) {
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="rounded-md bg-gray-02/60 p-3">
+    <div className="rounded-md border border-white-02 bg-white p-3">
       <dt className="text-[11px] text-gray-05">{label}</dt>
       <dd className="mt-1 font-medium tabular-nums text-black-01">{children}</dd>
     </div>

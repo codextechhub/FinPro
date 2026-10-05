@@ -48,6 +48,13 @@ describe("close outcome message", () => {
     ])).toBe("Closed Aug 2026. GR/IR clearing balance 480000 kobo");
   });
 
+  it("words that detail as the checklist does when given the same wording", () => {
+    const warning = item({ name: "grir_explained", passed: false, blocking: false, detail: "GR/IR clearing balance 480000 kobo" });
+    const words = { branchName: () => undefined, money: (kobo: number) => `N${(kobo / 100).toFixed(2)}` };
+    expect(closeOutcomeMessage("Aug 2026", [warning], (row) => checklistDetail(row, words)))
+      .toBe("Closed Aug 2026. GR/IR clearing balance N4800.00");
+  });
+
   it("counts them once there is more than one", () => {
     expect(closeOutcomeMessage("Aug 2026", [
       item({ name: "grir_explained", passed: false, blocking: false, detail: "a" }),
@@ -102,8 +109,16 @@ describe("the inter-branch close check", () => {
     expect(checklistDetail(row, words)).toBe("branches 3 and 9 disagree: N1.00 on one side and N0.00 on the other");
   });
 
-  it("leaves every other check's detail as sent", () => {
+  it("words both figures of a sub-ledger check in naira", () => {
     const row = item({ name: "ap_reconciled", passed: false, detail: "sub-ledger 1234500 vs control 1234000 kobo" });
-    expect(checklistDetail(row, words)).toBe("sub-ledger 1234500 vs control 1234000 kobo");
+    expect(checklistDetail(row, words)).toBe("sub-ledger N12345.00 vs control N12340.00");
+  });
+
+  it("words every other row's kobo in naira and keeps the rest as sent", () => {
+    expect(checklistDetail(item({ name: "trial_balance_balanced", detail: "difference 0 kobo" }), words)).toBe("difference N0.00");
+    expect(checklistDetail(item({ name: "grir_explained", detail: "GR/IR clearing balance 492900000 kobo (received not invoiced)" }), words))
+      .toBe("GR/IR clearing balance N4929000.00 (received not invoiced)");
+    expect(checklistDetail(item({ name: "no_draft_journals", detail: "0 draft journal(s) dated in period" }), words))
+      .toBe("0 draft journal(s) dated in period");
   });
 });

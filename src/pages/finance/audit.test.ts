@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditActorLabel, auditBranchLabel } from "./audit";
+import { auditActorLabel, auditBranchLabel, auditEntityLabel } from "./audit";
 
 /**
  * Holy Cross's trail, read by the proprietor. A journal posted at the Annex
@@ -33,5 +33,18 @@ describe("the audit trail's Actor column", () => {
   it("names the actor for an ordinary act, and System for an automatic one", () => {
     expect(auditActorLabel(base)).toBe("bello@brightstar.example.com");
     expect(auditActorLabel({ ...base, actor: null, acted_label: null })).toBe("System");
+  });
+});
+
+/** The Entity column names the kind of record in words, never the model name. */
+describe("the audit trail's Entity column", () => {
+  it("reads a model name as words", () => {
+    expect(auditEntityLabel("JournalEntry")).toBe("Journal entry");
+    expect(auditEntityLabel("DunningPolicy")).toBe("Dunning policy");
+    expect(auditEntityLabel("FixedAsset")).toBe("Fixed asset");
+  });
+
+  it("shows a dash when the entry names no record", () => {
+    expect(auditEntityLabel(null)).toBe("-");
   });
 });

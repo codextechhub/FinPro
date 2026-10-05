@@ -25,7 +25,7 @@ export function TonePill({ tone, children }: { tone: keyof typeof TONE; children
 }
 
 /** A select over `branches`. `placeholder` is the empty choice ("Any branch"). */
-export function BranchSelect({ branches, value, onChange, placeholder = "Select branch", label, allowEmpty = false, disabled }: {
+export function BranchSelect({ branches, value, onChange, placeholder = "Select branch", label, allowEmpty = false, disabled, className }: {
   branches: BranchOption[];
   value: string;
   onChange: (value: string) => void;
@@ -34,9 +34,11 @@ export function BranchSelect({ branches, value, onChange, placeholder = "Select 
   /** Offer the placeholder as a real choice (a filter), not only as a prompt. */
   allowEmpty?: boolean;
   disabled?: boolean;
+  /** Classes for the select itself; a filter bar passes `h-9` to match its neighbours. */
+  className?: string;
 }) {
   return (
-    <NativeSelect value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} disabled={disabled}>
+    <NativeSelect value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} disabled={disabled} className={className}>
       <option value="" disabled={!allowEmpty}>{placeholder}</option>
       {branches.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
     </NativeSelect>

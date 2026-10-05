@@ -157,6 +157,14 @@ describe("Reduce float", () => {
     expect(onRaised).toHaveBeenCalledWith(approval);
   });
 
+  it("opens without a problem in red, and names it once a field changes", () => {
+    act(() => root.render(<ReduceFloatDrawer fund={FUND} entity="BSS" onClose={() => undefined} onRaised={vi.fn()} />));
+    expect(body().querySelector("[role=alert]")).toBeNull();
+    expect(button("Bank ₦100,000.00")!.disabled).toBe(true);
+    act(() => type(inField<HTMLInputElement>("New float", "input")!, String(60_000 * NAIRA)));
+    expect(body().querySelector("[role=alert]")?.textContent).toBeTruthy();
+  });
+
   it("refuses a float that is not lower than today's", () => {
     act(() => root.render(<ReduceFloatDrawer fund={FUND} entity="BSS" onClose={() => undefined} onRaised={vi.fn()} />));
     act(() => type(inField<HTMLInputElement>("New float", "input")!, String(120_000 * NAIRA)));
@@ -186,6 +194,13 @@ describe("Close fund", () => {
     await act(async () => send.click());
     expect(mocks.close.mock.calls[0][0]).toMatchObject({ counted_amount: 20_000 * NAIRA, bank_account: "3", return_date: "2026-10-05" });
     expect(mocks.close.mock.calls[0][0]).not.toHaveProperty("new_float_amount");
+  });
+
+  it("opens without a problem in red until something is chosen", () => {
+    act(() => root.render(<CloseFundDrawer fund={FUND} entity="BSS" blockers={[]} onClose={() => undefined} onRaised={vi.fn()} />));
+    expect(body().querySelector("[role=alert]")).toBeNull();
+    act(() => type(inField<HTMLInputElement>("Cash counted", "input")!, String(99_000 * NAIRA)));
+    expect(body().querySelector("[role=alert]")?.textContent).toBeTruthy();
   });
 
   it("asks for no bank account when the tin is empty", () => {

@@ -77,12 +77,12 @@ export function ReceivablesSettings({ entityCode }: { entityCode: string | null 
           {docs.isLoading || !docs.data ? (
             <SettingsPanel><SettingsRow label="Loading" description="Reading credit and concession settings." /></SettingsPanel>
           ) : (
-            <CreditForm key={`${entityCode}-${docs.data.data.settings.updated_at}`} entityCode={entityCode} payload={docs.data.data} canUpdate={canUpdate} />
+            <CreditForm key={`credit-${entityCode}-${docs.data.data.settings.updated_at}`} entityCode={entityCode} payload={docs.data.data} canUpdate={canUpdate} />
           )}
           {policy.isLoading || !policy.data ? (
             <SettingsPanel><SettingsRow label="Loading" description="Reading the receivables policy." /></SettingsPanel>
           ) : (
-            <PolicyForm key={`${entityCode}-${policy.data.data.settings.updated_at}`} entityCode={entityCode} payload={policy.data.data} canUpdate={canUpdate} />
+            <PolicyForm key={`policy-${entityCode}-${policy.data.data.settings.updated_at}`} entityCode={entityCode} payload={policy.data.data} canUpdate={canUpdate} />
           )}
         </>
       )}
@@ -127,7 +127,7 @@ function CreditForm({ entityCode, payload, canUpdate }: { entityCode: string; pa
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
         <p className="font-mont text-xs text-gray-05">{canUpdate ? "Only changed values are written to audit history." : "Read only."}</p>
-        <Button onClick={save} disabled={!canUpdate || !dirty || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save"}</Button>
+        <Button onClick={save} disabled={!canUpdate || !dirty || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save credit and concessions"}</Button>
       </div>
     </SettingsPanel>
   );
