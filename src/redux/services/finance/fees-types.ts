@@ -108,6 +108,13 @@ export interface ProvisionLine {
   journal_id: number | null;
 }
 
+/**
+ * A doubtful-debt provision run, whole or as the reader's branches' part of it.
+ *
+ * A run covers every branch at once. A reader bound to some branches is sent
+ * only those branches' `lines`, with `required_total` and `movement_total`
+ * summed from them, and `partial_view` true.
+ */
 export interface DoubtfulDebtProvision {
   id: number;
   document_number: string;
@@ -118,8 +125,13 @@ export interface DoubtfulDebtProvision {
   movement_total: number;
   policy_snapshot: ProvisionBand[];
   lines: ProvisionLine[];
-  approval_required?: boolean;
+  /** Null in a partial view: whether the run needs approval turns on its whole
+   *  total, which the reader of a part is not shown. */
+  approval_required?: boolean | null;
   created_at: string;
+  /** True when the response is the reader's branches' part of the run. Absent
+   *  from older servers, which never send such a part. */
+  partial_view?: boolean;
 }
 
 export type DepositStatus = "HELD" | "RELEASED" | "FORFEITED" | "CANCELLED";

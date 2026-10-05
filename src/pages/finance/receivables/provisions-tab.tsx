@@ -11,8 +11,11 @@
  * posts, because receipts and write-offs made while it waited change them.
  *
  * A run covers every branch at once, so only a whole-school holder of the keys
- * raises, submits or posts one. A branch reader sees the runs and their own
- * branch's line.
+ * raises, submits or posts one. A reader bound to some branches is listed the
+ * runs with a line for one of them, each cut down to those branches' lines and
+ * totals (`partial_view`). Such a part offers nothing to submit or post and says
+ * nothing about approval: `approval_required` is null there, because whether a
+ * run needs approval turns on its whole total.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -38,6 +41,21 @@ import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
 const th = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const td = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
 
+/**
+ * Whether the run in hand is only the reader's branches' part of it.
+ *
+ * The server says so with `partial_view`; a null `approval_required` comes only
+ * with such a part, so either one is enough.
+ */
+export function isPartOfRun(run: Pick<DoubtfulDebtProvision, "partial_view" | "approval_required">): boolean {
+  return run.partial_view === true || run.approval_required === null;
+}
+
+/** "your branch's part", or "your branches' part" for a reader who works in several. */
+function yourBranchesPart(branchIds: number[] | null): string {
+  return (branchIds?.length ?? 0) > 1 ? "your branches' part" : "your branch's part";
+}
+
 /** The journal a provision's net movement posts: raising the allowance, or releasing it. */
 export function provisionRecap(lines: ProvisionLine[]) {
   const net = lines.reduce((sum, line) => sum + line.movement, 0);
@@ -50,7 +68,7 @@ export function provisionRecap(lines: ProvisionLine[]) {
 export function ProvisionsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
   const { can } = useCan();
-  const { wholeSchool } = useReaderReach();
+  const { wholeSchool, branchIds } = useReaderReach();
   const list = useListBranch();
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
@@ -60,11 +78,20 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
   const open = selected ? rows.find((r) => r.id === selected.id) ?? selected : null;
+  const showsParts = useMemo(() => rows.some(isPartOfRun), [rows]);
 
   const columns: Column<DoubtfulDebtProvision>[] = [
     { header: "Ref", cell: (r) => <span className="font-semibold tabular-nums">{r.document_number}</span> },
     { header: "As of", cell: (r) => <span className="tabular-nums">{dates.day(r.as_of)}</span> },
-    { header: "Allowance required", align: "right", cell: (r) => <Money kobo={r.required_total} currency={currency} align="right" /> },
+    {
+      header: "Allowance required", align: "right",
+      cell: (r) => (
+        <div className="flex flex-col items-end">
+          <Money kobo={r.required_total} currency={currency} align="right" />
+          {isPartOfRun(r) ? <span className="font-mont text-[11px] text-gray-05">{yourBranchesPart(branchIds)}</span> : null}
+        </div>
+      ),
+    },
     { header: "Change", align: "right", cell: (r) => <Money kobo={r.movement_total} currency={currency} align="right" /> },
     { header: "Status", cell: (r) => <StatusPill status={r.status} /> },
   ];
@@ -83,12 +110,17 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
       {!wholeSchool && can(P.FIN_CREATE_PROVISION) ? (
         <Note>A provision run covers every branch at once, so only someone who covers the whole school raises one.</Note>
       ) : null}
+      {showsParts ? (
+        <p className="font-mont text-xs text-gray-05">{`Each run covers the whole school. You are shown only ${yourBranchesPart(branchIds)}: its figures and its journal.`}</p>
+      ) : null}
       <DataTable
         columns={columns} rows={rows} rowKey={(r) => r.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={setSelected}
         page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
         emptyTitle="No provision runs"
-        emptyMessage="A run sets the allowance for doubtful debts from how old each overdue balance is."
+        emptyMessage={wholeSchool
+          ? "A run sets the allowance for doubtful debts from how old each overdue balance is."
+          : "A run that includes your branch shows here once someone who covers the whole school raises it."}
       />
       <NewProvisionModal open={creating} onClose={() => setCreating(false)} entity={entity} onCreated={setSelected} />
       <ProvisionDrawer provision={open} entity={entity} currency={currency} onClose={() => setSelected(null)} />
@@ -131,7 +163,7 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
 }) {
   const dates = useDates();
   const { can } = useCan();
-  const { wholeSchool } = useReaderReach();
+  const { wholeSchool, branchIds } = useReaderReach();
   const branches = useBranchColumn();
   const [confirming, setConfirming] = useState(false);
   const [submit, { isLoading: submitting }] = useSubmitProvisionMutation();
@@ -140,8 +172,9 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
   if (!provision) return null;
 
   const isDraft = provision.status === "DRAFT";
+  const partOnly = isPartOfRun(provision);
   const gated = provision.approval_required !== false;
-  const allowed = wholeSchool && can(gated ? P.FIN_SUBMIT_PROVISION : P.FIN_POST_PROVISION);
+  const allowed = !partOnly && wholeSchool && can(gated ? P.FIN_SUBMIT_PROVISION : P.FIN_POST_PROVISION);
   const recap = provisionRecap(provision.lines);
   const bandKeys = [...new Set(provision.lines.flatMap((l) => Object.keys(l.bands)))].sort((a, b) => Number(a) - Number(b));
 
@@ -176,6 +209,9 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
         ) : undefined}
       >
         <div className="space-y-5">
+          {partOnly ? (
+            <Note>{`This run covers the whole school. You are shown only ${yourBranchesPart(branchIds)}. Submitting and posting it are for someone who covers the whole school.`}</Note>
+          ) : null}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <DetailField label="Status"><StatusPill status={provision.status} /></DetailField>
             <DetailField label="Allowance required"><Money kobo={provision.required_total} currency={currency} /></DetailField>
@@ -183,7 +219,7 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
           </div>
           {isDraft ? (
             <Note>
-              {gated
+              {gated && !partOnly
                 ? "A second person approves this run before it posts. The figures are worked out again when it posts, so receipts and write-offs made meanwhile are counted."
                 : "The figures are worked out again when it posts, so receipts and write-offs made meanwhile are counted."}
             </Note>
@@ -250,7 +286,7 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
           <PostingRecap
             title={recap.net >= 0 ? "Raising the allowance" : "Releasing the allowance"}
             dr={recap.dr} cr={recap.cr} currency={currency} stackOnMobile
-            helper={branches.show ? "Posted as one journal per branch; this is their total." : undefined}
+            helper={branches.show && provision.lines.length > 1 ? "Posted as one journal per branch; this is their total." : undefined}
           />
           {provision.narration ? <DetailField label="Narration"><span className="font-normal">{provision.narration}</span></DetailField> : null}
         </div>
