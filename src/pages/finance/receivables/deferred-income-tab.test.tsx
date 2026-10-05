@@ -4,8 +4,9 @@
  * release was already reversed. The undo form offers September alone, with
  * what it holds, and the list follows the branch picked. When Lekki has closed
  * its own September while the school's is still open, the undo (which
- * reverses Ikeja's and Lekki's releases together) would be refused, so the
- * form lists September disabled as "closed at Lekki" and says why.
+ * reverses Ikeja's and Lekki's releases together) would be refused, and the
+ * server says so on both rows: the form lists September greyed out with the
+ * server's reason, and the release list shows it under the rows.
  */
 
 import { act } from "react";
@@ -13,7 +14,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ summary: vi.fn(), releases: vi.fn(), periods: vi.fn(), rows: [] as unknown[], periodRows: [] as unknown[] }));
+const mocks = vi.hoisted(() => ({ summary: vi.fn(), releases: vi.fn(), rows: [] as unknown[] }));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
@@ -39,12 +40,6 @@ vi.mock("@/redux/services/finance/fees-api", () => ({
   useReleaseDeferredIncomeMutation: () => [vi.fn(), { isLoading: false }],
   useReverseDeferredIncomeMutation: () => [vi.fn(), { isLoading: false }],
 }));
-vi.mock("@/redux/services/finance/setup-api", () => ({
-  useGetPeriodsQuery: (args: unknown) => {
-    mocks.periods(args);
-    return { data: { data: mocks.periodRows } };
-  },
-}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import type { DeferredIncomeReleaseRow } from "@/redux/services/finance/fees-types";
@@ -54,31 +49,37 @@ import { DeferredIncomeTab, undoableMonths } from "./deferred-income-tab";
 
 const row = (over: Partial<DeferredIncomeReleaseRow>): DeferredIncomeReleaseRow => ({
   id: 1, branch_id: 1, branch_name: "Ikeja", date: "2026-09-30", month: "2026-09", period_id: 9, period_name: "September 2026",
-  period_status: "OPEN", amount: 1_000_000, journal_id: 400, journal_number: "JE-0400", reversed: false, reversed_at: null,
-  can_reverse: true, ...over,
+  period_status: "OPEN", branch_period_status: "OPEN", amount: 1_000_000, journal_id: 400, journal_number: "JE-0400",
+  reversed: false, reversed_at: null, can_reverse: true, reverse_blocked_reason: null, ...over,
 });
 const ROWS = [
   row({}),
   row({ id: 2, branch_id: 2, branch_name: "Lekki", amount: 500_000, journal_id: 401, journal_number: "JE-0401" }),
-  row({ id: 3, date: "2026-08-31", month: "2026-08", period_id: 8, period_name: "August 2026", period_status: "CLOSED", can_reverse: false }),
+  row({
+    id: 3, date: "2026-08-31", month: "2026-08", period_id: 8, period_name: "August 2026", period_status: "CLOSED",
+    branch_period_status: "CLOSED", can_reverse: false, reverse_blocked_reason: "August 2026 is closed; its releases are sealed with it.",
+  }),
   row({ id: 4, date: "2026-07-31", month: "2026-07", period_id: 7, period_name: "July 2026", reversed: true, can_reverse: false }),
 ];
 
-const LEKKI_CLOSED_SEPTEMBER = {
-  id: 9, branch_states: [
-    { branch: 1, branch_name: "Ikeja", status: "OPEN", closed_at: null },
-    { branch: 2, branch_name: "Lekki", status: "CLOSED", closed_at: "2026-10-02T09:00:00Z" },
-  ],
-};
+const SHARED_REASON = "Lekki has closed September 2026, and the undo reverses every branch's release of the month together.";
+/** Lekki has closed its own September; the school's month is still open. */
+const LEKKI_CLOSED_SEPTEMBER = [
+  row({ can_reverse: false, reverse_blocked_reason: SHARED_REASON }),
+  row({
+    id: 2, branch_id: 2, branch_name: "Lekki", amount: 500_000, journal_id: 401, journal_number: "JE-0401",
+    branch_period_status: "CLOSED", can_reverse: false,
+    reverse_blocked_reason: "Lekki has closed September 2026; its release is sealed with that month.",
+  }),
+  ...ROWS.slice(2),
+];
 
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
   mocks.summary.mockReset();
   mocks.releases.mockReset();
-  mocks.periods.mockReset();
   mocks.rows = ROWS;
-  mocks.periodRows = [];
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -90,13 +91,15 @@ afterEach(() => {
 
 describe("the months a release can be undone in", () => {
   it("are the open months with a release not yet reversed, each once with its total", () => {
-    expect(undoableMonths(ROWS)).toEqual([{ periodId: 9, name: "September 2026", amount: 1_500_000, journals: 2, closedAt: [] }]);
+    expect(undoableMonths(ROWS)).toEqual([{ periodId: 9, name: "September 2026", amount: 1_500_000, journals: 2, blockedReason: null }]);
   });
 
-  it("name a branch that closed its own month, where it holds a release", () => {
-    expect(undoableMonths(ROWS, [LEKKI_CLOSED_SEPTEMBER])[0].closedAt).toEqual(["Lekki"]);
-    const ikejaOnly = ROWS.filter((r) => r.branch_id === 1);
-    expect(undoableMonths(ikejaOnly, [LEKKI_CLOSED_SEPTEMBER])[0].closedAt).toEqual([]);
+  it("carry the server's reason when a branch has closed an open month, from the row that names it", () => {
+    expect(undoableMonths(LEKKI_CLOSED_SEPTEMBER)).toEqual([
+      { periodId: 9, name: "September 2026", amount: 1_500_000, journals: 2, blockedReason: SHARED_REASON },
+    ]);
+    const lekkiOnly = LEKKI_CLOSED_SEPTEMBER.filter((r) => r.branch_id === 2);
+    expect(undoableMonths(lekkiOnly)[0].blockedReason).toBe("Lekki has closed September 2026; its release is sealed with that month.");
   });
 });
 
@@ -115,18 +118,19 @@ describe("the deferred income tab", () => {
     expect(mocks.releases).toHaveBeenCalledWith({ entity: "BSS", reversed: "false", page_size: 100 });
     const options = Array.from(document.body.querySelectorAll('select[aria-label="Month"] option')).map((o) => o.textContent);
     expect(options).toEqual(["Select a month", "September 2026: ₦15,000.00 in 2 journals"]);
-    expect(mocks.periods).toHaveBeenCalledWith({ entity: "BSS", status: "OPEN", include_branches: "true" });
   });
 
-  it("lists a month one branch has closed as disabled, and says why", async () => {
-    mocks.periodRows = [LEKKI_CLOSED_SEPTEMBER];
+  it("greys out a month one branch has closed, gives the server's reason, and says it under the rows", async () => {
+    mocks.rows = LEKKI_CLOSED_SEPTEMBER;
     act(() => root.render(<MemoryRouter><DeferredIncomeTab entity="BSS" currency="NGN" /></MemoryRouter>));
     const undo = Array.from(document.body.querySelectorAll("button")).find((b) => b.textContent?.includes("Undo a month"));
     await act(async () => { undo?.click(); });
     const september = Array.from(document.body.querySelectorAll<HTMLOptionElement>('select[aria-label="Month"] option'))
       .find((o) => o.value === "9");
-    expect(september?.textContent).toBe("September 2026: closed at Lekki");
+    expect(september?.textContent).toBe("September 2026: cannot be undone");
     expect(september?.disabled).toBe(true);
-    expect(document.body.textContent).toContain("A month closed at any branch cannot be undone until that branch re-opens it.");
+    expect(document.body.querySelector("[role=dialog]")?.textContent ?? document.body.textContent).toContain(SHARED_REASON);
+    expect(container.textContent).toContain("its release is sealed with that month");
+    expect(container.textContent).not.toContain("August 2026 is closed");
   });
 });

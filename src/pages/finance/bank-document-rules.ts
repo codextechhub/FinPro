@@ -36,19 +36,47 @@ export function bankDocumentStatus(doc: ApprovalFacts): string {
 }
 
 /**
+ * Whether a bank document is a draft back from approval, which its requester may
+ * correct, send again or cancel.
+ *
+ * The server allows all three for a DRAFT no approver holds: one rejected
+ * (`REJECTED`), or one whose request was withdrawn or cancelled
+ * (`NOT_SUBMITTED`). A document waiting on its approvers, posted, voided or
+ * cancelled is refused (422), so nothing is offered for it.
+ */
+export function bankDocumentReworkable(doc: ApprovalFacts): boolean {
+  return doc.status === "DRAFT" && (doc.approval_state === "REJECTED" || doc.approval_state === "NOT_SUBMITTED");
+}
+
+/**
  * What a bank document not yet in the books says about its approval, or null.
  *
  * Ikeja's N5,000,000 capital receipt waits while its approval is pending. Once
- * the approver rejects it, it reads as rejected and never reaching the books,
- * not as still waiting, though its status is back at DRAFT either way.
+ * the approver rejects it, it reads as rejected and not in the books, not as
+ * still waiting, though its status is back at DRAFT either way; it can then be
+ * corrected and sent again, or cancelled. A draft whose request was withdrawn
+ * or cancelled says the same.
  */
-export function bankDocumentApprovalNote(doc: ApprovalFacts): { tone: "waiting" | "rejected"; text: string } | null {
+export function bankDocumentApprovalNote(doc: ApprovalFacts): { tone: "waiting" | "rejected" | "returned"; text: string } | null {
   if (doc.status !== "DRAFT" && doc.status !== "PENDING_APPROVAL") return null;
   if (doc.approval_state === "REJECTED") {
-    return { tone: "rejected", text: "Rejected under Workflow, Approvals, so it never reached the books. Record it again if the money still needs recording." };
+    return { tone: "rejected", text: "Rejected under Workflow, Approvals, so it has not reached the books. Correct it and send it again, or cancel it." };
   }
   if (doc.approval_state === "PENDING" || doc.status === "PENDING_APPROVAL" || doc.approval_state === undefined) {
     return { tone: "waiting", text: "Waiting for approval under Workflow, Approvals. It reaches the books once approved." };
   }
+  if (doc.approval_state === "NOT_SUBMITTED") {
+    return { tone: "returned", text: "Not sent for approval, or its request was withdrawn. Correct it and send it again, or cancel it." };
+  }
   return null;
+}
+
+/**
+ * The fields a correction changes, and only those: a PATCH sends nothing the
+ * reader left as it was, so the server's audit of the edit names what moved.
+ * Both sides use the same shape the create form sends (an account by its code,
+ * a bank account by its id, an empty reference as "").
+ */
+export function changedFields<T extends Record<string, string | number>>(before: T, after: T): Partial<T> {
+  return Object.fromEntries(Object.entries(after).filter(([key, value]) => value !== before[key])) as Partial<T>;
 }

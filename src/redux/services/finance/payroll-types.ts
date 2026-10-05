@@ -330,13 +330,24 @@ export interface RemittanceSchedule {
   total: number;
 }
 
-/** Each person's year for the employer's annual PAYE return. */
+/**
+ * Each person's year for the employer's annual PAYE return, one row per person.
+ *
+ * A person is told apart by their user account (`employee_id`), then their
+ * salary record (`salary_id`), then, for a hand-typed line naming neither, the
+ * name and tax number as typed (both ids null). Two people who share a name are
+ * two rows.
+ */
+export type AnnualPayeReturnRow = AnnualPayeReturn["rows"][number];
+
 export interface AnnualPayeReturn {
   year: number;
   entity: string;
   issuer: string;
   rows: {
     salary_id: number | null;
+    /** The person's user account; null for someone known only by salary record or typed by hand. */
+    employee_id: number | null;
     employee_name: string;
     tax_id: string;
     tax_states: string[];

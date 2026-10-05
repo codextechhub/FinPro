@@ -19,13 +19,21 @@
  * one rejected back to DRAFT reads Rejected rather than still waiting, and
  * names its branch as the server sent it.
  *
+ * A draft back from approval (rejected, or its request withdrawn or cancelled)
+ * offers Edit, Send again and Cancel to whoever may create that kind of
+ * document and covers its branch, the server's own rule for all three. Edit
+ * sends only the fields that changed; Send again goes through the same route as
+ * a new document; Cancel asks first, then keeps the document as cancelled with
+ * nothing posted. A refusal (422, the approvers took it back in the meantime)
+ * is worded by the central handler.
+ *
  * The section reads `?bank_document=transaction|transfer` and `?document=<id>`,
  * which is where an approval's link to a bank document lands.
  */
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Ban, Plus } from "lucide-react";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Ban, PencilLine, Plus, Send, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -34,6 +42,7 @@ import {
   type Column, type TabStripItem,
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
+import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,12 +55,17 @@ import { useDates } from "../../lib/display-prefs";
 import { SOURCE_DOCUMENT_ID_PARAM, sourceDocumentIdFromParams } from "@/lib/source-document-route";
 import { useGetBankAccountsQuery } from "@/redux/services/finance/ops-api";
 import {
+  useCancelBankTransactionMutation, useCancelBankTransferMutation,
   useCreateBankTransactionMutation, useCreateBankTransferMutation, useGetBankTransactionsQuery,
   useGetBankTransactionDocumentQuery, useGetBankTransferDocumentQuery,
-  useGetBankTransfersQuery, useVoidBankTransactionMutation, useVoidBankTransferMutation,
+  useGetBankTransfersQuery, useSubmitBankTransactionMutation, useSubmitBankTransferMutation,
+  useUpdateBankTransactionMutation, useUpdateBankTransferMutation,
+  useVoidBankTransactionMutation, useVoidBankTransferMutation,
 } from "@/redux/services/finance/bank-documents-api";
 import type { BankTransactionDirection, BankTransactionDocument, BankTransferDocument } from "@/redux/services/finance/bank-documents-types";
-import { bankDocumentAccountProblem, bankDocumentApprovalNote, bankDocumentStatus } from "./bank-document-rules";
+import {
+  bankDocumentAccountProblem, bankDocumentApprovalNote, bankDocumentReworkable, bankDocumentStatus, changedFields,
+} from "./bank-document-rules";
 import { NO_BRANCH_YET } from "../../lib/branch-labels";
 
 type Kind = "transaction" | "transfer";
@@ -159,7 +173,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return <div><dt className="font-mont text-[11px] text-gray-05">{label}</dt><dd className="mt-1 font-mont text-sm font-semibold tabular-nums text-black-01">{value || "-"}</dd></div>;
 }
 
-/** One bank document, with Void while it stands. */
+/** One bank document, with Void while it stands, and Edit, Send again and Cancel while it is a draft back from approval. */
 function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
   kind: Kind; id: number; entity: string; currency?: string | null; onClose: () => void;
 }) {
@@ -176,6 +190,44 @@ function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
   const doc = kind === "transaction" ? transaction : transfer;
   const approvalNote = doc ? bankDocumentApprovalNote(doc) : null;
   const busy = voidingTransaction || voidingTransfer;
+  const { canChange } = useWholeSchoolAccess();
+  const createCode = kind === "transaction" ? P.FIN_CREATE_BANK_TRANSACTION : P.FIN_CREATE_BANK_TRANSFER;
+  const mayRework = !!doc && bankDocumentReworkable(doc) && canChange(createCode, [doc.branch_id]);
+  const [editing, setEditing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [submitTransaction, { isLoading: sendingTransaction }] = useSubmitBankTransactionMutation();
+  const [submitTransfer, { isLoading: sendingTransfer }] = useSubmitBankTransferMutation();
+  const [cancelTransaction, { isLoading: cancellingTransaction }] = useCancelBankTransactionMutation();
+  const [cancelTransfer, { isLoading: cancellingTransfer }] = useCancelBankTransferMutation();
+  const sending = sendingTransaction || sendingTransfer;
+  const sendAgain = async () => {
+    if (!doc) return;
+    try {
+      const response = kind === "transaction"
+        ? await submitTransaction({ id: doc.id, entity }).unwrap()
+        : await submitTransfer({ id: doc.id, entity }).unwrap();
+      toast.success(response.message || `${doc.document_number} sent.`);
+    } catch { /* central: a 422 says the approvers hold it, or it is final */ }
+  };
+  const doCancel = async () => {
+    if (!doc) return;
+    try {
+      const response = kind === "transaction"
+        ? await cancelTransaction({ id: doc.id, entity }).unwrap()
+        : await cancelTransfer({ id: doc.id, entity }).unwrap();
+      toast.success(response.message || `${doc.document_number} cancelled.`);
+      setCancelling(false);
+    } catch { /* central */ }
+  };
+  const footer = doc && doc.status === "POSTED"
+    ? <Can permission={kind === "transaction" ? P.FIN_REVERSE_BANK_TRANSACTION : P.FIN_REVERSE_BANK_TRANSFER}><Button variant="outline-dest" onClick={() => setConfirming(true)}><Ban className="size-4" /> Void</Button></Can>
+    : mayRework
+      ? <div className="flex w-full flex-wrap justify-end gap-2">
+        <Button variant="outline-dest" disabled={sending} onClick={() => setCancelling(true)}><XCircle className="size-4" /> Cancel</Button>
+        <Button variant="outline" disabled={sending} onClick={() => setEditing(true)}><PencilLine className="size-4" /> Edit</Button>
+        <Button loading={sending} onClick={sendAgain}><Send className="size-4" /> Send again</Button>
+      </div>
+      : null;
   const doVoid = async () => {
     if (!doc) return;
     try {
@@ -187,7 +239,7 @@ function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
     } catch { /* central: a reconciled bank line refuses the void */ }
   };
   return <>
-    <DetailDrawer open onOpenChange={(open) => !open && onClose()} title={doc?.document_number || (kind === "transaction" ? "Bank transaction" : "Transfer")} description={kind === "transaction" ? "Money in or out of a bank account" : "Money between two accounts of one branch"} widthClass="sm:max-w-[560px]" footer={doc && doc.status === "POSTED" && <Can permission={kind === "transaction" ? P.FIN_REVERSE_BANK_TRANSACTION : P.FIN_REVERSE_BANK_TRANSFER}><Button variant="outline-dest" onClick={() => setConfirming(true)}><Ban className="size-4" /> Void</Button></Can>}>
+    <DetailDrawer open onOpenChange={(open) => !open && onClose()} title={doc?.document_number || (kind === "transaction" ? "Bank transaction" : "Transfer")} description={kind === "transaction" ? "Money in or out of a bank account" : "Money between two accounts of one branch"} widthClass="sm:max-w-[560px]" footer={footer}>
       {loading ? <LoadingState rows={4} /> : !doc ? <ErrorState onRetry={kind === "transaction" ? transactionQ.refetch : transferQ.refetch} /> : <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">
         <Field label="Status" value={<StatusPill status={bankDocumentStatus(doc)} />} />
         <Field label="Amount" value={formatMoney(doc.amount, currency)} />
@@ -208,33 +260,51 @@ function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
         {approvalNote && <p data-testid="bank-document-approval" className={cn("sm:col-span-2 rounded-md border px-3 py-2 font-mont text-xs", approvalNote.tone === "rejected" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-amber-200 bg-amber-50 text-amber-900")}>{approvalNote.text}</p>}
       </dl>}
     </DetailDrawer>
+    {editing && transaction && <BankTransactionForm entity={entity} currency={currency} existing={transaction} onClose={() => setEditing(false)} />}
+    {editing && transfer && <BankTransferForm entity={entity} currency={currency} existing={transfer} onClose={() => setEditing(false)} />}
+    <ConfirmActionModal open={cancelling} onOpenChange={setCancelling} title={`Cancel ${doc?.document_number}?`} description="It is kept as cancelled and never reaches the books. It cannot be sent again afterwards." confirmText="Cancel it" destructive loading={cancellingTransaction || cancellingTransfer} onConfirm={doCancel} />
     <ConfirmActionModal open={confirming} onOpenChange={setConfirming} title={`Void ${doc?.document_number}?`} description={kind === "transaction" ? "Reverses the money in or out. Refused once its bank line has been reconciled; unmatch the line first." : "Reverses both sides of the transfer. Refused while either side is reconciled; unmatch the line first."} confirmText="Void" destructive loading={busy} onConfirm={doVoid} />
   </>;
 }
 
-function BankTransactionForm({ entity, currency, onClose }: { entity: string; currency?: string | null; onClose: () => void }) {
+/** The create form's fields as a stored transaction holds them, for a correction to start from. */
+function transactionFieldsOf(doc: BankTransactionDocument) {
+  return {
+    bank_account: doc.bank_account_id, direction: doc.direction, amount: doc.amount, counter_account: doc.counter_account_code,
+    transaction_date: doc.transaction_date, narration: doc.narration, reference: doc.reference ?? "",
+  };
+}
+
+/** Records a bank transaction, or with `existing` corrects a draft back from approval, sending only what changed. */
+function BankTransactionForm({ entity, currency, existing, onClose }: { entity: string; currency?: string | null; existing?: BankTransactionDocument; onClose: () => void }) {
   const { applies: multiBranch } = useReaderBranchLens();
   const { data: accountRows } = useGetBankAccountsQuery({ entity, page: 1 });
-  const [bank, setBank] = useState("");
-  const [direction, setDirection] = useState<BankTransactionDirection>("IN");
-  const [amount, setAmount] = useState(0);
-  const [counter, setCounter] = useState("");
-  const [date, setDate] = useState("");
-  const [narration, setNarration] = useState("");
-  const [reference, setReference] = useState("");
-  const [create, { isLoading }] = useCreateBankTransactionMutation();
+  const [bank, setBank] = useState(existing ? String(existing.bank_account_id) : "");
+  const [direction, setDirection] = useState<BankTransactionDirection>(existing?.direction ?? "IN");
+  const [amount, setAmount] = useState(existing?.amount ?? 0);
+  const [counter, setCounter] = useState(existing?.counter_account_code ?? "");
+  const [date, setDate] = useState(existing?.transaction_date ?? "");
+  const [narration, setNarration] = useState(existing?.narration ?? "");
+  const [reference, setReference] = useState(existing?.reference ?? "");
+  const [create, { isLoading: creating }] = useCreateBankTransactionMutation();
+  const [update, { isLoading: updating }] = useUpdateBankTransactionMutation();
+  const isLoading = creating || updating;
   const account = toArray(accountRows?.data).find((a) => String(a.id) === bank);
   const problem = bankDocumentAccountProblem(account, multiBranch);
-  const ready = !!bank && !problem && amount > 0 && !!counter && !!date && !!narration.trim();
+  const draft = { bank_account: Number(bank), direction, amount, counter_account: counter, transaction_date: date, narration: narration.trim(), reference: reference.trim() };
+  const changes = existing ? changedFields(transactionFieldsOf(existing), draft) : draft;
+  const ready = !!bank && !problem && amount > 0 && !!counter && !!date && !!narration.trim() && Object.keys(changes).length > 0;
   const save = async () => {
     if (!ready) return;
     try {
-      const response = await create({ entity, bank_account: Number(bank), direction, amount, counter_account: counter, transaction_date: date, narration: narration.trim(), reference: reference.trim() || undefined }).unwrap();
-      toast.success(response.message || "Bank transaction recorded.");
+      const response = existing
+        ? await update({ id: existing.id, entity, ...changes }).unwrap()
+        : await create({ entity, ...draft, reference: draft.reference || undefined }).unwrap();
+      toast.success(response.message || (existing ? "Bank transaction corrected." : "Bank transaction recorded."));
       onClose();
     } catch { /* central: the server names the document to use for a control account */ }
   };
-  return <DetailDrawer open onOpenChange={(open) => !isLoading && !open && onClose()} title="Bank transaction" description="Money in or out with no customer or supplier behind it." widthClass="sm:max-w-[560px]" footer={<><Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button><Button disabled={!ready} loading={isLoading} onClick={save}>Record</Button></>}>
+  return <DetailDrawer open onOpenChange={(open) => !isLoading && !open && onClose()} title={existing ? `Correct ${existing.document_number}` : "Bank transaction"} description={existing ? "Change what was wrong, then send it again." : "Money in or out with no customer or supplier behind it."} widthClass="sm:max-w-[560px]" footer={<><Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button><Button disabled={!ready} loading={isLoading} onClick={save}>{existing ? "Save changes" : "Record"}</Button></>}>
     <div className="space-y-4">
       <Segmented label="Which way" value={direction} onChange={setDirection} options={[["IN", "Money in"], ["OUT", "Money out"]] as const} />
       <FormField label="Bank account" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} /></FormField>
@@ -253,29 +323,44 @@ function BankTransactionForm({ entity, currency, onClose }: { entity: string; cu
   </DetailDrawer>;
 }
 
-function BankTransferForm({ entity, currency, onClose }: { entity: string; currency?: string | null; onClose: () => void }) {
+/** The create form's fields as a stored transfer holds them, for a correction to start from. */
+function transferFieldsOf(doc: BankTransferDocument) {
+  return {
+    from_account: doc.from_account_id, to_account: doc.to_account_id, amount: doc.amount,
+    transfer_date: doc.transfer_date, narration: doc.narration, reference: doc.reference ?? "",
+  };
+}
+
+/** Records a transfer, or with `existing` corrects a draft back from approval, sending only what changed. */
+function BankTransferForm({ entity, currency, existing, onClose }: { entity: string; currency?: string | null; existing?: BankTransferDocument; onClose: () => void }) {
   const { applies: multiBranch } = useReaderBranchLens();
   const { data: accountRows } = useGetBankAccountsQuery({ entity, page: 1 });
   const accounts = toArray(accountRows?.data);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [amount, setAmount] = useState(0);
-  const [date, setDate] = useState("");
-  const [narration, setNarration] = useState("");
-  const [reference, setReference] = useState("");
-  const [create, { isLoading }] = useCreateBankTransferMutation();
+  const [from, setFrom] = useState(existing ? String(existing.from_account_id) : "");
+  const [to, setTo] = useState(existing ? String(existing.to_account_id) : "");
+  const [amount, setAmount] = useState(existing?.amount ?? 0);
+  const [date, setDate] = useState(existing?.transfer_date ?? "");
+  const [narration, setNarration] = useState(existing?.narration ?? "");
+  const [reference, setReference] = useState(existing?.reference ?? "");
+  const [create, { isLoading: creating }] = useCreateBankTransferMutation();
+  const [update, { isLoading: updating }] = useUpdateBankTransferMutation();
+  const isLoading = creating || updating;
   const source = accounts.find((a) => String(a.id) === from);
   const problem = bankDocumentAccountProblem(source, multiBranch);
-  const ready = !!from && !!to && from !== to && !problem && amount > 0 && !!date && !!narration.trim();
+  const draft = { from_account: Number(from), to_account: Number(to), amount, transfer_date: date, narration: narration.trim(), reference: reference.trim() };
+  const changes = existing ? changedFields(transferFieldsOf(existing), draft) : draft;
+  const ready = !!from && !!to && from !== to && !problem && amount > 0 && !!date && !!narration.trim() && Object.keys(changes).length > 0;
   const save = async () => {
     if (!ready) return;
     try {
-      const response = await create({ entity, from_account: Number(from), to_account: Number(to), amount, transfer_date: date, narration: narration.trim(), reference: reference.trim() || undefined }).unwrap();
-      toast.success(response.message || "Transfer recorded.");
+      const response = existing
+        ? await update({ id: existing.id, entity, ...changes }).unwrap()
+        : await create({ entity, ...draft, reference: draft.reference || undefined }).unwrap();
+      toast.success(response.message || (existing ? "Transfer corrected." : "Transfer recorded."));
       onClose();
     } catch { /* central */ }
   };
-  return <DetailDrawer open onOpenChange={(open) => !isLoading && !open && onClose()} title="Bank transfer" description="Move money between two accounts of the same branch." widthClass="sm:max-w-[560px]" footer={<><Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button><Button disabled={!ready} loading={isLoading} onClick={save}>Record transfer</Button></>}>
+  return <DetailDrawer open onOpenChange={(open) => !isLoading && !open && onClose()} title={existing ? `Correct ${existing.document_number}` : "Bank transfer"} description={existing ? "Change what was wrong, then send it again." : "Move money between two accounts of the same branch."} widthClass="sm:max-w-[560px]" footer={<><Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button><Button disabled={!ready} loading={isLoading} onClick={save}>{existing ? "Save changes" : "Record transfer"}</Button></>}>
     <div className="space-y-4">
       <FormField label="From" required><BankAccountPicker entity={entity} value={from} onChange={(next) => { setFrom(next); setTo(""); }} /></FormField>
       {problem && <p role="alert" className="font-mont text-[11px] leading-5 text-destructive">{problem}</p>}

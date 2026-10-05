@@ -25,6 +25,7 @@ import { useReaderReach } from "../../../host";
 import { useDates } from "../../../lib/display-prefs";
 import { useGetAnnualPayeReturnQuery, useGetTaxFilingScheduleQuery } from "@/redux/services/finance/payroll-api";
 import type { TaxFiling } from "@/redux/services/finance/ops-types";
+import type { AnnualPayeReturnRow } from "@/redux/services/finance/payroll-types";
 
 const th = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const td = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
@@ -106,7 +107,38 @@ export function RemittanceSchedulePanel({ filing, entity, currency }: { filing: 
   );
 }
 
-/** The employer's annual PAYE return for a year, person by person. */
+/** A row's key on the annual return: the person's account, else salary record, else where it sits. */
+export function annualRowKey(row: Pick<AnnualPayeReturnRow, "employee_id" | "salary_id" | "employee_name" | "tax_id">, index: number): string {
+  if (row.employee_id != null) return `user-${row.employee_id}`;
+  if (row.salary_id != null) return `salary-${row.salary_id}`;
+  return `typed-${index}-${row.employee_name}-${row.tax_id}`;
+}
+
+const sameName = (name: string) => name.toLowerCase().replace(/[^a-z]/g, "");
+
+/**
+ * What tells a person apart from a namesake on the same return, or null when
+ * nobody else on it shares their name.
+ *
+ * Kemi Ade at Ikeja and Kemi Ade at Lekki are two people with two accounts, and
+ * the server lists them as two rows. Two identical-looking names would read as
+ * a duplicate, so each says which one it is: the tax number where one is known,
+ * else that the person is on the roster or was typed by hand on a run.
+ */
+export function namesakeNote(row: AnnualPayeReturnRow, rows: AnnualPayeReturnRow[]): string | null {
+  const name = sameName(row.employee_name);
+  if (rows.filter((other) => sameName(other.employee_name) === name).length < 2) return null;
+  if (row.tax_id) return `Tax ID ${row.tax_id}`;
+  if (row.employee_id != null || row.salary_id != null) return "On the roster, with no tax ID recorded";
+  return "Typed by hand on a payroll run, with no tax ID";
+}
+
+/**
+ * The employer's annual PAYE return for a year, person by person.
+ *
+ * Rows are keyed by the person, not by name (`annualRowKey`), and a name that
+ * appears twice says which person each row is (`namesakeNote`).
+ */
 export function AnnualPayeReturnDrawer({ open, entity, currency, onClose }: { open: boolean; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
   const { wholeSchool } = useReaderReach();
@@ -157,9 +189,10 @@ export function AnnualPayeReturnDrawer({ open, entity, currency, onClose }: { op
                 </tr></thead>
                 <tbody>
                   {rows.map((row, index) => (
-                    <tr key={row.salary_id != null ? `salary-${row.salary_id}` : `line-${index}-${row.employee_name}`}>
+                    <tr key={annualRowKey(row, index)}>
                       <td className={td}>
                         {row.employee_name}
+                        {namesakeNote(row, rows) ? <span className="block text-[11px] text-gray-05">{namesakeNote(row, rows)}</span> : null}
                         {row.opening_gross > 0 ? <span className="block text-[11px] text-gray-05">{`Includes ${money(row.opening_gross)} pay and ${money(row.opening_paye)} PAYE before this payroll`}</span> : null}
                       </td>
                       <td className={cn(td, "text-gray-05")}>{row.tax_id || "-"}</td>
