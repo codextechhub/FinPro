@@ -33,7 +33,8 @@
  *
  *   Workflow (60): 01 template, 02 instance, 03 action, 04 group, 05 approvers.
  *   Most workflow codes are declared by each host, which gates its own menus on
- *   them; the two here gate screens only this package renders.
+ *   them; the ones here gate screens only this package renders, and carry the
+ *   same numbers the hosts give those keys (600162 publishes a route in both).
  *
  * Every code these modules use lives here and nowhere else; the host
  * applications spread this table into their own.
@@ -91,6 +92,10 @@ export const P = {
   FIN_EMAIL_RECEIPT: "202850",
   FIN_EMAIL_STATEMENT: "202651",
   FIN_ESTABLISH_PETTY_CASH: "202040",
+  FIN_RETURN_PETTY_CASH: "202044",
+  FIN_CLOSE_PETTY_CASH: "202024",
+  FIN_REOPEN_PETTY_CASH: "202042",
+  FIN_REVERSE_PETTY_CASH: "202014",
   FIN_FILE_TAX: "202119",
   FIN_GENERATE_DUNNING: "201025",
   FIN_GENERATE_FEE_STRUCTURE: "202725",
@@ -249,6 +254,7 @@ export const P = {
   PROC_VIEW_VENDOR_INVOICES: "701001",
   PROC_VIEW_VENDOR_PAYMENTS: "701101",
   VIEW_AUDIT: "101801",  // view audit events and entity trails
+  PUBLISH_WORKFLOW_TEMPLATE: "600162",  // publish an approval route, such as the ready-made petty cash return route
   VIEW_WORKFLOW_TEMPLATES: "600101",  // browse approval workflow templates
   CHANGE_APPROVERS: "600511",  // change who approves a request; delegate for somebody else
 } as const;
@@ -263,6 +269,7 @@ export type PermissionCode = (typeof P)[keyof typeof P];
 export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "101801": "platform.audit.view",
   "600101": "workflow.template.view",
+  "600162": "workflow.template.publish",
   "600511": "workflow.approvers.assign",
   "203301": "finance.entity.view",
   "200102": "finance.entity.create",
@@ -320,6 +327,10 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "201915": "finance.expenseclaim.settle",
   "202036": "finance.pettycash.replenish",
   "202040": "finance.pettycash.establish",
+  "202044": "finance.pettycash.return",
+  "202024": "finance.pettycash.close",
+  "202042": "finance.pettycash.reopen",
+  "202014": "finance.pettycash.reverse",
   "202902": "finance.pettycashvoucher.create",
   "202913": "finance.pettycashvoucher.post",
   "202108": "finance.tax.create",

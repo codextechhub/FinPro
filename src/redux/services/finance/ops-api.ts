@@ -26,6 +26,9 @@ import type {
   SalaryStructure,
   PettyCashFund,
   PettyCashFundDetail,
+  PettyCashReturn,
+  PettyCashReturnInput,
+  PettyCashReturnRoute,
   PettyCashVoucher,
   TaxFiling,
   TaxObligation,
@@ -38,6 +41,13 @@ import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-type
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
 type E = { entity: string; page?: number; page_size?: number; status?: string };
 type Act = { id: number; entity: string };
+
+/** What a petty cash return or its void moves: the fund, its journal, the bank
+ *  account's register and the approvals it may wait in. */
+const PETTY_CASH_MONEY_TAGS = [
+  "FinancePettyCash", "FinanceJournals", "FinanceBankAccounts", "FinanceStatementLines",
+  "FinanceReports", "WorkflowPending", "WorkflowSubmissions",
+] as const;
 
 export const opsApi = baseApi.injectEndpoints({
   endpoints: (b) => ({
@@ -262,6 +272,49 @@ export const opsApi = baseApi.injectEndpoints({
     voidPettyCashVoucher: b.mutation<ApiEnvelope<PettyCashVoucher>, Act>({
       query: ({ id, entity }) => ({ url: `/finance/petty-cash-vouchers/${id}/void/${qs({ entity })}`, method: "POST" }),
       invalidatesTags: ["FinancePettyCash", "FinanceJournals", "FinanceReports"],
+    }),
+    // A draft voucher is cancelled; it never touched a ledger.
+    cancelPettyCashVoucher: b.mutation<ApiEnvelope<PettyCashVoucher>, Act>({
+      query: ({ id, entity }) => ({ url: `/finance/petty-cash-vouchers/${id}/cancel/${qs({ entity })}`, method: "POST" }),
+      invalidatesTags: ["FinancePettyCash"],
+    }),
+    // A plain edit moves no cash; the server refuses (409) what only a return may do.
+    updatePettyCashFund: b.mutation<ApiEnvelope<PettyCashFund>, Act & { name?: string; custodian?: number | null; custodian_name?: string; float_amount?: number; is_active?: boolean }>({
+      query: ({ id, entity, ...body }) => ({ url: `/finance/petty-cash-funds/${id}/${qs({ entity })}`, method: "PATCH", body }),
+      invalidatesTags: ["FinancePettyCash"],
+    }),
+    // Returns bank the tin's cash: 201 posted, or 201 waiting with an approval block.
+    reducePettyCashFloat: b.mutation<ApiEnvelope<PettyCashReturn>, Act & PettyCashReturnInput & { new_float_amount: number }>({
+      query: ({ id, entity, ...body }) => ({ url: `/finance/petty-cash-funds/${id}/reduce/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: [...PETTY_CASH_MONEY_TAGS],
+    }),
+    closePettyCashFund: b.mutation<ApiEnvelope<PettyCashReturn>, Act & PettyCashReturnInput>({
+      query: ({ id, entity, ...body }) => ({ url: `/finance/petty-cash-funds/${id}/close/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: [...PETTY_CASH_MONEY_TAGS],
+    }),
+    reopenPettyCashFund: b.mutation<ApiEnvelope<PettyCashFund>, Act & { reason: string; float_amount?: number }>({
+      query: ({ id, entity, ...body }) => ({ url: `/finance/petty-cash-funds/${id}/reopen/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["FinancePettyCash"],
+    }),
+    getPettyCashReturns: b.query<PaginatedEnvelope<PettyCashReturn>, E & { fund?: number; kind?: string }>({
+      query: (p) => ({ url: `/finance/petty-cash-returns/${qs(p)}`, method: "GET" }),
+      providesTags: ["FinancePettyCash"],
+    }),
+    getPettyCashReturn: b.query<ApiEnvelope<PettyCashReturn>, Act>({
+      query: ({ id, entity }) => ({ url: `/finance/petty-cash-returns/${id}/${qs({ entity })}`, method: "GET" }),
+      providesTags: ["FinancePettyCash"],
+    }),
+    voidPettyCashReturn: b.mutation<ApiEnvelope<PettyCashReturn>, Act & { date?: string }>({
+      query: ({ id, entity, ...body }) => ({ url: `/finance/petty-cash-returns/${id}/void/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: [...PETTY_CASH_MONEY_TAGS],
+    }),
+    getPettyCashReturnRoute: b.query<ApiEnvelope<PettyCashReturnRoute>, { entity: string }>({
+      query: ({ entity }) => ({ url: `/finance/petty-cash-returns/approval-template/${qs({ entity })}`, method: "GET" }),
+      providesTags: ["FinancePettyCash"],
+    }),
+    adoptPettyCashReturnRoute: b.mutation<ApiEnvelope<PettyCashReturnRoute>, { entity: string; threshold?: number }>({
+      query: ({ entity, ...body }) => ({ url: `/finance/petty-cash-returns/approval-template/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["FinancePettyCash"],
     }),
 
     // Payroll
@@ -517,6 +570,16 @@ export const {
   useCreatePettyCashVoucherMutation,
   usePostPettyCashVoucherMutation,
   useVoidPettyCashVoucherMutation,
+  useCancelPettyCashVoucherMutation,
+  useUpdatePettyCashFundMutation,
+  useReducePettyCashFloatMutation,
+  useClosePettyCashFundMutation,
+  useReopenPettyCashFundMutation,
+  useGetPettyCashReturnsQuery,
+  useGetPettyCashReturnQuery,
+  useVoidPettyCashReturnMutation,
+  useGetPettyCashReturnRouteQuery,
+  useAdoptPettyCashReturnRouteMutation,
   useGetPayrollRunsQuery,
   useGetPayrollSummaryQuery,
   useGetPayrollRunQuery,
