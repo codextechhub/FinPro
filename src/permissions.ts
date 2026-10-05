@@ -21,7 +21,8 @@
  *   21 tax, 22 payrollrun, 23 budget, 24 fixedasset, 25 audit, 26 customer,
  *   27 feestructure, 28 payment, 29 pettycashvoucher, 30 salary, 31 writeoff,
  *   32 settings; 33 entity, 34 account and 35 period hold the renumbered codes
- *   described below; 36 fiscalyear.
+ *   described below; 36 fiscalyear; 41 credittransfer, 42 deferredincome,
+ *   43 provision, 44 deposit.
  *
  *   Procurement (70): 01 category, 02 vendor, 03 catalog_item, 04 contract,
  *   05 requisition, 06 rfq, 07 quotation, 08 purchase_order, 09 goods_receipt,
@@ -167,6 +168,22 @@ export const P = {
   FIN_VIEW_TAX_CODES: "201501",
   FIN_VIEW_WRITE_OFFS: "203101",
   FIN_WRITE_OFF_INVOICE: "200521",
+  FIN_IMPORT_OPENING_CUSTOMERS: "202618",  // carry in bills unpaid before go-live
+  FIN_RECOVER_WRITE_OFF: "203114",  // a written-off debt paid after all
+  FIN_VIEW_CREDIT_TRANSFERS: "204101",
+  FIN_CREATE_CREDIT_TRANSFER: "204102",
+  FIN_SUBMIT_CREDIT_TRANSFER: "204130",
+  FIN_REVERSE_CREDIT_TRANSFER: "204114",
+  FIN_VIEW_DEFERRED_INCOME: "204201",
+  FIN_RELEASE_DEFERRED_INCOME: "204225",  // every branch at once
+  FIN_REVERSE_DEFERRED_INCOME: "204214",
+  FIN_VIEW_PROVISIONS: "204301",
+  FIN_CREATE_PROVISION: "204302",
+  FIN_SUBMIT_PROVISION: "204330",
+  FIN_POST_PROVISION: "204313",
+  FIN_VIEW_DEPOSITS: "204401",
+  FIN_SETTLE_DEPOSITS: "204415",  // return deposits, or set them against bills
+  FIN_FORFEIT_DEPOSITS: "204425",  // every branch at once
   PAY_REPLAY_UNATTRIBUTED_WEBHOOK: "800748",
   PAY_VIEW_COLLECTIONS: "800101",
   PAY_CREATE_COLLECTION: "800102",
@@ -448,6 +465,22 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "202901": "finance.pettycashvoucher.view",
   "203001": "finance.salary.view",
   "203101": "finance.writeoff.view",
+  "202618": "finance.customer.import_opening",
+  "203114": "finance.writeoff.reverse",
+  "204101": "finance.credittransfer.view",
+  "204102": "finance.credittransfer.create",
+  "204130": "finance.credittransfer.submit",
+  "204114": "finance.credittransfer.reverse",
+  "204201": "finance.deferredincome.view",
+  "204225": "finance.deferredincome.run",
+  "204214": "finance.deferredincome.reverse",
+  "204301": "finance.provision.view",
+  "204302": "finance.provision.create",
+  "204330": "finance.provision.submit",
+  "204313": "finance.provision.post",
+  "204401": "finance.deposit.view",
+  "204415": "finance.deposit.settle",
+  "204425": "finance.deposit.run",
   "700101": "procurement.category.view",
   "700201": "procurement.vendor.view",
   "700301": "procurement.catalog_item.view",

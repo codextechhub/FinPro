@@ -37,7 +37,7 @@ import type {
 } from "./ar-types";
 
 type EntityList = { entity: string; page?: number; status?: string; customer?: string };
-type FeeLineInput = { code?: string; description: string; revenue_account: string; amount: number; tax_code?: string; is_optional?: boolean };
+type FeeLineInput = { code?: string; description: string; revenue_account: string; amount: number; tax_code?: string; is_optional?: boolean; kind?: "CHARGE" | "DEPOSIT" };
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
 
 export type VoidableArResource = "invoices" | "payments" | "credit-notes" | "refunds" | "concessions";
@@ -60,10 +60,15 @@ export const arApi = baseApi.injectEndpoints({
     createInvoice: builder.mutation<ApiEnvelope<Invoice>, {
       entity: string; customer: string | number; invoice_date: string; due_date?: string;
       reference?: string; narration?: string; post?: boolean; branch?: number;
-      lines: { revenue_account: string | number; description?: string; quantity?: number; unit_price: number; tax_code?: string | number | null }[];
+      /** Bills `customer` as the payer for this customer (a sponsor paying for a pupil). */
+      beneficiary?: string | number;
+      lines: {
+        revenue_account: string | number; description?: string; quantity?: number; unit_price: number; tax_code?: string | number | null;
+        kind?: "CHARGE" | "DEPOSIT"; service_start?: string; service_end?: string;
+      }[];
     }>({
       query: ({ entity, ...body }) => ({ url: `/finance/invoices/${qs({ entity })}`, method: "POST", body }),
-      invalidatesTags: ["FinanceInvoices", "FinanceReports", "FinanceJournals"],
+      invalidatesTags: ["FinanceInvoices", "FinanceReports", "FinanceJournals", "FinanceDeferredIncome", "FinanceDeposits"],
     }),
     // Backend keys: amount? · write_off_account? · write_off_date? · narration.
     writeOffInvoice: builder.mutation<ApiEnvelope<InvoiceWriteOffResult>, { id: number; entity: string; amount?: number; write_off_account?: string | number; write_off_date?: string; narration?: string; reason?: string }>({
@@ -420,9 +425,9 @@ export const arApi = baseApi.injectEndpoints({
       query: ({ id, entity, ...body }) => ({ url: `/finance/fee-structures/${id}/duplicate/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceFeeStructures"],
     }),
-    generateFromFeeStructure: builder.mutation<ApiEnvelope<{ structure: string; generated: number; invoices: Invoice[] }>, { id: string | number; entity: string; branch?: number; customers?: (string | number)[]; all_active?: boolean; invoice_date?: string; due_date?: string }>({
+    generateFromFeeStructure: builder.mutation<ApiEnvelope<{ structure: string; generated: number; invoices: Invoice[] }>, { id: string | number; entity: string; branch?: number; customers?: (string | number)[]; all_active?: boolean; invoice_date?: string; due_date?: string; service_start?: string; service_end?: string }>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/fee-structures/${id}/generate/${qs({ entity })}`, method: "POST", body }),
-      invalidatesTags: ["FinanceFeeStructures", "FinanceInvoices"],
+      invalidatesTags: ["FinanceFeeStructures", "FinanceInvoices", "FinanceDeferredIncome", "FinanceDeposits"],
     }),
   }),
 });

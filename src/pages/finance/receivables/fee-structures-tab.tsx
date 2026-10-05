@@ -12,10 +12,16 @@
  * generic-valuable richness - per-line fee code, optional-vs-required, the tax
  * breakdown, usage/activity, Duplicate - and drop the school-only bits. Frequency
  * is intentionally omitted (generation raises a single invoice, not a schedule).
+ *
+ * Every line states its VAT treatment, read from the school's tax codes: a line
+ * saved with no tax code takes the exempt VAT code. A line marked "Refundable
+ * deposit" (a caution deposit) is billed like any other but held for the
+ * customer, never earned, so its account is always Deposits held. An optional
+ * line is billed only to the customers assigned to it, from the line's Assign.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, FileStack, Pencil, Copy, CircleCheck, RefreshCw, AlertTriangle } from "lucide-react";
+import { Plus, Search, Trash2, FileStack, Pencil, Copy, CircleCheck, RefreshCw, AlertTriangle, Users } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField,
   AccountPicker, TaxCodePicker, toArray, type Column,
@@ -35,8 +41,11 @@ import {
   useUpdateFeeStructureMutation, useDuplicateFeeStructureMutation,
   useGenerateFromFeeStructureMutation,
 } from "@/redux/services/finance/ar-api";
-import type { FeeStructure, FeeAppliesTo } from "@/redux/services/finance/ar-types";
+import type { FeeStructure, FeeAppliesTo, FeeItem, ChargeKind } from "@/redux/services/finance/ar-types";
+import { useGetTaxCodesQuery } from "@/redux/services/finance/setup-api";
 import { useDates } from "../../../lib/display-prefs";
+import { lineTreatment } from "../../../utils/tax-treatment";
+import { FeeItemAssignmentsDrawer } from "./fee-item-assignments-drawer";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -63,6 +72,9 @@ function StatusPill({ active }: { active: boolean }) {
 }
 function OptionalPill({ optional }: { optional: boolean }) {
   return <span className={cn(PILL, optional ? "bg-amber-50 text-amber-700" : "bg-gray-03/60 text-gray-05")}>{optional ? "Optional" : "Required"}</span>;
+}
+function DepositPill() {
+  return <span className={cn(PILL, "bg-blue-50 text-blue-700")}>Refundable deposit</span>;
 }
 
 export function FeeStructuresTab({ entity, currency }: { entity: string; currency?: string | null }) {
@@ -143,6 +155,9 @@ function FeeStructureDetailDrawer({ structure, entity, currency, onClose, onEdit
   const dates = useDates();
   const { can } = useCan();
   const [generating, setGenerating] = useState(false);
+  const [assigning, setAssigning] = useState<FeeItem | null>(null);
+  const { data: taxData } = useGetTaxCodesQuery({ entity }, { skip: !structure });
+  const taxCodes = toArray(taxData?.data);
   // Fetch the full record (carries usage/activity) once the drawer is open.
   const { data: detail } = useGetFeeStructureQuery(
     { id: structure?.code ?? "", entity }, { skip: !structure });
@@ -182,7 +197,7 @@ function FeeStructureDetailDrawer({ structure, entity, currency, onClose, onEdit
 
           <div>
             <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Lines</p>
-            <div className="overflow-hidden rounded-md border border-white-02">
+            <div className="overflow-x-auto rounded-md border border-white-02">
               <table className="w-full border-collapse">
                 <thead><tr>
                   <th className={thCls}>Fee item</th><th className={thCls}>GL account</th>
@@ -198,8 +213,21 @@ function FeeStructureDetailDrawer({ structure, entity, currency, onClose, onEdit
                       </td>
                       <td className={cn(tdCls, "tabular-nums text-gray-05")}>{it.revenue_account_code}</td>
                       <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={it.amount} currency={currency} align="right" /></td>
-                      <td className={tdCls}>{it.tax_code_value ?? <span className="text-gray-05">Exempt</span>}</td>
-                      <td className={tdCls}><OptionalPill optional={it.is_optional} /></td>
+                      <td className={tdCls}>
+                        {it.tax_code_value ? <span className="font-medium">{it.tax_code_value}</span> : null}
+                        <span className="block text-[11px] text-gray-05">{lineTreatment(it.tax_code_value, taxCodes)}</span>
+                      </td>
+                      <td className={tdCls}>
+                        <span className="flex flex-wrap items-center gap-1">
+                          <OptionalPill optional={it.is_optional} />
+                          {it.kind === "DEPOSIT" ? <DepositPill /> : null}
+                          {it.is_optional && isCustomer ? (
+                            <button type="button" onClick={() => setAssigning(it)} className="inline-flex items-center gap-1 font-mont text-[11px] font-medium text-primary hover:underline">
+                              <Users className="size-3" /> Assign
+                            </button>
+                          ) : null}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -244,6 +272,9 @@ function FeeStructureDetailDrawer({ structure, entity, currency, onClose, onEdit
         </div>
       </DetailDrawer>
 
+      {assigning ? (
+        <FeeItemAssignmentsDrawer entity={entity} structureCode={full.code} item={assigning} onClose={() => setAssigning(null)} />
+      ) : null}
       {generating && FeeGenerationPanel ? (
         <FeeGenerationPanel structure={full} entity={entity} currency={currency} onClose={() => setGenerating(false)} />
       ) : generating ? (
@@ -261,14 +292,22 @@ function FeeStructureDetailDrawer({ structure, entity, currency, onClose, onEdit
 function GenerateDrawer({ structure, entity, onClose }: { structure: FeeStructure; entity: string; onClose: () => void }) {
   const [invoiceDate, setInvoiceDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [serviceStart, setServiceStart] = useState("");
+  const [serviceEnd, setServiceEnd] = useState("");
   const [failure, setFailure] = useState("");
   const [generate, { isLoading }] = useGenerateFromFeeStructureMutation();
   const branch = useRaisingBranchChoice();
+  // Both dates or neither, and never ending before it starts: the server's rule.
+  const periodValid = (!serviceStart && !serviceEnd) || (!!serviceStart && !!serviceEnd && serviceEnd >= serviceStart);
 
   const submit = async () => {
     setFailure("");
     try {
-      const res = await generate({ id: structure.code, entity, all_active: true, invoice_date: invoiceDate, due_date: dueDate || undefined, ...branch.body() }).unwrap();
+      const res = await generate({
+        id: structure.code, entity, all_active: true, invoice_date: invoiceDate, due_date: dueDate || undefined,
+        ...(serviceStart && serviceEnd ? { service_start: serviceStart, service_end: serviceEnd } : {}),
+        ...branch.body(),
+      }).unwrap();
       toast.success(res.message || `Generated ${res.data?.generated ?? 0} invoice(s).`);
       onClose();
     } catch (error) {
@@ -283,17 +322,26 @@ function GenerateDrawer({ structure, entity, onClose }: { structure: FeeStructur
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !invoiceDate || !branch.ready} onClick={submit} className="gap-1.5"><FileStack className="size-4" />{isLoading ? "Generating…" : "Generate"}</Button>
+        <Button disabled={isLoading || !invoiceDate || !branch.ready || !periodValid} onClick={submit} className="gap-1.5"><FileStack className="size-4" />{isLoading ? "Generating…" : "Generate"}</Button>
       </>}
     >
       <div className="space-y-4">
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
-          Raises one posted invoice per active customer from this structure's lines ({formatMoney(structure.total_with_tax)} each, tax included). Customers already billed for it are skipped.
+          Raises one posted invoice per active customer from this structure's lines ({formatMoney(structure.total_with_tax)} each, tax included). Customers already billed for it are skipped, and so is the account of anyone who pays for other customers.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} />
           <FormField label="Due date"><DatePickerInput value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" /></FormField>
         </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FormField label="Pays for, from"><DatePickerInput value={serviceStart} onChange={(e) => setServiceStart(e.target.value)} className="bg-white" /></FormField>
+          <FormField label="Pays for, to"><DatePickerInput value={serviceEnd} onChange={(e) => setServiceEnd(e.target.value)} className="bg-white" /></FormField>
+        </div>
+        <p className="-mt-2 font-mont text-[11px] leading-4 text-gray-05">
+          {periodValid
+            ? "Optional. The period these fees pay for, such as the term. Fees billed before it starts are held as deferred income and released month by month."
+            : "Give both dates, with the end on or after the start."}
+        </p>
         <RaisingBranchChoiceField choice={branch} hint={FEE_RUN_BRANCH_HINT} />
         {failure ? (
           <div role="alert" className="flex gap-2 rounded-md border border-error/30 bg-error/5 px-3 py-2.5">
@@ -353,8 +401,8 @@ function DuplicateDrawer({ structure, entity, onClose }: { structure: FeeStructu
   );
 }
 
-type EditItem = { code: string; description: string; revenue_account: string; amount: number; tax_code: string; is_optional: boolean };
-const emptyItem = (): EditItem => ({ code: "", description: "", revenue_account: "", amount: 0, tax_code: "", is_optional: false });
+type EditItem = { code: string; description: string; revenue_account: string; amount: number; tax_code: string; is_optional: boolean; kind: ChargeKind };
+const emptyItem = (): EditItem => ({ code: "", description: "", revenue_account: "", amount: 0, tax_code: "", is_optional: false, kind: "CHARGE" });
 
 function StructureFormDrawer({ open, structure, onClose, entity, currency }: {
   open: boolean; structure: FeeStructure | null; onClose: () => void; entity: string; currency?: string | null;
@@ -383,7 +431,7 @@ function StructureFormDrawer({ open, structure, onClose, entity, currency }: {
       setDescription(structure.description);
       setActive(structure.is_active);
       setItems(structure.items.length
-        ? structure.items.map((it) => ({ code: it.code, description: it.description, revenue_account: it.revenue_account_code, amount: it.amount, tax_code: it.tax_code_value ?? "", is_optional: it.is_optional }))
+        ? structure.items.map((it) => ({ code: it.code, description: it.description, revenue_account: it.revenue_account_code, amount: it.amount, tax_code: it.tax_code_value ?? "", is_optional: it.is_optional, kind: it.kind ?? "CHARGE" }))
         : [emptyItem()]);
     } else {
       setCode(""); setName(""); setAppliesTo("CUSTOMER"); setDescription(""); setActive(true); setItems([emptyItem()]);
@@ -396,11 +444,15 @@ function StructureFormDrawer({ open, structure, onClose, entity, currency }: {
   const removeItem = (i: number) => setItems((s) => s.filter((_, idx) => idx !== i));
   const total = items.reduce((s, it) => s + it.amount, 0);
 
-  const validItems = items.filter((it) => it.description.trim() && it.revenue_account && it.amount > 0);
+  // A deposit's account is always Deposits held, set by the server, so it needs none here.
+  const validItems = items.filter((it) => it.description.trim() && (it.kind === "DEPOSIT" || it.revenue_account) && it.amount > 0);
   const canSubmit = name.trim() !== "" && validItems.length > 0;
 
   const submit = async () => {
-    const payloadItems = validItems.map((it) => ({ code: it.code.trim() || undefined, description: it.description.trim(), revenue_account: it.revenue_account, amount: it.amount, tax_code: it.tax_code || undefined, is_optional: it.is_optional }));
+    const payloadItems = validItems.map((it) => ({
+      code: it.code.trim() || undefined, description: it.description.trim(), revenue_account: it.revenue_account,
+      amount: it.amount, tax_code: it.tax_code || undefined, is_optional: it.is_optional, kind: it.kind,
+    }));
     try {
       if (isEdit && structure) {
         const res = await update({ id: structure.code, entity, name: name.trim(), applies_to: appliesTo, description: description.trim(), is_active: active, items: payloadItems }).unwrap();
@@ -459,11 +511,18 @@ function StructureFormDrawer({ open, structure, onClose, entity, currency }: {
                 <div className="grid flex-1 grid-cols-12 gap-2">
                   <div className="col-span-2"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Fee code</p><Input value={it.code} onChange={(e) => setItem(i, { code: e.target.value })} placeholder="SERVICE" className="bg-white font-mont text-sm" /></div>
                   <div className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Fee item</p><Input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="Service fee" className="bg-white font-mont text-sm" /></div>
-                  <div className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">GL account</p><AccountPicker entity={entity} value={it.revenue_account} onChange={(v) => setItem(i, { revenue_account: v })} accountType="INCOME" postableOnly placeholder="Revenue account" /></div>
+                  <div className="col-span-3"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">GL account</p>
+                    {it.kind === "DEPOSIT"
+                      ? <p className="flex h-9 items-center rounded-md border border-white-02 bg-gray-50 px-2 font-mont text-xs text-gray-05">Deposits held (2170)</p>
+                      : <AccountPicker entity={entity} value={it.revenue_account} onChange={(v) => setItem(i, { revenue_account: v })} accountType="INCOME" postableOnly placeholder="Revenue account" />}
+                  </div>
                   <div className="col-span-2"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Amount</p><MoneyInput valueKobo={it.amount} onChangeKobo={(v) => setItem(i, { amount: v })} currency={currency} /></div>
                   <div className="col-span-2"><p className="mb-1 font-mont text-[10px] uppercase tracking-wide text-gray-05">Tax</p><TaxCodePicker entity={entity} value={it.tax_code} onChange={(v) => setItem(i, { tax_code: v })} usage="sales" /></div>
                 </div>
-                <label className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap font-mont text-xs text-gray-01"><input type="checkbox" checked={it.is_optional} onChange={(e) => setItem(i, { is_optional: e.target.checked })} className="accent-primary" /> Optional</label>
+                <div className="flex shrink-0 flex-col gap-1">
+                  <label className="flex items-center gap-1.5 whitespace-nowrap font-mont text-xs text-gray-01"><input type="checkbox" checked={it.is_optional} onChange={(e) => setItem(i, { is_optional: e.target.checked })} className="accent-primary" /> Optional</label>
+                  <label className="flex items-center gap-1.5 whitespace-nowrap font-mont text-xs text-gray-01"><input type="checkbox" checked={it.kind === "DEPOSIT"} onChange={(e) => setItem(i, { kind: e.target.checked ? "DEPOSIT" : "CHARGE" })} className="accent-primary" /> Refundable deposit</label>
+                </div>
                 <button type="button" onClick={() => removeItem(i)} disabled={items.length <= 1} className="mb-0.5 shrink-0 rounded p-1.5 text-gray-05 hover:bg-destructive/5 hover:text-destructive disabled:opacity-30" aria-label="Remove line"><Trash2 className="size-4" /></button>
               </div>
             ))}

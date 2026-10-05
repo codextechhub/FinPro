@@ -41,6 +41,7 @@ import type {
   PeriodCloseResult,
   PostingWindow,
   TaxCode,
+  TaxTreatment,
 } from "./setup-types";
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
@@ -187,7 +188,7 @@ export const setupApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/tax-codes/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceSetup"],
     }),
-    upsertTaxCode: b.mutation<ApiEnvelope<TaxCode>, { entity: string; code: string; name: string; rate_bps: number; is_recoverable?: boolean; collected_account?: string; paid_account?: string; is_active?: boolean }>({
+    upsertTaxCode: b.mutation<ApiEnvelope<TaxCode>, { entity: string; code: string; name: string; rate_bps: number; treatment?: TaxTreatment; is_recoverable?: boolean; collected_account?: string; paid_account?: string; is_active?: boolean }>({
       query: ({ entity, ...body }) => ({ url: `/finance/tax-codes/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceSetup"],
     }),
@@ -240,7 +241,7 @@ export const setupApi = baseApi.injectEndpoints({
       query: ({ entity }) => ({ url: `/finance/settings/documents/${qs({ entity })}`, method: "GET" }),
       providesTags: ["FinanceSettings"],
     }),
-    updateFinanceDocumentSettings: b.mutation<ApiEnvelope<FinanceDocumentSettingsPayload>, { entity: string; default_invoice_due_days?: number; default_invoice_narration?: string; auto_post_manual_invoices?: boolean; allow_customer_opening_balances?: boolean; term_collection_target_pct?: number; primary_collection_bank_account?: number | null }>({
+    updateFinanceDocumentSettings: b.mutation<ApiEnvelope<FinanceDocumentSettingsPayload>, { entity: string; default_invoice_due_days?: number; default_invoice_narration?: string; auto_post_manual_invoices?: boolean; allow_customer_opening_balances?: boolean; term_collection_target_pct?: number; primary_collection_bank_account?: number | null; auto_apply_customer_credit?: boolean; concession_second_person_threshold?: number }>({
       query: ({ entity, ...body }) => ({ url: `/finance/settings/documents/${qs({ entity })}`, method: "PATCH", body }),
       invalidatesTags: ["FinanceSettings", "FinanceAuditLog", "FinanceBankAccounts"],
     }),

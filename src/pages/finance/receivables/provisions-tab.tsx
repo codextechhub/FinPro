@@ -1,0 +1,263 @@
+/**
+ * Receivables -> Doubtful Debts: the provision runs.
+ *
+ * A run works out the allowance each branch must hold for debts that may not be
+ * paid, from how old each overdue balance is and the school's bands (by default
+ * 25% over 180 days, 50% over 365 and 100% over 730, under Settings >
+ * Receivables). It is raised as a draft with its figures, approved by a second
+ * person through its own route, and posted as one journal per branch: an
+ * increase debits Bad debts (5350) and credits the Allowance for doubtful debts
+ * (1290), a decrease the reverse. The figures are worked out again when it
+ * posts, because receipts and write-offs made while it waited change them.
+ *
+ * A run covers every branch at once, so only a whole-school holder of the keys
+ * raises, submits or posts one. A branch reader sees the runs and their own
+ * branch's line.
+ */
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { Check, Plus, Send } from "lucide-react";
+import {
+  ConfirmActionModal, DataTable, DetailDrawer, FormField, FormModal, Money, PostingDateField,
+  PostingRecap, StatusPill, toArray, type Column,
+} from "@/components/finance-ui";
+import { useCan } from "@/components/finance-ui/can";
+import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { P } from "../../../permissions";
+import { useReaderReach } from "../../../host";
+import { useDates } from "../../../lib/display-prefs";
+import {
+  useCreateProvisionMutation, useGetProvisionsQuery, usePostProvisionMutation, useSubmitProvisionMutation,
+} from "@/redux/services/finance/fees-api";
+import type { DoubtfulDebtProvision, ProvisionLine } from "@/redux/services/finance/fees-types";
+import { DetailField, Note, bandLabel, bpsToPercent, useBranchColumn } from "./fees-parts";
+
+const th = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
+const td = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
+
+/** The journal a provision's net movement posts: raising the allowance, or releasing it. */
+export function provisionRecap(lines: ProvisionLine[]) {
+  const net = lines.reduce((sum, line) => sum + line.movement, 0);
+  const amount = Math.abs(net);
+  const expense = { code: "5350", name: "Bad debts", amount };
+  const allowance = { code: "1290", name: "Allowance for doubtful debts", amount };
+  return net >= 0 ? { dr: [expense], cr: [allowance], net } : { dr: [allowance], cr: [expense], net };
+}
+
+export function ProvisionsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const dates = useDates();
+  const { can } = useCan();
+  const { wholeSchool } = useReaderReach();
+  const [page, setPage] = useState(1);
+  const [creating, setCreating] = useState(false);
+  const [selected, setSelected] = useState<DoubtfulDebtProvision | null>(null);
+  const { data, isLoading, isFetching, isError, refetch } = useGetProvisionsQuery({ entity, page });
+  const rows = useMemo(() => toArray(data?.data), [data]);
+  const pg = data?.pagination;
+  const open = selected ? rows.find((r) => r.id === selected.id) ?? selected : null;
+
+  const columns: Column<DoubtfulDebtProvision>[] = [
+    { header: "Ref", cell: (r) => <span className="font-semibold tabular-nums">{r.document_number}</span> },
+    { header: "As of", cell: (r) => <span className="tabular-nums">{dates.day(r.as_of)}</span> },
+    { header: "Allowance required", align: "right", cell: (r) => <Money kobo={r.required_total} currency={currency} align="right" /> },
+    { header: "Change", align: "right", cell: (r) => <Money kobo={r.movement_total} currency={currency} align="right" /> },
+    { header: "Status", cell: (r) => <StatusPill status={r.status} /> },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-mont text-xs text-gray-05">One journal per branch, worked out from each branch&apos;s aged debts.</p>
+        {wholeSchool && can(P.FIN_CREATE_PROVISION) ? (
+          <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New provision run</Button>
+        ) : null}
+      </div>
+      {!wholeSchool && can(P.FIN_CREATE_PROVISION) ? (
+        <Note>A provision run covers every branch at once, so only someone who covers the whole school raises one.</Note>
+      ) : null}
+      <DataTable
+        columns={columns} rows={rows} rowKey={(r) => r.id}
+        loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={setSelected}
+        page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
+        emptyTitle="No provision runs"
+        emptyMessage="A run sets the allowance for doubtful debts from how old each overdue balance is."
+      />
+      <NewProvisionModal open={creating} onClose={() => setCreating(false)} entity={entity} onCreated={setSelected} />
+      <ProvisionDrawer provision={open} entity={entity} currency={currency} onClose={() => setSelected(null)} />
+    </div>
+  );
+}
+
+function NewProvisionModal({ open, onClose, entity, onCreated }: {
+  open: boolean; onClose: () => void; entity: string; onCreated: (p: DoubtfulDebtProvision) => void;
+}) {
+  const [asOf, setAsOf] = useState("");
+  const [narration, setNarration] = useState("");
+  const [create, { isLoading }] = useCreateProvisionMutation();
+  const close = () => { setAsOf(""); setNarration(""); onClose(); };
+  const submit = async () => {
+    try {
+      const res = await create({ entity, as_of: asOf, narration: narration.trim() || undefined }).unwrap();
+      toast.success(res.message || "Provision prepared.");
+      onCreated(res.data);
+      close();
+    } catch { /* central */ }
+  };
+  return (
+    <FormModal
+      open={open} onOpenChange={(o) => !o && close()}
+      title="New provision run"
+      description="Works out each branch's allowance from its debts aged to this date. Nothing posts until it is approved."
+      submitText="Prepare run" loading={isLoading} canSubmit={!!asOf} onSubmit={submit}
+    >
+      <PostingDateField label="Age debts to" entity={entity} value={asOf} onChange={setAsOf} />
+      <FormField label="Narration">
+        <Input value={narration} onChange={(e) => setNarration(e.target.value)} maxLength={255} placeholder="e.g. Year-end provision" className="bg-white" />
+      </FormField>
+    </FormModal>
+  );
+}
+
+function ProvisionDrawer({ provision, entity, currency, onClose }: {
+  provision: DoubtfulDebtProvision | null; entity: string; currency?: string | null; onClose: () => void;
+}) {
+  const dates = useDates();
+  const { can } = useCan();
+  const { wholeSchool } = useReaderReach();
+  const branches = useBranchColumn();
+  const [confirming, setConfirming] = useState(false);
+  const [submit, { isLoading: submitting }] = useSubmitProvisionMutation();
+  const [post, { isLoading: posting }] = usePostProvisionMutation();
+  const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "provision run" });
+  if (!provision) return null;
+
+  const isDraft = provision.status === "DRAFT";
+  const gated = provision.approval_required !== false;
+  const allowed = wholeSchool && can(gated ? P.FIN_SUBMIT_PROVISION : P.FIN_POST_PROVISION);
+  const recap = provisionRecap(provision.lines);
+  const bandKeys = [...new Set(provision.lines.flatMap((l) => Object.keys(l.bands)))].sort((a, b) => Number(a) - Number(b));
+
+  const act = async () => {
+    try {
+      if (gated) {
+        const res = await submit({ entity, id: provision.id }).unwrap();
+        toast.success(res.message || "Provision submitted for approval.");
+        promptIfParked(res.data?.approval);
+        setConfirming(false);
+        if (!res.data?.approval?.parked) onClose();
+        return;
+      }
+      const res = await post({ entity, id: provision.id }).unwrap();
+      toast.success(res.message || "Provision posted.");
+      setConfirming(false);
+      onClose();
+    } catch { /* central */ }
+  };
+
+  return (
+    <>
+      <DetailDrawer
+        open onOpenChange={(o) => (o ? undefined : onClose())}
+        title={provision.document_number}
+        description={`Doubtful debts aged to ${dates.day(provision.as_of)}`}
+        widthClass="sm:max-w-2xl"
+        footer={isDraft && allowed ? (
+          <Button onClick={() => setConfirming(true)} className="gap-1.5">
+            {gated ? <><Send className="size-4" /> Submit for approval</> : <><Check className="size-4" /> Post provision</>}
+          </Button>
+        ) : undefined}
+      >
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <DetailField label="Status"><StatusPill status={provision.status} /></DetailField>
+            <DetailField label="Allowance required"><Money kobo={provision.required_total} currency={currency} /></DetailField>
+            <DetailField label="Change to the allowance"><Money kobo={provision.movement_total} currency={currency} /></DetailField>
+          </div>
+          {isDraft ? (
+            <Note>
+              {gated
+                ? "A second person approves this run before it posts. The figures are worked out again when it posts, so receipts and write-offs made meanwhile are counted."
+                : "The figures are worked out again when it posts, so receipts and write-offs made meanwhile are counted."}
+            </Note>
+          ) : null}
+
+          <div>
+            <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">
+              {branches.show ? "By branch" : "Figures"}
+            </p>
+            <div className="overflow-x-auto rounded-md border border-white-02">
+              <table className="w-full border-collapse">
+                <thead><tr>
+                  {branches.show ? <th className={th}>Branch</th> : null}
+                  <th className={`${th} text-right`}>Required</th>
+                  <th className={`${th} text-right`}>Held now</th>
+                  <th className={`${th} text-right`}>Change</th>
+                </tr></thead>
+                <tbody>
+                  {provision.lines.map((line) => (
+                    <tr key={line.branch_id ?? "none"}>
+                      {branches.show ? <td className={td}>{branches.name(line.branch_id, line.branch_name)}</td> : null}
+                      <td className={`${td} text-right`}><Money kobo={line.required} currency={currency} align="right" /></td>
+                      <td className={`${td} text-right`}><Money kobo={line.current} currency={currency} align="right" /></td>
+                      <td className={`${td} text-right`}><Money kobo={line.movement} currency={currency} align="right" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {bandKeys.length ? (
+            <div>
+              <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">By age</p>
+              <div className="overflow-x-auto rounded-md border border-white-02">
+                <table className="w-full border-collapse">
+                  <thead><tr>
+                    {branches.show ? <th className={th}>Branch</th> : null}
+                    <th className={th}>Band</th>
+                    <th className={`${th} text-right`}>Owed</th>
+                    <th className={`${th} text-right`}>Required</th>
+                  </tr></thead>
+                  <tbody>
+                    {provision.lines.flatMap((line) => bandKeys.filter((k) => line.bands[k]).map((k) => (
+                      <tr key={`${line.branch_id}-${k}`}>
+                        {branches.show ? <td className={td}>{branches.name(line.branch_id, line.branch_name)}</td> : null}
+                        <td className={td}>
+                          {bandLabel(k)}
+                          {(() => {
+                            const band = provision.policy_snapshot.find((b) => String(b.over_days) === k);
+                            return band ? <span className="text-gray-05"> at {bpsToPercent(band.rate_bps)}</span> : null;
+                          })()}
+                        </td>
+                        <td className={`${td} text-right`}><Money kobo={line.bands[k].owed} currency={currency} align="right" /></td>
+                        <td className={`${td} text-right`}><Money kobo={line.bands[k].required} currency={currency} align="right" /></td>
+                      </tr>
+                    )))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          <PostingRecap
+            title={recap.net >= 0 ? "Raising the allowance" : "Releasing the allowance"}
+            dr={recap.dr} cr={recap.cr} currency={currency} stackOnMobile
+            helper={branches.show ? "Posted as one journal per branch; this is their total." : undefined}
+          />
+          {provision.narration ? <DetailField label="Narration"><span className="font-normal">{provision.narration}</span></DetailField> : null}
+        </div>
+      </DetailDrawer>
+      <ConfirmActionModal
+        open={confirming} onOpenChange={(o) => !o && setConfirming(false)}
+        title={gated ? "Submit this provision run for approval?" : "Post this provision run?"}
+        description={gated
+          ? `Sends ${provision.document_number} for approval. Nothing reaches the ledger until it is approved.`
+          : `Posts ${provision.document_number} as one journal per branch, with the figures worked out again today.`}
+        confirmText={gated ? "Submit" : "Post"} loading={submitting || posting} onConfirm={act}
+      />
+      {noApproverDialog}
+    </>
+  );
+}
