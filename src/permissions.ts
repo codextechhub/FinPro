@@ -43,6 +43,11 @@
  *   them; the ones here gate screens only this package renders, and carry the
  *   same numbers the hosts give those keys (600162 publishes a route in both).
  *
+ *   Platform (10): 19 audit, for `platform.audit.view` alone. The hosts number
+ *   their other audit keys under 06, but 100601 is the school app's fees view
+ *   and 101801 the console's field access view, so this key takes a resource
+ *   number neither host uses.
+ *
  * Every code these modules use lives here and nowhere else; the host
  * applications spread this table into their own.
  */
@@ -310,7 +315,7 @@ export const P = {
   PROC_UPDATE_VENDOR_CREDIT_NOTE: "701903",
   PROC_VIEW_VENDOR_CREDIT_NOTES: "701901",
   PROC_VOID_VENDOR_INVOICE: "701014",
-  VIEW_AUDIT: "101801",  // view audit events and entity trails
+  VIEW_AUDIT: "101901",  // view audit events and entity trails
   PUBLISH_WORKFLOW_TEMPLATE: "600162",  // publish an approval route, such as the ready-made petty cash return route
   VIEW_WORKFLOW_TEMPLATES: "600101",  // browse approval workflow templates
   CHANGE_APPROVERS: "600511",  // change who approves a request; delegate for somebody else
@@ -324,7 +329,7 @@ export type PermissionCode = (typeof P)[keyof typeof P];
  *  a screen then gates on nothing. A host merges this into its own registry.
  */
 export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
-  "101801": "platform.audit.view",
+  "101901": "platform.audit.view",
   "600101": "workflow.template.view",
   "600162": "workflow.template.publish",
   "600511": "workflow.approvers.assign",

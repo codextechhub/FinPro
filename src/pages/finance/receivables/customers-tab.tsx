@@ -34,7 +34,7 @@ const STATUS_LABEL: Record<string, string> = { ACTIVE: "Active", OVERDUE: "Overd
 
 function Initials({ name }: { name: string }) {
   const init = name.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join("");
-  return <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-pry-01 font-mont text-[10px] font-semibold text-primary">{init || "—"}</span>;
+  return <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-pry-01 font-mont text-[10px] font-semibold text-primary">{init || "-"}</span>;
 }
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -82,10 +82,10 @@ export function CustomersTab({ entity, currency }: { entity: string; currency?: 
     { header: "Customer", cell: (c) => (
       <span className="inline-flex items-center gap-2"><Initials name={c.name} /><span className="font-medium text-gray-01">{c.name}</span></span>
     ) },
-    { header: "Contact", cell: (c) => <span className="text-gray-05">{c.billing_email || c.billing_phone || "—"}</span> },
+    { header: "Contact", cell: (c) => <span className="text-gray-05">{c.billing_email || c.billing_phone || "-"}</span> },
     { header: "Balance", align: "right", cell: (c) => {
       const bal = c.balance ?? 0;
-      if (bal === 0) return <span className="text-gray-05">—</span>;
+      if (bal === 0) return <span className="text-gray-05">-</span>;
       return bal < 0
         ? <span className="block text-right tabular-nums text-green-01">{formatMoney(-bal, currency)} cr</span>
         : <span className="block text-right tabular-nums">{formatMoney(bal, currency)}</span>;
