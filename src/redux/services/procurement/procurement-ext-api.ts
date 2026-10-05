@@ -243,6 +243,15 @@ export const procurementExtApi = baseApi.injectEndpoints({
       query: ({ id, entity, ...body }) => ({ url: `/procurement/stock-items/${id}/issue/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcStock", "FinanceJournals"],
     }),
+    // Between two branches' stores the receiving branch owes the cost through an
+    // inter-branch transfer, so the inter-branch lists refresh too.
+    transferStock: b.mutation<
+      ApiEnvelope<{ movement: StockMovement; received: StockMovement; inter_branch_transfer_id: number | null; stock_item: StockItemDetail }>,
+      { id: number; entity: string; quantity: number; to_location: string | number; location?: string | number; movement_date?: string; reference?: string; narration?: string }
+    >({
+      query: ({ id, entity, ...body }) => ({ url: `/procurement/stock-items/${id}/transfer/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["ProcStock", "FinanceJournals", "FinanceInterBranch"],
+    }),
     // Adjust posts a real journal (write-up or shrinkage) - refresh finance journals too.
     adjustStock: b.mutation<ApiEnvelope<{ movement: StockMovement; stock_item: StockItemDetail }>, { id: number; entity: string; quantity_delta: number; location?: string | number; movement_date?: string; unit_cost?: number; adjustment_account?: string; reference?: string; narration?: string }>({
       query: ({ id, entity, ...body }) => ({ url: `/procurement/stock-items/${id}/adjust/${qs({ entity })}`, method: "POST", body }),
@@ -376,6 +385,7 @@ export const {
   useCreateStockItemMutation,
   useUpdateStockItemMutation,
   useIssueStockMutation,
+  useTransferStockMutation,
   useAdjustStockMutation,
   useGetStockMovementsQuery,
   useGetProcurementDashboardQuery,

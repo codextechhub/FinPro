@@ -41,7 +41,8 @@ import { EmptyState, ErrorState, ForbiddenState, LoadingState } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers } from "./close-checklist";
+import { checklistDetail, checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers } from "./close-checklist";
+import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
 import {
   useCloseFiscalYearMutation,
@@ -70,7 +71,7 @@ import {
   useCalendarBranch,
   type CalendarBranch,
 } from "./calendar-branch";
-import { useReaderReach } from "../../../host";
+import { useBranches, useReaderReach } from "../../../host";
 import { useDates } from "../../../lib/display-prefs";
 import { isForbidden } from "../../../lib/api-errors";
 
@@ -728,6 +729,8 @@ export function PeriodCloseDrawer({
   onClose: () => void;
 }) {
   const dates = useDates();
+  const { data: branchRows } = useBranches();
+  const branchName = (branchId: number) => branchRows?.find((b) => Number(b.id) === branchId)?.name;
   const { data, isLoading, isError, error, refetch } = useGetPeriodChecklistQuery(
     id ? { id, entity, ...(calendar.readBranch != null ? { branch: calendar.readBranch } : {}) } : skipToken,
   );
@@ -956,7 +959,7 @@ export function PeriodCloseDrawer({
                             <span className="rounded bg-gray-02 px-1.5 py-0.5 font-mont text-[10px] text-gray-05">Non-blocking</span>
                           ) : null}
                         </div>
-                        {item.detail ? <p className="mt-1 break-words font-mont text-xs leading-5 text-gray-05">{item.detail}</p> : null}
+                        {item.detail ? <p className="mt-1 break-words font-mont text-xs leading-5 text-gray-05">{checklistDetail(item, { branchName, money: (kobo) => formatMoney(kobo) })}</p> : null}
                         {severity === "warning" ? (
                           <p className="mt-1 font-mont text-[11px] leading-5 text-amber-700">This does not stop the close. It is here so the figure is seen first.</p>
                         ) : null}

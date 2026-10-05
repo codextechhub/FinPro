@@ -52,6 +52,23 @@ export const EXPENSES_SECTIONS = ["claims", "petty-cash"] as const;
 export type ExpensesSection = (typeof EXPENSES_SECTIONS)[number];
 export const DEFAULT_EXPENSES_SECTION: ExpensesSection = "claims";
 
+/**
+ * Branches dealing with each other: money sent and asked for, who owes whom,
+ * money collected for another branch, shared costs and the rules that split
+ * them. Mounted under `INTER_BRANCH_PATH` beneath the Finance root; the menu
+ * offers it only at a school with more than one branch.
+ */
+export const INTER_BRANCH_PATH = "/finance/inter-branch";
+export const INTER_BRANCH_SECTIONS = [
+  "transfers",
+  "balances",
+  "held-receipts",
+  "recharges",
+  "cost-rules",
+] as const;
+export type InterBranchSection = (typeof INTER_BRANCH_SECTIONS)[number];
+export const DEFAULT_INTER_BRANCH_SECTION: InterBranchSection = "transfers";
+
 export const BUDGETS_SECTIONS = ["budgets", "assets", "tax"] as const;
 export type BudgetsSection = (typeof BUDGETS_SECTIONS)[number];
 export const DEFAULT_BUDGETS_SECTION: BudgetsSection = "budgets";

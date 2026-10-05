@@ -23,6 +23,7 @@ export const FINANCE_TAG_TYPES = [
   "FinanceExpenseClaims",
   "FinanceFeeStructures",
   "FinanceFixedAssets",
+  "FinanceInterBranch",
   "FinanceInvoices",
   "FinanceJournals",
   "FinancePaymentPlans",

@@ -6,6 +6,9 @@
  * with Book/Statement/Unreconciled metric cards, Import statement and
  * Auto-reconcile.
  *
+ * A shared account (one no branch owns) at a school with several branches
+ * offers a whole-school reader "Split by branch" (bank-split-drawer.tsx).
+ *
  * Honest adaptations: the prototype's "Cash books / petty cash" lives on the
  * separate Petty Cash screen; USD-position / cash-on-hand KPIs (FX + petty cash)
  * are dropped. We store statement *lines*, grouped under imported Statements.
@@ -17,7 +20,7 @@ import { showBlobPreview } from "../../components/finance-ui/file-preview-dialog
 import { useActionParam } from "@/hooks/use-action-param";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, Upload, RefreshCw, ListChecks, FileText, History, Settings as SettingsIcon, ArrowLeftRight, ChevronDown, Rows3, FileSpreadsheet, Eye, Pencil, Undo2 } from "lucide-react";
+import { Plus, Search, Trash2, Upload, RefreshCw, ListChecks, FileText, History, Settings as SettingsIcon, ArrowLeftRight, ChevronDown, Rows3, FileSpreadsheet, Eye, Pencil, Undo2, Split } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
 import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, AccessField, useFieldAccess, fieldWriteErrors, RaisingBranchChoiceField, useRaisingBranchChoice, type Column, type TabStripItem, type FieldErrors } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
@@ -58,6 +61,8 @@ import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 import { BankDocumentsSection } from "./bank-documents";
+import { BankSplitDrawer, canSplitAccount } from "./bank-split-drawer";
+import { useInterBranchReader } from "./inter-branch/use-inter-branch";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -207,7 +212,12 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
   const detail = data?.data;
   const access = useFieldAccess(BANK_ACCOUNT, detail ?? account);
   const [reconcile, { isLoading: reconciling }] = useAutoReconcileMutation();
+  const reader = useInterBranchReader();
+  const [splitting, setSplitting] = useState(false);
   if (!account) return null;
+  const offerSplit = canSplitAccount(detail ?? account, {
+    multiBranch: reader.applies, wholeSchool: reader.reach.wholeSchool, canUpdate: can(P.FIN_UPDATE_BANK_ACCOUNT),
+  });
 
   const m = detail?.metrics;
   const doReconcile = async () => {
@@ -228,6 +238,9 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
           <>
             <StatusPill status={account.is_active ? "ACTIVE" : "INACTIVE"} />
             <div className="flex-1" />
+            {offerSplit ? (
+              <Button variant="outline" onClick={() => setSplitting(true)} className="gap-1.5"><Split className="size-4" /> Split by branch</Button>
+            ) : null}
             <Can permission={P.FIN_IMPORT_BANK}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -295,6 +308,16 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
           id={account.id}
           entity={entity}
           onClose={() => setImporting(null)}
+        />
+      ) : null}
+      {splitting ? (
+        <BankSplitDrawer
+          account={detail ?? account}
+          bookBalance={m?.book_balance ?? account.book_balance}
+          entity={entity}
+          currency={currency}
+          reader={reader}
+          onClose={() => setSplitting(false)}
         />
       ) : null}
       {editingStatement !== null ? (
