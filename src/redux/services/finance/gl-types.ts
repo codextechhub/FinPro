@@ -31,7 +31,10 @@ export interface JournalListItem {
 
 export interface JournalSummary {
   total: number;
+  /** Counts per stored status, leaving out journals sent back, as each tab does. */
   by_status: Partial<Record<JournalStatus, number>>;
+  /** The journals an approver sent back; absent from an older server. */
+  sent_back?: number;
   posted_total: { kobo: number; naira: string };
   reversed_total: { kobo: number; naira: string };
 }

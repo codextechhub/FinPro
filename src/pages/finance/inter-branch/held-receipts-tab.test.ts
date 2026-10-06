@@ -88,18 +88,18 @@ describe("a held receipt whose forward was sent back", () => {
 describe("the held receipts filter", () => {
   const forward = (status: string) => ({ ...HELD, forwarded_by: { id: 70, document_number: "IBT-0070", status } });
 
-  it("offers each status the list takes, worded as its rows' pills", () => {
-    expect(HELD_FILTERS.map(([value]) => value)).toEqual(["HELD", "FORWARDING", "FORWARDED", "VOIDED"]);
+  it("offers each status the list takes, worded as its rows' pills, and Sent back", () => {
+    expect(HELD_FILTERS.map(([value]) => value)).toEqual(["HELD", "FORWARDING", "SENT_BACK", "FORWARDED", "VOIDED"]);
     const word = (value: string) => HELD_FILTERS.find(([v]) => v === value)?.[1];
     expect(word("HELD")).toBe(heldStage(HELD).label);
     expect(word("FORWARDED")).toBe(heldStage(forward("POSTED")).label);
     expect(word("VOIDED")).toBe(heldStage({ ...HELD, status: "REVERSED" }).label);
   });
 
-  it("says Forwarding also lists a receipt whose forward was sent back, as its row says Sent back", () => {
-    expect(HELD_FILTERS.find(([v]) => v === "FORWARDING")?.[1]).toBe("Forwarding or sent back");
-    expect(heldStage(forward("PENDING_APPROVAL")).label).toBe("Forwarding");
-    expect(heldStage(forward("DRAFT")).label).toBe("Sent back");
+  it("keeps Forwarding and Sent back apart, as the rows' pills are", () => {
+    const word = (value: string) => HELD_FILTERS.find(([v]) => v === value)?.[1];
+    expect(word("FORWARDING")).toBe(heldStage(forward("PENDING_APPROVAL")).label);
+    expect(word("SENT_BACK")).toBe(heldStage({ ...HELD, forwarded_by: { id: 70, document_number: "IBT-0070", status: "DRAFT", approval_returned: true } }).label);
   });
 });
 
@@ -109,5 +109,27 @@ describe("a held receipt whose forward is approved and not yet sent", () => {
     expect(note).toContain("approved and not yet sent");
     expect(note).toContain("only once that transfer is sent and voided");
     expect(note).not.toContain("with the approver");
+  });
+});
+
+/**
+ * Mrs Okafor forwards Mr Okafor's receipt to Lekki and Mr Adeyemi sends the
+ * forward back. The server marks the forward approval_returned, and the
+ * receipt reads Sent back with the advice to resume or withdraw it. A forward
+ * the server marks not returned reads Forwarding, whatever its status.
+ */
+describe("a forward the server marks sent back", () => {
+  const marked = (status: string, approval_returned: boolean) => ({
+    ...HELD, forwarded_by: { id: 70, document_number: "IBT-0070", status, approval_returned },
+  });
+
+  it("reads Sent back, with the resume-or-withdraw note", () => {
+    expect(heldStage(marked("DRAFT", true))).toEqual({ label: "Sent back", tone: "sentBack" });
+    expect(forwardNote(marked("DRAFT", true))).toContain("resumes it, or withdraws it, under Workflow, My Submissions");
+  });
+
+  it("reads Forwarding when the server says it was not sent back", () => {
+    expect(heldStage(marked("DRAFT", false)).label).toBe("Forwarding");
+    expect(forwardNote(marked("DRAFT", false))).not.toContain("sent back");
   });
 });

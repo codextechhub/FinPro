@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Concession } from "@/redux/services/finance/ar-types";
 
 const mocks = vi.hoisted(() => ({
+  summary: undefined as unknown,
   rows: [] as unknown[],
   held: new Set<string>(),
   update: vi.fn(),
@@ -58,7 +59,7 @@ vi.mock("./document-void-action", () => ({ DocumentVoidAction: () => null }));
 vi.mock("./income-given-back", () => ({ IncomeGivenBack: () => null }));
 vi.mock("@/redux/services/finance/ar-api", () => ({
   useGetConcessionsQuery: () => ({ data: { data: mocks.rows, pagination: { currentPage: 1, totalPages: 1 } }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
-  useGetConcessionSummaryQuery: () => ({ data: undefined }),
+  useGetConcessionSummaryQuery: () => ({ data: mocks.summary }),
   useGetInvoicesQuery: () => ({ data: undefined }),
   useCreateConcessionMutation: mocks.mutation,
   usePostConcessionMutation: mocks.mutation,
@@ -88,7 +89,7 @@ const concession = (id: number, name: string, status: string): Concession => ({
 
 let container: HTMLDivElement;
 let root: Root;
-beforeEach(() => { mocks.held = new Set(); mocks.update.mockReset(); container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container); });
+beforeEach(() => { mocks.summary = undefined; mocks.held = new Set(); mocks.update.mockReset(); container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); });
 
 describe("concession states", () => {
@@ -186,5 +187,17 @@ describe("correcting a concession", () => {
     mocks.held = new Set([P.FIN_CREATE_CONCESSION]);
     act(() => root.render(<ConcessionDetailDrawer concession={concession(1, "Tunde Bakare", "POSTED")} entity="BSS" currency="NGN" onClose={vi.fn()} />));
     expect(button("Edit")).toBeUndefined();
+  });
+});
+
+describe("the concession totals", () => {
+  it("show what was sent back apart from the drafts", () => {
+    mocks.rows = [];
+    mocks.summary = { data: { posted_ytd: 0, draft_pending: 2_000_000, sent_back: 5_000_000, active_count: 3 } };
+    act(() => root.render(<MemoryRouter><ConcessionsTab entity="BSS" currency="NGN" /></MemoryRouter>));
+    const tiles = [...container.querySelectorAll("p")].map((p) => p.textContent ?? "");
+    const after = (label: string) => tiles[tiles.indexOf(label) + 1];
+    expect(after("Draft (pending)")).toContain("20,000");
+    expect(after("Sent back")).toContain("50,000");
   });
 });

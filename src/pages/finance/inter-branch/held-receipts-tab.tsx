@@ -47,7 +47,7 @@ import { useDates } from "../../../lib/display-prefs";
 import { transferLink } from "./links";
 import { BranchSelect, Fact, Note, TonePill } from "./parts";
 import type { InterBranchReader } from "./use-inter-branch";
-import { SENT_BACK_WORD } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 
 const METHODS = [
   ["BANK_TRANSFER", "Bank transfer"], ["CASH", "Cash"], ["CARD", "Card"],
@@ -64,12 +64,14 @@ export function heldActions(h: HeldReceipt, { canForward, canVoid, covers }: {
 }
 
 /**
- * Whether a held receipt's forward is back with whoever sent it. A forward
- * returned by its approver is a DRAFT again with its request open (a forward
- * whose approval ended is dropped, so `forwarded_by` names only a live one).
+ * Whether a held receipt's forward is back with whoever sent it, as the
+ * server's `forwarded_by.approval_returned` says. A server from before it is
+ * read by the forward's status: one returned by its approver is a DRAFT again
+ * (a forward whose approval ended is dropped, so `forwarded_by` names only a
+ * live one).
  */
 export function forwardSentBack(h: Pick<HeldReceipt, "forwarded_by">): boolean {
-  const f = h.forwarded_by as (HeldReceipt["forwarded_by"] & { approval_returned?: boolean }) | null;
+  const f = h.forwarded_by;
   if (!f) return false;
   return f.approval_returned ?? f.status === "DRAFT";
 }
@@ -112,13 +114,14 @@ export function forwardNote(h: Pick<HeldReceipt, "forwarded_by">): string | null
 
 /**
  * The held receipts filter: each status the list takes, worded as its rows'
- * pills ({@link heldStage}). The server lists a receipt whose forward was sent
- * back under Forwarding, since its forward is still live, so that option says
- * so: its row wears Sent back.
+ * pills ({@link heldStage}), and Sent back, which asks the list for
+ * `?approval=returned`: the receipts whose forward an approver sent back.
+ * Forwarding leaves those out, as their rows read Sent back.
  */
 export const HELD_FILTERS: readonly (readonly [string, string])[] = [
   ["HELD", "Held"],
-  ["FORWARDING", `Forwarding or ${SENT_BACK_WORD.toLowerCase()}`],
+  ["FORWARDING", "Forwarding"],
+  [SENT_BACK_FILTER, SENT_BACK_WORD],
   ["FORWARDED", "Forwarded"],
   ["VOIDED", "Voided"],
 ];
@@ -136,7 +139,7 @@ export function HeldReceiptsTab({ entity, currency, reader }: { entity: string; 
   const [open, setOpen] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   useSourceDocumentParam(setOpen);
-  const { data, isLoading, isFetching, isError, refetch } = useGetHeldReceiptsQuery({ entity, status: status || undefined, page, page_size: 25 });
+  const { data, isLoading, isFetching, isError, refetch } = useGetHeldReceiptsQuery({ entity, ...statusFilterArgs(status), page, page_size: 25 });
   const rows = toArray(data?.data);
 
   const columns: Column<HeldReceipt>[] = [

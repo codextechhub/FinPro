@@ -205,11 +205,12 @@ export default function RequisitionsPage() {
           </div>
         </header>
 
-        <div data-guide="procurement-requisitions.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div data-guide="procurement-requisitions.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {summaryLoading || !summary ? <div className={cn(INFORMATION_CARD_SURFACE, "col-span-full rounded-md")}><LoadingState rows={2} /></div> : <>
             <StatCard label="Pending Approval" value={summary.pending_approval.count} icon={Clock3} tone="amber" sub={money(summary.pending_approval.amount)} />
             <StatCard label="Approved (MTD)" value={summary.approved_mtd.count} icon={Check} tone="green" sub={countChange(summary.approved_mtd.change)} />
             <StatCard label="Draft" value={summary.draft.count} icon={FilePenLine} tone="gray" sub={money(summary.draft.amount)} />
+            <StatCard label={SENT_BACK_WORD} value={summary.sent_back?.count ?? 0} icon={RotateCcw} tone="indigo" sub={money(summary.sent_back?.amount ?? 0)} />
             <StatCard label="Total Value (MTD)" value={money(summary.total_value_mtd.amount)} icon={FileText} sub={change(summary.total_value_mtd.change_pct)} />
           </>}
         </div>

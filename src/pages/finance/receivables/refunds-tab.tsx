@@ -153,7 +153,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
 
   return (
     <>
-      <div className={cn("mb-5 grid grid-cols-1 gap-4", bothKinds ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+      <div className={cn("mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2", bothKinds ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
         {data?.kpis.refundable_credit !== null && (
           <Stat label="Refundable credit" hint="Total customer credit available to refund." value={formatMoney(data?.kpis.refundable_credit ?? 0, currency)} />
         )}
@@ -161,6 +161,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
           <Stat label="Written off (YTD)" value={formatMoney(data?.kpis.written_off_ytd ?? 0, currency)} />
         )}
         <Stat label={DOCUMENT_STATUS_WORDS.PENDING_APPROVAL} value={String(data?.kpis.pending ?? 0)} />
+        <Stat label={SENT_BACK_WORD} value={String(data?.kpis.sent_back ?? 0)} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

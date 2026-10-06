@@ -193,6 +193,8 @@ export interface RequisitionSummary {
   approved_mtd: { count: number; amount: number; change: number };
   draft: { count: number; amount: number };
   total_value_mtd: { amount: number; change_pct: number | null };
+  /** The documents an approver sent back, which no other count includes; absent from an older server. */
+  sent_back?: { count: number; amount: number };
 }
 
 export interface RequisitionBudgetAvailability {
@@ -298,6 +300,8 @@ export interface PurchaseOrderSummary {
   partially_received: { count: number };
   awaiting_receipt: { count: number };
   po_value_mtd: { amount: number; change_pct: number | null };
+  /** The documents an approver sent back, which no other count includes; absent from an older server. */
+  sent_back?: { count: number };
 }
 
 export interface GRNLine {
@@ -458,6 +462,8 @@ export interface VendorInvoiceSummary {
   approved: { count: number };
   overdue: { count: number; amount: number };
   disputed: { count: number };
+  /** The documents an approver sent back, which no other count includes; absent from an older server. */
+  sent_back?: { count: number };
 }
 
 export interface VendorInvoiceReferenceMatch {

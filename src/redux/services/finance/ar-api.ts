@@ -208,7 +208,7 @@ export const arApi = baseApi.injectEndpoints({
       {
         pagination: Pagination;
         /** A KPI drawn from a kind the reader may not see is `null`. */
-        kpis: { written_off_ytd: number | null; pending: number; refundable_credit: number | null };
+        kpis: { written_off_ytd: number | null; pending: number; sent_back?: number; refundable_credit: number | null };
         /** The row kinds this reader receives: refunds need the refund key, write-offs theirs. */
         kinds: ("REFUND" | "WRITEOFF")[];
         data: ArAdjustment[];
@@ -239,7 +239,7 @@ export const arApi = baseApi.injectEndpoints({
       query: (params) => ({ url: `/finance/concessions/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceConcessions"],
     }),
-    getConcessionSummary: builder.query<ApiEnvelope<{ posted_ytd: number; draft_pending: number; active_count: number }>, { entity: string }>({
+    getConcessionSummary: builder.query<ApiEnvelope<{ posted_ytd: number; draft_pending: number; sent_back?: number; active_count: number }>, { entity: string }>({
       query: (params) => ({ url: `/finance/concessions/summary/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceConcessions"],
     }),

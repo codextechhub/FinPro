@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import {
   Ban, CheckCircle2, ChevronRight, Clock3, FilePenLine, FileText, Info, Mail, PackageCheck,
-  Plus, Printer, ReceiptText, Search, Send, ShoppingCart,
+  Plus, Printer, ReceiptText, RotateCcw, Search, Send, ShoppingCart,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -47,7 +47,7 @@ import { useCancelPurchaseOrderMutation } from "@/redux/services/procurement/pay
 import { SOURCE_DOCUMENT_ID_PARAM } from "@/lib/source-document-route";
 import { PURCHASE_ORDER_TABS, purchaseOrderPill } from "./document-status";
 import { purchaseOrderChanges, purchaseOrderForm } from "./purchase-order-edit";
-import { WITH_APPROVERS_NOTE, statusFilterArgs } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_WORD, WITH_APPROVERS_NOTE, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 
 const STATUS_TABS = PURCHASE_ORDER_TABS;
@@ -155,11 +155,12 @@ export default function PurchaseOrdersPage() {
           </div>
         </header>
 
-        <div data-guide="procurement-purchase-orders.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div data-guide="procurement-purchase-orders.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {summaryLoading || !summary ? <div className={cn(INFORMATION_CARD_SURFACE, "col-span-full rounded-md")}><LoadingState rows={2} /></div> : <>
             <StatCard label="Open POs" value={summary.open.count} sub={money(summary.open.amount)} icon={ShoppingCart} />
             <StatCard label="Partially Received" value={summary.partially_received.count} sub={summary.partially_received.count ? "Receipt work in progress" : "No partial receipts"} icon={PackageCheck} tone="amber" />
             <StatCard label="Awaiting Receipt" value={summary.awaiting_receipt.count} sub={summary.awaiting_receipt.count ? "No accepted quantity yet" : "All open orders have receipts"} icon={Clock3} tone="gray" />
+            <StatCard label={SENT_BACK_WORD} value={summary.sent_back?.count ?? 0} sub={summary.sent_back?.count ? "Back with whoever sent them" : "None sent back"} icon={RotateCcw} tone="indigo" />
             <StatCard label="PO Value (MTD)" value={money(summary.po_value_mtd.amount)} sub={summary.po_value_mtd.change_pct == null ? "No prior MTD comparison" : `${summary.po_value_mtd.change_pct >= 0 ? "+" : ""}${summary.po_value_mtd.change_pct}% vs prior MTD`} icon={FileText} tone="green" />
           </>}
         </div>

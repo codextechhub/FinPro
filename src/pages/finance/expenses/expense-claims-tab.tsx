@@ -127,7 +127,7 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
   const resetPage = () => setPage(1);
 
   const summaryQ = useGetExpenseClaimSummaryQuery({ entity });
-  const kpis = summaryQ.data?.data ?? { open: 0, month_total: 0, avg: 0, awaiting: 0 };
+  const kpis = summaryQ.data?.data ?? { open: 0, month_total: 0, avg: 0, awaiting: 0, sent_back: 0 };
 
   const columns: Column<ExpenseClaim>[] = [
     { header: "Claim no.", cell: (c) => <span className="font-semibold tabular-nums">{c.document_number}</span> },
@@ -140,11 +140,12 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
 
   return (
     <div className="space-y-4" data-guide="finance-expense-claims.workbench">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-guide="finance-expense-claims.summary">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" data-guide="finance-expense-claims.summary">
         <Kpi label="Open claims" value={String(kpis.open)} hint="Draft or awaiting payment" />
         <Kpi label="Submitted this month" value={formatMoney(kpis.month_total, currency)} />
         <Kpi label="Average claim" value={formatMoney(kpis.avg, currency)} />
         <Kpi label="Awaiting payment" value={formatMoney(kpis.awaiting, currency)} hint="Approved, not yet reimbursed" />
+        <Kpi label={SENT_BACK_WORD} value={String(kpis.sent_back ?? 0)} hint="Back with whoever sent them" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3" data-guide="finance-expense-claims.controls">

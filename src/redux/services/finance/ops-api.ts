@@ -192,7 +192,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/expense-claims/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceExpenseClaims"],
     }),
-    getExpenseClaimSummary: b.query<ApiEnvelope<{ open: number; month_total: number; avg: number; awaiting: number }>, { entity: string }>({
+    getExpenseClaimSummary: b.query<ApiEnvelope<{ open: number; month_total: number; avg: number; awaiting: number; sent_back?: number }>, { entity: string }>({
       query: (p) => ({ url: `/finance/expense-claims/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceExpenseClaims"],
     }),

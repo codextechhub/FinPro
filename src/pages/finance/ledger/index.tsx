@@ -98,8 +98,8 @@ export default function GeneralLedgerPage() {
       value: t.key,
       label: <>{t.label} <span className="ml-1 opacity-70">{count(t.key)}</span></>,
     })),
-    // Sent back is not a status, so the summary has no count for it.
-    { value: SENT_BACK_FILTER, label: SENT_BACK_WORD },
+    // Sent back is counted apart: no status count includes a journal sent back.
+    { value: SENT_BACK_FILTER, label: <>{SENT_BACK_WORD} <span className="ml-1 opacity-70">{summary?.sent_back ?? 0}</span></> },
   ];
 
   const columns: Column<JournalListItem>[] = [

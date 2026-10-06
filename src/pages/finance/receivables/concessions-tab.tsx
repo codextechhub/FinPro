@@ -121,9 +121,10 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
 
   return (
     <>
-      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Posted (YTD)" value={formatMoney(summary?.posted_ytd ?? 0, currency)} />
         <Stat label="Draft (pending)" value={formatMoney(summary?.draft_pending ?? 0, currency)} />
+        <Stat label={SENT_BACK_WORD} value={formatMoney(summary?.sent_back ?? 0, currency)} />
         <Stat label="Active concessions" value={String(summary?.active_count ?? 0)} />
       </div>
 

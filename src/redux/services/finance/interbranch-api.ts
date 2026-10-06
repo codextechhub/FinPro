@@ -85,7 +85,7 @@ export const interBranchApi = baseApi.injectEndpoints({
       providesTags: ["FinanceInterBranch"],
     }),
 
-    getHeldReceipts: b.query<PaginatedEnvelope<HeldReceipt>, { entity: string; status?: string; page?: number; page_size?: number }>({
+    getHeldReceipts: b.query<PaginatedEnvelope<HeldReceipt>, { entity: string; status?: string; approval?: "returned"; page?: number; page_size?: number }>({
       query: (p) => ({ url: `/finance/held-receipts/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceInterBranch"],
     }),

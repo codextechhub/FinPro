@@ -257,7 +257,11 @@ export interface HeldReceipt {
   narration: string;
   journal_id: number | null;
   /** The live transfer forwarding it, if any. */
-  forwarded_by: { id: number; document_number: string; status: string } | null;
+  forwarded_by: {
+    id: number; document_number: string; status: string;
+    /** True while an approver has sent the forward back to whoever sent it; absent from an older server. */
+    approval_returned?: boolean;
+  } | null;
 }
 
 export interface RecordHeldReceiptBody {

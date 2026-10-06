@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => {
     rows: [] as unknown[],
     listArgs: undefined as unknown,
     exported: undefined as unknown,
+    summary: undefined as unknown,
     workflow: undefined as unknown,
     update: (() => undefined) as (body: unknown) => void,
     resume: (() => undefined) as (id: unknown) => void,
@@ -81,6 +82,7 @@ vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverProm
 vi.mock("sonner", () => ({ toast: { success: () => undefined, error: () => undefined } }));
 vi.mock("@/redux/services/procurement/procurement-api", () => mocks.api({
   useGetRequisitionQuery: () => ({ ...mocks.query(), data: { data: mocks.state.doc } }),
+  useGetRequisitionSummaryQuery: () => ({ ...mocks.query(), data: mocks.state.summary }),
   useGetRequisitionsQuery: (args: unknown) => { mocks.state.listArgs = args; return { ...mocks.query(), currentData: { data: mocks.state.rows, pagination: { currentPage: 1, totalPages: 1 } } }; },
   useUpdateRequisitionMutation: mocks.mutation((body) => mocks.state.update(body)),
 }));
@@ -212,5 +214,28 @@ describe("the requisitions Sent back tab", () => {
     expect(mocks.state.exported).toEqual({ approval: "returned", search: "" });
     act(() => tab("Pending Approval").click());
     expect(mocks.state.exported).toEqual({ status: "PENDING_APPROVAL", search: "" });
+  });
+});
+
+/**
+ * Bright Star has one requisition with its approver and two sent back to
+ * Mrs Bello. The Pending Approval tile counts the one, as its tab lists it,
+ * and the Sent back tile counts the two.
+ */
+describe("the requisition tiles", () => {
+  it("count what was sent back apart from what waits on an approver", () => {
+    mocks.state.held = new Set([P.PROC_VIEW_REQUISITIONS]);
+    mocks.state.rows = [];
+    mocks.state.summary = { data: {
+      as_of: "2026-10-06", pending_approval: { count: 1, amount: 100_000 }, approved_mtd: { count: 0, amount: 0, change: 0 },
+      draft: { count: 0, amount: 0 }, total_value_mtd: { amount: 0, change_pct: null }, sent_back: { count: 2, amount: 900_000 },
+    } };
+    act(() => root.render(<MemoryRouter><RequisitionsPage /></MemoryRouter>));
+    const tile = (label: string) => [...container.querySelectorAll('[data-guide="procurement-requisitions.summary"] p')]
+      .find((p) => p.textContent === label)?.parentElement?.textContent ?? "";
+    expect(tile("Pending Approval")).toContain("1");
+    expect(tile("Sent back")).toContain("2");
+    expect(tile("Sent back")).toContain("9,000");
+    mocks.state.summary = undefined;
   });
 });

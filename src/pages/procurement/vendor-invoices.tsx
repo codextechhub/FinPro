@@ -63,7 +63,7 @@ import { useDates } from "../../lib/display-prefs";
 import { useVoidVendorInvoiceMutation } from "@/redux/services/procurement/payables-corrections-api";
 import { BillCreditNotes, CreditNoteForm, CreditNotesView } from "./vendor-credit-notes";
 import { VENDOR_INVOICE_TABS, approvalStateWord, vendorInvoiceWord } from "./document-status";
-import { WITH_APPROVERS_NOTE, isSentBack, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_WORD, WITH_APPROVERS_NOTE, isSentBack, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 import { vendorInvoiceChanges } from "./vendor-invoice-edit";
 import { OpeningBillsDrawer } from "./opening-bills-drawer";
@@ -162,9 +162,10 @@ function BillsView({ entity, currency, switcher }: { entity: string; currency?: 
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
       <header data-guide="procurement-vendor-invoices.heading" className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-1.5"><h1 className="font-mont text-lg font-semibold text-gray-01">Vendor Invoices</h1><InfoHint ariaLabel="About vendor invoices">Supplier bills remain drafts until matched, approved, and posted to Accounts Payable.</InfoHint></div><p className="mt-0.5 font-mont text-xs text-gray-05">Review three-way matches, approval, settlement, and overdue exposure.</p></div><div className="flex flex-wrap items-center gap-2">{switcher}<Can permission={P.PROC_IMPORT_OPENING_VENDOR_INVOICES}><Button variant="outline" onClick={() => setImporting(true)}><Upload className="size-4" /> Opening bills</Button></Can><QuickExportButton screen="procurement.vendor_invoices" params={{ ...statusFilterArgs(status, "display_status"), search: debouncedSearch }} entity={entity} typeface="geist" defaultName="Vendor invoices" /><Can permission={P.PROC_CREATE_VENDOR_INVOICE}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> Record Invoice</Button></Can></div></header>
-      <div data-guide="procurement-vendor-invoices.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-guide="procurement-vendor-invoices.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {summaryLoading || !summary ? <div className={cn(INFORMATION_CARD_SURFACE, "col-span-full rounded-md")}><LoadingState rows={2} /></div> : <>
           <StatCard label="Under Review" value={summary.under_review.count} icon={Clock3} tone="amber" />
+          <StatCard label={SENT_BACK_WORD} value={summary.sent_back?.count ?? 0} icon={RotateCcw} tone="indigo" />
           <StatCard label="Approved" value={summary.approved.count} icon={Check} tone="green" />
           <StatCard label="Overdue" value={summary.overdue.count} sub={money(summary.overdue.amount)} icon={AlertTriangle} tone="red" />
           <StatCard label="Disputed" value={summary.disputed.count} icon={AlertTriangle} tone="red" />

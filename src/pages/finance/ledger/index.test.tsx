@@ -8,7 +8,9 @@
  *      outline and its "No longer on the staff" title.
  *   3. A link from another screen (`?document=501`, an inter-branch transfer's
  *      journal) opens that journal.
- *   4. The export asks for what the list asks for: the Sent back tab exports
+ *   4. Each tab's count is the server's count for it: Drafts leaves out the
+ *      journals sent back, which the Sent back tab counts.
+ *   5. The export asks for what the list asks for: the Sent back tab exports
  *      the journals sent back (approval=returned), and Drafts the drafts.
  */
 
@@ -17,7 +19,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ journals: vi.fn(), summary: vi.fn(), exported: vi.fn(), rows: [] as unknown[], opened: [] as (number | null)[] }));
+const mocks = vi.hoisted(() => ({ journals: vi.fn(), summary: vi.fn(), exported: vi.fn(), rows: [] as unknown[], summaryData: undefined as unknown, opened: [] as (number | null)[] }));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
@@ -49,7 +51,7 @@ vi.mock("@/redux/services/finance/gl-api", () => ({
   },
   useGetJournalSummaryQuery: (args: unknown) => {
     mocks.summary(args);
-    return { data: undefined };
+    return { data: mocks.summaryData };
   },
 }));
 vi.mock("./direct-entry-drawer", () => ({ DirectEntryDrawer: () => null }));
@@ -73,6 +75,7 @@ beforeEach(() => {
   mocks.journals.mockReset();
   mocks.summary.mockReset();
   mocks.rows = [];
+  mocks.summaryData = undefined;
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -133,5 +136,18 @@ describe("the journal export", () => {
     act(() => tab("Drafts").click());
     expect(mocks.exported.mock.lastCall?.[0]).toMatchObject({ status: "DRAFT" });
     expect(mocks.exported.mock.lastCall?.[0]).not.toHaveProperty("approval");
+  });
+});
+
+describe("the tab counts", () => {
+  it("count drafts apart from the journals sent back", () => {
+    mocks.summaryData = { data: {
+      total: 9, by_status: { DRAFT: 3, POSTED: 4 }, sent_back: 2,
+      posted_total: { kobo: 0, naira: "0.00" }, reversed_total: { kobo: 0, naira: "0.00" },
+    } };
+    mount();
+    const tabs = [...container.querySelectorAll("button")].map((b) => b.textContent?.replace(/\s+/g, " ").trim() ?? "");
+    expect(tabs).toContain("Drafts 3");
+    expect(tabs).toContain("Sent back 2");
   });
 });
