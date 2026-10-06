@@ -4,7 +4,7 @@
  * (`views_settings.FinanceCalendarSettingsView` and `views_records`).
  */
 
-import type { FinanceAuditLog, SettingConsumer } from "./setup-types";
+import type { ChoiceOption, FinanceAuditLog, SettingConsumer } from "./setup-types";
 
 /** Money as the records endpoints send it: kobo beside the server's naira text. */
 export interface RecordsMoney {
@@ -22,6 +22,7 @@ export type NextYearMode = "AUTO_OPEN" | "WARN_ONLY";
 export interface FinanceCalendarSettingsValues {
   next_year_mode: NextYearMode;
   next_year_mode_label: string;
+  next_year_mode_options: ChoiceOption<NextYearMode>[];
   next_year_lead_days: number;
   /**
    * Months close in date order (on by default): a month closes once every

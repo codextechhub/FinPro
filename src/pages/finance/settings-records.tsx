@@ -56,18 +56,15 @@ import { P } from "../../permissions";
 export const LEAD_DAYS_MIN = 7;
 export const LEAD_DAYS_MAX = 180;
 
-const MODES: { value: NextYearMode; label: string; description: string }[] = [
-  {
-    value: "AUTO_OPEN",
-    label: "Open the next year automatically",
-    description: "The next fiscal year opens by itself, starting the day after the last one ends, with the same months.",
-  },
-  {
-    value: "WARN_ONLY",
-    label: "Warn only",
-    description: "Nothing opens by itself. Whoever may open a fiscal year for the whole school is warned in the app and by email, weekly and then daily in the last week.",
-  },
-];
+/**
+ * What each next-year mode does, written beside the option. The option's name
+ * comes from the server (`next_year_mode_options`) so the form, the history line
+ * and every refusal use the same words.
+ */
+const MODE_DESCRIPTION: Record<NextYearMode, string> = {
+  AUTO_OPEN: "The next fiscal year opens by itself, starting the day after the last one ends, with the same months.",
+  WARN_ONLY: "Nothing opens by itself. Whoever may open a fiscal year for the whole school is warned in the app and by email, weekly and then daily in the last week.",
+};
 
 /** Whether `text` is a whole number of days the server accepts as a lead. */
 export function validLeadDays(text: string): boolean {
@@ -127,7 +124,7 @@ function CalendarRuleForm({ entityCode, payload }: { entityCode: string; payload
       <SettingsPanel title="Opening the next year" description="What happens as the last fiscal year comes to its end. After that day nothing can post until a new year is open.">
         <fieldset className="space-y-2 px-4 py-4 sm:px-5" disabled={!canUpdate}>
           <legend className="sr-only">When the calendar nears its end</legend>
-          {MODES.map((option) => (
+          {values.next_year_mode_options.map((option) => (
             <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-md border border-white-02 bg-white p-3 has-[:checked]:border-primary has-[:disabled]:cursor-default">
               <input
                 type="radio"
@@ -141,7 +138,7 @@ function CalendarRuleForm({ entityCode, payload }: { entityCode: string; payload
                 <span className="block font-mont text-sm font-medium text-gray-01">
                   {option.label}{option.value === "AUTO_OPEN" ? <span className="ml-1.5 font-normal text-gray-05">(default)</span> : null}
                 </span>
-                <span className="mt-0.5 block font-mont text-xs leading-5 text-gray-05">{option.description}</span>
+                <span className="mt-0.5 block font-mont text-xs leading-5 text-gray-05">{MODE_DESCRIPTION[option.value]}</span>
               </span>
             </label>
           ))}

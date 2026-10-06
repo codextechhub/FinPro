@@ -32,6 +32,7 @@ import { fiscalRunwayNotice } from "./fiscal-runway-model";
 import { InfoHint, TabStrip, useActiveEntity, type TabStripItem } from "@/components/finance-ui";
 import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/states";
 import { useCan } from "@/components/finance-ui/can";
+import { periodLabelFrom } from "@/components/finance-ui/period-labels";
 import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import { cn } from "@/lib/utils";
@@ -210,7 +211,7 @@ export default function FinanceDashboard() {
                 className="h-8 rounded-md border border-white-02 bg-white px-2 font-mont text-xs font-medium text-gray-01">
                 <option value="">Today</option>
                 {periods.map((p) => (
-                  <option key={p.id} value={`${p.fiscal_year}:${p.period_no}`}>End of {p.name}</option>
+                  <option key={p.id} value={`${p.fiscal_year}:${p.period_no}`}>End of {p.label}</option>
                 ))}
               </select>
             )}
@@ -307,7 +308,7 @@ export default function FinanceDashboard() {
             )}
 
             {(d.close_progress || d.fiscal_runway?.calendar_end) && (
-              <YearCloseStrip runway={d.fiscal_runway} close={d.close_progress} fiscalYear={d.fiscal_year} />
+              <YearCloseStrip runway={d.fiscal_runway} close={d.close_progress} fiscalYear={d.fiscal_year} closePeriodLabel={d.close_progress ? periodLabelFrom(periods, d.close_progress.period) : undefined} />
             )}
           </div>
         )}

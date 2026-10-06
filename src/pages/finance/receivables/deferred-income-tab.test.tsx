@@ -48,7 +48,7 @@ import { DeferredIncomeTab, undoableMonths } from "./deferred-income-tab";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const row = (over: Partial<DeferredIncomeReleaseRow>): DeferredIncomeReleaseRow => ({
-  id: 1, branch_id: 1, branch_name: "Ikeja", date: "2026-09-30", month: "2026-09", period_id: 9, period_name: "September 2026",
+  id: 1, branch_id: 1, branch_name: "Ikeja", date: "2026-09-30", month: "2026-09", period_id: 9, period_name: "2026-09", period_label: "September 2026",
   period_status: "OPEN", branch_period_status: "OPEN", amount: 1_000_000, journal_id: 400, journal_number: "JE-0400",
   reversed: false, reversed_at: null, can_reverse: true, reverse_blocked_reason: null, ...over,
 });
@@ -56,10 +56,10 @@ const ROWS = [
   row({}),
   row({ id: 2, branch_id: 2, branch_name: "Lekki", amount: 500_000, journal_id: 401, journal_number: "JE-0401" }),
   row({
-    id: 3, date: "2026-08-31", month: "2026-08", period_id: 8, period_name: "August 2026", period_status: "CLOSED",
+    id: 3, date: "2026-08-31", month: "2026-08", period_id: 8, period_name: "2026-08", period_label: "August 2026", period_status: "CLOSED",
     branch_period_status: "CLOSED", can_reverse: false, reverse_blocked_reason: "August 2026 is closed; its releases are sealed with it.",
   }),
-  row({ id: 4, date: "2026-07-31", month: "2026-07", period_id: 7, period_name: "July 2026", reversed: true, can_reverse: false }),
+  row({ id: 4, date: "2026-07-31", month: "2026-07", period_id: 7, period_name: "2026-07", period_label: "July 2026", reversed: true, can_reverse: false }),
 ];
 
 const SHARED_REASON = "Lekki has closed September 2026, and the undo reverses every branch's release of the month together.";
@@ -118,6 +118,13 @@ describe("the deferred income tab", () => {
     expect(mocks.releases).toHaveBeenCalledWith({ entity: "BSS", reversed: "false", page_size: 100 });
     const options = Array.from(document.body.querySelectorAll('select[aria-label="Month"] option')).map((o) => o.textContent);
     expect(options).toEqual(["Select a month", "September 2026: ₦15,000.00 in 2 journals"]);
+    expect(options.join(" ")).not.toContain("2026-09");
+  });
+
+  it("names a release's month in words in the list, never by its stored name", () => {
+    act(() => root.render(<MemoryRouter><DeferredIncomeTab entity="BSS" currency="NGN" /></MemoryRouter>));
+    expect(container.textContent).toContain("September 2026");
+    expect(container.textContent).not.toContain("2026-09");
   });
 
   it("greys out a month one branch has closed, gives the server's reason, and says it under the rows", async () => {

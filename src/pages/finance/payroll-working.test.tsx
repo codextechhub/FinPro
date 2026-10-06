@@ -39,7 +39,7 @@ describe("how PAYE was worked out", () => {
 
   it("says where a supplied figure came from, with no table working", () => {
     act(() => root.render(<PayeWorkingView line={{ paye_source: "SUPPLIED", paye_amount: 2_000_000, tax_basis: {} }} />));
-    expect(document.body.textContent).toContain("Supplied by the school");
+    expect(document.body.textContent).toContain("Taken from the salary structure or roster");
     expect(document.body.textContent).toContain("No table working is kept");
   });
 

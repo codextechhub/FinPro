@@ -24,7 +24,7 @@ vi.mock("../../../host", async (importOriginal) => ({
   hostBranchLens: undefined,
 }));
 
-import { PlanTable } from "./payer-payments-tab";
+import { PlanTable, splitLabelFrom } from "./payer-payments-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -67,5 +67,19 @@ describe("payer payment preview", () => {
   it("says what is left as credit", () => {
     const text = render([{ ...ADA, amount: 450_000_00, credit: 50_000_00 }], [{ id: 1, name: "Ikeja" }]);
     expect(text).toContain("left as credit");
+  });
+});
+
+describe("how a split reads", () => {
+  const options = [{ value: "OLDEST_FIRST", label: "Oldest bill first, across every customer" }];
+
+  it("uses the server's label when the settings can be read", () => {
+    expect(splitLabelFrom(options, "OLDEST_FIRST")).toBe("Oldest bill first, across every customer");
+  });
+
+  it("falls back to its own words when they cannot, and to the code for a split it does not know", () => {
+    expect(splitLabelFrom(undefined, "OLDEST_FIRST")).toBe("Oldest bill first");
+    expect(splitLabelFrom(options, "EXPLICIT")).toBe("Amounts entered by hand");
+    expect(splitLabelFrom(options, "NEW_WAY")).toBe("NEW_WAY");
   });
 });

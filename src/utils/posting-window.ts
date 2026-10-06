@@ -143,7 +143,7 @@ export function blockedReason(
   if (!date || isWithinRanges(date, ranges)) return null;
 
   const period = blocked.find((p) => date >= p.start_date && date <= p.end_date);
-  if (period) return `${period.name} is ${statusWord(period.status)}.`;
+  if (period) return `${period.label} is ${statusWord(period.status)}.`;
   return "No fiscal period covers this date.";
 }
 
@@ -186,7 +186,7 @@ export function openWindowLabel(periods: PeriodBrief[]): string | null {
   }
 
   return runs
-    .map((run) => (run.length === 1 ? run[0].name : `${run[0].name} – ${run[run.length - 1].name}`))
+    .map((run) => (run.length === 1 ? run[0].label : `${run[0].label} – ${run[run.length - 1].label}`))
     .join(", ");
 }
 

@@ -10,7 +10,7 @@
  */
 
 import type { PayrollRun } from "./ops-types";
-import type { FinanceAuditLog, SettingConsumer } from "./setup-types";
+import type { ChoiceOption, FinanceAuditLog, SettingConsumer } from "./setup-types";
 
 /** Where a person's PAYE figure on a line came from. */
 export type PayeSource = "COMPUTED" | "OVERRIDE" | "SUPPLIED" | "MANUAL";
@@ -367,6 +367,7 @@ export interface AnnualPayeReturn {
 export interface FinancePayrollSettingsValues {
   paye_method: PayeMethod;
   paye_method_label: string;
+  paye_method_options: ChoiceOption<PayeMethod>[];
   tax_country: string;
   employee_pension_enabled: boolean;
   employee_pension_rate_bps: number;
@@ -394,7 +395,7 @@ export interface FinancePayrollSettingsPayload {
 }
 
 /** A partial payroll settings write. */
-export type FinancePayrollSettingsBody = Partial<Omit<FinancePayrollSettingsValues, "paye_method_label" | "updated_at" | "updated_by">>;
+export type FinancePayrollSettingsBody = Partial<Omit<FinancePayrollSettingsValues, "paye_method_label" | "paye_method_options" | "updated_at" | "updated_by">>;
 
 /** The statutory details a salary record's create and edit accept. A state or
  *  PFA is named by id or code; `null` or "" clears it. */

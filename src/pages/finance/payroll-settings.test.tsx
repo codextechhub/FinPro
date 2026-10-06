@@ -53,6 +53,10 @@ import type { FinancePayrollSettingsValues } from "@/redux/services/finance/payr
 
 const SAVED: FinancePayrollSettingsValues = {
   paye_method: "COMPUTED", paye_method_label: "Computed from the national tax table", tax_country: "NG",
+  paye_method_options: [
+    { value: "COMPUTED", label: "Computed from the national tax table" },
+    { value: "SUPPLIED", label: "Taken from the salary structure or roster" },
+  ],
   employee_pension_enabled: true, employee_pension_rate_bps: 800, employer_pension_enabled: true, employer_pension_rate_bps: 1000,
   nhf_enabled: true, nhf_rate_bps: 250, nsitf_enabled: true, nsitf_rate_bps: 100, itf_enabled: true, itf_rate_bps: 100,
   payslip_in_app: true, payslip_email: true, previous_pay_required: false, payroll_moved_here_on: null,
@@ -90,6 +94,23 @@ describe("the payroll policy form", () => {
     expect(mocks.update.mock.calls[0][0]).toEqual({
       entity: "BSS", nhf_enabled: false, employer_pension_rate_bps: 1200, payslip_email: false, payroll_moved_here_on: "2026-06-01",
     });
+  });
+
+  it("offers the PAYE choices exactly as the server labels them, and saves the stored value", async () => {
+    mocks.update.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Saved." }) });
+    act(() => root.render(<PayrollSettingsForm entityCode="BSS" values={SAVED} consumers={{}} canUpdate readOnlyReason={null} />));
+    const select = byLabel("Where PAYE comes from") as unknown as HTMLSelectElement;
+    expect([...select.options].map((option) => [option.value, option.textContent])).toEqual([
+      ["COMPUTED", "Computed from the national tax table"],
+      ["SUPPLIED", "Taken from the salary structure or roster"],
+    ]);
+    expect(document.body.textContent).not.toContain("Supplied by the school");
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "SUPPLIED");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => { saveButton().click(); });
+    expect(mocks.update.mock.calls[0][0]).toEqual({ entity: "BSS", paye_method: "SUPPLIED" });
   });
 
   it("greys everything for a reader who keeps one branch's books, and says why", () => {

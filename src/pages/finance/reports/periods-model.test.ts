@@ -7,6 +7,7 @@ function period(period_no: number, status: FiscalPeriod["status"]): FiscalPeriod
     id: period_no,
     period_no,
     name: `P${period_no}`,
+    label: `Month ${period_no}`,
     fiscal_year: 2026,
     start_date: `2026-${String(period_no).padStart(2, "0")}-01`,
     end_date: `2026-${String(period_no).padStart(2, "0")}-28`,

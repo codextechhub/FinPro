@@ -107,7 +107,8 @@ import { PeriodCloseDrawer, PeriodsTab } from "./periods-tab";
 
 const MARCH = {
   id: 41,
-  name: "March 2026",
+  name: "2026-03",
+  label: "March 2026",
   period_no: 3,
   start_date: "2026-03-01",
   end_date: "2026-03-31",
@@ -118,8 +119,8 @@ const IKEJA = { id: 1, name: "Ikeja" };
 const LEKKI = { id: 2, name: "Lekki" };
 
 const FY = { id: 7, year: 2026, start_date: "2026-01-01", end_date: "2026-12-31" };
-const H1 = { id: 51, name: "H1 2026", period_no: 1, fiscal_year: 2026, start_date: "2026-01-01", end_date: "2026-06-30", status: "CLOSED", closed_at: null };
-const H2 = { id: 52, name: "H2 2026", period_no: 2, fiscal_year: 2026, start_date: "2026-07-01", end_date: "2026-12-31", status: "CLOSED", closed_at: null };
+const H1 = { id: 51, name: "H1 2026", label: "H1 2026", period_no: 1, fiscal_year: 2026, start_date: "2026-01-01", end_date: "2026-06-30", status: "CLOSED", closed_at: null };
+const H2 = { id: 52, name: "H2 2026", label: "H2 2026", period_no: 2, fiscal_year: 2026, start_date: "2026-07-01", end_date: "2026-12-31", status: "CLOSED", closed_at: null };
 
 let container: HTMLDivElement;
 let root: Root;
@@ -493,7 +494,7 @@ describe("re-opening a fiscal year", () => {
   });
 });
 
-const FAILING_BANK = { name: "trial_balance_balanced", passed: false, blocking: true, detail: "Debits exceed credits by ₦50.00" };
+const FAILING_BANK = { name: "trial_balance_balanced", label: "Trial balance agrees (debits equal credits)", passed: false, blocking: true, detail: "Debits exceed credits by ₦50.00" };
 
 function checklistWith(items: unknown[], status = "OPEN") {
   mocks.checklist.mockReturnValue({
@@ -560,7 +561,7 @@ describe("forcing a month's close over a failing check", () => {
     await click(button("Force close"));
 
     expect(dialog()?.textContent).toContain("Checks you are overriding");
-    expect(dialog()?.textContent).toContain("Trial balance balanced: Debits exceed credits by ₦50.00");
+    expect(dialog()?.textContent).toContain("Trial balance agrees (debits equal credits): Debits exceed credits by ₦50.00");
     expect(button("Force close", dialog()!)?.disabled).toBe(true);
     await typeReason("  The accountant agreed the March bank balance  ");
     await click(button("Force close", dialog()!));
@@ -592,7 +593,7 @@ describe("work the close does itself", () => {
 
 describe("months closing in order", () => {
   const AUGUST_OPEN = {
-    name: "earlier_periods_closed", passed: false, blocking: true, done_by_close: false,
+    name: "earlier_periods_closed", label: "Earlier months closed", passed: false, blocking: true, done_by_close: false,
     detail: "Close August 2026 first. Months close in order, so September 2026 can close once every earlier month is closed.",
   };
 

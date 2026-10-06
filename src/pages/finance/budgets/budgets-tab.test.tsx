@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   held: new Set<string>(),
   list: null as unknown,
   rollup: undefined as unknown,
+  heatmap: { periods: [], rows: [] } as unknown,
   mutation: () => [() => undefined, { isLoading: false }],
 }));
 
@@ -58,7 +59,7 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetBudgetsQuery: () => ({ data: mocks.list, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
   useGetBudgetQuery: () => ({ data: undefined }),
   useGetBudgetVarianceQuery: () => ({ data: undefined }),
-  useGetBudgetHeatmapQuery: () => ({ data: { data: { periods: [], rows: [] } }, isFetching: false, isError: false }),
+  useGetBudgetHeatmapQuery: () => ({ data: { data: mocks.heatmap }, isFetching: false, isError: false }),
   useGetFiscalYearsQuery: () => ({ data: { data: [{ id: 1, year: 2026, status: "OPEN" }] } }),
   useGetBudgetRollupQuery: () => ({ data: mocks.rollup }),
   useCreateBudgetMutation: mocks.mutation,
@@ -68,7 +69,7 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useDeleteBudgetMutation: mocks.mutation,
 }));
 
-import { BudgetsTab, schoolTotal } from "./budgets-tab";
+import { BudgetsTab, Heatmap, schoolTotal } from "./budgets-tab";
 
 const { MAIN, ANNEX } = vi.hoisted(() => ({
   MAIN: { id: 19, name: "Holy Cross College Main Branch" },
@@ -213,5 +214,25 @@ describe("The school's total", () => {
     const text = render([MAIN_PLAN], { branches: [ANNEX, MAIN] }, false);
     expect(text).not.toContain("added together");
     expect(schoolTotal(undefined)).toBeNull();
+  });
+});
+
+describe("the variance heatmap", () => {
+  it("heads each month with its words, keeps the stored name out of sight, and files each cell by period number", () => {
+    mocks.heatmap = {
+      budget_id: 2, fiscal_year_id: 1, total_budget: 300_000, total_actual: 120_000,
+      periods: [{ period_no: 1, name: "2026-09", label: "September 2026" }, { period_no: 2, name: "2026-10", label: "October 2026" }],
+      rows: [{
+        account_id: 7, code: "5100", name: "Salaries", account_type: "EXPENSE", budget_total: 300_000, actual_total: 120_000,
+        cells: [{ period_no: 1, budget: 150_000, actual: 0 }, { period_no: 2, budget: 150_000, actual: 120_000 }],
+      }],
+    };
+    act(() => root.render(<Heatmap budgetId={2} entity="HOLYCROSS" />));
+    const headings = [...container.querySelectorAll("th")].map((th) => th.textContent);
+    expect(headings).toEqual(["Account", "September 2026", "October 2026", "YTD"]);
+    expect(container.textContent).not.toContain("2026-09");
+    const cells = [...container.querySelectorAll("tbody td")].map((td) => td.textContent ?? "");
+    expect(cells[1]).toBe("-");
+    expect(cells[2]).not.toBe("-");
   });
 });

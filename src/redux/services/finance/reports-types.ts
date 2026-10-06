@@ -1,3 +1,5 @@
+import type { PeriodBrief } from "./setup-types";
+
 // Financial-statement report types - mirror the JSON the vs_finance report
 // views emit. Money is the `{kobo, naira}` pair these endpoints return (not a
 // bare integer), so the UI can show either without re-deriving.
@@ -240,6 +242,8 @@ export interface FiscalRunway {
   first_uncovered_date?: string | null;
   /** Every stretch no period covers between two that are covered, oldest first. */
   gaps?: { start: string; end: string }[];
+  /** The last period of the calendar, `label` being the month in words. */
+  last_period?: PeriodBrief | null;
 }
 
 /**

@@ -229,7 +229,7 @@ function HeatLegend() {
   );
 }
 
-function Heatmap({ budgetId, entity }: { budgetId: number; entity: string }) {
+export function Heatmap({ budgetId, entity }: { budgetId: number; entity: string }) {
   const { data, isFetching, isError } = useGetBudgetHeatmapQuery({ id: budgetId, entity });
   const hm = data?.data;
   if (isError) return <p className="py-6 text-center font-mont text-xs text-destructive">Couldn't load the heatmap.</p>;
@@ -242,7 +242,7 @@ function Heatmap({ budgetId, entity }: { budgetId: number; entity: string }) {
         <thead>
           <tr>
             <th className={cn(thCls, "sticky left-0 z-10 min-w-44")}>Account</th>
-            {hm.periods.map((p) => <th key={p.period_no} className={cn(thCls, "text-right")}>{p.label}</th>)}
+            {hm.periods.map((p) => <th key={p.name} className={cn(thCls, "whitespace-nowrap text-right")}>{p.label}</th>)}
             <th className={cn(thCls, "text-right")}>YTD</th>
           </tr>
         </thead>

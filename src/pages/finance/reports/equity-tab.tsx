@@ -80,7 +80,7 @@ export function EquityReport({ entity, currency }: { entity: string; currency?: 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Select value={period} onChange={setPeriod} className="w-44">
           <option value="">Year to date</option>
-          {periods.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+          {periods.map((p) => <option key={p.id} value={String(p.id)}>{p.label}</option>)}
         </Select>
         <div className="flex items-center gap-2">
           {(["csv", "xlsx", "pdf"] as const).map((f) => (

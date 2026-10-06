@@ -728,7 +728,7 @@ function PeriodCard({ period, selected, onClick }: { period: FiscalPeriod; selec
       type="button"
       data-guide="finance-periods.period"
       onClick={onClick}
-      aria-label={`${periodActionLabel(period.status)} for ${period.name}`}
+      aria-label={`${periodActionLabel(period.status)} for ${period.label}`}
       className={cn(
         "group relative min-w-0 overflow-hidden rounded-lg border bg-white p-4 text-left transition-all",
         selected ? "border-primary ring-2 ring-primary/10" : "border-white-02 hover:border-primary/50 hover:shadow-sm",
@@ -738,7 +738,7 @@ function PeriodCard({ period, selected, onClick }: { period: FiscalPeriod; selec
       <div className="flex items-start justify-between gap-3 pl-1">
         <div className="min-w-0">
           <p className="font-mont text-[10px] font-semibold uppercase tracking-wide text-gray-05">Period {String(period.period_no).padStart(2, "0")}</p>
-          <p className="mt-1 truncate font-mont text-sm font-semibold text-gray-01">{period.name}</p>
+          <p className="mt-1 truncate font-mont text-sm font-semibold text-gray-01">{period.label}</p>
         </div>
         <StatusPill status={period.status} />
       </div>
@@ -911,21 +911,21 @@ export function PeriodCloseDrawer({
     try {
       const override = forced ? { force: true as const, reason: reason.trim() } : {};
       const response = await close({ id: id!, entity, soft, ...branchArg, ...override }).unwrap();
-      toast.success(closeOutcomeMessage(period?.name, response.data?.checklist?.items));
+      toast.success(closeOutcomeMessage(period?.label, response.data?.checklist?.items));
       closeDrawer();
     } catch { /* central */ }
   };
   const doReopen = async () => {
     try {
       const response = await reopen({ id: id!, entity, ...branchArg, reason: reason.trim() }).unwrap();
-      toast.success(response.message || `Re-opened ${period?.name}.`);
+      toast.success(response.message || `Re-opened ${period?.label}.`);
       closeDrawer();
     } catch { /* central */ }
   };
   const doLock = async () => {
     try {
       const response = await lock({ id: id!, entity, ...branchArg }).unwrap();
-      toast.success(response.message || `Locked ${period?.name}.`);
+      toast.success(response.message || `Locked ${period?.label}.`);
       closeDrawer();
     } catch { /* central */ }
   };
@@ -941,20 +941,20 @@ export function PeriodCloseDrawer({
   const forceable = forceCanClose(items);
   const confirmCopy: Record<PeriodAction, { title: string; description: string; text: string; destructive?: boolean; branchHint: string }> = {
     "soft-close": {
-      title: `Soft-close ${period?.name ?? "period"}${scope}?`,
+      title: `Soft-close ${period?.label ?? "period"}${scope}?`,
       description: "Blocks ordinary postings while still allowing controlled close-process entries. Authorised users can re-open it later.",
       text: "Soft-close period",
       branchHint: "Only this branch's month is soft-closed.",
     },
     close: {
-      title: `Run close for ${period?.name ?? "period"}${scope}?`,
+      title: `Run close for ${period?.label ?? "period"}${scope}?`,
       description: "Runs the close steps and blocks further postings. The period remains re-openable until it is permanently locked."
         + (several ? " The school's month closes once every branch has closed it." : ""),
       text: "Run period close",
       branchHint: "The close steps run against this branch's entries.",
     },
     force: {
-      title: `Force close ${period?.name ?? "period"}${scope}?`,
+      title: `Force close ${period?.label ?? "period"}${scope}?`,
       description: `Closes the month although ${blockers.length === 1 ? "one check that blocks the close fails" : `${blockers.length} checks that block the close fail`}. `
         + "The checks you override and your reason are kept on the audit trail with your name."
         + (several ? " The school's month closes once every branch has closed it." : ""),
@@ -963,14 +963,14 @@ export function PeriodCloseDrawer({
       branchHint: "Only this branch's month is closed.",
     },
     reopen: {
-      title: `Re-open ${period?.name ?? "period"}${scope}?`,
+      title: `Re-open ${period?.label ?? "period"}${scope}?`,
       description: "Allows ordinary journals and source documents to post into this period again. The re-open and your reason are recorded in the audit trail."
         + (several ? " The school's month re-opens with it." : ""),
       text: "Re-open period",
       branchHint: "Only this branch's month re-opens.",
     },
     lock: {
-      title: `Permanently lock ${period?.name ?? "period"}${scope}?`,
+      title: `Permanently lock ${period?.label ?? "period"}${scope}?`,
       description: "This cannot be reversed. Any correction must be posted in a later open period."
         + (several ? " The school's month locks once every branch has locked it." : ""),
       text: "Lock period",
@@ -985,7 +985,7 @@ export function PeriodCloseDrawer({
       <DetailDrawer
         open={id != null}
         onOpenChange={(open) => !open && closeDrawer()}
-        title={period ? `Manage ${period.name}` : "Period close"}
+        title={period ? `Manage ${period.label}` : "Period close"}
         description={period
           ? `Period ${period.period_no} · ${dates.day(period.start_date)} - ${dates.day(period.end_date)}`
             + (several && calendar.readBranch != null ? ` · ${calendarBranchName(calendar, calendar.readBranch)}` : "")

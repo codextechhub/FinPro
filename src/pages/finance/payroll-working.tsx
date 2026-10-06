@@ -23,11 +23,16 @@ import { formatMoney } from "@/utils/money";
 import type { PayrollLine } from "@/redux/services/finance/ops-types";
 import type { PayeSource, PayeWorking, PayeYearFigures, PayrollLineItem } from "@/redux/services/finance/payroll-types";
 
-/** What each PAYE source means, in plain words. */
+/**
+ * What each PAYE source means, in plain words. A line's source is the setting
+ * "Where PAYE comes from" as it applied when the run was raised, so the two
+ * method sources read exactly as the settings screen's server labels do; the
+ * line itself carries only the code.
+ */
 export const PAYE_SOURCE_LABEL: Record<PayeSource, string> = {
-  COMPUTED: "Worked out from the tax table",
+  COMPUTED: "Computed from the national tax table",
   OVERRIDE: "Set by hand on the salary record",
-  SUPPLIED: "Supplied by the school",
+  SUPPLIED: "Taken from the salary structure or roster",
   MANUAL: "Typed on a run raised by hand",
 };
 

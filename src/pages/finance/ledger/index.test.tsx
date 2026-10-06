@@ -54,6 +54,9 @@ vi.mock("@/redux/services/finance/gl-api", () => ({
     return { data: mocks.summaryData };
   },
 }));
+vi.mock("@/redux/services/finance/setup-api", () => ({
+  useGetPeriodsQuery: () => ({ data: { data: [{ id: 9, name: "2026-09", label: "September 2026" }] } }),
+}));
 vi.mock("./direct-entry-drawer", () => ({ DirectEntryDrawer: () => null }));
 vi.mock("./journal-detail-drawer", () => ({
   JournalDetailDrawer: ({ journalId }: { journalId: number | null }) => { mocks.opened.push(journalId); return null; },
@@ -64,7 +67,7 @@ import GeneralLedgerPage from "./index";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const JOURNAL = {
-  id: 3, document_number: "JE-0003", date: "2026-09-01", period: "Sep 2026", source: "MANUAL", status: "POSTED",
+  id: 3, document_number: "JE-0003", date: "2026-09-01", period: "2026-09", source: "MANUAL", status: "POSTED",
   narration: "Accrual", reference: "", posted_at: "2026-09-01T10:00:00Z", total_debit: 500_000,
   created_by: "Mr Eze", created_by_id: 14, created_by_is_exited: true,
 };
@@ -149,5 +152,14 @@ describe("the tab counts", () => {
     const tabs = [...container.querySelectorAll("button")].map((b) => b.textContent?.replace(/\s+/g, " ").trim() ?? "");
     expect(tabs).toContain("Drafts 3");
     expect(tabs).toContain("Sent back 2");
+  });
+});
+
+describe("the Period column", () => {
+  it("names a journal's month in words, never by its stored name", () => {
+    mocks.rows = [JOURNAL];
+    mount();
+    expect(container.textContent).toContain("September 2026");
+    expect(container.textContent).not.toContain("2026-09");
   });
 });

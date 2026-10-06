@@ -77,7 +77,7 @@ export function undoableMonths(rows: DeferredIncomeReleaseRow[]): UndoableMonth[
     if (row.reversed || row.period_id == null) continue;
     const block = openMonthBlock(row);
     if (!row.can_reverse && !block) continue;
-    const month = months.get(row.period_id) ?? { periodId: row.period_id, name: row.period_name ?? row.month, amount: 0, journals: 0, blockedReason: null };
+    const month = months.get(row.period_id) ?? { periodId: row.period_id, name: row.period_label ?? row.period_name ?? row.month, amount: 0, journals: 0, blockedReason: null };
     month.amount += row.amount;
     month.journals += 1;
     if (block && (!month.blockedReason || row.branch_period_status === "OPEN")) month.blockedReason = block;
@@ -118,7 +118,7 @@ export function DeferredIncomeTab({ entity, currency }: { entity: string; curren
   const releaseColumns: Column<DeferredIncomeReleaseRow>[] = [
     { header: "Date", cell: (r) => <span className="tabular-nums">{dates.day(r.date, r.branch_id)}</span> },
     ...(showBranch ? [{ header: "Branch", cell: (r: DeferredIncomeReleaseRow) => branches.name(r.branch_id, r.branch_name) }] : []),
-    { header: "Month", cell: (r) => r.period_name ?? dates.monthYear(`${r.month}-01`) },
+    { header: "Month", cell: (r) => r.period_label ?? dates.monthYear(`${r.month}-01`) },
     { header: "Journal", cell: (r) => <span className="tabular-nums text-gray-05">{r.journal_number ?? `#${r.journal_id}`}</span> },
     { header: "Released", align: "right", cell: (r) => <Money kobo={r.amount} currency={currency} align="right" /> },
     {

@@ -61,7 +61,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   mocks.calendar = {
-    settings: { next_year_mode: "AUTO_OPEN", next_year_mode_label: "Open the next fiscal year automatically", next_year_lead_days: 60, periods_close_in_order: true, updated_at: null, updated_by: null },
+    settings: { next_year_mode: "AUTO_OPEN", next_year_mode_label: "Open the next fiscal year automatically", next_year_mode_options: [{ value: "AUTO_OPEN", label: "Open the next fiscal year automatically" }, { value: "WARN_ONLY", label: "Warn finance staff only" }], next_year_lead_days: 60, periods_close_in_order: true, updated_at: null, updated_by: null },
     consumers: {},
     history: [],
   };
@@ -142,8 +142,8 @@ describe("opening the next year", () => {
 
     const auto = container.querySelector<HTMLInputElement>("input[value='AUTO_OPEN']");
     expect(auto?.checked).toBe(true);
-    expect(container.textContent).toContain("Open the next year automatically");
-    expect(container.textContent).toContain("Warn only");
+    expect(container.textContent).toContain("Open the next fiscal year automatically");
+    expect(container.textContent).toContain("Warn finance staff only");
     expect(numberInputs()[0].value).toBe("60");
   });
 

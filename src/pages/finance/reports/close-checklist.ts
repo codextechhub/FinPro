@@ -82,34 +82,12 @@ export function closeOutcomeMessage(
 }
 
 /**
- * Display names for the checks the backend ships.
+ * A checklist row's words: the server's own `label`, which pairs an accounting
+ * term with its plain words ("AR reconciled (what customers owe)").
  *
- * `humanize()` alone turns snake_case into "Grir explained" and "Ap reconciled",
- * which reads as a typo rather than as the ledger terms these are. Unknown names
- * still fall through to the generic humaniser, so a check added server-side
- * appears with a readable label rather than not at all.
- */
-export const CHECK_LABELS: Record<string, string> = {
-  ap_reconciled: "AP reconciled (what is owed to suppliers)",
-  ar_reconciled: "AR reconciled (what customers owe)",
-  grir_explained: "GR/IR explained (goods received, not yet billed)",
-  trial_balance_balanced: "Trial balance balanced",
-  no_draft_journals: "No draft journals",
-  depreciation_posted: "Depreciation posted",
-  depreciation_posted_for_year: "Depreciation posted for the year",
-  deferred_income_released: "Deferred income released",
-  gateway_clearing_current: "Collections in clearing",
-  inter_branch_balanced: "Branches agree on what they owe each other",
-  sealed_figures_unchanged: "Sealed figures unchanged",
-  earlier_periods_closed: "Earlier months closed",
-};
-
-export const checklistLabel = (name: string, fallback: (value: string) => string) =>
-  CHECK_LABELS[name] ?? fallback(name);
-
-/**
- * A checklist row's words: the server's own `label`, else this screen's name for
- * the check, else the humanised machine name.
+ * The screen keeps no names of its own for the checks. A row that arrives
+ * without a label (a check a newer server adds before its label is sent) shows
+ * its machine name humanised, so it still appears rather than not at all.
  */
 export const checklistItemLabel = (item: { name: string; label?: string }, fallback: (value: string) => string) =>
-  item.label?.trim() || checklistLabel(item.name, fallback);
+  item.label?.trim() || fallback(item.name);

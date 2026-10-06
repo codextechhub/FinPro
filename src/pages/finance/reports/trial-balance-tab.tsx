@@ -109,7 +109,7 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
         <div className="flex flex-wrap items-center gap-2">
           <Select value={period} onChange={(v) => { setPeriod(v); if (!v) setCompare(false); }} className="w-44">
             <option value="">All periods</option>
-            {periods.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+            {periods.map((p) => <option key={p.id} value={String(p.id)}>{p.label}</option>)}
           </Select>
           <Select value={acctType} onChange={setAcctType} className="w-40">
             <option value="">All account types</option>

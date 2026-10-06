@@ -81,7 +81,10 @@ export interface BranchCloseState {
 export interface FiscalPeriod {
   id: number;
   period_no: number;
+  /** The stored name ("2026-09"): what the server is sent back, never what a person reads. */
   name: string;
+  /** The month as a person reads it ("September 2026"). */
+  label: string;
   fiscal_year: number;
   start_date: string;
   end_date: string;
@@ -105,7 +108,10 @@ export interface StartedFiscalYear {
 /** A period reduced to what a date picker needs: when it is, and why it's blocked. */
 export interface PeriodBrief {
   id: number;
+  /** The stored name ("2026-09"). */
   name: string;
+  /** The month as a person reads it ("September 2026"). */
+  label: string;
   period_no: number;
   status: FiscalPeriod["status"];
   start_date: string;
@@ -311,11 +317,21 @@ export interface FinanceDocumentSettingsPayload {
   history: FinanceAuditLog[];
 }
 
+/**
+ * One option of a choice setting, as the server sends it: the stored `value` and
+ * the `label` the server writes into the setting's history and refusals.
+ */
+export interface ChoiceOption<T extends string = string> {
+  value: T;
+  label: string;
+}
+
 export interface FinanceBankingSettingsValues {
   default_bank_reconciliation_tolerance_days: number;
   default_group_reconciliation_matches: boolean;
   default_receipt_allocation_strategy: "oldest" | "largest";
   default_receipt_allocation_strategy_label: string;
+  default_receipt_allocation_strategy_options: ChoiceOption<"oldest" | "largest">[];
   petty_cash_low_balance_threshold_bps: number;
   updated_at: string | null;
   updated_by: string | null;
@@ -336,7 +352,7 @@ export interface FinanceAuditFacets {
 
 export interface CloseChecklistItem {
   name: string;
-  /** The check in words; absent from an older server. */
+  /** The check in words, an accounting term paired with its plain words; the server sends it on every row. */
   label?: string;
   passed: boolean;
   blocking: boolean;

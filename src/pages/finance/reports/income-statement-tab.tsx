@@ -26,6 +26,7 @@ import { useGetIncomeStatementQuery } from "@/redux/services/finance/reports-api
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { IncomeStatementLine, IncomeStatementTotals } from "@/redux/services/finance/reports-types";
 import { toArray } from "@/redux/services/finance/api-types";
+import { periodLabelFrom } from "@/components/finance-ui/period-labels";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 
 function Select({ value, onChange, children, className }: { value: string; onChange: (v: string) => void; children: ReactNode; className?: string }) {
@@ -96,7 +97,7 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
   const showBudget = d.has_budget && wantBudget;
   const showPrior = d.has_prior_year && wantPrior;
   const colCount = 2 + (showBudget ? 2 : 0) + (showPrior ? 1 : 0);
-  const periodLabel = d.period || (span.startsWith("fy:") && d.fiscal_year ? `FY ${d.fiscal_year}` : d.fiscal_year ? `${d.fiscal_year} fiscal year` : "Year to date");
+  const periodLabel = d.period ? periodLabelFrom(periods, d.period) : (span.startsWith("fy:") && d.fiscal_year ? `FY ${d.fiscal_year}` : d.fiscal_year ? `${d.fiscal_year} fiscal year` : "Year to date");
 
   const numCell = "px-3 py-2 text-right tabular-nums";
   const muted = "text-gray-05";
@@ -141,7 +142,7 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
               {years.map((year) => <option key={year} value={`fy:${year}`}>FY {year} (whole year)</option>)}
             </optgroup>
             <optgroup label="One period">
-              {periods.map((p) => <option key={p.id} value={`p:${p.fiscal_year}:${p.period_no}`}>{p.name}</option>)}
+              {periods.map((p) => <option key={p.id} value={`p:${p.fiscal_year}:${p.period_no}`}>{p.label}</option>)}
             </optgroup>
           </Select>
           {d.has_budget ? <CompareToggle label="vs Budget" checked={wantBudget} onChange={setWantBudget} /> : null}

@@ -93,7 +93,7 @@ export function AnalyticsSliceReport({ entity, currency }: { entity: string; cur
           </Select>
           <Select value={period} onChange={setPeriod} className="w-40">
             <option value="">All periods</option>
-            {periods.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+            {periods.map((p) => <option key={p.id} value={String(p.id)}>{p.label}</option>)}
           </Select>
           <Select value={acctType} onChange={setAcctType} className="w-40">
             <option value="">All account types</option>

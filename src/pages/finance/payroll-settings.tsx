@@ -1,7 +1,7 @@
 /**
  * Finance Settings, Payroll: how a set of books works out and delivers pay.
  *
- * PAYE is worked out from the national tax table or supplied by the school;
+ * PAYE is worked out from the national tax table or taken from the salary structure or roster;
  * each statutory deduction and employer contribution can be switched off or
  * re-rated; payslips can go in the app, by email, or both; and two settings
  * say how earlier pay is handled. "Earlier pay required" refuses a run that
@@ -141,8 +141,7 @@ export function PayrollSettingsForm({ entityCode, values, consumers, canUpdate, 
           </div>
           <select aria-label="Where PAYE comes from" value={method} disabled={!canUpdate} onChange={(event) => setMethod(event.target.value as PayeMethod)}
             className="h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02 sm:w-64">
-            <option value="COMPUTED">Computed from the tax table</option>
-            <option value="SUPPLIED">Supplied by the school</option>
+            {values.paye_method_options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>
       </SettingsPanel>

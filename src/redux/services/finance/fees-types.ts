@@ -8,13 +8,8 @@
  * (views_accruals, views_payers, views_ar). Money is integer kobo.
  */
 
-import type { FinanceAuditLog, SettingConsumer } from "./setup-types";
+import type { ChoiceOption, FinanceAuditLog, SettingConsumer } from "./setup-types";
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
-
-export interface ChoiceOption<T extends string = string> {
-  value: T;
-  label: string;
-}
 
 /** One rung of the ageing ladder: debts older than `over_days` are provided for at `rate_bps`. */
 export interface ProvisionBand {
@@ -88,6 +83,8 @@ export interface DeferredIncomeReleaseRow {
   month: string;
   period_id: number | null;
   period_name: string | null;
+  /** The release's month as a person reads it ("September 2026"); null when no period holds it. */
+  period_label: string | null;
   period_status: string | null;
   branch_period_status: string | null;
   amount: number;

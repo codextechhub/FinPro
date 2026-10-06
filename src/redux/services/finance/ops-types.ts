@@ -635,7 +635,8 @@ export interface BudgetHeatmapRow {
 export interface BudgetHeatmap {
   budget_id: number;
   fiscal_year_id: number;
-  periods: { period_no: number; label: string }[];
+  /** `label` is the month in words ("September 2026"); `name` is the stored name ("2026-09"), never shown. */
+  periods: { period_no: number; name: string; label: string }[];
   rows: BudgetHeatmapRow[];
   total_budget: number;
   total_actual: number | null;

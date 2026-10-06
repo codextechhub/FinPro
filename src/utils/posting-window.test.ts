@@ -11,14 +11,16 @@ import {
   todayISO,
 } from "./posting-window";
 
+/** A period as the posting window sends it: the stored name ("2026-01") beside its words. */
 const period = (
-  name: string,
+  label: string,
   start: string,
   end: string,
   status: PeriodBrief["status"] = "OPEN",
 ): PeriodBrief => ({
   id: Number(start.replace(/-/g, "")),
-  name,
+  name: start.slice(0, 7),
+  label,
   period_no: Number(start.slice(5, 7)),
   status,
   start_date: start,
