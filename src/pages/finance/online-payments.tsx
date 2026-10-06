@@ -177,7 +177,7 @@ function CustodyForm({ entity, payload }: { entity: string; payload: FullCustody
           <label className="font-mont text-xs font-semibold text-gray-01">
             Clearing warning (days)
             <Input className="mt-2 bg-white" type="number" min={CLEARING_STALE_DAYS.low} max={CLEARING_STALE_DAYS.high} step="1" value={staleDays} onChange={(e) => setStaleDays(e.target.value)} disabled={!write.may} />
-            <span className="mt-1 block font-normal leading-5 text-gray-05">The month-end checklist warns about online payments waiting in gateway clearing longer than this (1 to 60).</span>
+            <span className="mt-1 block font-normal leading-5 text-gray-05">The month-end checklist warns about online payments still waiting to be paid into the bank longer than this (1 to 60).</span>
           </label>
         </div>
 

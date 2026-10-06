@@ -10,7 +10,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PayerPlanShare } from "@/redux/services/finance/fees-types";
+import type { PayerPayment, PayerPlanShare } from "@/redux/services/finance/fees-types";
 
 const mocks = vi.hoisted(() => ({ branches: [] as { id: number; name: string }[] }));
 
@@ -24,7 +24,13 @@ vi.mock("../../../host", async (importOriginal) => ({
   hostBranchLens: undefined,
 }));
 
-import { PlanTable, splitLabelFrom } from "./payer-payments-tab";
+vi.mock("@/redux/services/finance/fees-api", () => ({
+  useVoidPayerPaymentMutation: () => [vi.fn(), { isLoading: false }],
+}));
+vi.mock("@/components/finance-ui/can", () => ({ useCan: () => ({ can: () => false }) }));
+vi.mock("../../../lib/display-prefs", () => ({ useDates: () => ({ day: (v: string) => String(v).slice(0, 10) }) }));
+
+import { PayerPaymentDrawer, PlanTable } from "./payer-payments-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -71,15 +77,22 @@ describe("payer payment preview", () => {
 });
 
 describe("how a split reads", () => {
-  const options = [{ value: "OLDEST_FIRST", label: "Oldest bill first, across every customer" }];
+  const PAYMENT: PayerPayment = {
+    id: 5, document_number: "PYP-0005", status: "POSTED", payer: { id: 9, code: "CUS-OKAFOR", name: "Mr Okafor" },
+    branch_id: 1, branch_name: "Ikeja", bank_account: { id: 3, name: "GTBank collections" }, amount: 500_000_00,
+    payment_date: "2026-09-26", method: "BANK_TRANSFER", split: "EXPLICIT", split_label: "Entered per customer",
+    reference: "", narration: "", shares: [],
+  };
 
-  it("uses the server's label when the settings can be read", () => {
-    expect(splitLabelFrom(options, "OLDEST_FIRST")).toBe("Oldest bill first, across every customer");
-  });
+  it("shows the payment's own split label, for a split no setting offers as well as for one it does", () => {
+    mocks.branches = [{ id: 1, name: "Ikeja" }];
+    act(() => root.render(<PayerPaymentDrawer payment={PAYMENT} entity="HOLYCROSS" currency="NGN" onClose={() => undefined} />));
+    expect(document.body.textContent).toContain("Entered per customer");
+    expect(document.body.textContent).not.toContain("EXPLICIT");
 
-  it("falls back to its own words when they cannot, and to the code for a split it does not know", () => {
-    expect(splitLabelFrom(undefined, "OLDEST_FIRST")).toBe("Oldest bill first");
-    expect(splitLabelFrom(options, "EXPLICIT")).toBe("Amounts entered by hand");
-    expect(splitLabelFrom(options, "NEW_WAY")).toBe("NEW_WAY");
+    act(() => root.render(<PayerPaymentDrawer
+      payment={{ ...PAYMENT, split: "OLDEST_FIRST", split_label: "Oldest bill first, across every customer" }}
+      entity="HOLYCROSS" currency="NGN" onClose={() => undefined} />));
+    expect(document.body.textContent).toContain("Oldest bill first, across every customer");
   });
 });

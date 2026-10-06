@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { paymentsForLine, settlementFigures, settlementProblem, waitingPayments } from "./settlement-booking";
+import { GATEWAY_CLEARING_NAME, paymentsForLine, settlementFigures, settlementProblem, waitingPayments } from "./settlement-booking";
 
 const ZONE = "Africa/Lagos";
 const line = { amount: 98_500_000, txn_date: "2026-10-07" };
@@ -85,5 +85,11 @@ describe("paymentsForLine", () => {
     expect(paymentsForLine({ branch_id: null }, [ikejaPay, lekkiPay])).toHaveLength(2);
     expect(paymentsForLine({}, [ikejaPay, lekkiPay])).toHaveLength(2);
     expect(paymentsForLine({ branch_id: 1 }, [{ gateway_id: 3, branch_id: undefined }]).map((p) => p.gateway_id)).toEqual([3]);
+  });
+});
+
+describe("the account the payments wait in", () => {
+  it("is named with its plain words beside it, as the chart of accounts names it", () => {
+    expect(GATEWAY_CLEARING_NAME).toBe("Gateway clearing (online payments not yet in the bank)");
   });
 });

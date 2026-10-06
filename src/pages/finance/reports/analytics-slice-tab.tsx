@@ -16,6 +16,7 @@ import { viewReportExport } from "@/utils/finance-export";
 import { useGetAnalyticsSliceQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery, useGetDimensionsQuery } from "@/redux/services/finance/setup-api";
 import { toArray } from "@/redux/services/finance/api-types";
+import { ReportPeriodHeading } from "@/components/finance-ui/report-period-heading";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { periodParams } from "./period-params";
@@ -72,14 +73,14 @@ export function AnalyticsSliceReport({ entity, currency }: { entity: string; cur
   if (isLoading) return <LoadingState />;
   if (isError || !sl) return <ErrorState onRetry={refetch} />;
 
-  const periodLabel = periods.find((p) => String(p.id) === period)?.name;
   const axisLabel = axis === "cost_center" ? "Cost centre" : (dims.find((d) => d.code === axis)?.name || axis);
 
   return (
     <div className="space-y-5">
       {sl.narrowed && <BranchReportNote />}
+      <ReportPeriodHeading label={sl.period_label} fallback="All periods" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Axis" value={axisLabel} foot={periodLabel || "All periods"} />
+        <KpiCard label="Axis" value={axisLabel} foot={sl.period_label || "All periods"} />
         <KpiCard label="Buckets" value={String(Object.keys(sl.bucket_totals).length)} foot="Distinct values" />
         <KpiCard label="Accounts" value={String(sl.rows.length)} foot={acctType ? `${acctType.toLowerCase()} only` : "with activity"} />
         <KpiCard label="Total net" value={signed(sl.total_net.kobo, currency)} foot="Debit − credit" />

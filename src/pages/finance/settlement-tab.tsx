@@ -217,7 +217,7 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
       {tab === "suggested" ? (
         <DataTable columns={suggestedCols} rows={suggested} rowKey={(g) => `${g.bank_line_id}`}
           onRowClick={canBook ? bookSuggestion : undefined}
-          emptyTitle="Nothing to book" emptyMessage="No bank line matches payments waiting in gateway clearing. Open an unmatched bank line to book it by hand." />
+          emptyTitle="Nothing to book" emptyMessage="No bank line matches online payments waiting to be paid into the bank. Open an unmatched bank line to book it by hand." />
       ) : tab === "unmatched" ? (
         <DataTable columns={unmatchedCols} rows={unmatched} rowKey={(b) => b.bank_line_id} onRowClick={(line) => setPicked({ kind: "bank", line })}
           emptyTitle="Nothing unexplained" emptyMessage="Every bank line maps to a gateway record." />

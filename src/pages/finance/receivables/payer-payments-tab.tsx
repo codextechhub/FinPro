@@ -50,29 +50,9 @@ import {
 
 const METHODS = ["BANK_TRANSFER", "CASH", "CARD", "CHEQUE", "ONLINE", "OTHER"] as const;
 const methodLabel = (m: string) => m.replace("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
-/**
- * How a split reads when the receivables settings are not readable to this
- * person. A payment and its preview carry only the split's code, so the server's
- * own labels (`payer_payment_split_options`) are used whenever they can be read.
- * `EXPLICIT` is a split no setting offers: the bursar typed every amount.
- */
-const SPLIT_LABEL: Record<string, string> = {
-  OLDEST_FIRST: "Oldest bill first",
-  PROPORTIONAL: "In proportion to what each owes",
-  AS_ENTERED: "As entered",
-  EXPLICIT: "Amounts entered by hand",
-};
+/** The splits the form lets a bursar pick; the school's other splits are policy only. */
+const PICKABLE_SPLITS: PayerPaymentSplit[] = ["OLDEST_FIRST", "PROPORTIONAL"];
 
-/** The split code's words: the server's label when the settings are readable, else the fallback. */
-export function splitLabelFrom(options: { value: string; label: string }[] | undefined, code: string): string {
-  return options?.find((option) => option.value === code)?.label ?? SPLIT_LABEL[code] ?? code;
-}
-
-function useSplitLabel(entity: string): (code: string) => string {
-  const { can } = useCan();
-  const options = useGetReceivablesSettingsQuery({ entity }, { skip: !can(P.FIN_VIEW_SETTINGS) }).data?.data.settings.payer_payment_split_options;
-  return (code) => splitLabelFrom(options, code);
-}
 const th = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const td = "border-t border-white-02 px-3 py-2 align-top font-mont text-xs text-black-01";
 
@@ -181,8 +161,10 @@ function RecordPayerPaymentDrawer({ entity, currency, onClose, onRecorded }: {
   };
   const startManual = () => set({ manual: true, amounts: plan ? amountsFromPlan(plan.data.shares) : form.amounts });
 
-  const splitLabel = useSplitLabel(entity);
-  const defaultSplit = settings ? splitLabel(settings.payer_payment_split) : null;
+  // The words for each split come from the receivables settings, so the picker is
+  // offered to a reader of those settings; a payment and its preview carry their own.
+  const splitOptions = settings?.payer_payment_split_options ?? [];
+  const defaultSplit = splitOptions.find((o) => o.value === settings?.payer_payment_split)?.label ?? null;
 
   return (
     <DetailDrawer
@@ -232,8 +214,7 @@ function RecordPayerPaymentDrawer({ entity, currency, onClose, onRecorded }: {
               aria-label="How to split it"
             >
               <option value="">{defaultSplit ? `School setting: ${defaultSplit}` : "School setting"}</option>
-              <option value="OLDEST_FIRST">{splitLabel("OLDEST_FIRST")}</option>
-              <option value="PROPORTIONAL">{splitLabel("PROPORTIONAL")}</option>
+              {splitOptions.filter((o) => PICKABLE_SPLITS.includes(o.value)).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               <option value="MANUAL">I will enter each customer&apos;s amount</option>
             </NativeSelect>
           </FormField>
@@ -266,7 +247,7 @@ function RecordPayerPaymentDrawer({ entity, currency, onClose, onRecorded }: {
           <div className={cn("space-y-2", !fresh && "opacity-60")}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-mont text-sm font-semibold text-black-01">How it will be split</p>
-              <span className="font-mont text-xs text-gray-05">{splitLabel(plan.data.split)}{plan.data.branch_name ? ` · received at ${plan.data.branch_name}` : ""}</span>
+              <span className="font-mont text-xs text-gray-05">{plan.data.split_label}{plan.data.branch_name ? ` · received at ${plan.data.branch_name}` : ""}</span>
             </div>
             {!fresh ? <Note tone="warn">The form has changed since this preview. Preview again before recording.</Note> : null}
             <PlanTable shares={plan.data.shares} currency={currency} receivedAt={plan.data.branch_name} />
@@ -332,7 +313,7 @@ export function PlanTable({ shares, currency, receivedAt }: { shares: PayerPlanS
   );
 }
 
-function PayerPaymentDrawer({ payment, entity, currency, onClose }: {
+export function PayerPaymentDrawer({ payment, entity, currency, onClose }: {
   payment: PayerPayment | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
@@ -341,7 +322,6 @@ function PayerPaymentDrawer({ payment, entity, currency, onClose }: {
   const [voiding, setVoiding] = useState(false);
   const [voidDate, setVoidDate] = useState("");
   const [voidPayment, { isLoading }] = useVoidPayerPaymentMutation();
-  const splitLabel = useSplitLabel(entity);
   if (!payment) return null;
   const forwarded = payment.shares.some((s) => s.forwarded_by);
   const live = payment.status === "POSTED";
@@ -373,7 +353,7 @@ function PayerPaymentDrawer({ payment, entity, currency, onClose }: {
             <DetailField label="Received into">{payment.bank_account.name}</DetailField>
             {branches.show ? <DetailField label="Received at">{branches.name(payment.branch_id, payment.branch_name)}</DetailField> : null}
             <DetailField label="Method">{methodLabel(payment.method)}</DetailField>
-            <DetailField label="Split">{splitLabel(payment.split)}</DetailField>
+            <DetailField label="Split">{payment.split_label}</DetailField>
             {payment.reference ? <DetailField label="Reference">{payment.reference}</DetailField> : null}
           </div>
           <div className="overflow-x-auto rounded-md border border-white-02">

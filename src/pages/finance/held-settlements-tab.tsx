@@ -39,6 +39,7 @@ import { P } from "../../permissions";
 import { platformName } from "../../host";
 import { useDates } from "../../lib/display-prefs";
 import { usePaymentBranchColumn } from "./payment-branches";
+import { GATEWAY_CLEARING_NAME } from "./settlement-booking";
 import {
   HELD_STATUS_CHOICES,
   STAGE_LABEL,
@@ -229,7 +230,7 @@ function HeldSettlementDrawer({ row, currency, onClose, tenantName, action }: {
         {row.final ? <p className="font-mont text-[11px] text-gray-05">The last settlement before payments go straight to the branch&rsquo;s bank.</p> : null}
         {row.failure_reason ? <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 font-mont text-xs text-destructive">{row.failure_reason}</p> : null}
         <p className="font-mont text-[11px] leading-5 text-gray-05">
-          The branch bears the provider&rsquo;s fees on its payments and the transfer fee. Once paid, the school&rsquo;s books record it at the branch: Dr bank, Dr bank charges, Cr gateway clearing.
+          The branch bears the provider&rsquo;s fees on its payments and the transfer fee. Once paid, the school&rsquo;s books record it at the branch: Dr bank, Dr bank charges, Cr {GATEWAY_CLEARING_NAME}.
         </p>
       </div>
     </DetailDrawer>

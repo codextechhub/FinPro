@@ -21,7 +21,7 @@ import { formatMoney } from "@/utils/money";
 import { useBookSettlementMutation } from "@/redux/services/payments/payments-api";
 import type { SettlementRow, UnmatchedBankLine } from "@/redux/services/payments/payments-types";
 import { useDates } from "../../lib/display-prefs";
-import { paymentsForLine, settlementFigures, settlementProblem } from "./settlement-booking";
+import { GATEWAY_CLEARING_NAME, paymentsForLine, settlementFigures, settlementProblem } from "./settlement-booking";
 
 export interface BookSettlementTarget {
   line: UnmatchedBankLine;
@@ -64,7 +64,7 @@ export function BookSettlementModal({ target, payments, bankName, entity, curren
     { code: "", name: bankName ? `Bank: ${bankName}` : "Bank", amount: Math.max(figures.net, 0) },
     ...(figures.fee > 0 ? [{ code: "", name: "Bank charges (provider fees)", amount: figures.fee }] : []),
   ];
-  const cr: RecapRow[] = [{ code: "", name: "Gateway clearing", amount: figures.gross }];
+  const cr: RecapRow[] = [{ code: "", name: GATEWAY_CLEARING_NAME, amount: figures.gross }];
 
   const confirm = async () => {
     try {
@@ -110,7 +110,7 @@ export function BookSettlementModal({ target, payments, bankName, entity, curren
             </ul>
           ) : (
             <p className="font-mont text-xs text-gray-05">
-              {otherBranches ? `No online payments of ${line.branch_name} are waiting in gateway clearing.` : "No online payments are waiting in gateway clearing."}
+              {otherBranches ? `No online payments of ${line.branch_name} are waiting to be paid into the bank.` : "No online payments are waiting to be paid into the bank."}
             </p>
           )}
           {otherBranches ? (

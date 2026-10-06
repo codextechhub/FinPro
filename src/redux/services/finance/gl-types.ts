@@ -13,6 +13,8 @@ export interface JournalListItem {
   document_number: string;
   date: string;
   period: string | null;
+  /** The period in words ("September 2026"); null when the journal has no period. */
+  period_label: string | null;
   source: JournalSource;
   status: JournalStatus;
   narration: string;

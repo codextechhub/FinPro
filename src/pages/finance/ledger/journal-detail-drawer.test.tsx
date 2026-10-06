@@ -39,9 +39,6 @@ vi.mock("@/hooks/use-permissions", () => ({
 }));
 vi.mock("../../../lib/display-prefs", () => ({ useDates: () => ({ day: (v: string) => String(v).slice(0, 10), today: () => "2026-10-06" }) }));
 vi.mock("../../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
-vi.mock("@/redux/services/finance/setup-api", () => ({
-  useGetPeriodsQuery: () => ({ data: { data: [{ id: 10, name: "2026-10", label: "October 2026" }] } }),
-}));
 vi.mock("./direct-entry-drawer", () => ({ DirectEntryDrawer: ({ existing }: { existing?: { document_number: string } }) => <p>Correcting {existing?.document_number}</p> }));
 vi.mock("@/redux/services/finance/gl-api", () => {
   const mutation = () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }];
@@ -59,7 +56,7 @@ import { JournalDetailDrawer } from "./journal-detail-drawer";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const JOURNAL = {
-  id: 40, document_number: "JV-0040", date: "2026-10-01", period: "2026-10", source: "MANUAL", status: "DRAFT",
+  id: 40, document_number: "JV-0040", date: "2026-10-01", period: "2026-10", period_label: "October 2026", source: "MANUAL", status: "DRAFT",
   narration: "Owner's capital", reference: "", posted_at: null, total_debit: 500_000_000, total_credit: 500_000_000,
   created_by: "Mrs Bello", created_by_id: 4, reverses_id: null, reversal_action: null,
   approval_state: "PENDING", approval_returned: true, workflow_instance_id: "wf-40", lines: [],

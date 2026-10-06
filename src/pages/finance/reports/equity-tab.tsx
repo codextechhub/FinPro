@@ -19,6 +19,7 @@ import { useGetChangesInEquityQuery } from "@/redux/services/finance/reports-api
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { EquityColumn } from "@/redux/services/finance/reports-types";
 import { toArray } from "@/redux/services/finance/api-types";
+import { ReportPeriodHeading } from "@/components/finance-ui/report-period-heading";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { periodParams } from "./period-params";
@@ -77,6 +78,7 @@ export function EquityReport({ entity, currency }: { entity: string; currency?: 
   return (
     <div className="space-y-5">
       {d.narrowed && <BranchReportNote />}
+      <ReportPeriodHeading label={d.period_label} fallback="Year to date" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Select value={period} onChange={setPeriod} className="w-44">
           <option value="">Year to date</option>

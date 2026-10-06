@@ -32,7 +32,6 @@ import { fiscalRunwayNotice } from "./fiscal-runway-model";
 import { InfoHint, TabStrip, useActiveEntity, type TabStripItem } from "@/components/finance-ui";
 import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/states";
 import { useCan } from "@/components/finance-ui/can";
-import { periodLabelFrom } from "@/components/finance-ui/period-labels";
 import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import { cn } from "@/lib/utils";
@@ -308,7 +307,7 @@ export default function FinanceDashboard() {
             )}
 
             {(d.close_progress || d.fiscal_runway?.calendar_end) && (
-              <YearCloseStrip runway={d.fiscal_runway} close={d.close_progress} fiscalYear={d.fiscal_year} closePeriodLabel={d.close_progress ? periodLabelFrom(periods, d.close_progress.period) : undefined} />
+              <YearCloseStrip runway={d.fiscal_runway} close={d.close_progress} fiscalYear={d.fiscal_year} />
             )}
           </div>
         )}

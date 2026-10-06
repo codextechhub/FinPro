@@ -22,7 +22,7 @@ const LABELS: Record<string, string> = {
   "balance-sheet": "Balance Sheet", "cash-flow": "Cash Flow",
   "changes-in-equity": "Changes in Equity", analytics: "Cost & Dimension Analysis",
   periods: "Periods & Close",
-  seals: "Sealed Figures",
+  seals: "Closed figures",
 };
 
 /**

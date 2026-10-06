@@ -1,5 +1,5 @@
 /**
- * Sealed Figures, the auditor's check that closed months and years have not moved.
+ * Closed figures, the auditor's check that closed months and years have not moved.
  *
  * Mrs Bello, who covers the whole school, runs the check: every closed month
  * and year is listed as matching, or the balances that moved are named with
@@ -94,7 +94,7 @@ describe("the verdict", () => {
   });
 });
 
-describe("Sealed Figures", () => {
+describe("Closed figures", () => {
   it("runs the check only when asked, for the year chosen", async () => {
     await render();
     expect(mocks.verify).not.toHaveBeenCalled();

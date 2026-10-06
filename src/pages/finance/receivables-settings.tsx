@@ -55,6 +55,16 @@ export function useReceivablesSettingsAccess() {
   };
 }
 
+/**
+ * What each release method does, under the choice that picks one. The two are
+ * named by the options' own labels, so the hint and the dropdown above it never
+ * word one method two ways.
+ */
+export function recognitionHint(options: { value: string; label: string }[]): string {
+  const name = (value: string) => options.find((o) => o.value === value)?.label ?? value;
+  return `${name("SPREAD_MONTHLY")}: an equal share is released each month of the term, the last month taking any odd kobo. ${name("AT_PERIOD_START")}: the whole fee is released in the term's first month.`;
+}
+
 export function ReceivablesSettings({ entityCode }: { entityCode: string | null }) {
   const { canView, canUpdate, branchBound } = useReceivablesSettingsAccess();
   const docs = useGetFinanceDocumentSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
@@ -176,7 +186,7 @@ function PolicyForm({ entityCode, payload, canUpdate }: { entityCode: string; pa
             <NativeSelect className="mt-2" value={recognition} onChange={(e) => setRecognition(e.target.value as RevenueRecognition)} disabled={!canUpdate} aria-label="Release method">
               {v.revenue_recognition_options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </NativeSelect>
-            <span className={hint}>Spread monthly releases an equal share each month of the term, the last month taking any odd kobo. At period start releases the whole fee in the term&apos;s first month.</span>
+            <span className={hint}>{recognitionHint(v.revenue_recognition_options)}</span>
             <SettingsConsumer consumer={payload.consumers.revenue_recognition} />
           </label>
         </div>

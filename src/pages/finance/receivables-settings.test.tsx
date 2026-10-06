@@ -44,7 +44,7 @@ vi.mock("@/redux/services/finance/fees-api", () => ({
     isLoading: false,
     data: { data: { consumers: {}, history: [], settings: {
       revenue_recognition: "SPREAD_MONTHLY", revenue_recognition_label: "",
-      revenue_recognition_options: [{ value: "SPREAD_MONTHLY", label: "Spread evenly" }, { value: "AT_PERIOD_START", label: "At period start" }],
+      revenue_recognition_options: [{ value: "SPREAD_MONTHLY", label: "Spread evenly over each month of the service period" }, { value: "AT_PERIOD_START", label: "All in the month the service period starts" }],
       provision_bands: [{ over_days: 180, rate_bps: 2500 }, { over_days: 365, rate_bps: 5000 }, { over_days: 730, rate_bps: 10000 }],
       deposits_offset_unpaid_bills: false, unclaimed_deposit_years: 6,
       payer_payment_split: "OLDEST_FIRST", payer_payment_split_options: [{ value: "OLDEST_FIRST", label: "Oldest first" }],
@@ -89,5 +89,14 @@ describe("receivables settings", () => {
     const saves = [...container.querySelectorAll("button")].filter((b) => b.textContent?.includes("Save"));
     expect(saves.length).toBeGreaterThan(0);
     expect(saves.every((b) => b.disabled)).toBe(true);
+  });
+});
+
+describe("the release method hint", () => {
+  it("names each method by the label the choice above it shows", () => {
+    const text = render(true);
+    expect(text).toContain("Spread evenly over each month of the service period: an equal share is released each month");
+    expect(text).toContain("All in the month the service period starts: the whole fee is released in the term's first month");
+    expect(text).not.toContain("Spread monthly");
   });
 });

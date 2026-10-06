@@ -618,10 +618,8 @@ export function PostingsCard({ journals, currency, to }: { journals: NonNullable
 
 // ── year and close ───────────────────────────────────────────────────────────
 
-export function YearCloseStrip({ runway, close, fiscalYear, closePeriodLabel }: {
+export function YearCloseStrip({ runway, close, fiscalYear }: {
   runway: D["fiscal_runway"]; close: D["close_progress"]; fiscalYear: string | null;
-  /** The month being closed in words; the overview names it by its stored name only. */
-  closePeriodLabel?: string;
 }) {
   const dates = useDates();
   const days = runway?.days_remaining;
@@ -638,7 +636,7 @@ export function YearCloseStrip({ runway, close, fiscalYear, closePeriodLabel }: 
       {close && (
         <div className="flex min-w-0 flex-col gap-3">
           <div className="flex items-baseline justify-between gap-2 font-mont">
-            <span className="text-[13px] font-semibold text-gray-01">{closePeriodLabel ?? close.period} close</span>
+            <span className="text-[13px] font-semibold text-gray-01">{close.period_label} close</span>
             <span className="text-xs tabular-nums text-gray-05">{close.done} of {close.total} checks</span>
           </div>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-9">

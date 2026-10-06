@@ -372,6 +372,8 @@ export interface PayrollLine {
   other_deductions_amount?: number;
   employer_contributions_amount?: number;
   paye_source?: PayeSource;
+  /** How the PAYE figure was reached, in the server's words. */
+  paye_source_label?: string;
   tax_table_id?: number | null;
   tax_basis?: PayeWorking;
   items?: PayrollLineItem[];

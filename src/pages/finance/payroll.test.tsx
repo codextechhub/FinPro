@@ -491,7 +491,7 @@ describe("the earlier-pay list above the roster", () => {
 const APRIL_LINE = {
   id: 51, line_no: 1, employee_id: 77, salary_id: 31, employee_name: "Aisha Bello", gross_amount: 30_000_000, paye_amount: 9_533_000,
   pension_amount: 2_400_000, net_amount: 17_317_000, other_deductions_amount: 750_000, employer_contributions_amount: 3_600_000,
-  components: [], cost_center: null, branch_id: 19, branch_name: "Ikeja Branch", paye_source: "COMPUTED" as const,
+  components: [], cost_center: null, branch_id: 19, branch_name: "Ikeja Branch", paye_source: "COMPUTED" as const, paye_source_label: "Computed from the national tax table",
   items: [
     { id: 1, kind: "DEDUCTION" as const, code: "PAYE" as const, label: "PAYE", amount: 9_533_000, basis_amount: 0, rate_bps: 0, deduction_type_id: null, liability_account_id: 1, expense_account_id: null },
     { id: 2, kind: "DEDUCTION" as const, code: "NHF" as const, label: "National Housing Fund", amount: 750_000, basis_amount: 30_000_000, rate_bps: 250, deduction_type_id: null, liability_account_id: 2, expense_account_id: null },

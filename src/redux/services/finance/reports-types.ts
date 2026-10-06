@@ -36,6 +36,8 @@ export interface AnalyticsSlice {
   narrowed?: boolean;
   entity: string;
   period: string | null;
+  /** The period in words ("September 2026"), the report's heading; null when it covers every period. */
+  period_label: string | null;
   axis: string;
   rows: AnalyticsSliceRow[];
   bucket_totals: Record<string, ReportMoney>;
@@ -47,6 +49,8 @@ export interface TrialBalance {
   narrowed?: boolean;
   entity: string;
   period: string | null;
+  /** The period in words ("September 2026"), the report's heading; null when it covers every period. */
+  period_label: string | null;
   rows: TrialBalanceRow[];
   total_debit: ReportMoney;
   total_credit: ReportMoney;
@@ -84,6 +88,8 @@ export interface IncomeStatement {
   narrowed?: boolean;
   entity: string;
   period: string | null;
+  /** The period in words ("September 2026"), the report's heading; null when it covers every period. */
+  period_label: string | null;
   fiscal_year: number | null;
   prior_fiscal_year: number | null;
   has_budget: boolean;
@@ -155,6 +161,8 @@ export interface CashFlow {
   narrowed?: boolean;
   entity: string;
   period: string | null;
+  /** The period in words ("September 2026"), the report's heading; null when it covers every period. */
+  period_label: string | null;
   opening_cash: ReportMoney;
   closing_cash: ReportMoney;
   by_activity: Record<string, ReportMoney>;
@@ -179,6 +187,8 @@ export interface ChangesInEquity {
   narrowed?: boolean;
   entity: string;
   period: string | null;
+  /** The period in words ("September 2026"), the report's heading; null when it covers every period. */
+  period_label: string | null;
   as_of: string;
   columns: EquityColumn[];
   total_opening: ReportMoney;
@@ -345,6 +355,8 @@ export interface FinanceDashboard {
   } | null;
   fiscal_year: string | null;
   period: string | null;
+  /** The dashboard's period in words ("September 2026"); null when there is none. */
+  period_label: string | null;
   as_of: string;
   narrowed: boolean;
   fiscal_runway: FiscalRunway;
@@ -384,6 +396,8 @@ export interface FinanceDashboard {
   approvals: { items: { label: string; count: number }[]; total: number } | null;
   close_progress: {
     period: string;
+    /** The month being closed in words ("September 2026"). */
+    period_label: string;
     done: number;
     total: number;
     checks: { name: string; passed: boolean; blocking: boolean }[];

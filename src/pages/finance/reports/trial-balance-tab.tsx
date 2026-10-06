@@ -21,6 +21,7 @@ import { useGetTrialBalanceQuery } from "@/redux/services/finance/reports-api";
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { TrialBalanceRow } from "@/redux/services/finance/reports-types";
 import { toArray } from "@/redux/services/finance/api-types";
+import { ReportPeriodHeading } from "@/components/finance-ui/report-period-heading";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { periodParams } from "./period-params";
@@ -85,8 +86,8 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
   if (isLoading) return <LoadingState />;
   if (isError || !tb) return <ErrorState onRetry={refetch} />;
 
-  const periodLabel = periods.find((p) => String(p.id) === period)?.name;
-  const priorLabel = periods.find((p) => String(p.id) === priorId)?.name;
+  const periodLabel = tb.period_label;
+  const priorLabel = periods.find((p) => String(p.id) === priorId)?.label;
 
   return (
     <div className="space-y-5">
@@ -97,6 +98,8 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
           The trial balance always totals equal - every debit has a matching credit. It's the input to the <span className="font-semibold">Income Statement</span> (income &amp; expense) and the <span className="font-semibold">Balance Sheet</span> (asset, liability &amp; equity); investigate any imbalance here before producing those.
         </InfoHint>
       </div>
+
+      <ReportPeriodHeading label={tb.period_label} fallback="All periods" />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Total debit" value={formatMoney(tb.total_debit.kobo, currency)} foot={periodLabel || "All periods"} />

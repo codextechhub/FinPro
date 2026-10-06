@@ -206,3 +206,11 @@ describe("the console header's title", () => {
     expect(activeNavTitle(financeNav, section("Budgets & Forecasts"))).toBeNull();
   });
 });
+
+describe("the check that closed months have not moved", () => {
+  it("sits in the Reports & Close menu as Closed figures, never as Sealed Figures", () => {
+    const check = ALL_ENTRIES.find((entry) => entry.url.endsWith("/reports/seals"));
+    expect(check?.title).toBe("Closed figures");
+    expect(ALL_ENTRIES.map((entry) => entry.title)).not.toContain("Sealed Figures");
+  });
+});

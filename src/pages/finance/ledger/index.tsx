@@ -35,7 +35,6 @@ import { JournalDetailDrawer } from "./journal-detail-drawer";
 import { useSourceDocumentParam } from "../../../lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
-import { usePeriodLabel } from "@/components/finance-ui/period-labels";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { useDates } from "../../../lib/display-prefs";
 import { presetRange } from "../../../utils/date-presets";
@@ -68,7 +67,6 @@ export default function GeneralLedgerPage() {
   const [directOpen, setDirectOpen] = useState(false);
   const { can } = useCan();
   const [showArchived] = useShowArchived();
-  const periodLabel = usePeriodLabel(entity);
   useActionParam("new", can(P.FIN_POST_DIRECT_ENTRY), () => setDirectOpen(true));
   // A link from another screen (`?document=<journal id>`) opens that journal.
   useSourceDocumentParam(setSelected);
@@ -107,7 +105,7 @@ export default function GeneralLedgerPage() {
   const columns: Column<JournalListItem>[] = [
     { header: "Journal No.", cell: (j) => <span className="font-semibold">{j.document_number}</span> },
     { header: "Date", cell: (j) => dates.day(j.date) },
-    { header: "Period", cell: (j) => periodLabel(j.period) },
+    { header: "Period", cell: (j) => j.period_label ?? "-" },
     { header: "Source", cell: (j) => cap(j.source) },
     { header: "Reference", cell: (j) => <span className="block max-w-xs truncate text-gray-01">{j.narration || j.reference || "-"}</span> },
     { header: "Total Debit", align: "right", cell: (j) => <Money kobo={j.total_debit} currency={currency} align="right" /> },

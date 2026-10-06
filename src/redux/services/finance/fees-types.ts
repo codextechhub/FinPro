@@ -275,6 +275,8 @@ export interface PayerPaymentPlan {
   amount: number;
   payment_date: string;
   split: string;
+  /** The split in the server's words ("Oldest bill first, across every customer"). */
+  split_label: string;
   shares: PayerPlanShare[];
 }
 
@@ -304,6 +306,8 @@ export interface PayerPayment {
   payment_date: string;
   method: string;
   split: string;
+  /** The split in the server's words. */
+  split_label: string;
   reference: string;
   narration: string;
   shares: PayerPaymentShare[];

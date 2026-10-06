@@ -17,7 +17,7 @@ const APRIL: PayslipContent = {
   issuer: "Bright Star School", document_number: "PR-4/1", employee_name: "Aisha Bello", period_label: "April 2026", pay_date: "28 Apr 2026",
   branch: "Ikeja Branch", tax_id: "TIN-1", tax_state: "Lagos", pfa: "", pension_pin: "",
   earnings: [{ name: "Basic", amount: "₦300,000.00" }], deductions: [{ name: "PAYE", amount: "₦95,330.00" }], employer: [{ name: "NSITF employee compensation", amount: "₦3,000.00" }],
-  gross: "₦300,000.00", total_deductions: "₦95,330.00", net: "₦204,670.00", paye_source: "Computed from the tax table", tax_table: "NG PAYE 2026",
+  gross: "₦300,000.00", total_deductions: "₦95,330.00", net: "₦204,670.00", paye_source: "Computed from the national tax table", tax_table: "NG PAYE 2026",
   ytd: { gross: "₦300,000.00", paye: "₦95,330.00", pension: "₦0.00", net: "₦204,670.00" },
   brought_forward: { employer_name: "Unity Schools Ltd", gross: "₦900,000.00", taxable_pay: "₦900,000.00", paye: "₦45,000.00", pension: "₦0.00" },
   opening: null,

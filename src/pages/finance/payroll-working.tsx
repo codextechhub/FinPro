@@ -21,20 +21,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import type { PayrollLine } from "@/redux/services/finance/ops-types";
-import type { PayeSource, PayeWorking, PayeYearFigures, PayrollLineItem } from "@/redux/services/finance/payroll-types";
-
-/**
- * What each PAYE source means, in plain words. A line's source is the setting
- * "Where PAYE comes from" as it applied when the run was raised, so the two
- * method sources read exactly as the settings screen's server labels do; the
- * line itself carries only the code.
- */
-export const PAYE_SOURCE_LABEL: Record<PayeSource, string> = {
-  COMPUTED: "Computed from the national tax table",
-  OVERRIDE: "Set by hand on the salary record",
-  SUPPLIED: "Taken from the salary structure or roster",
-  MANUAL: "Typed on a run raised by hand",
-};
+import type { PayeWorking, PayeYearFigures, PayrollLineItem } from "@/redux/services/finance/payroll-types";
 
 /** A rate in basis points as a percentage: 250 reads "2.5%". */
 export function ratePercent(bps: number): string {
@@ -118,11 +105,11 @@ function YearRows({ figures, currency }: { figures: PayeYearFigures; currency?: 
  * says where the figure came from instead. Earlier months from before this
  * payroll are shown even then, because the server records them on every line.
  */
-export function PayeWorkingView({ line, currency }: { line: Pick<PayrollLine, "tax_basis" | "paye_source" | "paye_amount">; currency?: string | null }) {
+export function PayeWorkingView({ line, currency }: { line: Pick<PayrollLine, "tax_basis" | "paye_source" | "paye_source_label" | "paye_amount">; currency?: string | null }) {
   const working: PayeWorking = line.tax_basis ?? {};
   const inputs = working.inputs;
   const money = (kobo?: number) => formatMoney(kobo ?? 0, currency);
-  const source = line.paye_source ? PAYE_SOURCE_LABEL[line.paye_source] : null;
+  const source = line.paye_source_label ?? null;
   const previous = working.brought_forward;
   const opening = working.opening;
   const deductedBefore = (inputs?.paye_before ?? 0) + (previous?.paye ?? 0) + (opening?.paye ?? 0);
@@ -182,7 +169,7 @@ export function PayeWorkingView({ line, currency }: { line: Pick<PayrollLine, "t
           ) : null}
         </Block>
       ) : !working.override ? (
-        <p className="font-mont text-xs text-gray-05">No table working is kept for this line: its PAYE was not worked out from the tax table.</p>
+        <p className="font-mont text-xs text-gray-05">No table working is kept for this line: its PAYE was not computed from the national tax table.</p>
       ) : null}
     </div>
   );

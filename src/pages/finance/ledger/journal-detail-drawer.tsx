@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import { Check, FilePenLine, Printer, Send } from "lucide-react";
 import { DetailDrawer, Money, StatusPill, ConfirmActionModal, InfoHint } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
-import { usePeriodLabel } from "@/components/finance-ui/period-labels";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { RETURNED_HINT, sentBackPill } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
@@ -49,7 +48,6 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
   journalId: number | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
-  const periodLabel = usePeriodLabel(entity);
   const open = journalId != null;
   const { data, isLoading, isError, refetch } = useGetJournalQuery({ id: journalId!, entity }, { skip: !open });
   const [submitJournal, { isLoading: submitting }] = useSubmitJournalMutation();
@@ -89,7 +87,7 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
         open={open}
         onOpenChange={(o) => !o && onClose()}
         title={j ? j.document_number : "Journal"}
-        description={j ? `${dates.day(j.date)}${j.period ? ` · ${periodLabel(j.period)}` : ""} · ${cap(j.source)} journal` : undefined}
+        description={j ? `${dates.day(j.date)}${j.period_label ? ` · ${j.period_label}` : ""} · ${cap(j.source)} journal` : undefined}
         widthClass="sm:max-w-3xl"
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">

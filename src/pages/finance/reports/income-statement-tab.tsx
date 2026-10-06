@@ -26,7 +26,7 @@ import { useGetIncomeStatementQuery } from "@/redux/services/finance/reports-api
 import { useGetPeriodsQuery } from "@/redux/services/finance/setup-api";
 import type { IncomeStatementLine, IncomeStatementTotals } from "@/redux/services/finance/reports-types";
 import { toArray } from "@/redux/services/finance/api-types";
-import { periodLabelFrom } from "@/components/finance-ui/period-labels";
+import { ReportPeriodHeading } from "@/components/finance-ui/report-period-heading";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 
 function Select({ value, onChange, children, className }: { value: string; onChange: (v: string) => void; children: ReactNode; className?: string }) {
@@ -97,7 +97,7 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
   const showBudget = d.has_budget && wantBudget;
   const showPrior = d.has_prior_year && wantPrior;
   const colCount = 2 + (showBudget ? 2 : 0) + (showPrior ? 1 : 0);
-  const periodLabel = d.period ? periodLabelFrom(periods, d.period) : (span.startsWith("fy:") && d.fiscal_year ? `FY ${d.fiscal_year}` : d.fiscal_year ? `${d.fiscal_year} fiscal year` : "Year to date");
+  const periodLabel = d.period_label ?? (span.startsWith("fy:") && d.fiscal_year ? `FY ${d.fiscal_year}` : d.fiscal_year ? `${d.fiscal_year} fiscal year` : "Year to date");
 
   const numCell = "px-3 py-2 text-right tabular-nums";
   const muted = "text-gray-05";
@@ -134,6 +134,7 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
   return (
     <div className="space-y-5">
       {d.narrowed && <BranchReportNote />}
+      <ReportPeriodHeading label={d.period_label} fallback={periodLabel} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <Select value={span} onChange={setSpan} className="w-full sm:w-52">

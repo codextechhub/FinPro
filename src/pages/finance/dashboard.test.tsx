@@ -86,7 +86,7 @@ const kpi = (kobo: number, spark: number[] = [0, kobo]) => ({ value: money(kobo)
 const TERM = { key: "term", label: "This term", name: "First Term 2026/2027", start: "2026-08-17", end: "2026-11-15", basis: "billed_for" as const };
 
 const EMPTY: Dashboard = {
-  entity: "HOLYCROSS", fiscal_year: "2026", period: "2026-09", as_of: "2026-09-26",
+  entity: "HOLYCROSS", fiscal_year: "2026", period: "2026-09", period_label: "September 2026", as_of: "2026-09-26",
   books: "school", reader_first_name: null,
   window: TERM,
   windows: [TERM, { key: "month", label: "This month", name: "September 2026" }, { key: "year", label: "Year to date", name: "FY 2026 to date" }],
@@ -312,7 +312,7 @@ describe("Finance overview attention and edge cases", () => {
       top_payers: [], ar_aging: AGING,
       upcoming: [{ date: "2026-09-28", kind: "payroll", direction: "out", title: "September payroll", detail: "24 staff", amount: money(100) }],
       trend: { labels: ["Sep 26"], issued: [1], collected: [1] },
-      close_progress: { period: "2026-09", done: 1, total: 2, checks: [] },
+      close_progress: { period: "2026-09", period_label: "September 2026", done: 1, total: 2, checks: [] },
       recent_journals: [],
     };
     const text = render(full, "finance.report.view", "finance.invoice.create", "finance.payment.create");
@@ -320,7 +320,7 @@ describe("Finance overview attention and edge cases", () => {
     for (const present of ["Cash & bank", "Payables", "Net income, year to date", "Billed vs collected",
       "Needs your attention", "Cash by account", "How parents paid", "Branches this term",
       "Against the school's budget", "Most overdue payers", "Coming up in 30 days", "Recent postings",
-      "2026-09 close", "Record receipt", "New invoice"]) {
+      "September 2026 close", "Record receipt", "New invoice"]) {
       expect(text).toContain(present);
     }
   });
@@ -329,8 +329,8 @@ describe("Finance overview attention and edge cases", () => {
 describe("pinning the dashboard to a period", () => {
   it("sends the period's own year beside its number, so March 2025 is not read as March 2026", () => {
     mocks.periods = [
-      { id: 90, period_no: 3, name: "March 2026", fiscal_year: 2026, start_date: "2026-03-01", end_date: "2026-03-31", status: "OPEN", closed_at: null },
-      { id: 50, period_no: 3, name: "March 2025", fiscal_year: 2025, start_date: "2025-03-01", end_date: "2025-03-31", status: "CLOSED", closed_at: null },
+      { id: 90, period_no: 3, name: "2026-03", label: "March 2026", fiscal_year: 2026, start_date: "2026-03-01", end_date: "2026-03-31", status: "OPEN", closed_at: null },
+      { id: 50, period_no: 3, name: "2025-03", label: "March 2025", fiscal_year: 2025, start_date: "2025-03-01", end_date: "2025-03-31", status: "CLOSED", closed_at: null },
     ];
     render(EMPTY);
     const picker = container.querySelector<HTMLSelectElement>("select[aria-label='As of period']");

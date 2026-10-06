@@ -33,6 +33,13 @@ import { calendarDayOf } from "../../utils/dates";
 import { formatMoney } from "../../utils/money";
 import type { SettlementRow, UnmatchedBankLine } from "@/redux/services/payments/payments-types";
 
+/**
+ * The account a confirmed online payment waits in, as an accountant screen names
+ * it: the account's name and what it holds in plain words, the same pair the
+ * books' own chart of accounts carries.
+ */
+export const GATEWAY_CLEARING_NAME = "Gateway clearing (online payments not yet in the bank)";
+
 export interface SettlementFigures {
   gross: number;
   fee: number;

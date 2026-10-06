@@ -1,5 +1,5 @@
 /**
- * Reports & Close > Sealed Figures: prove the closed months and years have not
+ * Reports & Close > Closed figures: prove the closed months and years have not
  * moved.
  *
  * Every month close, month lock and year close stores each account's balance
