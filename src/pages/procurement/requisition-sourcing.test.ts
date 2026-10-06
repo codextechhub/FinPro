@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { completeFreeLineIds, requisitionSourcing, sourcingMark, sourcingNote } from "./requisition-sourcing";
+import { completeFreeLineIds, requisitionSourcing, requisitionSourcingFilter, sourcingNote } from "./requisition-sourcing";
 
 const CHAIRS = 501;
 const DESKS = 502;
@@ -28,18 +28,20 @@ describe("requisitionSourcing", () => {
   });
 });
 
-describe("the picker's words", () => {
-  it("marks a held requisition in the list and leaves a free one plain", () => {
-    expect(sourcingMark("all-held")).toBe(" - every line already on an RFQ or order");
-    expect(sourcingMark("partly-held")).toBe(" - some lines already on an RFQ or order");
-    expect(sourcingMark("free")).toBe("");
+describe("requisitionSourcingFilter", () => {
+  it("asks for a free line for an RFQ, and every line free for an order", () => {
+    expect(requisitionSourcingFilter("rfq")).toEqual({ has_free_lines: "true" });
+    expect(requisitionSourcingFilter("order")).toEqual({ all_lines_free: "true" });
+    expect(requisitionSourcingFilter(undefined)).toEqual({});
   });
+});
 
-  it("tells an order that a part held blocks the whole requisition, and an RFQ to drop the held lines", () => {
-    expect(sourcingNote("partly-held", "order", "PR-0004")).toContain("an order takes the whole requisition");
+describe("sourcingNote", () => {
+  it("tells an RFQ to drop the held lines, and an order that a part held blocks it", () => {
     expect(sourcingNote("partly-held", "rfq", "PR-0004")).toContain("Remove them from this RFQ");
+    expect(sourcingNote("partly-held", "order", "PR-0004")).toContain("an order takes the whole requisition");
     expect(sourcingNote("all-held", "rfq", "PR-0004")).toContain("Every line of PR-0004 is already on an RFQ or purchase order");
-    expect(sourcingNote("free", "order", "PR-0004")).toBeNull();
+    expect(sourcingNote("free", "rfq", "PR-0004")).toBeNull();
   });
 });
 

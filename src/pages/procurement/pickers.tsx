@@ -7,7 +7,7 @@ import { toArray } from "@/components/finance-ui";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useCan } from "@/components/finance-ui/can";
 import { P } from "../../permissions";
-import { completeFreeLineIds, requisitionSourcing, sourcingMark, sourcingNote, type SourcingPurpose } from "./requisition-sourcing";
+import { completeFreeLineIds, requisitionSourcing, requisitionSourcingFilter, sourcingNote, type SourcingPurpose } from "./requisition-sourcing";
 import { useGetVendorsQuery, useGetCategoriesQuery, useGetRequisitionsQuery, useGetPurchaseOrdersQuery } from "@/redux/services/procurement/procurement-api";
 import { useGetRfqsQuery, useGetContractsQuery, useGetFreeRequisitionLinesQuery, useGetStockTransferDestinationsQuery } from "@/redux/services/procurement/procurement-ext-api";
 import type { StockLocation, StockTransferDestination, VendorCategory } from "@/redux/services/procurement/procurement-types";
@@ -55,23 +55,29 @@ export function CategoryPicker({ entity, value, onChange, label, placeholder = "
 /**
  * An approved requisition to raise an RFQ or an order from.
  *
- * With `sourcing`, each requisition whose lines another live RFQ or order
- * already holds is marked, and choosing one says why the save will be
- * refused (requisition-sourcing.ts). The marks come from the server's free
- * requisition lines, which only a reader who may view RFQs can ask for;
- * anyone else sees the plain list and meets the server's refusal on save.
+ * With `sourcing`, the server leaves out what is already taken: an RFQ is
+ * offered requisitions with at least one line no live RFQ or order holds
+ * (`has_free_lines`), an order only those whose every line is free
+ * (`all_lines_free`), since an order takes the whole requisition. The list is
+ * asked again each time the picker opens, so a requisition just put on an RFQ
+ * is not offered a second time. A reader without the requisition view key
+ * is not asked for the list at all, rather than meeting a refusal.
+ *
+ * A requisition an RFQ is offered may still have some lines held elsewhere.
+ * Once one is chosen, a reader who may view RFQs reads which (from the server's
+ * free lines of that requisition) before saving, and the server's refusal on
+ * save stays the last word.
  */
 export function RequisitionPicker({ entity, value, onChange, label, placeholder = "Select requisition", isRequired, status, sourcing }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string; isRequired?: boolean; status?: string; sourcing?: SourcingPurpose }) {
-  const { data, isLoading } = useGetRequisitionsQuery({ entity, page_size: 100, ...(status ? { status } : {}) });
-  const canAsk = useCan().can(P.PROC_VIEW_RFQS) && !!sourcing;
-  const { data: freeData } = useGetFreeRequisitionLinesQuery({ entity, page_size: 100 }, { skip: !canAsk });
+  const { can } = useCan();
+  const { data, isLoading } = useGetRequisitionsQuery(
+    { entity, page_size: 100, ...(status ? { status } : {}), ...requisitionSourcingFilter(sourcing) },
+    { refetchOnMountOrArgChange: !!sourcing, skip: !can(P.PROC_VIEW_REQUISITIONS) },
+  );
+  const canAsk = can(P.PROC_VIEW_RFQS) && sourcing === "rfq";
   const { data: chosenFree } = useGetFreeRequisitionLinesQuery({ entity, page_size: 100, requisition: Number(value) }, { skip: !canAsk || !value });
-  const listFree = completeFreeLineIds(freeData?.data ? toArray(freeData.data) : undefined, freeData?.pagination?.totalItems);
   const rows = toArray(data?.data);
-  const options = rows.map((r) => {
-    const mark = listFree ? sourcingMark(requisitionSourcing(r.lines.map((line) => line.id), listFree)) : "";
-    return { value: String(r.id), label: `${r.document_number} (${r.status})${mark}` };
-  });
+  const options = rows.map((r) => ({ value: String(r.id), label: `${r.document_number} (${r.status})` }));
   const chosen = rows.find((r) => String(r.id) === value);
   const chosenIds = completeFreeLineIds(chosenFree?.data ? toArray(chosenFree.data) : undefined, chosenFree?.pagination?.totalItems);
   const note = sourcing && chosen && chosenIds

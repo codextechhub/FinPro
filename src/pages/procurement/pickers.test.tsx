@@ -4,10 +4,10 @@
  * named with its branch, never typed as a code, and the sending store is not
  * offered as its own destination.
  *
- * A buyer raising an order from PR-0004, whose chairs already sit on
- * RFQ-0007, sees PR-0004 marked in the list and, once chosen, why the order
- * will be refused. A reader who may not view RFQs is not asked about free
- * lines at all.
+ * The requisition pickers ask the server for what is still free: an RFQ
+ * for requisitions with a free line, an order for those whose every line is
+ * free. A buyer who picks PR-0004 for an RFQ, whose chairs already sit on
+ * RFQ-0007, reads that some of its lines are held before saving.
  */
 
 import { act } from "react";
@@ -15,7 +15,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  destinations: vi.fn(), select: vi.fn(), free: vi.fn(), requisitions: undefined as unknown, held: new Set<string>(),
+  destinations: vi.fn(), select: vi.fn(), free: vi.fn(), requisitionArgs: vi.fn(), requisitions: undefined as unknown, held: new Set<string>(),
 }));
 
 vi.mock("@/redux/services/procurement/procurement-ext-api", () => ({
@@ -36,7 +36,7 @@ vi.mock("@/hooks/use-permissions", () => ({
 vi.mock("@/redux/services/procurement/procurement-api", () => ({
   useGetVendorsQuery: () => ({ data: undefined }),
   useGetCategoriesQuery: () => ({ data: undefined }),
-  useGetRequisitionsQuery: () => ({ data: mocks.requisitions }),
+  useGetRequisitionsQuery: (args: unknown, options: unknown) => { mocks.requisitionArgs(args, options); return { data: mocks.requisitions }; },
   useGetPurchaseOrdersQuery: () => ({ data: undefined }),
 }));
 vi.mock("@/components/custom/search-select", () => ({
@@ -103,32 +103,48 @@ describe("the requisition an order or RFQ is raised from", () => {
 
   beforeEach(() => {
     mocks.free.mockReset();
-    mocks.requisitions = { data: [requisition(4, "PR-0004", [501, 502]), requisition(5, "PR-0005", [601]), requisition(6, "PR-0006", [701, 702])] };
-    mocks.free.mockImplementation((args: { requisition?: number }, options: { skip?: boolean }) => {
-      if (options?.skip) return { data: undefined };
-      if (args.requisition === 4) return { data: { data: [{ id: 502 }], pagination: { totalItems: 1 } } };
-      return { data: { data: [{ id: 502 }, { id: 601 }], pagination: { totalItems: 2 } } };
-    });
+    mocks.requisitionArgs.mockReset();
+    mocks.requisitions = { data: [requisition(4, "PR-0004", [501, 502]), requisition(5, "PR-0005", [601])] };
+    mocks.free.mockImplementation((_args: unknown, options: { skip?: boolean }) => (
+      options?.skip ? { data: undefined } : { data: { data: [{ id: 502 }], pagination: { totalItems: 1 } } }
+    ));
   });
 
-  it("marks requisitions another RFQ or order holds, and says why once one is chosen", () => {
-    mocks.held = new Set([P.PROC_VIEW_RFQS]);
-    act(() => root.render(<RequisitionPicker entity="BSS" value="4" onChange={vi.fn()} status="APPROVED" sourcing="order" />));
+  it("offers an order only requisitions whose every line is free, asked afresh each time", () => {
+    mocks.held = new Set([P.PROC_VIEW_RFQS, P.PROC_VIEW_REQUISITIONS]);
+    act(() => root.render(<RequisitionPicker entity="BSS" value="" onChange={vi.fn()} status="APPROVED" sourcing="order" />));
+    expect(mocks.requisitionArgs).toHaveBeenLastCalledWith(
+      { entity: "BSS", page_size: 100, status: "APPROVED", all_lines_free: "true" }, { refetchOnMountOrArgChange: true, skip: false },
+    );
+    expect(mocks.free.mock.calls.every(([, options]) => options?.skip)).toBe(true);
+  });
 
-    expect(mocks.select.mock.lastCall?.[0].options.map((o: { label: string }) => o.label)).toEqual([
-      "PR-0004 (APPROVED) - some lines already on an RFQ or order",
-      "PR-0005 (APPROVED)",
-      "PR-0006 (APPROVED) - every line already on an RFQ or order",
-    ]);
-    expect(container.textContent).toContain("Some lines of PR-0004 are already on an RFQ or purchase order, and an order takes the whole requisition.");
+  it("offers an RFQ requisitions with a free line, and says which of the chosen one's lines are held", () => {
+    mocks.held = new Set([P.PROC_VIEW_RFQS, P.PROC_VIEW_REQUISITIONS]);
+    act(() => root.render(<RequisitionPicker entity="BSS" value="4" onChange={vi.fn()} status="APPROVED" sourcing="rfq" />));
+    expect(mocks.requisitionArgs).toHaveBeenLastCalledWith(
+      { entity: "BSS", page_size: 100, status: "APPROVED", has_free_lines: "true" }, { refetchOnMountOrArgChange: true, skip: false },
+    );
+    expect(mocks.free).toHaveBeenLastCalledWith({ entity: "BSS", page_size: 100, requisition: 4 }, { skip: false });
+    expect(container.textContent).toContain("Some lines of PR-0004 are already on an RFQ or purchase order. Remove them from this RFQ before you save.");
   });
 
   it("asks nothing about free lines of a reader who may not view RFQs", () => {
-    mocks.held = new Set();
+    mocks.held = new Set([P.PROC_VIEW_REQUISITIONS]);
     act(() => root.render(<RequisitionPicker entity="BSS" value="4" onChange={vi.fn()} status="APPROVED" sourcing="rfq" />));
-
     expect(mocks.free.mock.calls.every(([, options]) => options?.skip)).toBe(true);
-    expect(mocks.select.mock.lastCall?.[0].options.map((o: { label: string }) => o.label)).toEqual(["PR-0004 (APPROVED)", "PR-0005 (APPROVED)", "PR-0006 (APPROVED)"]);
     expect(container.textContent).not.toContain("already on an RFQ");
+  });
+
+  it("leaves the plain list alone without a purpose", () => {
+    mocks.held = new Set([P.PROC_VIEW_REQUISITIONS]);
+    act(() => root.render(<RequisitionPicker entity="BSS" value="" onChange={vi.fn()} status="APPROVED" />));
+    expect(mocks.requisitionArgs).toHaveBeenLastCalledWith({ entity: "BSS", page_size: 100, status: "APPROVED" }, { refetchOnMountOrArgChange: false, skip: false });
+  });
+
+  it("does not ask for requisitions without the key to view them", () => {
+    mocks.held = new Set([P.PROC_VIEW_RFQS]);
+    act(() => root.render(<RequisitionPicker entity="BSS" value="" onChange={vi.fn()} status="APPROVED" sourcing="order" />));
+    expect(mocks.requisitionArgs.mock.lastCall?.[1]).toMatchObject({ skip: true });
   });
 });

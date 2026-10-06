@@ -124,7 +124,14 @@ export const procurementApi = baseApi.injectEndpoints({
     }),
 
     // Requisitions
-    getRequisitions: b.query<PaginatedEnvelope<Requisition>, E>({
+    /**
+     * Requisitions, filtered by `status` and `search`. `has_free_lines` keeps
+     * an approved requisition with at least one line no live RFQ or order
+     * holds (an RFQ can still take it); `all_lines_free` keeps one whose every
+     * line is free (an order, which takes every line, can). "false" keeps the
+     * rest.
+     */
+    getRequisitions: b.query<PaginatedEnvelope<Requisition>, E & { has_free_lines?: "true" | "false"; all_lines_free?: "true" | "false" }>({
       query: (p) => ({ url: `/procurement/requisitions/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcRequisitions"],
     }),

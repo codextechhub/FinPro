@@ -9,16 +9,23 @@
  * a line sent without its link stops holding the requisition line, and the
  * same chairs read as free to put on another RFQ or order and are bought
  * twice. A line the buyer adds by hand has no link and sends none.
+ *
+ * A saved line also sends its own `id`, which is how the server matches it to
+ * the line it updates. A body for an RFQ that sources requisition lines and
+ * names no line ids is refused, because it cannot say which lines were kept;
+ * a line left out of a body that names the others is removed. A line added in
+ * the form has no id and is new.
  */
 
 import { emptyLine, type DocLine } from "@/components/finance-ui/line-editor";
 import type { RequisitionLine, RfqLine } from "@/redux/services/procurement/procurement-types";
 
 /** An editor line that may hold the requisition line it sources. */
-export type RfqDocLine = DocLine & { requisitionLine?: number | null };
+export type RfqDocLine = DocLine & { requisitionLine?: number | null; lineId?: number };
 
 /** One line of an RFQ create, edit or amendment body. Unpriced: never a unit price. */
 export type RfqLineBody = {
+  id?: number;
   description: string;
   quantity: number;
   expense_account?: string;
@@ -35,6 +42,7 @@ export function rfqDocLines(lines: RfqLine[]): RfqDocLine[] {
     account: line.expense_code || "",
     taxCode: line.tax_code_id ? String(line.tax_code_id) : "",
     requisitionLine: line.requisition_line_id ?? null,
+    lineId: line.id,
   }));
 }
 
@@ -54,6 +62,7 @@ export function rfqLinesBody(lines: RfqDocLine[]): RfqLineBody[] {
   return lines
     .filter((line) => line.description.trim())
     .map((line) => ({
+      ...(line.lineId ? { id: line.lineId } : {}),
       description: line.description.trim(),
       quantity: line.quantity || 1,
       ...(line.account ? { expense_account: line.account } : {}),

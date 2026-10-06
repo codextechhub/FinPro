@@ -14,11 +14,11 @@ const requisitionChairs: RequisitionLine = { id: 501, line_no: 1, catalog_item_i
 const edit = (lines: RfqDocLine[], index: number, patch: Partial<RfqDocLine>) => lines.map((line, i) => (i === index ? { ...line, ...patch } : line));
 
 describe("rfqLinesBody", () => {
-  it("sends every saved line's requisition link back unchanged when nothing on the lines moved", () => {
+  it("sends every saved line's id and requisition link back unchanged when nothing on the lines moved", () => {
     expect(rfqLinesBody(rfqDocLines([chairs, desks, handAdded]))).toEqual([
-      { description: "Classroom chair", quantity: 40, expense_account: "5300", requisition_line: 501 },
-      { description: "Desk", quantity: 10, expense_account: "5300", tax_code: "4", requisition_line: 502 },
-      { description: "Delivery", quantity: 1 },
+      { id: 11, description: "Classroom chair", quantity: 40, expense_account: "5300", requisition_line: 501 },
+      { id: 12, description: "Desk", quantity: 10, expense_account: "5300", tax_code: "4", requisition_line: 502 },
+      { id: 13, description: "Delivery", quantity: 1 },
     ]);
   });
 
@@ -29,10 +29,10 @@ describe("rfqLinesBody", () => {
 
   it("keeps each remaining line's own link when a line above it is removed", () => {
     const lines = rfqDocLines([chairs, desks]).filter((_, i) => i !== 0);
-    expect(rfqLinesBody(lines)).toEqual([{ description: "Desk", quantity: 10, expense_account: "5300", tax_code: "4", requisition_line: 502 }]);
+    expect(rfqLinesBody(lines)).toEqual([{ id: 12, description: "Desk", quantity: 10, expense_account: "5300", tax_code: "4", requisition_line: 502 }]);
   });
 
-  it("sends no link for a line added by hand", () => {
+  it("sends neither an id nor a link for a line added in the form", () => {
     expect(rfqLinesBody([...rfqDocLines([chairs]), { ...emptyLine(), description: "Delivery" }])[1]).toEqual({ description: "Delivery", quantity: 1 });
   });
 

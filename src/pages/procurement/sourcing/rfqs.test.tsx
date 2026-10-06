@@ -5,9 +5,9 @@
  * the requisition line and the chairs read as free to order a second time.
  *
  *   1. The buyer renames the draft and saves: both lines go back with their
- *      links, though nothing about the lines changed.
+ *      ids and links, though nothing about the lines changed.
  *   2. The buyer amends the issued RFQ to 35 chairs: both lines go back with
- *      their links.
+ *      their ids and links.
  */
 
 import { act } from "react";
@@ -96,7 +96,7 @@ function type(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
   field.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-describe("saving an RFQ keeps each line's requisition link", () => {
+describe("saving an RFQ keeps each line's id and requisition link", () => {
   it("sends both links back when only the draft's title changes", async () => {
     act(() => root.render(<RfqForm entity="BSS" currency="NGN" initial={RFQ} onClose={vi.fn()} />));
     const title = [...container.querySelectorAll("input")].find((i) => i.value === "Classroom furniture")!;
@@ -107,8 +107,8 @@ describe("saving an RFQ keeps each line's requisition link", () => {
     expect(mocks.update.mock.lastCall?.[0]).toMatchObject({
       id: 7, title: "Classroom furniture, Term 1",
       lines: [
-        { description: "Classroom chair", quantity: 40, requisition_line: 501 },
-        { description: "Desk", quantity: 10, requisition_line: 502 },
+        { id: 11, description: "Classroom chair", quantity: 40, requisition_line: 501 },
+        { id: 12, description: "Desk", quantity: 10, requisition_line: 502 },
       ],
     });
   });
@@ -122,8 +122,8 @@ describe("saving an RFQ keeps each line's requisition link", () => {
 
     expect(mocks.amend).toHaveBeenCalledTimes(1);
     expect(mocks.amend.mock.lastCall?.[0].lines).toEqual([
-      { description: "Classroom chair", quantity: 35, expense_account: "5300", requisition_line: 501 },
-      { description: "Desk", quantity: 10, expense_account: "5300", requisition_line: 502 },
+      { id: 11, description: "Classroom chair", quantity: 35, expense_account: "5300", requisition_line: 501 },
+      { id: 12, description: "Desk", quantity: 10, expense_account: "5300", requisition_line: 502 },
     ]);
   });
 });
