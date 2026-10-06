@@ -493,7 +493,7 @@ describe("re-opening a fiscal year", () => {
   });
 });
 
-const FAILING_BANK = { name: "trial_balance_balanced", passed: false, blocking: true, detail: "Debits exceed credits by 5000 kobo" };
+const FAILING_BANK = { name: "trial_balance_balanced", passed: false, blocking: true, detail: "Debits exceed credits by ₦50.00" };
 
 function checklistWith(items: unknown[], status = "OPEN") {
   mocks.checklist.mockReturnValue({
@@ -560,7 +560,7 @@ describe("forcing a month's close over a failing check", () => {
     await click(button("Force close"));
 
     expect(dialog()?.textContent).toContain("Checks you are overriding");
-    expect(dialog()?.textContent).toContain("Trial balance balanced: Debits exceed credits by 5000 kobo");
+    expect(dialog()?.textContent).toContain("Trial balance balanced: Debits exceed credits by ₦50.00");
     expect(button("Force close", dialog()!)?.disabled).toBe(true);
     await typeReason("  The accountant agreed the March bank balance  ");
     await click(button("Force close", dialog()!));
@@ -569,6 +569,42 @@ describe("forcing a month's close over a failing check", () => {
       id: 41, entity: "BRIGHTSTAR", soft: false, force: true,
       reason: "The accountant agreed the March bank balance",
     });
+  });
+});
+
+describe("work the close does itself", () => {
+  const DEPRECIATION_DUE = {
+    name: "depreciation_posted", passed: true, blocking: true, done_by_close: true,
+    detail: "6 depreciation charges are due; closing the period posts them.",
+  };
+
+  it("reads as done by the close, not as a check that blocks it", async () => {
+    checklistWith([DEPRECIATION_DUE]);
+    await mountDrawer();
+
+    expect(document.body.textContent).toContain("Done by the close");
+    expect(document.body.textContent).not.toContain("Blocks the close");
+    expect(document.body.textContent).not.toContain("must pass before this period can close");
+    expect(document.body.textContent).toContain("closing the period posts them.");
+    expect(button("Force close")).toBeUndefined();
+  });
+});
+
+describe("months closing in order", () => {
+  const AUGUST_OPEN = {
+    name: "earlier_periods_closed", passed: false, blocking: true, done_by_close: false,
+    detail: "Close August 2026 first. Months close in order, so September 2026 can close once every earlier month is closed.",
+  };
+
+  it("shows the month in the way as a blocker that force close cannot get past", async () => {
+    checklistWith([AUGUST_OPEN, FAILING_BANK]);
+    await mountDrawer();
+
+    expect(document.body.textContent).toContain("Earlier months closed");
+    expect(document.body.textContent).toContain("Close August 2026 first.");
+    expect(document.body.textContent).toContain("Blocks the close");
+    expect(button("Force close")).toBeUndefined();
+    expect(document.body.textContent).not.toContain("You may force the close with a reason.");
   });
 });
 

@@ -32,7 +32,7 @@ export function EntitiesTab() {
     { header: "Code", cell: (e) => <span className="font-semibold">{e.code}</span> },
     { header: "Reporting code", cell: (e) => <span className="font-mont text-gray-05">{e.number_code}</span> },
     { header: "Name", cell: (e) => e.name },
-    { header: "Kind", cell: (e) => <span className="capitalize">{e.kind.toLowerCase()}</span> },
+    { header: "Kind", cell: (e) => e.kind_label || "-" },
     { header: "Base currency", cell: (e) => e.base_currency },
     { header: "Status", cell: (e) => <StatusPill status={e.is_active ? "ACTIVE" : "INACTIVE"} /> },
   ];

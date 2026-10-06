@@ -34,7 +34,7 @@ export const recordsApi = baseApi.injectEndpoints({
     }),
     updateFinanceCalendarSettings: b.mutation<
       ApiEnvelope<FinanceCalendarSettingsPayload>,
-      { entity: string; next_year_mode?: NextYearMode; next_year_lead_days?: number }
+      { entity: string; next_year_mode?: NextYearMode; next_year_lead_days?: number; periods_close_in_order?: boolean }
     >({
       query: ({ entity, ...body }) => ({ url: `/finance/settings/calendar/${qs({ entity })}`, method: "PATCH", body }),
       invalidatesTags: ["FinanceSettings", "FinanceAuditLog", "FinanceReports"],

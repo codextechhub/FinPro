@@ -112,17 +112,14 @@ export function useNoApproverPrompt({ documentLabel = "document", onContinued }:
             Waiting on: <span className="font-medium text-black-01">{park.stage_label}</span>
           </p>
         )}
-        {(park?.role_key || park?.requirement) && (
+        {(park?.role_name || park?.requirement) && (
           <p className="text-xs text-gray-500">
             To fix this properly,{" "}
-            {park.role_key ? (
-              // Only a role-sourced stage sends a key, and the chip is worth the
-              // extra markup there because the key is a literal an admin looks up.
+            {park.role_name ? (
+              // A role-sourced stage names its role, as this school calls it.
               <>
                 assign someone to the{" "}
-                <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-[11px] text-black-01">
-                  {park.role_key}
-                </code>{" "}
+                <span className="font-medium text-black-01">{park.role_name}</span>{" "}
                 role
               </>
             ) : (

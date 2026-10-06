@@ -78,7 +78,7 @@ export default function TeamLoad() {
                       .map((s) => (
                         <li key={s.stage_code} className="flex items-center gap-3">
                           <span className="flex-1 truncate text-sm text-gray-01">
-                            {s.stage_label ?? s.stage_code}
+                            {s.stage_label || "A retired stage"}
                           </span>
                           <div className="h-1.5 w-24 overflow-hidden rounded-full bg-gray-100">
                             <span

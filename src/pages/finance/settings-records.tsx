@@ -9,6 +9,11 @@
  * warned. "Days ahead" is how early, from 7 to 180 days; the same window is the
  * one the dashboard warns in.
  *
+ * Closing months in order. On by default: a month closes once every earlier
+ * month is closed, and reopens once every later month is open, across the year
+ * boundary too. A school that turns it off may close and reopen months in any
+ * order.
+ *
  * Record keeping. Books are kept for the statutory floor CodeX sets (read-only
  * here) or longer if the school chooses, counted from the end of each fiscal
  * year; a kept record cannot be deleted. The archive age says how long after
@@ -24,6 +29,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   PolicyBadge,
   SettingsAuditHistory,
@@ -172,8 +178,56 @@ function CalendarRuleForm({ entityCode, payload }: { entityCode: string; payload
           ) : null}
         </div>
       </SettingsPanel>
+      <div className="mt-5"><CloseOrderPanel entityCode={entityCode} payload={payload} /></div>
       <div className="mt-5"><SettingsAuditHistory rows={payload.history} /></div>
     </>
+  );
+}
+
+/**
+ * The switch that keeps a school's months closing in date order.
+ *
+ * Bright Star leaves it on: September cannot close while August is open, and
+ * August cannot reopen while September is closed. A school that closes some
+ * months out of turn turns it off. Saved on its own, so changing it never sends
+ * the calendar rule above with it.
+ */
+function CloseOrderPanel({ entityCode, payload }: { entityCode: string; payload: FinanceCalendarSettingsPayload }) {
+  const { canUpdate, readOnlyNote } = useSettingsWriteAccess(P.FIN_UPDATE_SETTINGS);
+  const saved = payload.settings.periods_close_in_order;
+  const [inOrder, setInOrder] = useState(saved);
+  const [update, state] = useUpdateFinanceCalendarSettingsMutation();
+
+  const save = async () => {
+    try {
+      const response = await update({ entity: entityCode, periods_close_in_order: inOrder }).unwrap();
+      toast.success(response.message || "Fiscal calendar settings saved.");
+    } catch { /* central */ }
+  };
+
+  return (
+    <SettingsPanel title="Closing months" description="Whether months must close one after another.">
+      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div className="min-w-0">
+          <p className="font-mont text-sm font-medium text-gray-01">
+            Close months in order<span className="ml-1.5 font-normal text-gray-05">(default)</span>
+          </p>
+          <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">
+            A month closes only once every earlier month is closed, and reopens only while every later month is open. January cannot close while December of the year before is still open. Force close does not get past it.
+          </p>
+          <SettingsConsumer consumer={payload.consumers.periods_close_in_order} />
+        </div>
+        <Switch checked={inOrder} onCheckedChange={setInOrder} disabled={!canUpdate} aria-label="Close months in order" />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
+        <p className="font-mont text-xs text-gray-05">{readOnlyNote ?? "Only changed values are written to audit history."}</p>
+        {canUpdate ? (
+          <Button onClick={save} disabled={inOrder === saved || state.isLoading}>
+            <Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save close order"}
+          </Button>
+        ) : null}
+      </div>
+    </SettingsPanel>
   );
 }
 

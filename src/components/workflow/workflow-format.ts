@@ -53,6 +53,25 @@ const ORGANOGRAM_LABEL: Record<string, string> = {
   SPECIFIC_POSITION: "the holder of a specific seat",
 };
 
+/** What a role reads as when neither the server nor the host can name it. */
+export const UNNAMED_ROLE = "A role not set up here";
+
+/**
+ * A route's end, by the stage's name.
+ *
+ * A null code is the start of the workflow on the `from` side and its approval
+ * on the `to` side, which the caller words as `end`. A stage the server sent no
+ * name for (one since retired) reads as "A retired stage", never as its code.
+ */
+export function routeStageName(
+  code: string | null | undefined,
+  label: string | null | undefined,
+  end: string,
+): string {
+  if (code == null) return end;
+  return label || "A retired stage";
+}
+
 /**
  * One line naming who approves a stage, whichever way it resolves.
  *
@@ -72,7 +91,7 @@ export function approverSummary(
 ): string {
   switch (stage.approver_source) {
     case "WORKFLOW_GROUP":
-      return `${stage.approver_group_name || stage.approver_group_code || "?"} (group)`;
+      return stage.approver_group_name ? `${stage.approver_group_name} (group)` : "An approver group";
     case "DYNAMIC_ROLE": {
       if (stage.dynamic_role) return `${stage.dynamic_role.name} (Dynamic Role)`;
       const n = stage.dynamic_role_rules?.length ?? 0;
@@ -84,17 +103,14 @@ export function approverSummary(
         return `Organogram - ${levels} ${levels === 1 ? "level" : "levels"} up`;
       }
       if (stage.organogram_target === "SPECIFIC_POSITION") {
-        return `Organogram - ${stage.organogram_position_code || "a seat"}`;
+        return `Organogram - ${stage.organogram_position_name || "a named post"}`;
       }
       return `Organogram - ${ORGANOGRAM_LABEL[stage.organogram_target] ?? "relative to the requester"}`;
     }
     default:
-      return (
-        stage.approver_role_name ||
-        (stage.approver_role_key ? roleName?.(stage.approver_role_key) : undefined) ||
-        stage.approver_role_key ||
-        "-"
-      );
+      if (stage.approver_role_name) return stage.approver_role_name;
+      if (!stage.approver_role_key) return "-";
+      return roleName?.(stage.approver_role_key) || UNNAMED_ROLE;
   }
 }
 
@@ -121,7 +137,7 @@ export function approverScopeLabel(
     return isPlatformTenant ? "Everyone, platform-wide" : "Whole school (as published)";
   }
   if (scope === "SCHOOL") return isPlatformTenant ? "Whole organisation" : "Whole school";
-  return String(scope);
+  return "As the template sets it";
 }
 
 /**
@@ -129,17 +145,12 @@ export function approverScopeLabel(
  *
  * The server's `label` wins: every workflow payload carries
  * `document_type_label`, read from the handler's own noun ("Customer refund",
- * "Restricted role grant"), so pass it whenever the row has one. Without it,
- * the code's last segment is put into words the way the server's own fallback
- * does ("finance.write_off" reads "Write off"), which is only ever reached for
- * a server too old to send a label.
+ * "Restricted role grant"), so pass it whenever the row has one. Without it
+ * the type reads as "Document": the code is the server's, and is never put
+ * into words here.
  */
-export function humanizeDocumentType(docType: string, label?: string | null): string {
-  if (label) return label;
-  if (!docType) return "Document";
-  const last = docType.split(".").pop() ?? docType;
-  const words = last.replace(/_/g, " ").toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
+export function humanizeDocumentType(_docType: string, label?: string | null): string {
+  return label || "Document";
 }
 
 export const AUDIT_EVENT_LABEL: Record<AuditEventType, string> = {

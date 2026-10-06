@@ -15,16 +15,40 @@
 
 import type { CloseChecklistItem } from "@/redux/services/finance/setup-types";
 
-export type ChecklistSeverity = "passed" | "blocker" | "warning";
+export type ChecklistSeverity = "passed" | "done-by-close" | "blocker" | "warning";
 
-/** What this row means: it passed, it stops the close, or it wants a look. */
+/**
+ * What this row means: it passed, the close will settle it, it stops the
+ * close, or it wants a look.
+ *
+ * `done-by-close` is work outstanding now that pressing Close does itself,
+ * such as six depreciation charges falling due: the close posts them before it
+ * checks. Drawn as a blocker it read as a broken control, because the close
+ * then went through. The backend reports such a row as passed as well, so the
+ * progress count and the ready state already include it.
+ */
 export function checklistSeverity(item: CloseChecklistItem): ChecklistSeverity {
+  if (item.done_by_close) return "done-by-close";
   if (item.passed) return "passed";
   return item.blocking ? "blocker" : "warning";
 }
 
 export const failedBlockers = (items: CloseChecklistItem[]) =>
   items.filter((item) => checklistSeverity(item) === "blocker");
+
+/**
+ * The check that holds a month until every earlier month is closed.
+ *
+ * Unlike every other blocker it cannot be forced past: the order a school's
+ * months close in is its own setting, not a check a reason overrides.
+ */
+export const CLOSE_ORDER_CHECK = "earlier_periods_closed";
+
+/** Whether a force close could get past these blockers: never past the close order. */
+export const forceCanClose = (items: CloseChecklistItem[]) => {
+  const blockers = failedBlockers(items);
+  return blockers.length > 0 && !blockers.some((item) => item.name === CLOSE_ORDER_CHECK);
+};
 
 export const failedWarnings = (items: CloseChecklistItem[]) =>
   items.filter((item) => checklistSeverity(item) === "warning");
@@ -72,28 +96,8 @@ export const CHECK_LABELS: Record<string, string> = {
   gateway_clearing_current: "Collections in clearing",
   inter_branch_balanced: "Branches agree on what they owe each other",
   sealed_figures_unchanged: "Sealed figures unchanged",
+  earlier_periods_closed: "Earlier months closed",
 };
 
 export const checklistLabel = (name: string, fallback: (value: string) => string) =>
   CHECK_LABELS[name] ?? fallback(name);
-
-/**
- * A row's detail in the reader's words.
- *
- * Most checks write amounts in kobo: "sub-ledger 380650000 vs control
- * 380650000 kobo", "difference 0 kobo". Every such figure is reworded in naira,
- * both figures of a "sub-ledger X vs control Y" pair included. The
- * inter-branch check already names its branches and gives naira ("Ikeja Branch
- * and Lekki Branch disagree: Ikeja Branch's books say Lekki Branch owes Ikeja
- * Branch N50.00; ..."), so it passes through as sent. Wording this does not
- * recognise is shown as sent.
- */
-export function checklistDetail(
-  item: CloseChecklistItem,
-  { money }: { money: (kobo: number) => string },
-): string {
-  return (item.detail ?? "")
-    .replace(/sub-ledger (-?\d+) vs control (-?\d+) kobo/g, (_whole, sub: string, control: string) =>
-      `sub-ledger ${money(Number(sub))} vs control ${money(Number(control))}`)
-    .replace(/(-?\d+) kobo/g, (_whole, kobo: string) => money(Number(kobo)));
-}

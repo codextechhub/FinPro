@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  checklistDetail, checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers, failedWarnings,
+  checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers, failedWarnings,
+  forceCanClose,
 } from "./close-checklist";
 import type { CloseChecklistItem } from "@/redux/services/finance/setup-types";
 
@@ -16,6 +17,23 @@ describe("close checklist severity", () => {
     expect(checklistSeverity(item({ passed: false, blocking: false }))).toBe("warning");
   });
 
+  it("reads work the close does itself as done by the close, never as a blocker", () => {
+    const due = item({
+      name: "depreciation_posted", passed: true, blocking: true, done_by_close: true,
+      detail: "6 depreciation charges are due; closing the period posts them.",
+    });
+    expect(checklistSeverity(due)).toBe("done-by-close");
+    expect(failedBlockers([due])).toEqual([]);
+  });
+
+  it("offers a force close past any blocker but the order months close in", () => {
+    const order = item({ name: "earlier_periods_closed", passed: false, blocking: true });
+    const bank = item({ name: "trial_balance_balanced", passed: false, blocking: true });
+    expect(forceCanClose([bank])).toBe(true);
+    expect(forceCanClose([order, bank])).toBe(false);
+    expect(forceCanClose([item({ passed: true })])).toBe(false);
+  });
+
   it("treats a passed non-blocking row as passed, not as a warning", () => {
     // grir_explained passes when GR/IR nets to zero; it must not be drawn as a
     // warning just because it is the non-blocking one.
@@ -26,8 +44,8 @@ describe("close checklist severity", () => {
   it("partitions a real mixed checklist", () => {
     const items = [
       item({ name: "trial_balance", passed: true }),
-      item({ name: "ap_reconciled", passed: false, blocking: true, detail: "sub-ledger 1234500 vs control 1234000 kobo" }),
-      item({ name: "grir_explained", passed: false, blocking: false, detail: "GR/IR clearing balance 480000 kobo" }),
+      item({ name: "ap_reconciled", passed: false, blocking: true, detail: "Sub-ledger ₦12,345.00 against control ₦12,340.00." }),
+      item({ name: "grir_explained", passed: false, blocking: false, detail: "GR/IR clearing holds ₦4,800.00 of goods received and not yet invoiced." }),
       item({ name: "no_draft_journals", passed: false, blocking: false, detail: "2 drafts" }),
     ];
     expect(failedBlockers(items).map((i) => i.name)).toEqual(["ap_reconciled"]);
@@ -44,15 +62,8 @@ describe("close outcome message", () => {
   it("carries the one warning's own detail, since that is the number to look at", () => {
     expect(closeOutcomeMessage("Aug 2026", [
       item({ passed: true }),
-      item({ name: "grir_explained", passed: false, blocking: false, detail: "GR/IR clearing balance 480000 kobo" }),
-    ])).toBe("Closed Aug 2026. GR/IR clearing balance 480000 kobo");
-  });
-
-  it("words that detail as the checklist does when given the same wording", () => {
-    const warning = item({ name: "grir_explained", passed: false, blocking: false, detail: "GR/IR clearing balance 480000 kobo" });
-    const words = { money: (kobo: number) => `N${(kobo / 100).toFixed(2)}` };
-    expect(closeOutcomeMessage("Aug 2026", [warning], (row) => checklistDetail(row, words)))
-      .toBe("Closed Aug 2026. GR/IR clearing balance N4800.00");
+      item({ name: "grir_explained", passed: false, blocking: false, detail: "GR/IR clearing holds ₦4,800.00 of goods received and not yet invoiced." }),
+    ])).toBe("Closed Aug 2026. GR/IR clearing holds ₦4,800.00 of goods received and not yet invoiced.");
   });
 
   it("counts them once there is more than one", () => {
@@ -78,34 +89,12 @@ describe("close outcome message", () => {
   });
 });
 
-/**
- * Bright Star closes September with Ikeja and Lekki still disagreeing about a
- * transfer Lekki never confirmed. The check names the branches and gives naira
- * itself, so it reads as sent; the other checks' kobo is worded in naira.
- */
-describe("the inter-branch close check", () => {
-  const words = { money: (kobo: number) => `N${(kobo / 100).toFixed(2)}` };
-
-  it("has a label of its own", () => {
+describe("check labels", () => {
+  it("names the inter-branch check in the reader's words", () => {
     expect(checklistLabel("inter_branch_balanced", (v) => v)).toBe("Branches agree on what they owe each other");
   });
 
-  it("shows the server's own branch names and naira as sent", () => {
-    const detail = "Ikeja Branch and Lekki Branch disagree: Ikeja Branch's books say Lekki Branch owes Ikeja Branch ₦1,000,050.00; Lekki Branch's books say nothing is owed; the inter-branch account nets to ₦50.00 debit, not zero";
-    const row = item({ name: "inter_branch_balanced", passed: false, blocking: true, detail });
-    expect(checklistDetail(row, words)).toBe(detail);
-  });
-
-  it("words both figures of a sub-ledger check in naira", () => {
-    const row = item({ name: "ap_reconciled", passed: false, detail: "sub-ledger 1234500 vs control 1234000 kobo" });
-    expect(checklistDetail(row, words)).toBe("sub-ledger N12345.00 vs control N12340.00");
-  });
-
-  it("words every other row's kobo in naira and keeps the rest as sent", () => {
-    expect(checklistDetail(item({ name: "trial_balance_balanced", detail: "difference 0 kobo" }), words)).toBe("difference N0.00");
-    expect(checklistDetail(item({ name: "grir_explained", detail: "GR/IR clearing balance 492900000 kobo (received not invoiced)" }), words))
-      .toBe("GR/IR clearing balance N4929000.00 (received not invoiced)");
-    expect(checklistDetail(item({ name: "no_draft_journals", detail: "0 draft journal(s) dated in period" }), words))
-      .toBe("0 draft journal(s) dated in period");
+  it("falls back to the generic label for a check it does not know", () => {
+    expect(checklistLabel("new_check", (v) => v.toUpperCase())).toBe("NEW_CHECK");
   });
 });

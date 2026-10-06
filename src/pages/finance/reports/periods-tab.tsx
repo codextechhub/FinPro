@@ -45,8 +45,7 @@ import { EmptyState, ErrorState, ForbiddenState, LoadingState } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { checklistDetail, checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers } from "./close-checklist";
-import { formatMoney } from "@/utils/money";
+import { checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers, forceCanClose } from "./close-checklist";
 import { P } from "../../../permissions";
 import {
   useCloseFiscalYearMutation,
@@ -912,8 +911,7 @@ export function PeriodCloseDrawer({
     try {
       const override = forced ? { force: true as const, reason: reason.trim() } : {};
       const response = await close({ id: id!, entity, soft, ...branchArg, ...override }).unwrap();
-      toast.success(closeOutcomeMessage(period?.name, response.data?.checklist?.items,
-        (item) => checklistDetail(item, { money: (kobo) => formatMoney(kobo) })));
+      toast.success(closeOutcomeMessage(period?.name, response.data?.checklist?.items));
       closeDrawer();
     } catch { /* central */ }
   };
@@ -940,6 +938,7 @@ export function PeriodCloseDrawer({
   };
   const several = calendar.applies;
   const blockers = failedBlockers(items);
+  const forceable = forceCanClose(items);
   const confirmCopy: Record<PeriodAction, { title: string; description: string; text: string; destructive?: boolean; branchHint: string }> = {
     "soft-close": {
       title: `Soft-close ${period?.name ?? "period"}${scope}?`,
@@ -1016,7 +1015,7 @@ export function PeriodCloseDrawer({
                 >Lock period</Button>
               </Can>
             ) : null}
-            {canClose && blockers.length > 0 ? (
+            {canClose && forceable ? (
               <Can permission={P.FIN_FORCE_CLOSE_PERIOD}>
                 <Button
                   variant="outline"
@@ -1085,8 +1084,8 @@ export function PeriodCloseDrawer({
                       ? "One check must pass before this period can close."
                       : `${blockers.length} checks must pass before this period can close.`}
                   </span>{" "}
-                  Anything marked "Warning only" below will not stop it.
-                  {canClose && can(P.FIN_FORCE_CLOSE_PERIOD) ? " You may force the close with a reason." : ""}
+                  Anything marked "Warning only" or "Done by the close" below will not stop it.
+                  {canClose && forceable && can(P.FIN_FORCE_CLOSE_PERIOD) ? " You may force the close with a reason." : ""}
                 </p>
               </div>
             ) : null}
@@ -1096,7 +1095,7 @@ export function PeriodCloseDrawer({
             <div>
               <div className="mb-3 flex items-center gap-1.5">
                 <h4 className="font-mont text-sm font-semibold text-gray-01">Close checklist</h4>
-                <InfoHint ariaLabel="About the close checklist">Closing runs month-end controls and due depreciation. Soft close is reversible; permanent locks are not.</InfoHint>
+                <InfoHint ariaLabel="About the close checklist">Closing posts due depreciation and releases deferred income falling due, then runs month-end controls. Soft close is reversible; permanent locks are not.</InfoHint>
               </div>
               {/* A failed warning drawn like a failed blocker stops month-end for a
                   balance that is entirely legitimate, so the three states are told
@@ -1114,25 +1113,29 @@ export function PeriodCloseDrawer({
                       <span className={cn(
                         "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full font-mont text-[11px] font-semibold",
                         severity === "passed" ? "bg-green-01 text-white"
-                          : severity === "blocker" ? "bg-destructive text-white"
-                            : "bg-amber-500 text-white",
+                          : severity === "done-by-close" ? "bg-gray-04 text-white"
+                            : severity === "blocker" ? "bg-destructive text-white"
+                              : "bg-amber-500 text-white",
                       )}>
                         {severity === "passed" ? <Check className="size-3" />
-                          : severity === "blocker" ? <X className="size-3" />
-                            : <TriangleAlert className="size-3" />}
+                          : severity === "done-by-close" ? <Clock3 className="size-3" />
+                            : severity === "blocker" ? <X className="size-3" />
+                              : <TriangleAlert className="size-3" />}
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-mont text-sm font-medium text-gray-01">{checklistLabel(item.name, humanize)}</p>
                           {severity === "blocker" ? (
                             <span className="rounded bg-destructive/10 px-1.5 py-0.5 font-mont text-[10px] font-medium text-destructive">Blocks the close</span>
+                          ) : severity === "done-by-close" ? (
+                            <span className="rounded bg-gray-02 px-1.5 py-0.5 font-mont text-[10px] font-medium text-gray-05">Done by the close</span>
                           ) : severity === "warning" ? (
                             <span className="rounded bg-amber-100 px-1.5 py-0.5 font-mont text-[10px] font-medium text-amber-700">Warning only</span>
                           ) : !item.blocking ? (
                             <span className="rounded bg-gray-02 px-1.5 py-0.5 font-mont text-[10px] text-gray-05">Non-blocking</span>
                           ) : null}
                         </div>
-                        {item.detail ? <p className="mt-1 break-words font-mont text-xs leading-5 text-gray-05">{checklistDetail(item, { money: (kobo) => formatMoney(kobo) })}</p> : null}
+                        {item.detail ? <p className="mt-1 break-words font-mont text-xs leading-5 text-gray-05">{item.detail}</p> : null}
                         {sealsLink(item) && canWholeSchool(P.FIN_VIEW_SEALS) ? (
                           <Link to={`${F.REPORTS}/seals`} className="mt-1 inline-block font-mont text-xs font-semibold text-primary hover:underline">
                             Verify sealed figures

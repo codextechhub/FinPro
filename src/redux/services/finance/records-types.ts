@@ -23,6 +23,11 @@ export interface FinanceCalendarSettingsValues {
   next_year_mode: NextYearMode;
   next_year_mode_label: string;
   next_year_lead_days: number;
+  /**
+   * Months close in date order (on by default): a month closes once every
+   * earlier month is closed, and reopens once every later month is open.
+   */
+  periods_close_in_order: boolean;
   updated_at: string | null;
   updated_by: string | null;
 }

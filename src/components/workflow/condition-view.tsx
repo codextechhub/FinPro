@@ -1,44 +1,28 @@
 import type { WorkflowCondition } from "@/redux/services/dashboard/workflow-types";
 
-const OP_LABEL: Record<string, string> = {
-  eq: "=",
-  ne: "≠",
-  gt: ">",
-  gte: "≥",
-  lt: "<",
-  lte: "≤",
-  in: "in",
-  not_in: "not in",
-  contains: "contains",
-};
+/**
+ * What a condition reads as when the server sent no words for it: only a
+ * server older than the descriptions does that, and the stored condition is a
+ * field path, an operator key and a value in kobo, which is never shown.
+ */
+const UNDESCRIBED_CONDITION = "A condition set on this template";
 
-function fmtValue(v: unknown): string {
-  if (Array.isArray(v)) return `[${v.map(fmtValue).join(", ")}]`;
-  if (typeof v === "string") return `"${v}"`;
-  return String(v);
-}
-
-/** Render a condition JSON tree as a compact human-readable sentence. */
-function describeCondition(cond: WorkflowCondition): string {
-  if (cond == null) return "Always";
-  if ("all" in cond) return cond.all.map(describeCondition).join(" AND ");
-  if ("any" in cond) return cond.any.map(describeCondition).join(" OR ");
-  if ("not" in cond) return `NOT (${describeCondition(cond.not)})`;
-  if ("fn" in cond) {
-    const args = cond.args ? `(${JSON.stringify(cond.args)})` : "()";
-    return `${cond.fn}${args}`;
-  }
-  if ("op" in cond) {
-    return `${cond.field} ${OP_LABEL[cond.op] ?? cond.op} ${fmtValue(cond.value)}`;
-  }
-  return JSON.stringify(cond);
-}
-
+/**
+ * A stored condition, in the words the server wrote for it.
+ *
+ * Every payload that carries a condition carries its description beside it
+ * (`inclusion_condition_description`, a route's or a rule's
+ * `condition_description`), worded from the field catalogue with money in
+ * naira and branches, people and roles by name. This shows that sentence as
+ * prose. A missing condition always applies.
+ */
 export function ConditionView({
   condition,
+  description,
   className,
 }: {
   condition: WorkflowCondition;
+  description?: string | null;
   className?: string;
 }) {
   return (
@@ -46,9 +30,7 @@ export function ConditionView({
       {condition == null ? (
         <span className="text-gray-01 italic">Always applies</span>
       ) : (
-        <code className="rounded bg-gray-50 border border-white-02 px-1.5 py-0.5 text-xs text-black-01">
-          {describeCondition(condition)}
-        </code>
+        <span className="text-black-01">{description || UNDESCRIBED_CONDITION}</span>
       )}
     </span>
   );

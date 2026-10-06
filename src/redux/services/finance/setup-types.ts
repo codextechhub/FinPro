@@ -133,6 +133,12 @@ export interface ChecklistItem {
   name: string;
   passed: boolean;
   blocking: boolean;
+  /**
+   * Outstanding now, but the close settles it itself: due depreciation it posts,
+   * deferred income falling due it releases. Only the preview sets it, and such
+   * an item also reads as passed.
+   */
+  done_by_close?: boolean;
   detail: string;
 }
 
@@ -236,11 +242,23 @@ export interface FinanceAuditLog {
   /** The server's flags that the person has left; absent from an older server. */
   actor_is_exited?: boolean | null;
   effective_user_is_exited?: boolean | null;
+  /**
+   * On a settings screen's history only: each setting the change touched, with
+   * the server's label and its before and after in words. `field` is the
+   * machine key, for matching a change to its control; never show it.
+   */
+  changes?: FinanceSettingChange[];
+}
+
+export interface FinanceSettingChange {
+  field: string;
+  label: string;
+  before: string;
+  after: string;
 }
 
 export interface SettingConsumer {
   service: string;
-  consumer: string;
   impact: string;
 }
 
@@ -318,6 +336,8 @@ export interface CloseChecklistItem {
   name: string;
   passed: boolean;
   blocking: boolean;
+  /** See {@link ChecklistItem.done_by_close}. */
+  done_by_close?: boolean;
   detail: string;
 }
 

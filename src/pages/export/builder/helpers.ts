@@ -14,12 +14,31 @@ export function filterIsSet(def: DatasetFilter, spec: FilterSpec | undefined): b
     case "choice":
       return !!spec.values?.length;
     case "number_range":
-      return spec.min != null || spec.max != null;
+      return boundIsSet(spec.min) || boundIsSet(spec.max);
     case "boolean":
       return spec.value != null;
     default:
       return !!spec.value;
   }
+}
+
+function boundIsSet(bound: number | string | undefined): boolean {
+  return bound != null && String(bound).trim() !== "";
+}
+
+/**
+ * Why a money bound, typed in naira, would be refused - or null when it is a
+ * plain amount with at most two decimal places. Mirrors the server's check so
+ * the person hears it while typing rather than after a failed preview; the
+ * server stays the judge.
+ */
+export function moneyBoundError(bound: number | string | undefined): string | null {
+  if (!boundIsSet(bound)) return null;
+  const text = String(bound).trim();
+  if (!/^-?\d+(\.\d+)?$/.test(text)) return "Enter an amount in naira, such as 50000 or 50000.50.";
+  const decimals = text.split(".")[1] ?? "";
+  if (decimals.replace(/0+$/, "").length > 2) return "Use at most two digits after the decimal point.";
+  return null;
 }
 
 /** Rows, as an exact figure or the honest bucketed fallback. */

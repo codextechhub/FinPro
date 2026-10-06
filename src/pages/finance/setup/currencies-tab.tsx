@@ -82,7 +82,8 @@ export function CurrenciesTab() {
     { header: "Date", cell: (r) => <span className="tabular-nums">{dates.day(r.as_of)}</span> },
     { header: "Pair", cell: (r) => <span className="font-semibold">{r.base} → {r.quote}</span> },
     { header: "Rate", align: "right", cell: (r) => <span className="tabular-nums">{fmtRate(r.rate)}</span> },
-    { header: "Source", cell: (r) => r.source ? <span className="rounded bg-pry-01 px-1.5 py-0.5 font-mont text-[10px] font-semibold uppercase text-primary">{r.source}</span> : "-" },
+    // The source is the feed's name as somebody typed it ("CBN"), shown as typed.
+    { header: "Source", cell: (r) => r.source ? <span className="rounded bg-pry-01 px-1.5 py-0.5 font-mont text-[10px] font-semibold text-primary">{r.source}</span> : "-" },
   ];
   const currencyCols: Column<Currency>[] = [
     { header: "Code", cell: (c) => <span className="font-semibold">{c.code}</span> },

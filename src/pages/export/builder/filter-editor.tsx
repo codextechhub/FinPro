@@ -8,6 +8,10 @@
  * and the export quietly returns the wrong rows. So the mapping lives in one
  * place, here.
  *
+ * A number_range the catalogue marks `money` takes naira: the bounds are sent
+ * as the typed string, never through Number(), so no float touches an amount,
+ * and the server converts them to kobo.
+ *
  * A required filter cannot be removed; it renders with a REQUIRED flag and,
  * unset, blocks the save on the review step.
  */
@@ -18,7 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { DatasetFilter, FilterSpec } from "@/redux/services/dashboard/exports-types";
-import { filterIsSet } from "./helpers";
+import { filterIsSet, moneyBoundError } from "./helpers";
 
 export function FilterEditor({
   filters,
@@ -228,6 +232,10 @@ function FilterControl({
     );
   }
 
+  if (def.type === "number_range" && def.money) {
+    return <MoneyRange def={def} spec={spec} onPatch={onPatch} />;
+  }
+
   if (def.type === "number_range") {
     return (
       <div className="grid gap-2.5 sm:grid-cols-2">
@@ -261,5 +269,46 @@ function FilterControl({
       aria-label={def.label}
       className="h-9 bg-white"
     />
+  );
+}
+
+function MoneyRange({
+  def,
+  spec,
+  onPatch,
+}: {
+  def: DatasetFilter;
+  spec: FilterSpec;
+  onPatch: (next: Partial<FilterSpec>) => void;
+}) {
+  const bounds = [
+    { key: "min", label: "At least", value: spec.min },
+    { key: "max", label: "At most", value: spec.max },
+  ] as const;
+  return (
+    <div className="grid gap-2.5 sm:grid-cols-2">
+      {bounds.map((bound) => {
+        const error = moneyBoundError(bound.value);
+        return (
+          <label key={bound.key} className="block">
+            <span className="mb-1 block font-mont text-[11px] text-gray-05">{bound.label} (₦)</span>
+            <Input
+              type="text"
+              inputMode="decimal"
+              placeholder="50000"
+              aria-label={`${def.label} ${bound.label.toLowerCase()}, in naira`}
+              aria-invalid={error ? true : undefined}
+              value={bound.value ?? ""}
+              onChange={(e) => {
+                const typed = e.target.value.trim();
+                onPatch({ [bound.key]: typed === "" ? undefined : typed });
+              }}
+              className="h-9 bg-white"
+            />
+            {error && <span className="mt-1 block font-mont text-[11px] text-error-text">{error}</span>}
+          </label>
+        );
+      })}
+    </div>
   );
 }

@@ -184,7 +184,7 @@ export default function QueuesPage() {
       for (const job of rows) {
         const was = prev.get(job.id);
         if (was !== "QUEUED" && was !== "RUNNING") continue;
-        const name = job.label || job.task_name;
+        const name = job.label;
         const outcome = exportOutcome(job);
         if (job.status === "FAILED") toast.error(`${name} failed`);
         else if (job.status === "SUCCEEDED" && outcome?.omissions) {
@@ -205,7 +205,7 @@ export default function QueuesPage() {
     const base: Column<BackgroundJob>[] = [
       {
         header: "Task",
-        cell: (job) => <span className="font-semibold">{job.label || job.task_name}</span>,
+        cell: (job) => <span className="font-semibold">{job.label}</span>,
       },
       { header: "Type", cell: (job) => <KindChip kind={job.kind} /> },
       { header: "Status", cell: (job) => <RunStatusPill status={displayStatus(job)} /> },
@@ -377,8 +377,7 @@ function JobDrawer({ job, onClose }: { job: BackgroundJob | null; onClose: () =>
       // consoles are Geist, and the Sheet cannot inherit either.
       typeface="app"
       widthClass="sm:max-w-3xl"
-      title={job ? job.label || job.task_name : ""}
-      description={job?.task_name}
+      title={job ? job.label : ""}
     >
       {job && (
         <div className="space-y-5">

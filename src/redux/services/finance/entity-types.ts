@@ -8,6 +8,8 @@ export interface LedgerEntity {
   number_code: string; // 2-3 char reporting code, not the live document-number prefix
   name: string;
   kind: string;
+  /** The kind in words ("Tenant", "Product"); show this, never `kind`. */
+  kind_label?: string;
   base_currency: string; // 3-letter ISO code (its PK on the backend)
   is_active: boolean;
   source_school_id: number | null;

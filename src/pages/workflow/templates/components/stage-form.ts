@@ -30,6 +30,11 @@ export interface StageForm {
    * saving it never drops them.
    */
   legacy_rules: DynamicRulePayload[];
+  /**
+   * The server's wording of each legacy rule's condition, by the rule's
+   * `order`. Shown beside the rule; never published.
+   */
+  legacy_rule_descriptions: string[];
   /** Whole kobo, for trying the stage in the preview. Never published. */
   sample_amount: number | null;
   organogram_target: OrganogramTarget | "";
@@ -58,6 +63,7 @@ export const emptyStage = (): StageForm => ({
   approver_group_code: "",
   dynamic_role_code: "",
   legacy_rules: [],
+  legacy_rule_descriptions: [],
   sample_amount: null,
   organogram_target: "",
   organogram_levels: "1",

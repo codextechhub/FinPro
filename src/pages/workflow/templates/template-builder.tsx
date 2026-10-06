@@ -15,6 +15,7 @@ import {
   useGetApproverGroupsQuery,
   useGetDynamicRoleFieldsQuery,
   useGetDynamicRolesQuery,
+  useGetWorkflowTemplateDocumentTypesQuery,
   useGetWorkflowTemplateQuery,
   usePublishWorkflowTemplateMutation,
 } from "@/redux/services/dashboard/workflow-api";
@@ -31,7 +32,7 @@ import {
   conditionFromDrafts, conditionProblem, draftsFromCondition,
 } from "@/pages/protected/workflow/components/condition-draft";
 import {
-  approverScopeLabel, humanizeDocumentType,
+  UNNAMED_ROLE, approverScopeLabel, humanizeDocumentType,
 } from "@/pages/protected/workflow/components/workflow-format";
 import { ConditionView } from "@/pages/protected/workflow/components/condition-view";
 import { DynamicRoleRuleList } from "@/pages/protected/workflow/components/dynamic-role-rule-list";
@@ -211,7 +212,7 @@ function DynamicRoleStagePanel({
   loaded: boolean;
 }) {
   const { data: hostRoles } = useRoles();
-  const roleName = (key: string) => hostRoles?.find((r) => r.key === key)?.name ?? key;
+  const roleName = (key: string) => hostRoles?.find((r) => r.key === key)?.name ?? UNNAMED_ROLE;
   // Opens beside the builder, so an unsaved template is not lost on the way.
   const manageHref = `${routesPath.PROTECTED.WORKFLOW.APPROVER_GROUPS}?tab=rules`;
   const manage = (text: string) => (
@@ -263,7 +264,7 @@ function DynamicRoleStagePanel({
               {r.condition == null ? (
                 <span className="text-gray-01">Otherwise</span>
               ) : (
-                <ConditionView condition={r.condition} />
+                <ConditionView condition={r.condition} description={stage.legacy_rule_descriptions[r.order]} />
               )}
               <span aria-hidden className="text-gray-01">→</span>
               <span className="font-medium text-black-01">{roleName(r.role_key)}</span>
@@ -404,10 +405,23 @@ export default function TemplateBuilder() {
       loading: docFieldsLoading,
     };
   }, [docFields, docFieldsLoading]);
-  // The server names each document type; the code in words is the fallback.
+  // The types a template may be built for, by name, so nobody types a code.
+  const { data: templateTypes, isError: templateTypesFailed } =
+    useGetWorkflowTemplateDocumentTypesQuery(undefined, { skip: !canEditDetails });
+  const documentTypeOptions = useMemo(() => {
+    const options = (templateTypes ?? []).map((t) => ({ value: t.value, label: t.label }));
+    // A template already saved for a type no longer offered keeps showing it.
+    if (docType && !options.some((o) => o.value === docType)) {
+      options.push({ value: docType, label: humanizeDocumentType(docType, existing?.document_type_label) });
+    }
+    return options;
+  }, [templateTypes, docType, existing?.document_type_label]);
+  // The server names each document type; "Document" when it has not said.
   const documentLabel = humanizeDocumentType(
     documentType,
-    docFields?.document_types.find((t) => t.value === docType)?.label,
+    templateTypes?.find((t) => t.value === docType)?.label
+      ?? docFields?.document_types.find((t) => t.value === docType)?.label
+      ?? existing?.document_type_label,
   );
   // Who a Dynamic Role is tried for: its rules can test the person's role and branch.
   const { data: people } = useDirectory();
@@ -453,6 +467,12 @@ export default function TemplateBuilder() {
           dynamic_role_code: s.dynamic_role?.code ?? "",
           legacy_rules:
             s.approver_source === "DYNAMIC_ROLE" && !s.dynamic_role ? stageRulesPayload(s) : [],
+          legacy_rule_descriptions:
+            s.approver_source === "DYNAMIC_ROLE" && !s.dynamic_role
+              ? [...(s.dynamic_role_rules ?? [])]
+                  .sort((a, b) => a.order - b.order)
+                  .map((r) => r.condition_description ?? "")
+              : [],
           sample_amount: null,
           organogram_target: s.organogram_target ?? "",
           organogram_levels: String(s.organogram_levels ?? 1),
@@ -737,14 +757,26 @@ export default function TemplateBuilder() {
                   onChange={(e) => setName(e.target.value)}
                 />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <CustomInput
-                    id="tpl-doc-type"
-                    label="Document type"
-                    isRequired
-                    placeholder="e.g. leave.request"
-                    value={documentType}
-                    onChange={(e) => setDocumentType(e.target.value)}
-                  />
+                  {templateTypesFailed ? (
+                    <CustomInput
+                      id="tpl-doc-type"
+                      label="Document type"
+                      isRequired
+                      placeholder="The document's type, as the system names it"
+                      value={documentType}
+                      onChange={(e) => setDocumentType(e.target.value)}
+                    />
+                  ) : (
+                    <SearchSelect
+                      id="tpl-doc-type"
+                      label="Document type"
+                      isRequired
+                      placeholder="Which document is this path for?"
+                      options={documentTypeOptions}
+                      value={documentType}
+                      onChange={(e) => setDocumentType(e.target.value)}
+                    />
+                  )}
                   <CustomInput
                     id="tpl-code"
                     label="Code"

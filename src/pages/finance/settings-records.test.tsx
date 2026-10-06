@@ -6,9 +6,10 @@
  * 5 and 200 are outside the 7 to 180 the server accepts and are not sent.
  * Records are kept for CodeX's floor of six years: she lengthens Bright Star's
  * to eight, four is refused because it is shorter than the floor, and a blank
- * goes back to the floor. Mrs Adeyemi, the bursar for Lekki only, holds the
- * update key and reads both panels without a Save, because they bind every
- * branch.
+ * goes back to the floor. Bright Star's months close in order by default; Mrs
+ * Bello turns that off and only the switch is sent. Mrs Adeyemi, the bursar
+ * for Lekki only, holds the update key and reads every panel without a Save,
+ * because they bind every branch.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -60,7 +61,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   mocks.calendar = {
-    settings: { next_year_mode: "AUTO_OPEN", next_year_mode_label: "Open the next fiscal year automatically", next_year_lead_days: 60, updated_at: null, updated_by: null },
+    settings: { next_year_mode: "AUTO_OPEN", next_year_mode_label: "Open the next fiscal year automatically", next_year_lead_days: 60, periods_close_in_order: true, updated_at: null, updated_by: null },
     consumers: {},
     history: [],
   };
@@ -109,6 +110,29 @@ describe("the rules the forms check before sending", () => {
     expect(validRetentionYears("8", 6)).toBe(true);
     expect(validRetentionYears("6", 6)).toBe(true);
     expect(validRetentionYears("4", 6)).toBe(false);
+  });
+});
+
+describe("closing months in order", () => {
+  const toggle = () => container.querySelector<HTMLButtonElement>("button[aria-label='Close months in order']");
+
+  it("starts on, and saves only the switch when it is turned off", async () => {
+    await render(<CalendarRulePanel entityCode="BRIGHTSTAR" />);
+    expect(toggle()?.getAttribute("aria-checked")).toBe("true");
+    expect(button("Save close order")?.disabled).toBe(true);
+
+    await act(async () => toggle()!.click());
+    await act(async () => button("Save close order")!.click());
+
+    expect(mocks.updateCalendar).toHaveBeenCalledWith({ entity: "BRIGHTSTAR", periods_close_in_order: false });
+  });
+
+  it("is read without a Save by a bursar who covers one branch", async () => {
+    mocks.wholeSchool = false;
+    await render(<CalendarRulePanel entityCode="BRIGHTSTAR" />);
+
+    expect(toggle()?.disabled).toBe(true);
+    expect(button("Save close order")).toBeUndefined();
   });
 });
 

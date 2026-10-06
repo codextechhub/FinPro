@@ -29,10 +29,12 @@ import { pairTemplateVersions } from "./components/template-versions";
 import { AdoptionPanel } from "./components/adoption-panel";
 import { FieldHint } from "./components/template-builder-bits";
 import {
+  UNNAMED_ROLE,
   advanceRuleLabel,
   approverScopeLabel,
   approverSummary,
   humanizeDocumentType,
+  routeStageName as stageName,
 } from "@/pages/protected/workflow/components/workflow-format";
 import { ConditionView } from "@/pages/protected/workflow/components/condition-view";
 import { DynamicRoleRuleList } from "@/pages/protected/workflow/components/dynamic-role-rule-list";
@@ -258,11 +260,11 @@ export default function TemplateDetail() {
                                     {r.is_fallback ? (
                                       <span className="text-gray-01 italic">Otherwise</span>
                                     ) : (
-                                      <ConditionView condition={r.condition} />
+                                      <ConditionView condition={r.condition} description={r.condition_description} />
                                     )}
                                     <span aria-hidden className="text-gray-01">→</span>
                                     <span className="font-medium text-black-01">
-                                      {r.role_name || roleName(r.role_key) || r.role_key}
+                                      {r.role_name || roleName(r.role_key) || UNNAMED_ROLE}
                                     </span>
                                     {r.label && <span className="text-gray-01">{r.label}</span>}
                                   </li>
@@ -273,7 +275,8 @@ export default function TemplateDetail() {
                       )}
                       {s.inclusion_condition != null && (
                         <p className="mt-2 text-xs text-gray-01">
-                          Included only when <ConditionView condition={s.inclusion_condition} />
+                          Included only when{" "}
+                          <ConditionView condition={s.inclusion_condition} description={s.inclusion_condition_description} />
                         </p>
                       )}
                     </div>
@@ -294,11 +297,11 @@ export default function TemplateDetail() {
                     .sort((a, b) => a.order - b.order)
                     .map((r) => (
                       <div key={r.id} className="flex flex-wrap items-center gap-2 text-sm">
-                        <Badge variant="outline">{r.from_stage_code ?? "ENTRY"}</Badge>
+                        <Badge variant="outline">{stageName(r.from_stage_code, r.from_stage_label, "Start")}</Badge>
                         <ArrowRight className="size-3.5 text-gray-01" />
-                        <Badge variant="outline">{r.to_stage_code ?? "EXIT (approved)"}</Badge>
+                        <Badge variant="outline">{stageName(r.to_stage_code, r.to_stage_label, "Approved")}</Badge>
                         <span className="text-xs text-gray-01">
-                          when <ConditionView condition={r.condition} />
+                          when <ConditionView condition={r.condition} description={r.condition_description} />
                         </span>
                       </div>
                     ))}
@@ -313,7 +316,7 @@ export default function TemplateDetail() {
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(template.notification_events).map(([k, v]) => (
                     <Badge key={k} variant={v ? "active" : "inactive"}>
-                      {k}
+                      {template.notification_event_labels?.[k] ?? "A workflow notification"}
                     </Badge>
                   ))}
                 </div>

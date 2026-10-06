@@ -41,7 +41,7 @@ export function DynamicRoleRuleList({
             ) : (
               <>
                 <span className="text-gray-01">When </span>
-                {conditionSentence(rule.condition, fields, names)}
+                {rule.condition_description || conditionSentence(rule.condition, fields, names)}
               </>
             )}
             <span className="text-gray-01"> → </span>

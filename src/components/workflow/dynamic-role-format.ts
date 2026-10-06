@@ -46,7 +46,7 @@ export const OPERATOR_LABELS: Record<ConditionFieldType, Record<string, string>>
 const ANY_OPERATOR: Record<string, string> = { ...ORDERED, ...ONE_OF, contains: "contains" };
 
 export function operatorLabel(field: ConditionFieldSpec | undefined, op: string): string {
-  return (field && OPERATOR_LABELS[field.type]?.[op]) || ANY_OPERATOR[op] || op;
+  return (field && OPERATOR_LABELS[field.type]?.[op]) || ANY_OPERATOR[op] || "matches";
 }
 
 /** Names for the ids a condition may hold, from lists the caller already has. */
@@ -56,7 +56,11 @@ export interface NameLookups {
   role?: (key: string) => string | undefined;
 }
 
-/** One value in words: money as naira, a choice by its label, an id by its name. */
+/**
+ * One value in words: money as naira, a choice by its label, an id by its name.
+ * A choice, branch, person or role nothing names any more reads neutrally,
+ * never as its stored code or id.
+ */
 export function valueLabel(
   field: ConditionFieldSpec | undefined,
   value: unknown,
@@ -69,13 +73,13 @@ export function valueLabel(
     case "MONEY":
       return typeof value === "number" ? formatMoney(value) : text;
     case "CHOICE":
-      return field.choices.find((choice) => choice.value === text)?.label ?? text;
+      return field.choices.find((choice) => choice.value === text)?.label ?? "an option no longer offered";
     case "BRANCH":
-      return names.branch?.(text) ?? text;
+      return names.branch?.(text) ?? "a branch no longer on record";
     case "PERSON":
-      return names.person?.(text) ?? text;
+      return names.person?.(text) ?? "a person no longer on record";
     case "ROLE":
-      return names.role?.(text) ?? text;
+      return names.role?.(text) ?? "a role no longer defined";
     default:
       return text;
   }
@@ -101,13 +105,16 @@ const AMOUNT: ConditionFieldSpec = {
   operators: [], choices: [], document_types: [],
 };
 
-/** A field path in words: `requester.job_title` reads "Requester job title". */
-function fieldWords(key: string): string {
-  const words = key.replace(/^document\./, "").replace(/[._]/g, " ");
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
+/** What a field nothing in the catalogue names reads as; never its path. */
+const UNKNOWN_FIELD = "A detail of the document";
 
-/** A stored condition as one sentence, its comparisons joined by "and". */
+/**
+ * A condition as one sentence, its comparisons joined by "and".
+ *
+ * For a rule being written, before the server has worded it. A saved rule
+ * carries `condition_description`, the server's sentence, which callers show
+ * instead.
+ */
 export function conditionSentence(
   condition: WorkflowCondition,
   fields: Map<string, ConditionFieldSpec>,
@@ -116,7 +123,7 @@ export function conditionSentence(
   return conditionLeaves(condition)
     .map((leaf) => {
       const field = fields.get(leaf.field) ?? (leaf.field === "amount" ? AMOUNT : undefined);
-      return `${field?.label ?? fieldWords(leaf.field)} ${operatorLabel(field, leaf.op)} ${valueLabel(field, leaf.value, names)}`;
+      return `${field?.label ?? UNKNOWN_FIELD} ${operatorLabel(field, leaf.op)} ${valueLabel(field, leaf.value, names)}`;
     })
     .join(" and ");
 }
@@ -127,6 +134,6 @@ export function targetSentence(
     "target_kind" | "role_key" | "role_name" | "user_name" | "group_name" | "group_code">,
 ): string {
   if (rule.target_kind === "USER") return rule.user_name || "a named person";
-  if (rule.target_kind === "GROUP") return rule.group_name || rule.group_code || "an approver group";
-  return rule.role_name || rule.role_key;
+  if (rule.target_kind === "GROUP") return rule.group_name || "an approver group";
+  return rule.role_name || "a role not set up here";
 }

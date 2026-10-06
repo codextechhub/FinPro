@@ -195,7 +195,7 @@ function Overview({ entity, sections }: {
         </SettingsPanel>
       ) : (
         <SettingsPanel title="Active entity" description="The selected entity is the scope for Finance and Procurement documents.">
-          <SettingsRow icon={Building2} label={entity.name} description={`${entity.code} · ${entity.kind.toLowerCase()} entity`} value={entity.base_currency} badge={<PolicyBadge kind="configured">Active</PolicyBadge>} />
+          <SettingsRow icon={Building2} label={entity.name} description={entity.kind_label ? `${entity.code} · ${entity.kind_label}` : entity.code} value={entity.base_currency} badge={<PolicyBadge kind="configured">Active</PolicyBadge>} />
         </SettingsPanel>
       )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
