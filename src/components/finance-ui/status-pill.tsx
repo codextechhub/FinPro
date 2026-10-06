@@ -66,6 +66,8 @@ const VARIANT_BY_STATUS: Record<string, BadgeVariant> = {
   MISSED: "rejected",
   TERMINATED: "suspended",
   OVER_TOLERANCE: "suspended",
+  // waiting on its sender, not its approver (returned-correction.ts)
+  SENT_BACK: "suspended",
 };
 
 // Statuses whose humanised token is not the word a person should read.

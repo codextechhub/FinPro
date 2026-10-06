@@ -48,6 +48,7 @@ import {
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
+import { sentBackPill } from "@/components/finance-ui/returned-correction";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,7 +147,7 @@ function TransactionsList({ entity, currency, openId, onOpen }: { entity: string
     ...(branches.multiBranch ? [{ header: "Branch", cell: (t: BankTransactionDocument) => branches.name(t) }] : []),
     { header: "Other side", cell: (t) => <span className="min-w-0"><span className="tabular-nums text-gray-05">{t.counter_account_code}</span> {t.counter_account_name}</span> },
     { header: "Amount", align: "right", cell: (t) => <span className={cn("inline-flex items-center gap-1 tabular-nums", t.direction === "IN" ? "text-green-01" : "text-black-01")}>{t.direction === "IN" ? <ArrowDownLeft className="size-3.5" /> : <ArrowUpRight className="size-3.5" />}{formatMoney(t.amount, currency)}</span> },
-    { header: "Status", cell: (t) => <StatusPill status={bankDocumentStatus(t)} /> },
+    { header: "Status", cell: (t) => <StatusPill {...sentBackPill(t, bankDocumentStatus(t), undefined, true)} /> },
   ];
   return <>
     <DataTable columns={columns} rows={rows} rowKey={(t) => t.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(t) => onOpen(t.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle="No bank transactions" emptyMessage="Record capital, a loan, drawings, interest or charges here." />
@@ -167,7 +168,7 @@ function TransfersList({ entity, currency, openId, onOpen }: { entity: string; c
     { header: "To", cell: (t) => t.to_account_name },
     ...(branches.multiBranch ? [{ header: "Branch", cell: (t: BankTransferDocument) => branches.name(t) }] : []),
     { header: "Amount", align: "right", cell: (t) => <span className="tabular-nums">{formatMoney(t.amount, currency)}</span> },
-    { header: "Status", cell: (t) => <StatusPill status={bankDocumentStatus(t)} /> },
+    { header: "Status", cell: (t) => <StatusPill {...sentBackPill(t, bankDocumentStatus(t), undefined, true)} /> },
   ];
   return <>
     <DataTable columns={columns} rows={rows} rowKey={(t) => t.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(t) => onOpen(t.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle="No transfers" emptyMessage="Move money between two accounts of the same branch here." />
@@ -254,7 +255,7 @@ function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
   return <>
     <DetailDrawer open onOpenChange={(open) => !open && onClose()} title={doc?.document_number || (kind === "transaction" ? "Bank transaction" : "Transfer")} description={kind === "transaction" ? "Money in or out of a bank account" : "Money between two accounts of one branch"} widthClass="sm:max-w-[560px]" footer={footer}>
       {loading ? <LoadingState rows={4} /> : !doc ? <ErrorState onRetry={kind === "transaction" ? transactionQ.refetch : transferQ.refetch} /> : <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">
-        <Field label="Status" value={<StatusPill status={bankDocumentStatus(doc)} />} />
+        <Field label="Status" value={<StatusPill {...sentBackPill(doc, bankDocumentStatus(doc), undefined, true)} />} />
         <Field label="Amount" value={formatMoney(doc.amount, currency)} />
         {transaction && <>
           <Field label="Date" value={dates.day(transaction.transaction_date, transaction.branch_id)} />

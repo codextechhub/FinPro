@@ -5,7 +5,9 @@
  *
  * Void undoes a return. A posted one is reversed: the cash comes back on the
  * fund's books, the float is restored and a closed fund reopens. A draft left by
- * a rejected approval is cancelled. The server refuses a void while the bank line
+ * a rejected approval is cancelled; one an approver sent back is resumed by
+ * whoever sent it, or withdrawn from the approvals screen, and is never
+ * cancelled here while its request is open. The server refuses a void while the bank line
  * is matched on a reconciliation, after a later return of the same fund, or once
  * the float has changed since; the dialog names the refusal it can already see
  * and lists the rest, and the central handler words any refusal that comes back.
@@ -38,6 +40,8 @@ import { useDates } from "../../../lib/display-prefs";
 import { VoidReturnDialog } from "./petty-cash-return-drawers";
 import { branchQueryArg, inBranch, rowBranchName, type PettyCashBranch } from "./petty-cash-branch";
 import { returnVoidable, voidBlocker } from "./petty-cash-returns";
+import { RETURNED_HINT, sentBackPill } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 
 /** The page size the list asks for: the server's ceiling. */
 const RETURNS_PAGE = 100;
@@ -76,7 +80,7 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
     { header: "Date", cell: (r) => <span className="tabular-nums text-gray-05">{dates.day(r.return_date)}</span> },
     { header: "Banked", align: "right", cell: (r) => <span className="tabular-nums">{formatMoney(r.amount, currency)}</span> },
     { header: "Difference", align: "right", cell: (r) => <Difference ret={r} currency={currency} /> },
-    { header: "Status", cell: (r) => <StatusPill status={r.status} /> },
+    { header: "Status", cell: (r) => <StatusPill {...sentBackPill(r, r.status, undefined, true)} /> },
   ];
 
   return (
@@ -143,6 +147,8 @@ export function ReturnDetailDrawer({ ret: row, entity, currency, view, fund, ret
   const { can } = useCan();
   const { data } = useGetPettyCashReturnQuery({ id: row.id, entity });
   const ret = data?.data ?? row;
+  // No edit route: a return sent back is resumed as it is, or withdrawn to change it.
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(ret);
   const [confirming, setConfirming] = useState(false);
   const [voidReturn, { isLoading }] = useVoidPettyCashReturnMutation();
   const money = (kobo: number) => formatMoney(kobo, currency);
@@ -183,14 +189,17 @@ export function ReturnDetailDrawer({ ret: row, entity, currency, view, fund, ret
         open onOpenChange={(o) => (o ? undefined : onClose())}
         title={ret.document_number} description={`${returnKindLabel(ret)} · ${ret.fund_name}`}
         widthClass="sm:max-w-lg"
-        footer={canVoid ? (
+        footer={standing === "sender" ? (
+          <ResumeButton workflowId={workflowId} tags={["FinancePettyCash"]} onResumed={onClose} />
+        ) : canVoid ? (
           <Button variant="outline" onClick={() => setConfirming(true)} className="gap-1.5 text-destructive hover:text-destructive">
             <Ban className="size-4" /> {ret.status === "DRAFT" ? "Cancel return" : "Void"}
           </Button>
         ) : undefined}
       >
         <div className="space-y-4">
-          <StatusPill status={ret.status} />
+          <StatusPill {...sentBackPill(ret, ret.status, undefined, true)} />
+          <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} />
           {ret.status === "PENDING_APPROVAL" ? (
             <p className="font-mont text-xs text-gray-05">Waiting for a second person under the school's approval route. It reaches the books once approved.</p>
           ) : null}

@@ -41,6 +41,7 @@ import {
 import type { CreditNote } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
+import { SENT_BACK_WORD, isSentBack } from "@/components/finance-ui/returned-correction";
 import { creditNoteChanges, creditNoteCorrection, creditNoteCorrectionProblem, singleLine } from "./credit-note-edit";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { IncomeGivenBack } from "./income-given-back";
@@ -58,9 +59,11 @@ function shortenReason(s: string): string {
 
 // Posted credit note fully applied → "Applied"; otherwise "Issued". Debit notes
 // can't be allocated, so a posted debit note is always "Issued". Unposted → "Draft",
-// except one waiting on an approver, which is neither.
-function noteStatus(n: CreditNote): "DRAFT" | "PENDING_APPROVAL" | "ISSUED" | "APPLIED" | "REVERSED" {
+// except one waiting on an approver, which is neither, and one an approver sent
+// back to whoever sent it, which reads "Sent back".
+function noteStatus(n: CreditNote): "DRAFT" | "SENT_BACK" | "PENDING_APPROVAL" | "ISSUED" | "APPLIED" | "REVERSED" {
   if (n.status === "REVERSED") return "REVERSED";
+  if (isSentBack(n, true)) return "SENT_BACK";
   // A note awaiting approval is not a draft: it cannot be edited, and showing it
   // as one invites somebody to try to post it again.
   if (n.status === "PENDING_APPROVAL") return "PENDING_APPROVAL";
@@ -70,12 +73,13 @@ function noteStatus(n: CreditNote): "DRAFT" | "PENDING_APPROVAL" | "ISSUED" | "A
 }
 const STATUS_PILL: Record<string, string> = {
   DRAFT: "bg-gray-03/60 text-gray-05",
+  SENT_BACK: "bg-orange-500/10 text-yellow-01-text",
   PENDING_APPROVAL: "bg-amber-100 text-amber-700",
   ISSUED: "bg-blue-50 text-blue-700",
   APPLIED: "bg-green-01/10 text-green-01",
   REVERSED: "bg-gray-03/60 text-gray-05",
 };
-const STATUS_LABEL: Record<string, string> = { DRAFT: "Draft", PENDING_APPROVAL: "Awaiting approval", ISSUED: "Issued", APPLIED: "Applied", REVERSED: "Voided" };
+const STATUS_LABEL: Record<string, string> = { DRAFT: "Draft", SENT_BACK: SENT_BACK_WORD, PENDING_APPROVAL: "Awaiting approval", ISSUED: "Issued", APPLIED: "Applied", REVERSED: "Voided" };
 
 function TypeChip({ kind }: { kind: string }) {
   const debit = kind === "DEBIT";
@@ -213,6 +217,8 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
  * rejected or withdrawn, which comes back as a draft. A draft an approver sent
  * back is neither: its request still waits. Its sender corrects it (Edit) and
  * resumes it; anybody else is told only its sender may (returned-correction.ts).
+ * Any other draft is corrected (Edit) by whoever may create credit notes, then
+ * sent on as above.
  */
 export function NoteDetailDrawer({ note, entity, currency, onClose }: {
   note: CreditNote | null; entity: string; currency?: string | null; onClose: () => void;
@@ -288,7 +294,7 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
             {canApply ? (
               <Button onClick={() => setConfirmApply(true)} className="gap-1.5"><Check className="size-4" /> Apply to balance</Button>
             ) : null}
-            {standing === "sender" && can(P.FIN_CREATE_CREDIT_NOTE) ? (
+            {(isDraft || standing === "sender") && can(P.FIN_CREATE_CREDIT_NOTE) ? (
               <Button variant="outline" onClick={() => setEditing(true)} className="gap-1.5"><FilePenLine className="size-4" /> Edit</Button>
             ) : null}
             {standing === "sender" ? <ResumeButton workflowId={workflowId} tags={["FinanceCreditNotes"]} onResumed={onClose} /> : null}
@@ -325,7 +331,7 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
 
           <IncomeGivenBack rows={note.income_given_back} currency={currency} />
 
-          {status !== "DRAFT" ? (
+          {status !== "DRAFT" && status !== "SENT_BACK" ? (
             <div>
               <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">GL posting</p>
               <PostingRecap
@@ -360,8 +366,8 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
 }
 
 /**
- * Correct a credit or debit note an approver sent back, or a draft back from
- * approval: its date, reason and reference, and its line where it has one.
+ * Correct a credit or debit note: a draft, or one an approver sent back to
+ * whoever sent it: its date, reason and reference, and its line where it has one.
  * Only what changed is sent (credit-note-edit.ts); the note keeps its customer,
  * invoice, kind and branch.
  */
@@ -386,7 +392,7 @@ function CorrectNoteDrawer({ note, entity, currency, onClose, onSaved }: {
     if (!Object.keys(changes).length) { onClose(); return; }
     try {
       const res = await update({ id: note.id, entity, ...changes }).unwrap();
-      toast.success(res.message || "Changes saved. Resume it to send it back to the approver.");
+      toast.success(res.message || `${note.document_number} corrected.`);
       onClose();
       onSaved();
     } catch { /* central */ }

@@ -35,6 +35,7 @@ import { FilePreviewDialog, type PreviewFile } from "../../../components/finance
 import { printExpenseClaim } from "../../../utils/finance-print";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
+import { SENT_BACK_WORD, isSentBack } from "@/components/finance-ui/returned-correction";
 import {
   useGetExpenseClaimsQuery, useGetExpenseClaimSummaryQuery, useGetExpenseClaimQuery, useCreateExpenseClaimMutation,
   usePostExpenseClaimMutation, useRejectExpenseClaimMutation, useSettleExpenseClaimMutation, useVoidExpenseClaimMutation,
@@ -50,10 +51,11 @@ const tdCls = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-0
 
 // Our model: status DRAFT/PENDING_APPROVAL/POSTED/CANCELLED × payment status.
 // Collapse to the prototype's display states.
-type DispKey = "DRAFT" | "PENDING" | "APPROVED" | "PART_PAID" | "PAID" | "REJECTED";
+type DispKey = "DRAFT" | "SENT_BACK" | "PENDING" | "APPROVED" | "PART_PAID" | "PAID" | "REJECTED";
 function disp(c: ExpenseClaim): { key: DispKey; label: string; cls: string } {
   if (c.status === "CANCELLED") return { key: "REJECTED", label: "Rejected", cls: "bg-destructive/10 text-destructive" };
   if (c.status === "PENDING_APPROVAL") return { key: "PENDING", label: "Awaiting approval", cls: "bg-amber-50 text-amber-700" };
+  if (isSentBack(c, true)) return { key: "SENT_BACK", label: SENT_BACK_WORD, cls: "bg-orange-500/10 text-yellow-01-text" };
   if (c.status === "DRAFT") return { key: "DRAFT", label: "Draft", cls: "bg-gray-03/60 text-gray-05" };
   if (c.payment_status === "PAID") return { key: "PAID", label: "Paid", cls: "bg-green-01/10 text-green-01" };
   if (c.payment_status === "PARTIAL") return { key: "PART_PAID", label: "Part-paid", cls: "bg-amber-50 text-amber-700" };

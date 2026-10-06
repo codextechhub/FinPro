@@ -228,7 +228,8 @@ export interface ArAdjustment {
    * adjustment threshold. It therefore changes when the amount changes, so re-read
    * it after an edit rather than caching it against a document id.
    */
-  approval_required?: boolean;  /** Where its approval stands; absent from an older server. */
+  approval_required?: boolean;
+  /** Where its approval stands; absent from an older server. */
   approval_state?: string;
   /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
   approval_returned?: boolean;

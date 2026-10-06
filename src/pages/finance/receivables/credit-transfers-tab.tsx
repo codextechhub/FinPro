@@ -21,7 +21,7 @@ import {
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
-import { RETURNED_HINT } from "@/components/finance-ui/returned-correction";
+import { RETURNED_HINT, sentBackPill } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,7 +71,7 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
     ...(branches.show && list.view.selected === "all" ? [{ header: "Branch", cell: (t: CustomerCreditTransfer) => branches.name(t.branch_id) }] : []),
     { header: "Amount", align: "right", cell: (t) => <Money kobo={t.amount} currency={currency} align="right" /> },
     { header: "Date", cell: (t) => <span className="tabular-nums">{dates.day(t.transfer_date)}</span> },
-    { header: "Status", cell: (t) => <StatusPill status={t.status} label={CREDIT_TRANSFER_STATUS[t.status]} /> },
+    { header: "Status", cell: (t) => <StatusPill {...sentBackPill(t, t.status, CREDIT_TRANSFER_STATUS[t.status], true)} /> },
   ];
 
   return (
@@ -238,7 +238,7 @@ function TransferDrawer({ transfer, entity, currency, onClose }: {
           <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} />
           <div className="grid grid-cols-2 gap-4">
             <DetailField label="Amount"><Money kobo={transfer.amount} currency={currency} /></DetailField>
-            <DetailField label="Status"><StatusPill status={transfer.status} label={CREDIT_TRANSFER_STATUS[transfer.status]} /></DetailField>
+            <DetailField label="Status"><StatusPill {...sentBackPill(transfer, transfer.status, CREDIT_TRANSFER_STATUS[transfer.status], true)} /></DetailField>
             <DetailField label="From">{transfer.from_customer_name} <span className="font-normal text-gray-05">{transfer.from_customer_code}</span></DetailField>
             <DetailField label="To">{transfer.to_customer_name} <span className="font-normal text-gray-05">{transfer.to_customer_code}</span></DetailField>
             <DetailField label="Date">{dates.day(transfer.transfer_date)}</DetailField>

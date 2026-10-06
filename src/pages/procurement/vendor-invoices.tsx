@@ -63,7 +63,7 @@ import { useDates } from "../../lib/display-prefs";
 import { useVoidVendorInvoiceMutation } from "@/redux/services/procurement/payables-corrections-api";
 import { BillCreditNotes, CreditNoteForm, CreditNotesView } from "./vendor-credit-notes";
 import { VENDOR_INVOICE_TABS, approvalStateWord, vendorInvoiceWord } from "./document-status";
-import { WITH_APPROVERS_NOTE, approvalPillWord } from "@/components/finance-ui/returned-correction";
+import { WITH_APPROVERS_NOTE, isSentBack, sentBackPill } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 import { vendorInvoiceChanges } from "./vendor-invoice-edit";
 import { OpeningBillsDrawer } from "./opening-bills-drawer";
@@ -156,7 +156,7 @@ function BillsView({ entity, currency, switcher }: { entity: string; currency?: 
     { header: "Due Date", cell: (invoice) => dates.day(invoice.due_date) },
     { header: "Amount", align: "right", cell: (invoice) => <span className="tabular-nums">{money(invoice.total)}</span> },
     { header: "Paid", align: "right", cell: (invoice) => <span className="tabular-nums">{money(invoice.amount_paid)}</span> },
-    { header: "Status", cell: (invoice) => <div className="flex flex-wrap gap-1"><StatusPill status={invoice.status} label={vendorInvoiceWord(invoice.status)} />{invoice.display_status !== invoice.status && <StatusPill status={invoice.display_status} label={vendorInvoiceWord(invoice.display_status)} />}</div> },
+    { header: "Status", cell: (invoice) => <div className="flex flex-wrap gap-1"><StatusPill status={invoice.status} label={vendorInvoiceWord(invoice.status)} />{isSentBack(invoice) ? <StatusPill {...sentBackPill(invoice, invoice.approval_state)} /> : invoice.display_status !== invoice.status && <StatusPill status={invoice.display_status} label={vendorInvoiceWord(invoice.display_status)} />}</div> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
   return <ProcurementShell>
@@ -256,7 +256,7 @@ export function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | 
       {correction?.posted && <Can permission={P.PROC_VOID_VENDOR_INVOICE}><Button variant="outline-dest" onClick={() => setVoidOpen(true)}><Ban className="size-4" /> Void</Button></Can>}
     </>}>
       {isLoading ? <LoadingState rows={8} /> : isError || !invoice ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={invoice.status} label={vendorInvoiceWord(invoice.status)} /><StatusPill status={invoice.approval_state} label={approvalPillWord(invoice, approvalStateWord(invoice.approval_state))} /><StatusPill status={invoice.match_status} /><StatusPill status={invoice.payment_status} label={vendorInvoiceWord(invoice.payment_status)} />{invoice.is_overdue && <StatusPill status="OVERDUE" />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(invoice.total, currency)}</p></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={invoice.status} label={vendorInvoiceWord(invoice.status)} /><StatusPill {...sentBackPill(invoice, invoice.approval_state, approvalStateWord(invoice.approval_state))} /><StatusPill status={invoice.match_status} /><StatusPill status={invoice.payment_status} label={vendorInvoiceWord(invoice.payment_status)} />{invoice.is_overdue && <StatusPill status="OVERDUE" />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(invoice.total, currency)}</p></div>
         <TabStrip
           items={DETAIL_TAB_ITEMS}
           value={tab}

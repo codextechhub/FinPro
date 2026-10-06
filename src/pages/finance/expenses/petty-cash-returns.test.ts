@@ -91,6 +91,11 @@ describe("voiding a return", () => {
     expect(returnVoidable(ret({ status: "PENDING_APPROVAL" }))).toBe(false);
   });
 
+  it("does not cancel a draft whose approval request is open, sent back included", () => {
+    expect(returnVoidable(ret({ status: "DRAFT", approval_state: "PENDING", approval_returned: true }))).toBe(false);
+    expect(returnVoidable(ret({ status: "DRAFT", approval_state: "REJECTED", approval_returned: false }))).toBe(true);
+  });
+
   it("names the refusal the screen can already see", () => {
     const first = ret({ id: 10 });
     const later = ret({ id: 12, document_number: "PCR-0012" });

@@ -145,7 +145,39 @@ export function returnedHint(standing: "sender" | "returned", requestNamed: bool
 /** What the reader is told while the document is with its approvers. */
 export const WITH_APPROVERS_NOTE = "With the approver. Nobody can change it until they decide or send it back.";
 
+/** The word every list row and drawer pill uses for a document back with its sender. */
+export const SENT_BACK_WORD = "Sent back";
+
+/** The status token that pill wears, so it reads apart from one awaiting approval. */
+export const SENT_BACK_STATUS = "SENT_BACK";
+
+/**
+ * Whether a document is back with whoever sent it. A finance document is read
+ * through {@link financeReturnedFacts}, so a server from before
+ * `approval_returned` still marks a DRAFT left PENDING.
+ */
+export function isSentBack(doc: ReturnedFacts | null | undefined, finance = false): boolean {
+  const facts = finance ? financeReturnedFacts(doc) : doc;
+  return !!facts && facts.approval_state === "PENDING" && !!facts.approval_returned;
+}
+
+/**
+ * A status pill's status and label for `doc`: "Sent back" on a document back
+ * with its sender, else the pill it already wore. Mrs Bello's chairs
+ * requisition, sent back by Mr Eze, reads "Sent back" in her list rather than
+ * "Pending Approval", so she sees it waits on her before opening it. A
+ * document awaiting its approver keeps its own word.
+ */
+export function sentBackPill(
+  doc: ReturnedFacts | null | undefined,
+  status: string | null | undefined,
+  label?: string,
+  finance = false,
+): { status: string | null | undefined; label?: string } {
+  return isSentBack(doc, finance) ? { status: SENT_BACK_STATUS, label: SENT_BACK_WORD } : { status, label };
+}
+
 /** The approval pill's word: "Sent back" for a returned document, else `word`. */
 export function approvalPillWord(doc: ReturnedFacts, word: string | undefined): string | undefined {
-  return doc.approval_state === "PENDING" && doc.approval_returned ? "Sent back" : word;
+  return isSentBack(doc) ? SENT_BACK_WORD : word;
 }

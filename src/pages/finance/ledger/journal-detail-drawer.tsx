@@ -18,7 +18,7 @@ import { Check, FilePenLine, Printer, Send } from "lucide-react";
 import { DetailDrawer, Money, StatusPill, ConfirmActionModal, InfoHint } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
-import { RETURNED_HINT } from "@/components/finance-ui/returned-correction";
+import { RETURNED_HINT, sentBackPill } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -140,7 +140,7 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
             <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={directEntry ? undefined : RETURNED_HINT.resumeOnly} />
             {/* stat cards */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Status"><StatusPill status={j.status} /></Stat>
+              <Stat label="Status"><StatusPill {...sentBackPill(j, j.status, undefined, true)} /></Stat>
               <Stat label="Total Dr"><Money kobo={j.total_debit} currency={currency} /></Stat>
               <Stat label="Total Cr"><Money kobo={j.total_credit} currency={currency} /></Stat>
               <Stat label="Difference">

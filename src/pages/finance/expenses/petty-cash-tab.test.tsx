@@ -38,6 +38,21 @@ const mocks = vi.hoisted(() => ({
 }));
 
 const { idle } = vi.hoisted(() => ({ idle: () => [vi.fn(), { isLoading: false }] }));
+/** The approval request a returned document names, and who is signed in. */
+const returned = vi.hoisted(() => ({ uid: 4, request: undefined as unknown, resume: vi.fn() }));
+vi.mock("@/redux/services/finance/approval-request-api", () => ({
+  useGetDocumentApprovalRequestQuery: () => ({ data: undefined }),
+  approvalRequestApi: { util: { invalidateTags: () => ({ type: "test/invalidate" }) } },
+}));
+vi.mock("@/redux/services/dashboard/workflow-api", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetWorkflowInstanceQuery: () => ({ data: returned.request }),
+  useResubmitWorkflowInstanceMutation: () => [(id: string) => { returned.resume(id); return { unwrap: async () => ({}) }; }, { isLoading: false }],
+}));
+vi.mock("@/redux/store", () => ({
+  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {}, user: { id: returned.uid } } }),
+  useAppDispatch: () => vi.fn(),
+}));
 vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetPettyCashFundsQuery: () => ({ data: { data: mocks.funds }, isLoading: false }),
   useGetPettyCashFundQuery: () => ({ data: mocks.detail ? { data: mocks.detail } : undefined }),

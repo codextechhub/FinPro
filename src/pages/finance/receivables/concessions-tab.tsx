@@ -39,6 +39,7 @@ import { IncomeGivenBack } from "./income-given-back";
 import { useDates } from "../../../lib/display-prefs";
 import { DOCUMENT_STATUS_WORDS, statusWord } from "@/components/finance-ui/status-words";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
+import { sentBackPill } from "@/components/finance-ui/returned-correction";
 import { concessionChanges, concessionForm, concessionFormProblem, type ConcessionForm } from "./concession-edit";
 
 /** The states a concession list filters on, each named as its pill names it. */
@@ -115,7 +116,7 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
     { header: "Type", cell: (c) => <TypeChip kind={c.kind} /> },
     { header: "Amount", align: "right", cell: (c) => <Money kobo={c.amount} currency={currency} align="right" /> },
     { header: "Date", cell: (c) => <span className="tabular-nums">{dates.day(c.concession_date)}</span> },
-    { header: "Status", cell: (c) => <StatusPill status={c.status} label={statusWord(c.status)} /> },
+    { header: "Status", cell: (c) => <StatusPill {...sentBackPill(c, c.status, statusWord(c.status), true)} /> },
   ];
 
   return (
@@ -245,7 +246,7 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <Field label="Amount"><Money kobo={concession.amount} currency={currency} /></Field>
-            <Field label="Status"><StatusPill status={concession.status} label={statusWord(concession.status)} /></Field>
+            <Field label="Status"><StatusPill {...sentBackPill(concession, concession.status, statusWord(concession.status), true)} /></Field>
             <Field label="Against invoice">{concession.invoice_number ?? "-"}</Field>
             <Field label="Date">{dates.day(concession.concession_date)}</Field>
           </div>

@@ -38,6 +38,7 @@ import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { useDates } from "../../../lib/display-prefs";
 import { presetRange } from "../../../utils/date-presets";
+import { sentBackPill } from "@/components/finance-ui/returned-correction";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
 const SOURCES: JournalSource[] = ["MANUAL", "SALES", "PURCHASE", "BANK", "PAYROLL", "CLOSING", "OPENING", "FX", "SYSTEM"];
@@ -104,7 +105,7 @@ export default function GeneralLedgerPage() {
     { header: "Source", cell: (j) => cap(j.source) },
     { header: "Reference", cell: (j) => <span className="block max-w-xs truncate text-gray-01">{j.narration || j.reference || "-"}</span> },
     { header: "Total Debit", align: "right", cell: (j) => <Money kobo={j.total_debit} currency={currency} align="right" /> },
-    { header: "Status", cell: (j) => <StatusPill status={j.status} /> },
+    { header: "Status", cell: (j) => <StatusPill {...sentBackPill(j, j.status, undefined, true)} /> },
     { header: "Created By", cell: (j) => (
       <span className="inline-flex items-center gap-2" title={exitedTitle(j.created_by_is_exited)}>
         <UserAvatar userId={j.created_by_id ?? undefined} name={j.created_by} className={cn("size-6 rounded-full", exitedOutline(j.created_by_is_exited))} fallbackClassName="text-[9px] font-semibold" />

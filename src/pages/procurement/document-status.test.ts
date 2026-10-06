@@ -10,6 +10,7 @@ import { statusLabel } from "@/components/finance-ui/status-pill";
 import {
   PURCHASE_ORDER_TABS, VENDOR_CREDIT_NOTE_TABS, VENDOR_INVOICE_TABS, approvalStateWord, purchaseOrderWord,
   vendorCreditNoteWord, vendorInvoiceWord,
+  purchaseOrderPill,
 } from "./document-status";
 
 /** What a pill reads for `status`, given the screen's word for it. */
@@ -34,5 +35,21 @@ describe("payables and purchasing status words", () => {
 
   it("say a document's approval overlay is awaiting approval as its status does", () => {
     expect(approvalStateWord("PENDING")).toBe(vendorInvoiceWord("PENDING_APPROVAL"));
+  });
+});
+
+describe("purchaseOrderPill", () => {
+  // Mrs Bello's order for 40 chairs, as its row and drawer read it.
+  it("reads Pending Approval on a draft order its approvers have", () => {
+    const pill = purchaseOrderPill({ display_status: "DRAFT", approval_state: "PENDING", approval_returned: false });
+    expect(pill.status).toBe("PENDING_APPROVAL");
+    expect(pill.label ?? statusLabel(pill.status!)).toBe("Pending Approval");
+  });
+
+  it("reads Sent back once an approver hands it back, and Draft before it is sent", () => {
+    expect(purchaseOrderPill({ display_status: "DRAFT", approval_state: "PENDING", approval_returned: true }))
+      .toEqual({ status: "SENT_BACK", label: "Sent back" });
+    const draft = purchaseOrderPill({ display_status: "DRAFT", approval_state: "NOT_SUBMITTED", approval_returned: false });
+    expect(draft.status).toBe("DRAFT");
   });
 });

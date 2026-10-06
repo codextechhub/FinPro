@@ -54,7 +54,7 @@ import {
   creditInstruction, creditNoteHeaderChanges, creditNoteStage, type CreditMode, type LineCredit,
 } from "./vendor-credit-note-model";
 import { VENDOR_CREDIT_NOTE_TABS, approvalStateWord, vendorCreditNoteWord } from "./document-status";
-import { approvalPillWord } from "@/components/finance-ui/returned-correction";
+import { sentBackPill } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 
 const STATUS_TABS: TabStripItem<string>[] = VENDOR_CREDIT_NOTE_TABS.map((tab) => ({ ...tab }));
@@ -86,7 +86,7 @@ export function CreditNotesView({ entity, currency }: { entity: string; currency
     { header: "Date", cell: (note) => dates.day(note.note_date) },
     { header: "Total", align: "right", cell: (note) => <span className="tabular-nums">{money(note.total)}</span> },
     { header: "Credit left", align: "right", cell: (note) => <span className="tabular-nums">{note.status === "POSTED" && note.advance_remaining > 0 ? money(note.advance_remaining) : "-"}</span> },
-    { header: "Status", cell: (note) => <div className="flex flex-wrap gap-1"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill status={note.approval_state} label={approvalPillWord(note, approvalStateWord(note.approval_state))} />}</div> },
+    { header: "Status", cell: (note) => <div className="flex flex-wrap gap-1"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill {...sentBackPill(note, note.approval_state, approvalStateWord(note.approval_state))} />}</div> },
   ];
   return <>
     <section className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
@@ -110,7 +110,7 @@ export function BillCreditNotes({ bill, entity, currency }: { bill: VendorInvoic
   return <div className="space-y-2">
     {notes.length ? notes.map((note) => <button key={note.id} type="button" onClick={() => setOpenId(note.id)} className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border border-white-02 p-3 text-left hover:border-primary/40">
       <div className="min-w-0"><p className="font-mont text-sm font-semibold text-primary">{note.document_number || "Draft credit note"}</p><p className="mt-1 truncate font-mont text-xs text-gray-05">{dates.day(note.note_date)} · {note.reason}</p></div>
-      <div className="text-right"><p className="font-mont text-sm font-semibold tabular-nums">{formatMoney(note.total, currency)}</p><div className="mt-1 flex justify-end gap-1"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill status={note.approval_state} label={approvalPillWord(note, approvalStateWord(note.approval_state))} />}</div></div>
+      <div className="text-right"><p className="font-mont text-sm font-semibold tabular-nums">{formatMoney(note.total, currency)}</p><div className="mt-1 flex justify-end gap-1"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill {...sentBackPill(note, note.approval_state, approvalStateWord(note.approval_state))} />}</div></div>
     </button>) : <p className="rounded-md border border-dashed border-white-02 px-4 py-6 text-center font-mont text-xs text-gray-05">No credit notes have been raised on this bill.</p>}
     <CreditNoteDrawer key={openId ?? "closed"} id={openId} entity={entity} currency={currency} onClose={() => setOpenId(null)} />
   </div>;
@@ -167,7 +167,7 @@ export function CreditNoteDrawer({ id, entity, currency, onClose }: { id: number
       {stage === "posted" && <Can permission={P.PROC_REVERSE_VENDOR_CREDIT_NOTE}><Button variant="outline-dest" onClick={() => setVoiding(true)}><Ban className="size-4" /> Void</Button></Can>}
     </>}>
       {isLoading ? <LoadingState rows={6} /> : isError || !note ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill status={note.approval_state} label={approvalPillWord(note, approvalStateWord(note.approval_state))} />}</div><p className="font-mont text-lg font-semibold tabular-nums">{money(note.total)}</p></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill {...sentBackPill(note, note.approval_state, approvalStateWord(note.approval_state))} />}</div><p className="font-mont text-lg font-semibold tabular-nums">{money(note.total)}</p></div>
         <ReturnedNote standing={standing} request={workflow} requestNamed={!!workflowId} />
         {standing === "with-approvers" && <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs text-amber-900">With the approver. Nobody can change it until they decide or send it back; it posts once approved.</p>}
         <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">

@@ -14,6 +14,8 @@
 import {
   APPROVAL_STATE_WORDS, DOCUMENT_STATUS_WORDS, PAYMENT_PROGRESS_WORDS, statusWord,
 } from "@/components/finance-ui/status-words";
+import { sentBackPill } from "@/components/finance-ui/returned-correction";
+import type { PurchaseOrder } from "@/redux/services/procurement/procurement-types";
 
 /** A vendor bill's states: its lifecycle, then the list's headline overlay (display_status). */
 export const VENDOR_INVOICE_WORDS: Readonly<Record<string, string>> = {
@@ -63,6 +65,25 @@ export const vendorCreditNoteWord = (status: string | null | undefined) => statu
 
 /** A purchase order's word for `status`. */
 export const purchaseOrderWord = (status: string | null | undefined) => statusWord(status, PURCHASE_ORDER_WORDS);
+
+/**
+ * A purchase order's pill: "Sent back" while an approver has handed it back to
+ * whoever sent it, "Pending Approval" while its approvers have it, else its
+ * `display_status`.
+ *
+ * An order sent for approval stays a DRAFT with `approval_state` PENDING, and
+ * the server's `display_status` reads such an order as DRAFT. Mrs Bello's order
+ * for 40 chairs waits on Mr Eze: its row says Pending Approval, as the tab that
+ * lists it and the requisitions beside it do, rather than Draft.
+ */
+export function purchaseOrderPill(
+  po: Pick<PurchaseOrder, "display_status" | "approval_state" | "approval_returned">,
+): { status: string | null | undefined; label?: string } {
+  if (po.approval_state === "PENDING" && !po.approval_returned && po.display_status === "DRAFT") {
+    return { status: "PENDING_APPROVAL", label: purchaseOrderWord("PENDING_APPROVAL") };
+  }
+  return sentBackPill(po, po.display_status, purchaseOrderWord(po.display_status));
+}
 
 /** A procurement document's approval overlay (approval_state). */
 export const approvalStateWord = (state: string | null | undefined) => statusWord(state, APPROVAL_STATE_WORDS);

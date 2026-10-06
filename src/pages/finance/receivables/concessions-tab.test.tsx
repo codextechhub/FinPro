@@ -110,6 +110,25 @@ describe("concession states", () => {
     expect(document.body.textContent).not.toContain("Pending Approval");
   });
 
+  it("reads Sent back on a row and drawer an approver sent back, and keeps Draft and Awaiting approval otherwise", () => {
+    returned.request = undefined;
+    mocks.rows = [
+      { ...concession(3, "Chidi Obi", "DRAFT"), approval_state: "PENDING", approval_returned: true },
+      { ...concession(4, "Ngozi Eze", "DRAFT"), approval_state: "REJECTED", approval_returned: false },
+      { ...concession(5, "Bayo Ade", "PENDING_APPROVAL"), approval_state: "PENDING", approval_returned: false },
+    ];
+    act(() => root.render(<MemoryRouter><ConcessionsTab entity="BSS" currency="NGN" /></MemoryRouter>));
+
+    const rows = [...container.querySelectorAll("tbody tr")].map((tr) => tr.textContent ?? "");
+    expect(rows.find((t) => t.includes("CON-0003"))).toContain("Sent back");
+    expect(rows.find((t) => t.includes("CON-0004"))).toContain("Draft");
+    expect(rows.find((t) => t.includes("CON-0004"))).not.toContain("Sent back");
+    expect(rows.find((t) => t.includes("CON-0005"))).toContain("Awaiting approval");
+
+    act(() => (container.querySelector("tbody tr") as HTMLElement).click());
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain("Sent back");
+  });
+
   it("filters on the states the backend gives a concession", () => {
     expect([...CONCESSION_FILTER_STATUSES]).toEqual(["DRAFT", "PENDING_APPROVAL", "POSTED", "REVERSED"]);
   });

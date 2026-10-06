@@ -20,6 +20,22 @@ const mocks = vi.hoisted(() => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+/** The approval request a returned document names, and who is signed in. */
+const returned = vi.hoisted(() => ({ uid: 4, request: undefined as unknown, resume: vi.fn() }));
+vi.mock("@/redux/services/finance/approval-request-api", () => ({
+  useGetDocumentApprovalRequestQuery: () => ({ data: undefined }),
+  approvalRequestApi: { util: { invalidateTags: () => ({ type: "test/invalidate" }) } },
+}));
+vi.mock("@/redux/services/dashboard/workflow-api", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetWorkflowInstanceQuery: () => ({ data: returned.request }),
+  useResubmitWorkflowInstanceMutation: () => [(id: string) => { returned.resume(id); return { unwrap: async () => ({}) }; }, { isLoading: false }],
+}));
+vi.mock("@/redux/store", () => ({
+  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {}, user: { id: returned.uid } } }),
+  useAppDispatch: () => vi.fn(),
+}));
+vi.mock("../../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
 vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetPettyCashReturnsQuery: (...args: unknown[]) => {
     mocks.list(...args);
@@ -143,6 +159,27 @@ describe("petty cash returns", () => {
     act(() => button("Void")!.click());
     expect(document.body.querySelector("[role=alert]")?.textContent).toBe("Return PCR-0012 of this fund came after PCR-0010. Void it first.");
     expect(button("Void return")!.disabled).toBe(true);
+  });
+
+  it("reads Sent back on a return an approver sent back, offers its sender Resume, and no Cancel return", async () => {
+    returned.uid = 4;
+    returned.request = { id: "wf-10", status: "RETURNED", requested_by: 4, stage_instances: [] };
+    mocks.rows = [{ ...IKEJA_REDUCE, status: "DRAFT", approval_state: "PENDING", approval_returned: true, workflow_instance_id: "wf-10" }];
+    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    expect(tableRows()[0].textContent).toContain("Sent back");
+    act(() => (tableRows()[0] as HTMLElement).click());
+    expect(button("Cancel return")).toBeUndefined();
+    expect(document.body.textContent).toContain("To change it, withdraw it from your approvals");
+    await act(async () => button("Resume")!.click());
+    expect(returned.resume).toHaveBeenCalledWith("wf-10");
+  });
+
+  it("keeps Draft and Cancel return on a draft no approver holds", () => {
+    mocks.rows = [{ ...IKEJA_REDUCE, status: "DRAFT", approval_state: "REJECTED", approval_returned: false }];
+    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    expect(tableRows()[0].textContent).toContain("Draft");
+    act(() => (tableRows()[0] as HTMLElement).click());
+    expect(button("Cancel return")).toBeDefined();
   });
 
   it("offers no Void without the reverse key", () => {

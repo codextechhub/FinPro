@@ -255,6 +255,12 @@ export interface PettyCashReturn {
   approval?: ApprovalParkState;
   /** The fund as the return left it, present when it posted at once. */
   fund?: PettyCashFund;
+  /** Where its approval stands; absent from a server that does not say. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it; absent means unknown. */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }
 
 /** What raising a return sends; amounts in kobo. */

@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => {
     held: new Set<string>(),
     uid: 4,
     doc: null as unknown,
+    rows: [] as unknown[],
     workflow: undefined as unknown,
     update: (() => undefined) as (body: unknown) => void,
     resume: (() => undefined) as (id: unknown) => void,
@@ -64,11 +65,18 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRaisingBranchChoice: () => ({ ready: true, body: () => ({}) }),
   RaisingBranchChoiceField: () => null,
+  useActiveEntity: () => ({ code: "BSS", currency: "NGN", entity: null, isLoading: false }),
 }));
+vi.mock("./procurement-shell", () => ({ ProcurementShell: ({ children }: { children: React.ReactNode }) => children }));
+vi.mock("@/components/layout/page-shell", () => ({ PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
+vi.mock("../../host", async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), QuickExportButton: () => null }));
+vi.mock("@/lib/source-document-route", async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), useSourceDocumentParam: () => undefined }));
+vi.mock("@/hooks/use-action-param", () => ({ useActionParam: () => undefined }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverPrompt: () => ({ promptIfParked: () => undefined, noApproverDialog: null }) }));
 vi.mock("sonner", () => ({ toast: { success: () => undefined, error: () => undefined } }));
 vi.mock("@/redux/services/procurement/procurement-api", () => mocks.api({
   useGetRequisitionQuery: () => ({ ...mocks.query(), data: { data: mocks.state.doc } }),
+  useGetRequisitionsQuery: () => ({ ...mocks.query(), currentData: { data: mocks.state.rows, pagination: { currentPage: 1, totalPages: 1 } } }),
   useUpdateRequisitionMutation: mocks.mutation((body) => mocks.state.update(body)),
 }));
 vi.mock("@/redux/services/finance/setup-api", () => mocks.api({}));
@@ -78,7 +86,7 @@ vi.mock("@/redux/services/dashboard/workflow-api", () => mocks.api({
 }));
 
 import { P } from "../../permissions";
-import { RequisitionDrawer } from "./requisitions";
+import RequisitionsPage, { RequisitionDrawer } from "./requisitions";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -162,5 +170,20 @@ describe("a requisition with its approver", () => {
     expect(document.body.textContent).toContain("With the approver.");
     expect(button("Edit")).toBeUndefined();
     expect(button("Resume")).toBeUndefined();
+  });
+});
+
+describe("the requisitions list", () => {
+  it("reads Sent back on a requisition an approver sent back, and Pending Approval on one still with its approver", () => {
+    mocks.state.held = new Set([P.PROC_VIEW_REQUISITIONS]);
+    mocks.state.rows = [
+      { ...REQ, id: 9, document_number: "REQ-0009", title: "Chairs for Ikeja" },
+      { ...REQ, id: 10, document_number: "REQ-0010", title: "Toner", approval_returned: false },
+    ];
+    act(() => root.render(<MemoryRouter><RequisitionsPage /></MemoryRouter>));
+    const rows = [...container.querySelectorAll("tbody tr")].map((tr) => tr.textContent ?? "");
+    expect(rows.find((t) => t.includes("REQ-0009"))).toContain("Sent back");
+    expect(rows.find((t) => t.includes("REQ-0010"))).toContain("Pending Approval");
+    expect(rows.find((t) => t.includes("REQ-0010"))).not.toContain("Sent back");
   });
 });

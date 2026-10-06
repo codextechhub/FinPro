@@ -13,7 +13,7 @@ import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
 import { useServesPath } from "../../lib/host-routes";
 import { approvalWorkflowLink } from "./approval-workflow-link";
-import { WITH_APPROVERS_NOTE } from "@/components/finance-ui/returned-correction";
+import { WITH_APPROVERS_NOTE, sentBackPill } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 import {
   blankRequisitionLine, requisitionApiLines, requisitionChanges, requisitionForm,
@@ -148,7 +148,7 @@ export default function RequisitionsPage() {
       cell: (r) => <div><p>{dates.day(r.request_date)}</p><p className="mt-0.5 text-[11px] text-gray-05">{age(r.created_at)}</p></div>,
     },
     { header: "Amount", align: "right", cell: (r) => <span className="tabular-nums">{money(r.estimated_total)}</span> },
-    { header: "Status", cell: (r) => <StatusPill status={displayStatus(r)} /> },
+    { header: "Status", cell: (r) => <StatusPill {...sentBackPill(r, displayStatus(r))} /> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
@@ -314,7 +314,7 @@ export function RequisitionDrawer({ id, entity, currency, onClose }: {
         {isLoading ? <LoadingState rows={7} /> : isError || !req ? <ErrorState onRetry={refetch} /> : (
           <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <StatusPill status={displayStatus(req)} />
+              <StatusPill {...sentBackPill(req, displayStatus(req))} />
               <p className="font-mont text-lg font-semibold tabular-nums text-black-01">{formatMoney(req.estimated_total, currency)}</p>
             </div>
             <TabStrip

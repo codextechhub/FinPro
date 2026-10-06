@@ -7,6 +7,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 import type { InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
 import { stageLabel, stageTone } from "./transfer-actions";
+import { SENT_BACK_WORD, isSentBack, type ReturnedFacts } from "@/components/finance-ui/returned-correction";
 import type { BranchOption } from "./use-inter-branch";
 
 const PILL = "inline-flex whitespace-nowrap rounded px-2 py-0.5 font-mont text-[11px] font-medium";
@@ -14,9 +15,12 @@ const TONE = {
   good: "bg-green-01/10 text-green-01",
   waiting: "bg-amber-50 text-amber-800",
   closed: "bg-gray-03/60 text-gray-05",
+  sentBack: "bg-orange-500/10 text-yellow-01-text",
 } as const;
 
-export function StagePill({ transfer }: { transfer: Pick<InterBranchTransfer, "kind" | "stage"> }) {
+/** The transfer's stage, or "Sent back" while an approver has handed a send back to whoever sent it. */
+export function StagePill({ transfer }: { transfer: Pick<InterBranchTransfer, "kind" | "stage"> & ReturnedFacts }) {
+  if (isSentBack(transfer, true)) return <span className={cn(PILL, TONE.sentBack)}>{SENT_BACK_WORD}</span>;
   return <span className={cn(PILL, TONE[stageTone(transfer)])}>{stageLabel(transfer)}</span>;
 }
 

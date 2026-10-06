@@ -195,10 +195,14 @@ export const KIND_LABELS: Record<InterBranchKind, string> = {
   BANK_SPLIT: "Shared bank split",
 };
 
-/** The register's stage filter, as the list endpoint's `status` values. */
+/**
+ * The register's stage filter, as the list endpoint's `status` values. A send
+ * an approver sent back is a DRAFT, so the filter that lists requests lists it
+ * too, under the word its row wears as well.
+ */
 export const STATUS_FILTERS: readonly (readonly [string, string])[] = [
   ["", "Any stage"],
-  ["DRAFT", "Requested"],
+  ["DRAFT", "Requested or sent back"],
   ["PENDING_APPROVAL", "Waiting for approval"],
   ["POSTED", "Sent or booked"],
   ["CANCELLED", "Declined or not sent"],

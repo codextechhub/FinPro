@@ -45,7 +45,7 @@ import { useDates } from "../../lib/display-prefs";
 import { ReasonField } from "@/components/finance-ui/reason-field";
 import { useCancelPurchaseOrderMutation } from "@/redux/services/procurement/payables-corrections-api";
 import { SOURCE_DOCUMENT_ID_PARAM } from "@/lib/source-document-route";
-import { PURCHASE_ORDER_TABS, purchaseOrderWord } from "./document-status";
+import { PURCHASE_ORDER_TABS, purchaseOrderPill } from "./document-status";
 import { purchaseOrderChanges, purchaseOrderForm } from "./purchase-order-edit";
 import { WITH_APPROVERS_NOTE } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
@@ -128,7 +128,7 @@ export default function PurchaseOrdersPage() {
     { header: "Delivery", cell: (po) => dates.day(po.expected_date) },
     { header: "Total", align: "right", cell: (po) => <span className="tabular-nums">{money(po.total)}</span> },
     { header: "Received", cell: (po) => <span className="tabular-nums">{percent(po.received_pct)}</span> },
-    { header: "Status", cell: (po) => <StatusPill status={po.display_status} label={purchaseOrderWord(po.display_status)} /> },
+    { header: "Status", cell: (po) => <StatusPill {...purchaseOrderPill(po)} /> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
@@ -281,7 +281,7 @@ export function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: num
     {cancellable && <Can permission={P.PROC_UPDATE_PURCHASE_ORDER}><Button variant="outline-dest" onClick={() => setCancelOpen(true)}><Ban className="size-4" /> Cancel order</Button></Can>}
   </>}>
     {isLoading ? <LoadingState rows={7} /> : isError || !po ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3"><StatusPill status={po.display_status} label={purchaseOrderWord(po.display_status)} /><p className="font-mont text-lg font-semibold tabular-nums text-black-01">{money(po.total)}</p></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><StatusPill {...purchaseOrderPill(po)} /><p className="font-mont text-lg font-semibold tabular-nums text-black-01">{money(po.total)}</p></div>
       <TabStrip
         items={DETAIL_TAB_ITEMS}
         value={tab}

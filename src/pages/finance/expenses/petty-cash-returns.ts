@@ -126,9 +126,16 @@ export function closeProblem({ blockers, figures, hasBank, reason }: {
   return null;
 }
 
-/** Whether a return offers Void: a posted one is reversed, a draft cancelled. */
+/**
+ * Whether a return offers Void: a posted one is reversed, a draft cancelled.
+ * A draft whose approval request is still open, including one an approver sent
+ * back to whoever sent it, is not cancelled here: it is resumed, or withdrawn
+ * from the approvals screen. A read that does not say where its approval stands
+ * leaves a draft cancellable, as before, and the server has the last word.
+ */
 export function returnVoidable(ret: PettyCashReturn): boolean {
-  return ret.status === "POSTED" || ret.status === "DRAFT";
+  if (ret.status === "DRAFT") return ret.approval_state !== "PENDING";
+  return ret.status === "POSTED";
 }
 
 /**

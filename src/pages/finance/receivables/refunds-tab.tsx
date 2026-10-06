@@ -32,7 +32,8 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
-import { RETURNED_HINT } from "@/components/finance-ui/returned-correction";
+import { RETURNED_HINT, SENT_BACK_STATUS, SENT_BACK_WORD, isSentBack } from "@/components/finance-ui/returned-correction";
+import { useGetDocumentApprovalRequestQuery } from "@/redux/services/finance/approval-request-api";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { gateExplanation, predictsApproval } from "./adjustment-approval";
 import { useAdjustmentGate } from "./use-adjustment-gate";
@@ -68,10 +69,12 @@ function TypeChip({ kind }: { kind: Mode }) {
 }
 function StatusPill({ status }: { status: string }) {
   const normalized = status.toUpperCase();
-  const label = statusWord(normalized) ?? normalized.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  const label = normalized === SENT_BACK_STATUS ? SENT_BACK_WORD
+    : statusWord(normalized) ?? normalized.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
   return (
     <span className={cn("inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium",
       normalized === "POSTED" ? "bg-green-01/10 text-green-01"
+        : normalized === SENT_BACK_STATUS ? "bg-orange-500/10 text-yellow-01-text"
         : normalized === "PENDING_APPROVAL" ? "bg-blue-50 text-blue-700"
           : normalized === "REVERSED" ? "bg-gray-03/60 text-gray-05"
             : "bg-amber-50 text-amber-700")}>
@@ -142,7 +145,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
     { header: "Customer", cell: (r) => <span className="text-gray-01">{r.customer_name}</span> },
     { header: "Reason", cell: (r) => <span className="block max-w-[260px] truncate text-gray-01" title={r.reason}>{r.reason || "-"}</span> },
     { header: "Amount", align: "right", cell: (r) => <Money kobo={r.amount} currency={currency} align="right" /> },
-    { header: "Status", cell: (r) => <StatusPill status={r.status || "DRAFT"} /> },
+    { header: "Status", cell: (r) => <StatusPill status={isSentBack(r, true) ? SENT_BACK_STATUS : r.status || "DRAFT"} /> },
   ];
 
   return (
@@ -199,7 +202,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
   );
 }
 
-function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
+export function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
   row: ArAdjustment | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
@@ -212,11 +215,17 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({
     documentLabel: row?.kind === "WRITEOFF" ? "write-off" : "refund",
   });
+  // The combined list carries no approval state, so a draft's is read from its own detail.
+  const path = row?.kind === "WRITEOFF" ? "write-offs" : "refunds";
+  const docId = row?.kind === "WRITEOFF" ? row.write_off_id : row?.refund_id;
+  const { data: detail } = useGetDocumentApprovalRequestQuery(
+    { path, id: docId ?? 0, entity },
+    { skip: !row || !docId || row.status !== "DRAFT" || row.approval_state !== undefined },
+  );
+  const doc = row && detail?.data ? { ...row, ...detail.data } : row;
   // Neither has an edit route: one sent back is resumed as it is, or withdrawn to change it.
-  const { standing, request, workflowId, requestNamed } = useFinanceReturned(row, row?.kind === "WRITEOFF"
-    ? { path: "write-offs", entity, id: row.write_off_id }
-    : { path: "refunds", entity, id: row?.refund_id });
-  if (!row) return null;
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(doc, { path, entity, id: docId });
+  if (!row || !doc) return null;
 
   const wo = row.kind === "WRITEOFF";
   const posted = row.status === "POSTED";
@@ -307,7 +316,7 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
         ) : null}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Amount"><Money kobo={row.amount} currency={currency} /></Field>
-          <Field label="Status"><StatusPill status={row.status || "DRAFT"} /></Field>
+          <Field label="Status"><StatusPill status={isSentBack(doc, true) ? SENT_BACK_STATUS : row.status || "DRAFT"} /></Field>
           <Field label={wo ? "Against invoice" : "Reference"}>{row.reference || "-"}</Field>
           <Field label="Date">{dates.day(row.date)}</Field>
         </div>
