@@ -62,12 +62,22 @@ export function heldActions(h: HeldReceipt, { canForward, canVoid, covers }: {
   return { forward: open && own && canForward, void: open && own && canVoid };
 }
 
-function HeldStatus({ h }: { h: HeldReceipt }) {
-  if (h.status === "REVERSED") return <TonePill tone="closed">Voided</TonePill>;
+/**
+ * Where a held receipt stands. A forward whose approval ended unapproved no
+ * longer holds it (the server's `forwarded_by` is then null), so it reads
+ * "Held" again, with Forward and Void offered, never "Forwarding".
+ */
+export function heldStage(h: Pick<HeldReceipt, "status" | "forwarded_by">): { label: string; tone: "good" | "waiting" | "closed" } {
+  if (h.status === "REVERSED") return { label: "Voided", tone: "closed" };
   if (h.forwarded_by) {
-    return <TonePill tone={h.forwarded_by.status === "POSTED" ? "good" : "waiting"}>{h.forwarded_by.status === "POSTED" ? "Forwarded" : "Forwarding"}</TonePill>;
+    return h.forwarded_by.status === "POSTED" ? { label: "Forwarded", tone: "good" } : { label: "Forwarding", tone: "waiting" };
   }
-  return <TonePill tone="waiting">Held</TonePill>;
+  return { label: "Held", tone: "waiting" };
+}
+
+function HeldStatus({ h }: { h: HeldReceipt }) {
+  const stage = heldStage(h);
+  return <TonePill tone={stage.tone}>{stage.label}</TonePill>;
 }
 
 export function HeldReceiptsTab({ entity, currency, reader }: { entity: string; currency?: string | null; reader: InterBranchReader }) {

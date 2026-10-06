@@ -7,6 +7,8 @@
  * - **Send** and **Decline** meet or refuse a request, and belong to the branch
  *   that was asked (the sending branch). Only a request still waiting can be
  *   sent or declined. Nothing was booked yet, so a decline reverses nothing.
+ *   A send an approver sent back waits in the approvals screen, so it is
+ *   offered neither until it is resumed or withdrawn there.
  * - **Confirm arrival** belongs to the receiving branch, for money only (cash
  *   and forwarded receipts), once it is sent and not yet confirmed.
  * - **Void** reverses both branches' books, so it needs somebody who works in
@@ -20,6 +22,7 @@
  */
 
 import type { InterBranchKind, InterBranchStage, InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
+import { sentBackForChanges } from "@/components/finance-ui/sent-back";
 
 /** The reach question the host answers (`useReaderReach`). */
 export interface TransferReach {
@@ -69,7 +72,7 @@ export function transferActions(
   reach: TransferReach,
 ): TransferAction[] {
   const actions: TransferAction[] = [];
-  if (isOpenRequest(t) && keys.transfer && reach.covers([t.branch_id])) {
+  if (isOpenRequest(t) && !sentBackForChanges(t) && keys.transfer && reach.covers([t.branch_id])) {
     actions.push("send", "decline");
   }
   if (
@@ -118,6 +121,7 @@ const STAGE_WORDS: Record<InterBranchStage, string> = {
   SENT: "Sent",
   RECEIVED: "Arrived",
   DECLINED: "Declined",
+  NOT_SENT: "Not sent",
   VOIDED: "Voided",
 };
 
@@ -131,7 +135,7 @@ export function stageLabel(t: Pick<InterBranchTransfer, "kind" | "stage">): stri
 /** Pill tone for a stage. */
 export function stageTone(t: Pick<InterBranchTransfer, "kind" | "stage">): "good" | "waiting" | "closed" {
   if (t.stage === "RECEIVED" || (t.stage === "SENT" && !MONEY_KINDS.includes(t.kind))) return "good";
-  if (t.stage === "DECLINED" || t.stage === "VOIDED") return "closed";
+  if (t.stage === "DECLINED" || t.stage === "NOT_SENT" || t.stage === "VOIDED") return "closed";
   return "waiting";
 }
 
@@ -166,6 +170,20 @@ export function transferMeaning(
   }
 }
 
+/**
+ * What a transfer whose send was never approved leaves the reader to do, or
+ * null for any other stage. Its approval was rejected, withdrawn or cancelled,
+ * and nothing was booked: a forwarded receipt is held again, to forward or
+ * void; money is sent again as a new transfer.
+ */
+export function notSentNote(t: Pick<InterBranchTransfer, "kind" | "stage" | "branch_name" | "to_branch_name">): string | null {
+  if (t.stage !== "NOT_SENT") return null;
+  if (t.kind === "FORWARDED_RECEIPT") {
+    return `Not sent: its approval ended without approving it, and nothing was booked. ${t.branch_name} holds the receipt again, to forward to ${t.to_branch_name} or void.`;
+  }
+  return `Not sent: its approval ended without approving it, and nothing was booked. To send the money, make a new transfer.`;
+}
+
 /** What each kind is called on screen. */
 export const KIND_LABELS: Record<InterBranchKind, string> = {
   CASH: "Money",
@@ -183,6 +201,6 @@ export const STATUS_FILTERS: readonly (readonly [string, string])[] = [
   ["DRAFT", "Requested"],
   ["PENDING_APPROVAL", "Waiting for approval"],
   ["POSTED", "Sent or booked"],
-  ["CANCELLED", "Declined"],
+  ["CANCELLED", "Declined or not sent"],
   ["REVERSED", "Voided"],
 ];

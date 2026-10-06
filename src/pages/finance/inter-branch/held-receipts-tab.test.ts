@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/redux/services/finance/interbranch-api", () => ({}));
 
 import type { HeldReceipt } from "@/redux/services/finance/interbranch-types";
-import { heldActions, lookupNote } from "./held-receipts-tab";
+import { heldActions, heldStage, lookupNote } from "./held-receipts-tab";
 
 const HELD: HeldReceipt = {
   id: 4, document_number: "HR-0004", status: "POSTED", branch_id: 1, branch_name: "Ikeja",
@@ -31,6 +31,13 @@ describe("a held receipt's actions", () => {
     const forwarding = { ...HELD, forwarded_by: { id: 70, document_number: "IBT-0070", status: "PENDING_APPROVAL" } };
     expect(heldActions(forwarding, { ...keys, covers: ikeja })).toEqual({ forward: false, void: false });
     expect(heldActions({ ...HELD, status: "REVERSED" }, { ...keys, covers: ikeja })).toEqual({ forward: false, void: false });
+  });
+
+  it("come back once a forward's approval ends unapproved, and the receipt reads Held, not Forwarding", () => {
+    const backAgain = { ...HELD, forwarded_by: null };
+    expect(heldActions(backAgain, { ...keys, covers: ikeja })).toEqual({ forward: true, void: true });
+    expect(heldStage(backAgain)).toEqual({ label: "Held", tone: "waiting" });
+    expect(heldStage({ ...HELD, forwarded_by: { id: 70, document_number: "IBT-0070", status: "PENDING_APPROVAL" } }).label).toBe("Forwarding");
   });
 
   it("follow the keys", () => {

@@ -13,8 +13,8 @@ import { describe, expect, it } from "vitest";
 
 import type { InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
 import {
-  stageLabel, transferActions, transferMeaning, voidBlockedByKind, voidConditions, voidReachNote,
-  type TransferKeys,
+  STATUS_FILTERS, notSentNote, stageLabel, stageTone, transferActions, transferMeaning, voidBlockedByKind, voidConditions,
+  voidReachNote, type TransferKeys,
 } from "./transfer-actions";
 
 const IKEJA = 1;
@@ -117,5 +117,38 @@ describe("words", () => {
   it("reads a booked balance transfer as booked, and money sent as not yet confirmed", () => {
     expect(stageLabel(t({ kind: "RECHARGE" }))).toBe("Booked");
     expect(stageLabel(t({}))).toBe("Sent, not yet confirmed");
+  });
+});
+
+describe("a send whose approval ended unapproved", () => {
+  const notSent = t({ status: "CANCELLED", stage: "NOT_SENT", sent_at: null });
+
+  it("reads Not sent in a closed tone, and offers nobody anything", () => {
+    expect(stageLabel(notSent)).toBe("Not sent");
+    expect(stageTone(notSent)).toBe("closed");
+    expect(transferActions(notSent, ALL, bello)).toEqual([]);
+    expect(voidReachNote(notSent, ALL, adeyemi)).toBeNull();
+  });
+
+  it("says money is sent again as a new transfer, and a forwarded receipt is held again", () => {
+    expect(notSentNote(notSent)).toContain("To send the money, make a new transfer.");
+    expect(notSentNote({ ...notSent, kind: "FORWARDED_RECEIPT" })).toContain("Ikeja holds the receipt again, to forward to Lekki or void.");
+    expect(notSentNote(t({}))).toBeNull();
+  });
+
+  it("is found under the cancelled filter with the declined ones", () => {
+    expect(STATUS_FILTERS.find(([value]) => value === "CANCELLED")?.[1]).toBe("Declined or not sent");
+  });
+});
+
+describe("a request whose send was not approved", () => {
+  const back = t({ status: "DRAFT", stage: "REQUESTED", requested_at: "2026-01-09T09:00:00Z", sent_at: null });
+
+  it("is an open request again: Ikeja may send it or decline it", () => {
+    expect(transferActions(back, ALL, ikejaBursar)).toEqual(["send", "decline"]);
+  });
+
+  it("offers neither while an approver has sent Ikeja's send back to it", () => {
+    expect(transferActions({ ...back, approval_state: "PENDING" } as InterBranchTransfer, ALL, ikejaBursar)).toEqual([]);
   });
 });

@@ -21,13 +21,19 @@ export type InterBranchKind =
   | "INCOME_GIVEN_BACK"
   | "BANK_SPLIT";
 
-/** Where a transfer stands, in the words both branches use (`stage` on the model). */
+/**
+ * Where a transfer stands, in the words both branches use (`stage` on the model).
+ * `DECLINED` is a request the asked branch refused; `NOT_SENT` is a send nobody
+ * asked for, or a forwarded receipt, whose approval ended unapproved (status
+ * CANCELLED, nothing booked).
+ */
 export type InterBranchStage =
   | "REQUESTED"
   | "PENDING_APPROVAL"
   | "SENT"
   | "RECEIVED"
   | "DECLINED"
+  | "NOT_SENT"
   | "VOIDED";
 
 /** One branch's side of a transfer and the journal it posted (blank where the

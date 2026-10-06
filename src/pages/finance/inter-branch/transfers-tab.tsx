@@ -53,12 +53,14 @@ import {
 } from "@/redux/services/finance/interbranch-api";
 import type { InterBranchKind, InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
 import { useDates } from "../../../lib/display-prefs";
+import { sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { SentBackNote } from "@/components/finance-ui/sent-back-note";
 import { adjustmentLink, heldReceiptLink, journalLink, rechargeLink } from "./links";
 import { moveDebtSentence, movedDebt, movedItemAmount, movedItemLabel } from "./move-summary";
 import { MoveBalanceDrawer } from "./move-balance-drawer";
 import { BranchSelect, Fact, Note, StagePill } from "./parts";
 import {
-  KIND_LABELS, MONEY_KINDS, STATUS_FILTERS, isOpenRequest, transferActions, transferMeaning, voidBlockedByKind,
+  KIND_LABELS, MONEY_KINDS, STATUS_FILTERS, isOpenRequest, notSentNote, transferActions, transferMeaning, voidBlockedByKind,
   voidConditions, voidReachNote, type TransferAction,
 } from "./transfer-actions";
 import type { InterBranchReader } from "./use-inter-branch";
@@ -283,12 +285,13 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
                 Open the recharge <ArrowRight className="size-3.5" />
               </Link>
             ) : null}
-            {isOpenRequest(t) && !actions.includes("send") ? (
+            {sentBackForChanges(t) && reader.reach.covers([t.branch_id]) ? <SentBackNote doc={t} /> : isOpenRequest(t) && !actions.includes("send") ? (
               <Note>{`Waiting for ${t.branch_name} to send it or decline it.`}</Note>
             ) : null}
             {t.status === "POSTED" && !t.received_at && MONEY_KINDS.includes(t.kind) && !actions.includes("confirm") ? (
               <Note>{`Waiting for ${t.to_branch_name} to confirm the money arrived.`}</Note>
             ) : null}
+            {notSentNote(t) ? <Note>{notSentNote(t)}</Note> : null}
             {blocked ? <Note tone="warn">{blocked}</Note> : null}
             {reachNote ? <Note tone="warn">{reachNote}</Note> : null}
           </div>
