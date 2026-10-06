@@ -32,6 +32,8 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
+import { sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { SentBackNote } from "@/components/finance-ui/sent-back-note";
 import { gateExplanation, predictsApproval } from "./adjustment-approval";
 import { useAdjustmentGate } from "./use-adjustment-gate";
 import {
@@ -214,7 +216,7 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
 
   const wo = row.kind === "WRITEOFF";
   const posted = row.status === "POSTED";
-  const isDraft = row.status === "DRAFT";
+  const isDraft = row.status === "DRAFT" && !sentBackForChanges(row);
   // Server-computed. Refunds and write-offs are gated at any amount once the
   // ladder is published, so this is normally true - but it is read rather than
   // assumed, because a tenant that switched its own ladder off posts directly.
@@ -288,6 +290,7 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
       }
     >
       <div className="space-y-5">
+        <SentBackNote doc={row} />
         {isDraft && gated ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">
             {wo ? "A write-off concedes income" : "A refund moves cash out"}, so it needs a second

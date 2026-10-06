@@ -40,6 +40,8 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { CreditNote } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
+import { SENT_BACK_NOTE, sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { IncomeGivenBack } from "./income-given-back";
 import { useDates } from "../../../lib/display-prefs";
 
@@ -201,16 +203,50 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
   );
 }
 
-function NoteDetailDrawer({ note, entity, currency, onClose }: {
+/**
+ * One note, with what may be done to it.
+ *
+ * A draft is sent on from here: submitted for approval when the server says
+ * this note needs it (`approval_required`), posted otherwise. That covers a
+ * note created before its approval route existed, and one whose request was
+ * rejected or withdrawn, which comes back as a draft. A draft an approver sent
+ * back is neither: its request still waits, so the drawer points to the
+ * approvals screen instead (sent-back.ts).
+ */
+export function NoteDetailDrawer({ note, entity, currency, onClose }: {
   note: CreditNote | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
   const { can } = useCan();
   const [confirmApply, setConfirmApply] = useState(false);
+  const [confirmSend, setConfirmSend] = useState(false);
   const [allocate, { isLoading: applying }] = useAllocateCreditNoteMutation();
+  const [submitNote, { isLoading: submitting }] = useSubmitCreditNoteMutation();
+  const [postNote, { isLoading: posting }] = usePostCreditNoteMutation();
+  const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "credit note" });
 
   if (!note) return null;
   const status = noteStatus(note);
+  const sentBack = sentBackForChanges(note);
+  const isDraft = note.status === "DRAFT" && !sentBack;
+  const gated = note.approval_required === true;
+  const canSend = isDraft && can(gated ? P.FIN_SUBMIT_CREDIT_NOTE : P.FIN_POST_CREDIT_NOTE);
+  const doSend = async () => {
+    try {
+      if (gated) {
+        const res = await submitNote({ id: note.id, entity }).unwrap();
+        toast.success(res.message || `${kindLabel(note.kind)} submitted for approval.`);
+        promptIfParked(res.data?.approval);
+        setConfirmSend(false);
+        if (!res.data?.approval?.parked) onClose();
+        return;
+      }
+      const res = await postNote({ id: note.id, entity }).unwrap();
+      toast.success(res.message || `${kindLabel(note.kind)} posted.`);
+      setConfirmSend(false);
+      onClose();
+    } catch { /* central */ }
+  };
   const canApply =
     can(P.FIN_ALLOCATE_CREDIT_NOTE) && note.kind === "CREDIT" && status === "ISSUED" && note.unallocated_amount > 0;
   const recap = noteRecap(note);
@@ -250,6 +286,11 @@ function NoteDetailDrawer({ note, entity, currency, onClose }: {
             {canApply ? (
               <Button onClick={() => setConfirmApply(true)} className="gap-1.5"><Check className="size-4" /> Apply to balance</Button>
             ) : null}
+            {canSend ? (
+              <Button onClick={() => setConfirmSend(true)} className="gap-1.5">
+                {gated ? <><Send className="size-4" /> Submit for approval</> : <><Check className="size-4" /> Post note</>}
+              </Button>
+            ) : null}
           </>
         }
       >
@@ -261,6 +302,13 @@ function NoteDetailDrawer({ note, entity, currency, onClose }: {
             <Field label="Date">{dates.day(note.note_date)}</Field>
           </div>
           <Field label="Reason"><span className="font-normal">{note.reason || "-"}</span></Field>
+          {sentBack ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">{SENT_BACK_NOTE}</p>
+          ) : isDraft && gated && !can(P.FIN_SUBMIT_CREDIT_NOTE) ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">
+              {`This note needs a second person's approval before it reaches the ledger. ${noAccessMessage("submit credit notes")}`}
+            </p>
+          ) : null}
 
           {note.kind === "CREDIT" && note.allocated_amount > 0 ? (
             <div className="grid grid-cols-2 gap-4">
@@ -291,6 +339,15 @@ function NoteDetailDrawer({ note, entity, currency, onClose }: {
           : `Applies ${formatMoney(note.unallocated_amount, currency)} of credit to the customer's open invoices, oldest first.`}
         confirmText="Apply" loading={applying} onConfirm={doApply}
       />
+      <ConfirmActionModal
+        open={confirmSend} onOpenChange={(o) => !o && setConfirmSend(false)}
+        title={gated ? `Submit this ${kindLabel(note.kind).toLowerCase()} for approval?` : `Post this ${kindLabel(note.kind).toLowerCase()}?`}
+        description={gated
+          ? `Sends ${note.document_number} for approval. Nothing reaches the ledger until it is approved.`
+          : `Posts ${note.document_number} to the ledger.`}
+        confirmText={gated ? "Submit" : "Post"} loading={submitting || posting} onConfirm={doSend}
+      />
+      {noApproverDialog}
     </>
   );
 }

@@ -5,6 +5,11 @@
  * term's discount for Ada was voided. The status filter, the row pill and the
  * drawer all say "Awaiting approval" for the first and "Voided" for the
  * second, so a bursar who filters on a word finds rows wearing that same word.
+ *
+ * Tunde's scholarship comes back rejected for a vague reason. Mrs Bello, who
+ * may create concessions, corrects the reason alone and only the reason is
+ * sent. Ada's, sent back by an approver, waits in the approvals screen, so it
+ * offers no Edit and no Submit, and says where to go.
  */
 import { act } from "react";
 import { MemoryRouter } from "react-router";
@@ -14,12 +19,14 @@ import type { Concession } from "@/redux/services/finance/ar-types";
 
 const mocks = vi.hoisted(() => ({
   rows: [] as unknown[],
+  held: new Set<string>(),
+  update: vi.fn(),
   mutation: () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }],
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
-    hasPermission: () => false,
+    hasPermission: (code: string) => mocks.held.has(code),
     hasAnyPermission: () => false,
     hasAllPermissions: () => false,
     hasModuleAccess: () => true,
@@ -45,9 +52,18 @@ vi.mock("@/redux/services/finance/ar-api", () => ({
   useCreateConcessionMutation: mocks.mutation,
   usePostConcessionMutation: mocks.mutation,
   useSubmitConcessionMutation: mocks.mutation,
+  useUpdateConcessionMutation: () => [(body: unknown) => { mocks.update(body); return { unwrap: async () => ({ message: "Scholarship CON-0001 corrected.", data: body }) }; }, { isLoading: false }],
 }));
+vi.mock("@/components/finance-ui", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  PostingDateField: () => null,
+  AccountPicker: () => null,
+  MoneyInput: () => null,
+}));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { CONCESSION_FILTER_STATUSES, ConcessionsTab } from "./concessions-tab";
+import { P } from "../../../permissions";
+import { CONCESSION_FILTER_STATUSES, ConcessionDetailDrawer, ConcessionsTab } from "./concessions-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -60,7 +76,7 @@ const concession = (id: number, name: string, status: string): Concession => ({
 
 let container: HTMLDivElement;
 let root: Root;
-beforeEach(() => { container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container); });
+beforeEach(() => { mocks.held = new Set(); mocks.update.mockReset(); container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); });
 
 describe("concession states", () => {
@@ -84,5 +100,45 @@ describe("concession states", () => {
 
   it("filters on the states the backend gives a concession", () => {
     expect([...CONCESSION_FILTER_STATUSES]).toEqual(["DRAFT", "PENDING_APPROVAL", "POSTED", "REVERSED"]);
+  });
+});
+
+/** Type into a controlled input the way React hears it. */
+function type(field: HTMLInputElement, value: string) {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, value);
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+}
+const button = (label: string) => [...document.body.querySelectorAll("button")].find((b) => b.textContent?.trim() === label) as HTMLButtonElement | undefined;
+
+describe("correcting a concession", () => {
+  it("offers Edit on a rejected draft and sends only the corrected reason", async () => {
+    mocks.held = new Set([P.FIN_CREATE_CONCESSION, P.FIN_SUBMIT_CONCESSION]);
+    const rejected = { ...concession(1, "Tunde Bakare", "DRAFT"), approval_required: true, approval_state: "REJECTED" };
+    act(() => root.render(<ConcessionDetailDrawer concession={rejected} entity="BSS" currency="NGN" onClose={vi.fn()} />));
+    expect(button("Submit for approval")).toBeDefined();
+
+    act(() => button("Edit")!.click());
+    const reason = document.body.querySelector('input[aria-label="Basis / reason"]') as HTMLInputElement;
+    act(() => type(reason, "Academic scholarship, 2026 entrance exam"));
+    await act(async () => { button("Save changes")!.click(); });
+    expect(mocks.update).toHaveBeenCalledWith({ id: 1, entity: "BSS", reason: "Academic scholarship, 2026 entrance exam" });
+  });
+
+  it("offers neither Edit nor Submit on a draft an approver sent back, and says where to go", () => {
+    mocks.held = new Set([P.FIN_CREATE_CONCESSION, P.FIN_SUBMIT_CONCESSION]);
+    const sentBack = { ...concession(2, "Ada Okafor", "DRAFT"), approval_required: true, approval_state: "PENDING" };
+    act(() => root.render(<ConcessionDetailDrawer concession={sentBack} entity="BSS" currency="NGN" onClose={vi.fn()} />));
+    expect(button("Edit")).toBeUndefined();
+    expect(button("Submit for approval")).toBeUndefined();
+    expect(document.body.textContent).toContain("An approver sent this back to you.");
+  });
+
+  it("offers no Edit without the key to create concessions, nor on a posted one", () => {
+    mocks.held = new Set([P.FIN_SUBMIT_CONCESSION]);
+    act(() => root.render(<ConcessionDetailDrawer concession={concession(1, "Tunde Bakare", "DRAFT")} entity="BSS" currency="NGN" onClose={vi.fn()} />));
+    expect(button("Edit")).toBeUndefined();
+    mocks.held = new Set([P.FIN_CREATE_CONCESSION]);
+    act(() => root.render(<ConcessionDetailDrawer concession={concession(1, "Tunde Bakare", "POSTED")} entity="BSS" currency="NGN" onClose={vi.fn()} />));
+    expect(button("Edit")).toBeUndefined();
   });
 });

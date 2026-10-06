@@ -13,6 +13,8 @@ import { Check, Printer, Send } from "lucide-react";
 import { DetailDrawer, Money, StatusPill, ConfirmActionModal, InfoHint } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
+import { sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { SentBackNote } from "@/components/finance-ui/sent-back-note";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
@@ -83,7 +85,7 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
               Created by {j?.created_by ?? "-"}{j?.posted_at ? ` · Posted ${dates.day(j.posted_at)}` : ""}
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              {j?.status === "DRAFT" && (
+              {j?.status === "DRAFT" && !sentBackForChanges(j) && (
                 <Can permission={P.FIN_SUBMIT_JOURNAL}>
                   <Button onClick={() => setConfirmSubmit(true)} className="gap-1.5"><Send className="size-4" /> Submit</Button>
                 </Can>
@@ -119,6 +121,7 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
       >
         {isLoading ? <LoadingState rows={5} /> : isError || !j ? <ErrorState onRetry={refetch} /> : (
           <div className="space-y-4">
+            <SentBackNote doc={j} />
             {/* stat cards */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Stat label="Status"><StatusPill status={j.status} /></Stat>

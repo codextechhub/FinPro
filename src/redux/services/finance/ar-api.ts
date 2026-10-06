@@ -247,6 +247,15 @@ export const arApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/finance/concessions/${id}/submit/${qs({ entity })}`, method: "POST" }),
       invalidatesTags: ["FinanceConcessions", "WorkflowPending", "WorkflowSubmissions"],
     }),
+    /**
+     * Correct a draft concession: only the fields sent change. Its customer,
+     * invoice and branch are fixed (400); refused (422) while its approvers hold
+     * it, or once posted. Key finance.concession.create.
+     */
+    updateConcession: builder.mutation<ApiEnvelope<Concession>, { id: number; entity: string; kind?: string; concession_date?: string; amount?: number; allowance_account?: string | null; reason?: string; reference?: string }>({
+      query: ({ id, entity, ...body }) => ({ url: `/finance/concessions/${id}/${qs({ entity })}`, method: "PATCH", body }),
+      invalidatesTags: ["FinanceConcessions"],
+    }),
     postConcession: builder.mutation<ApiEnvelope<Concession>, { id: number; entity: string }>({
       query: ({ id, entity }) => ({ url: `/finance/concessions/${id}/post/${qs({ entity })}`, method: "POST" }),
       invalidatesTags: ["FinanceConcessions", "FinanceReports", "FinanceJournals", "FinanceInvoices"],
@@ -463,6 +472,7 @@ export const {
   useCreateConcessionMutation,
   usePostConcessionMutation,
   useSubmitConcessionMutation,
+  useUpdateConcessionMutation,
   useGetPaymentPlansQuery,
   useCreatePaymentPlanMutation,
   useActivatePaymentPlanMutation,

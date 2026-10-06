@@ -21,6 +21,8 @@ import {
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
+import { sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { SentBackNote } from "@/components/finance-ui/sent-back-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/utils/money";
@@ -224,12 +226,13 @@ function TransferDrawer({ transfer, entity, currency, onClose }: {
           {transfer.status === "POSTED" && can(P.FIN_REVERSE_CREDIT_TRANSFER) ? (
             <Button variant="outline" onClick={() => setConfirm("void")} className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/5"><Ban className="size-4" /> Void</Button>
           ) : null}
-          {transfer.status === "DRAFT" && can(P.FIN_SUBMIT_CREDIT_TRANSFER) ? (
+          {transfer.status === "DRAFT" && !sentBackForChanges(transfer) && can(P.FIN_SUBMIT_CREDIT_TRANSFER) ? (
             <Button onClick={() => setConfirm("submit")} className="gap-1.5"><Send className="size-4" /> Submit for approval</Button>
           ) : null}
         </>}
       >
         <div className="space-y-4">
+          <SentBackNote doc={transfer} />
           <div className="grid grid-cols-2 gap-4">
             <DetailField label="Amount"><Money kobo={transfer.amount} currency={currency} /></DetailField>
             <DetailField label="Status"><StatusPill status={transfer.status} label={CREDIT_TRANSFER_STATUS[transfer.status]} /></DetailField>

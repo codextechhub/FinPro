@@ -12,7 +12,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
-import { Plus, Search, Printer, Check, Send } from "lucide-react";
+import { Plus, Search, Printer, Check, Send, FilePenLine } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, ConfirmActionModal, DetailDrawer, FormField, Segmented,
   CustomerPicker, AccountPicker, InfoHint, PostingRecap, toArray, type Column, type RecapRow,
@@ -31,13 +31,15 @@ import { gateExplanation, primaryAction } from "./adjustment-approval";
 import { useAdjustmentGate } from "./use-adjustment-gate";
 import {
   useGetConcessionsQuery, useGetConcessionSummaryQuery, useCreateConcessionMutation,
-  usePostConcessionMutation, useSubmitConcessionMutation, useGetInvoicesQuery,
+  usePostConcessionMutation, useSubmitConcessionMutation, useGetInvoicesQuery, useUpdateConcessionMutation,
 } from "@/redux/services/finance/ar-api";
 import type { Concession } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
 import { IncomeGivenBack } from "./income-given-back";
 import { useDates } from "../../../lib/display-prefs";
 import { DOCUMENT_STATUS_WORDS, statusWord } from "@/components/finance-ui/status-words";
+import { SENT_BACK_NOTE, sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { concessionChanges, concessionForm, concessionFormProblem, type ConcessionForm } from "./concession-edit";
 
 /** The states a concession list filters on, each named as its pill names it. */
 export const CONCESSION_FILTER_STATUSES = ["DRAFT", "PENDING_APPROVAL", "POSTED", "REVERSED"] as const;
@@ -153,24 +155,38 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
         emptyMessage="Grant a waiver, discount or scholarship with New concession."
       />
 
-      <ConcessionDetailDrawer concession={selected} entity={entity} currency={currency} onClose={() => setSelected(null)} />
+      <ConcessionDetailDrawer concession={selected} entity={entity} currency={currency} onClose={() => setSelected(null)} onCorrected={setSelected} />
       <NewConcessionDrawer open={creating} onClose={() => setCreating(false)} entity={entity} currency={currency} />
     </>
   );
 }
 
-function ConcessionDetailDrawer({ concession, entity, currency, onClose }: {
+/**
+ * One concession, with what may be done to it.
+ *
+ * A draft is sent on (submitted or posted, as the server's `approval_required`
+ * says) and may be corrected first by a holder of the create key: a draft
+ * never sent, or one back from approval because it was rejected or its request
+ * was withdrawn or cancelled. One an approver sent back is still with its
+ * approvers, so it offers neither and points to the approvals screen
+ * (sent-back.ts). The list holds only concessions in the reader's branches, and
+ * the server answers a correction outside them as not found.
+ */
+export function ConcessionDetailDrawer({ concession, entity, currency, onClose, onCorrected }: {
   concession: Concession | null; entity: string; currency?: string | null; onClose: () => void;
+  onCorrected?: (next: Concession) => void;
 }) {
   const dates = useDates();
   const { can } = useCan();
   const [confirmPost, setConfirmPost] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [post, { isLoading: posting }] = usePostConcessionMutation();
   const [submit, { isLoading: submitting }] = useSubmitConcessionMutation();
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "concession" });
   if (!concession) return null;
 
-  const isDraft = concession.status === "DRAFT";
+  const sentBack = sentBackForChanges(concession);
+  const isDraft = concession.status === "DRAFT" && !sentBack;
   // The server's own answer, computed by the same function `post` calls - so the
   // button can never be the one the endpoint refuses. Above the tenant's threshold
   // a concession must be submitted; below it, posting is still the ordinary route.
@@ -214,6 +230,9 @@ function ConcessionDetailDrawer({ concession, entity, currency, onClose }: {
                 onVoided={onClose}
               />
             ) : null}
+            {isDraft && can(P.FIN_CREATE_CONCESSION) ? (
+              <Button variant="outline" onClick={() => setEditing(true)} className="gap-1.5"><FilePenLine className="size-4" /> Edit</Button>
+            ) : null}
             {isDraft && can(gated ? P.FIN_SUBMIT_CONCESSION : P.FIN_POST_CONCESSION) ? (
               <Button onClick={() => setConfirmPost(true)} className="gap-1.5">
                 {gated ? <><Send className="size-4" /> Submit for approval</> : <><Check className="size-4" /> Post concession</>}
@@ -229,6 +248,9 @@ function ConcessionDetailDrawer({ concession, entity, currency, onClose }: {
             <Field label="Against invoice">{concession.invoice_number ?? "-"}</Field>
             <Field label="Date">{dates.day(concession.concession_date)}</Field>
           </div>
+          {sentBack ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">{SENT_BACK_NOTE}</p>
+          ) : null}
           {isDraft && gated ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">
               At this amount the concession needs a second person's approval, so it is submitted
@@ -263,8 +285,62 @@ function ConcessionDetailDrawer({ concession, entity, currency, onClose }: {
           : `Posts ${concession.document_number} - reduces ${concession.invoice_number}'s balance (Dr allowance · Cr AR).`}
         confirmText={gated ? "Submit" : "Post"} loading={busy} onConfirm={doAct}
       />
+      {editing ? (
+        <EditConcessionDrawer
+          concession={concession} entity={entity} currency={currency}
+          onClose={() => setEditing(false)}
+          onSaved={(next) => { setEditing(false); onCorrected?.(next); }}
+        />
+      ) : null}
       {noApproverDialog}
     </>
+  );
+}
+
+/** Correct a draft concession; only the changed fields are sent (concession-edit.ts). */
+function EditConcessionDrawer({ concession, entity, currency, onClose, onSaved }: {
+  concession: Concession; entity: string; currency?: string | null; onClose: () => void; onSaved: (next: Concession) => void;
+}) {
+  const [form, setForm] = useState<ConcessionForm>(() => concessionForm(concession));
+  const [update, { isLoading }] = useUpdateConcessionMutation();
+  const set = <K extends keyof ConcessionForm>(key: K, value: ConcessionForm[K]) => setForm((f) => ({ ...f, [key]: value }));
+  const changes = concessionChanges(concession, form);
+  const problem = concessionFormProblem(form);
+  const changed = Object.keys(changes).length > 0;
+  const save = async () => {
+    if (!changed || problem) return;
+    try {
+      const res = await update({ id: concession.id, entity, ...changes }).unwrap();
+      toast.success(res.message || "Concession corrected.");
+      onSaved(res.data);
+    } catch { /* central */ }
+  };
+  return (
+    <DetailDrawer
+      open onOpenChange={(o) => { if (!o && !isLoading) onClose(); }}
+      title={`Edit ${concession.document_number}`}
+      description={`${concession.customer_name} · against ${concession.invoice_number ?? "its invoice"}. The customer and invoice stay as they are.`}
+      widthClass="sm:max-w-xl"
+      footer={<>
+        <Button variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
+        <Button onClick={save} disabled={!changed || !!problem} loading={isLoading}>Save changes</Button>
+      </>}
+    >
+      <div className="space-y-4">
+        <Segmented label="Type" value={form.kind} onChange={(v) => set("kind", v)} options={KINDS} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <PostingDateField label="Date" entity={entity} value={form.date} onChange={(v) => set("date", v)} />
+          <FormField label="Amount" required><MoneyInput valueKobo={form.amount} onChangeKobo={(v) => set("amount", v)} currency={currency} /></FormField>
+        </div>
+        <FormField label="Allowance account">
+          <AccountPicker entity={entity} value={form.allowance} onChange={(v) => set("allowance", v)} accountType="INCOME" postableOnly
+            placeholder="Defaults to discounts & allowances (4910)" />
+        </FormField>
+        <FormField label="Basis / reason" required><Input aria-label="Basis / reason" value={form.reason} onChange={(e) => set("reason", e.target.value)} className="bg-white" /></FormField>
+        <FormField label="Reference"><Input aria-label="Reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="bg-white" /></FormField>
+        {problem && changed ? <p role="alert" className="font-mont text-[11px] text-destructive">{problem}</p> : null}
+      </div>
+    </DetailDrawer>
   );
 }
 

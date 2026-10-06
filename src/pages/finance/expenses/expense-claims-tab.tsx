@@ -34,6 +34,8 @@ import { fetchAttachmentBlob } from "@/utils/attachment-download";
 import { FilePreviewDialog, type PreviewFile } from "../../../components/finance-ui/file-preview-dialog";
 import { printExpenseClaim } from "../../../utils/finance-print";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
+import { sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { SentBackNote } from "@/components/finance-ui/sent-back-note";
 import {
   useGetExpenseClaimsQuery, useGetExpenseClaimSummaryQuery, useGetExpenseClaimQuery, useCreateExpenseClaimMutation,
   usePostExpenseClaimMutation, useRejectExpenseClaimMutation, useSettleExpenseClaimMutation, useVoidExpenseClaimMutation,
@@ -206,13 +208,13 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
   if (!claim || !full) return null;
 
   const d = disp(full);
-  const isDraft = full.status === "DRAFT";
+  const isDraft = full.status === "DRAFT" && !sentBackForChanges(full);
   const isPending = full.status === "PENDING_APPROVAL";
   const isApprovedUnpaid = full.status === "POSTED" && full.payment_status !== "PAID";
   // Void needs a posted claim with NO reimbursement yet (the backend refuses once
   // amount_paid > 0 - including partial); reject is the DRAFT path.
   const canVoid = full.status === "POSTED" && full.payment_status === "UNPAID";
-  const attachable = isDraft;
+  const attachable = full.status === "DRAFT";
 
   const doPost = async () => { try { const r = await post({ id: full.id, entity }).unwrap(); toast.success(r.message || "Claim approved."); } catch { /* central */ } };
   const doSubmit = async () => {
@@ -261,6 +263,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
         }
       >
         <div className="space-y-5">
+          <SentBackNote doc={full} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Total</p><p className="mt-1 font-mont text-base font-semibold tabular-nums text-black-01">{formatMoney(full.total, currency)}</p></div>
             <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Subtotal · Tax</p><p className="mt-1 font-mont text-sm font-semibold tabular-nums text-black-01">{formatMoney(full.subtotal, currency)} · {formatMoney(full.tax_total, currency)}</p></div>

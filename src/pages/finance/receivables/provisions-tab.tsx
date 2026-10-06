@@ -25,6 +25,8 @@ import {
   PostingRecap, StatusPill, toArray, type Column,
 } from "@/components/finance-ui";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
+import { sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { SentBackNote } from "@/components/finance-ui/sent-back-note";
 import { statusWord } from "@/components/finance-ui/status-words";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -172,7 +174,7 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "provision run" });
   if (!provision) return null;
 
-  const isDraft = provision.status === "DRAFT";
+  const isDraft = provision.status === "DRAFT" && !sentBackForChanges(provision);
   const partOnly = isPartOfRun(provision);
   const gated = provision.approval_required !== false;
   const allowed = !partOnly && (gated ? canWholeSchool(P.FIN_SUBMIT_PROVISION) : canWholeSchool(P.FIN_POST_PROVISION));
@@ -218,6 +220,7 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
             <DetailField label="Allowance required"><Money kobo={provision.required_total} currency={currency} /></DetailField>
             <DetailField label="Change to the allowance"><Money kobo={provision.movement_total} currency={currency} /></DetailField>
           </div>
+          <SentBackNote doc={provision} />
           {isDraft ? (
             <Note>
               {gated && !partOnly
