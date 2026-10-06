@@ -334,7 +334,7 @@ function SpendingCard({ spending, windowName, currency }: { spending: NonNullabl
 // ── payroll, claims, petty cash ──────────────────────────────────────────────
 
 const RUN_STATUS: Record<string, string> = {
-  DRAFT: "draft, not yet posted", POSTED: "accrued, not yet paid", PAID: "paid", CANCELLED: "cancelled",
+  DRAFT: "draft, not yet posted", POSTED: "posted, not yet paid", PAID: "paid", CANCELLED: "cancelled",
 };
 
 function PayrollCard({ run, currency }: { run: NonNullable<S["payroll"]>; currency?: string | null }) {

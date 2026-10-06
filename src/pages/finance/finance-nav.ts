@@ -48,7 +48,7 @@ export const financeNav: ConsoleNavGroup[] = [
     label: "Receivables",
     items: [
       { title: "Customers / Payers", url: `${F.RECEIVABLES}/customers`, icon: Users, permissions: [P.FIN_VIEW_CUSTOMERS] },
-      { title: "AR Invoices", url: `${F.RECEIVABLES}/invoices`, icon: ReceiptText, permissions: [P.FIN_VIEW_INVOICES] },
+      { title: "Invoices", url: `${F.RECEIVABLES}/invoices`, icon: ReceiptText, permissions: [P.FIN_VIEW_INVOICES] },
       { title: "Receipts & Allocation", url: F.RECEIPTS_ALLOCATION, icon: CreditCard, permissions: [P.FIN_VIEW_PAYMENTS] },
       { title: "Credit / Debit Notes", url: `${F.RECEIVABLES}/credit-notes`, icon: FileMinus, permissions: [P.FIN_VIEW_CREDIT_NOTES] },
       { title: "Refunds & Write-offs", url: `${F.RECEIVABLES}/refunds`, icon: Undo2, permissions: [P.FIN_VIEW_REFUNDS, P.FIN_VIEW_WRITE_OFFS] },

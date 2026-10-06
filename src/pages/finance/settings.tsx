@@ -92,8 +92,8 @@ const GROUPS: ConsoleSettingsGroup[] = [
 
 const ACCOUNT_DESCRIPTIONS: Record<string, string> = {
   CASH_BANK: "Primary cash line used by cash reporting and operational fallbacks.",
-  ACCOUNTS_RECEIVABLE: "Control account for customer balances.",
-  ACCOUNTS_PAYABLE: "Control account for vendor balances.",
+  ACCOUNTS_RECEIVABLE: "Control account for customer balances (the total every customer owes).",
+  ACCOUNTS_PAYABLE: "Control account for vendor balances (the total owed to every vendor).",
   CUSTOMER_CREDIT: "Unapplied receipts, overpayments and refundable customer credit.",
   GRIR_CLEARING: "Clears received goods against matched vendor invoices.",
   OUTPUT_VAT: "Tax collected on sales and held for remittance.",

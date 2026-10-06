@@ -1,5 +1,5 @@
 /**
- * AR Invoices at Bright Star: the status counts ask the summary for the same
+ * Invoices at Bright Star: the status counts ask the summary for the same
  * archived years the list shows, so each tab's count matches its rows. An
  * archived year is out of both until "Show archived years" is ticked.
  *

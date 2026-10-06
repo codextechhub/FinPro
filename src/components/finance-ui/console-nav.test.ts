@@ -104,7 +104,7 @@ describe("what a reader is offered", () => {
     const shown = titles(visibleConsoleNav(financeNav, bursar));
 
     expect(shown).toEqual(expect.arrayContaining([
-      "Dashboard", "AR Invoices", "Receipts & Allocation", "Trial Balance", "Virtual Accounts",
+      "Dashboard", "Invoices", "Receipts & Allocation", "Trial Balance", "Virtual Accounts",
     ]));
     expect(shown).not.toContain("Chart of Accounts");
     expect(shown).not.toContain("Collections");
@@ -126,7 +126,7 @@ describe("what a reader is offered", () => {
   it("opens the procurement analytics on the analytics key the reports check", () => {
     const analyst = reader("procurement.analytics.view");
     expect(titles(visibleConsoleNav(procurementNav, analyst))).toEqual(
-      expect.arrayContaining(["AP Aging", "Spend", "Vendor Performance"]),
+      expect.arrayContaining(["Unpaid bills by age", "Spend", "Vendor Performance"]),
     );
     expect(titles(visibleConsoleNav(procurementNav, reader("procurement.report.view")))).not.toContain("Spend");
   });
@@ -191,12 +191,12 @@ describe("the console header's title", () => {
   const section = (title: string) => url(title).slice(0, url(title).lastIndexOf("/"));
 
   it("names the menu item whose address the reader is on", () => {
-    expect(activeNavTitle(financeNav, url("AR Invoices"))).toBe("AR Invoices");
+    expect(activeNavTitle(financeNav, url("Invoices"))).toBe("Invoices");
     expect(activeNavTitle(financeNav, url("Dashboard"))).toBe("Dashboard");
   });
 
   it("does not let the console root claim a section's bare address", () => {
-    expect(activeNavTitle(financeNav, section("AR Invoices"))).toBeNull();
+    expect(activeNavTitle(financeNav, section("Invoices"))).toBeNull();
     expect(activeNavTitle(financeNav, section("Budgets & Forecasts"))).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-// AP Aging (§6) - outstanding payables bucketed by age, as of a chosen date.
+// Unpaid bills by age (AP aging): what is owed to suppliers, grouped by age, as of a chosen date.
 import { useMemo, useState } from "react";
 import { AlertTriangle, Banknote, Clock, HandCoins } from "lucide-react";
 
@@ -53,7 +53,7 @@ export default function ApAgingScreen({ entity, currency }: SectionProps) {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <SectionHeader title="AP Aging" subtitle="Outstanding payables bucketed by age.">
+      <SectionHeader title="Unpaid bills by age (AP aging)" subtitle="What is owed to suppliers, grouped by how late it is.">
         <DateFilter label="As of" value={asOf} onChange={setAsOf} />
       </SectionHeader>
 

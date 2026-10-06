@@ -297,7 +297,7 @@ export function buildTaxFilingPackPrintDocument(
       { kind: "heading", level: 1, text: "Tax filing pack" },
       { kind: "text", className: "sub", text: `Statutory obligations · generated ${formatDateTime(now, prefs)}` },
       { kind: "table", headings: [
-        cell("Tax"), cell("Period"), cell("Authority"), cell("Accrued", "r"),
+        cell("Tax"), cell("Period"), cell("Authority"), cell("Owed", "r"),
         cell("Outstanding", "r"), cell("Due date"), cell("Filing ref"), cell("Status"),
       ], rows },
     ],

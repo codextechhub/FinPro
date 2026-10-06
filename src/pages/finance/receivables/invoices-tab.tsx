@@ -151,7 +151,7 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
       <div>
         <div className="flex items-center gap-1.5">
           <h1 className="font-mont text-lg font-semibold text-gray-01">Customer Invoices</h1>
-          <InfoHint ariaLabel="About customer invoices">Customer invoices debit Accounts Receivable and credit revenue on posting. A payment is recorded against the invoice; the AR control account (what customers owe) must equal the sum of open invoice balances - a tie reconciled at period close.</InfoHint>
+          <InfoHint ariaLabel="About customer invoices">Posting an invoice records what the customer owes and the income it brings in. A payment is recorded against the invoice, and what customers owe always equals the open balances of their invoices.</InfoHint>
         </div>
         <p className="mt-0.5 font-mont text-xs text-gray-05">Accounts receivable for the selected entity.</p>
       </div>

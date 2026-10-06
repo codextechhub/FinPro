@@ -464,7 +464,7 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
         onOpenChange={setCancelOpen}
         title={`${isPosted ? "Void" : "Cancel"} ${r.document_number}?`}
         description={isPosted
-          ? "Reverses this run's accrual journal (a mirror entry backing out the salary expense and the PAYE, pension and net-wages payables) and cancels the run. Use this to undo a run posted in error - it can't be voided once net pay has been paid."
+          ? "Reverses this run's journal (backing out the salaries and the PAYE, pension and net wages it said were owed) and cancels the run. Use this to undo a run posted in error - it can't be voided once net pay has been paid."
           : "Discards this draft run. Nothing was posted, so no journal is affected."}
         confirmText={isPosted ? "Void run" : "Cancel run"}
         destructive

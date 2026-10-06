@@ -32,7 +32,7 @@ export default function ExpensesPage({ section = DEFAULT_EXPENSES_SECTION }: {
             <h1 className="font-mont text-lg font-semibold text-gray-01">{isPettyCash ? "Petty Cash" : "Expense Claims"}</h1>
             {isPettyCash
               ? <InfoHint ariaLabel="About petty-cash floats">A petty-cash float is an imprest tin mapped to its own GL account. Establishing or replenishing moves cash from the bank into it (Dr petty cash, Cr bank); each voucher spends it (Dr expense, Cr petty cash). Replenish restores the float to its ceiling. Reduce float and Close fund count the tin and bank its cash (Dr bank, Cr petty cash), with any difference from the books going to Cash over and short.</InfoHint>
-              : <InfoHint ariaLabel="About expense claims">Expense claims book like a vendor invoice with the staff member as the "vendor". Approving posts Dr expense (+ recoverable input VAT) / Cr Accrued Reimbursement (a liability); paying it later credits the bank and clears the accrual.</InfoHint>}
+              : <InfoHint ariaLabel="About expense claims">An expense claim pays a member of staff back for school spending. Approving it books the spending and what the school now owes them; paying it later takes the money from the bank and clears what is owed.</InfoHint>}
           </div>
           <p className="mt-0.5 font-mont text-xs text-gray-05">{isPettyCash ? "Petty-cash floats, vouchers and returns to the bank." : "Out-of-pocket spending by staff that needs reimbursement."}</p>
         </div>

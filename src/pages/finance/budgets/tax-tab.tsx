@@ -34,7 +34,7 @@ import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-acces
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 
-const OB_TYPES: [string, string][] = [["VAT", "VAT"], ["WHT", "WHT (withholding tax)"], ["PAYE", "PAYE"], ["PENSION", "Pension"], ["OTHER", "Other levy"]];
+const OB_TYPES: [string, string][] = [["VAT", "VAT"], ["WHT", "Withholding tax"], ["PAYE", "PAYE"], ["PENSION", "Pension"], ["OTHER", "Other levy"]];
 const FREQ: [string, string][] = [["MONTHLY", "Monthly"], ["QUARTERLY", "Quarterly"], ["ANNUAL", "Annual"]];
 // filing_status → prototype label (Open / Filed / Paid)
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -78,7 +78,7 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
     { header: "Tax", cell: (f) => <span className="font-semibold text-gray-01">{f.obligation_code}</span> },
     { header: "Period", cell: (f) => <span className="tabular-nums text-gray-05">{taxPeriodLabel(f.period_start, f.period_end, dates.prefs)}</span> },
     { header: "Authority", cell: (f) => <span className="font-mont text-[11px] text-gray-05">{f.authority_name || "-"}</span> },
-    { header: "Accrued", align: "right", cell: (f) => <Money kobo={f.gross_liability} currency={currency} align="right" /> },
+    { header: "Owed", align: "right", cell: (f) => <Money kobo={f.gross_liability} currency={currency} align="right" /> },
     { header: "Outstanding", align: "right", cell: (f) => f.balance_due > 0 ? <span className="font-mont text-xs tabular-nums text-destructive">{formatMoney(f.balance_due, currency)}</span> : <span className="text-gray-05">-</span> },
     { header: "Due date", cell: (f) => <span className="tabular-nums text-gray-05">{dates.day(f.due_date)}</span> },
     { header: "Filing ref", cell: (f) => <span className="font-mont text-[11px] tabular-nums text-gray-05">{f.filing_reference || "-"}</span> },
@@ -191,7 +191,7 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
         </>}>
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Metric label="Accrued" value={formatMoney(f.gross_liability, currency)} />
+            <Metric label="Owed for the period" value={formatMoney(f.gross_liability, currency)} />
             <Metric label="Amount due" value={formatMoney(f.amount_due, currency)} />
             <Metric label="Outstanding" value={formatMoney(f.balance_due, currency)} tone={f.balance_due > 0 ? "bad" : undefined} />
             <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Status</p><div className="mt-1.5"><StatusPill status={f.filing_status} /></div></div>
@@ -200,7 +200,7 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
           <div className="rounded-md border border-white-02 bg-white p-4">
             <p className="mb-3 font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">Filing lifecycle</p>
             <div className="space-y-3">
-              <Step state="done" title="Accrued" sub={`Posted to ${f.liability_account_name || f.obligation_code + " payable"} during the period`} />
+              <Step state="done" title="Owed" sub={`Booked to ${f.liability_account_name || f.obligation_code + " payable"} during the period`} />
               <Step state={filed ? "done" : "current"} title="Filed with authority" sub={filed ? `Filed${f.filing_reference ? ` · ref ${f.filing_reference}` : ""}${f.filed_at ? ` · ${dates.day(f.filed_at)}` : ""}` : "Not yet filed"} />
               <Step state={paid ? "done" : filed ? "current" : "todo"} title="Paid / remitted" sub={paid ? "Remitted in full" : f.amount_paid > 0 ? `Part-paid · ${formatMoney(f.balance_due, currency)} left` : "Awaiting payment"} />
             </div>
@@ -384,7 +384,7 @@ function NewFilingDrawer({ open, onClose, entity }: { open: boolean; onClose: ()
           <FormField label="Period end" required><DatePickerInput value={end} onChange={(e) => setEnd(e.target.value)} className="h-9 bg-white" /></FormField>
         </div>
         <FormField label="Due date"><DatePickerInput value={due} onChange={(e) => setDue(e.target.value)} className="h-9 bg-white" /></FormField>
-        <p className="font-mont text-[11px] text-gray-05">The accrued amount is read from the obligation's liability control account over the period.</p>
+        <p className="font-mont text-[11px] text-gray-05">The amount owed is read from this tax's account in the books over the period.</p>
       </div>
     </DetailDrawer>
   );

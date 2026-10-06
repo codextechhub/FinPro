@@ -66,7 +66,7 @@ const SECTIONS: ConsoleSettingsSection[] = [
   { key: "sourcing-lifecycle", title: "Sourcing and lifecycle", description: "RFQs and renewals", icon: Clock3, group: "purchasing" },
   { key: "competitive-governance", title: "Competitive governance", description: "Bid minimums and exceptions", icon: Gavel, group: "purchasing" },
   { key: "matching", title: "Invoice matching", description: "PO, receipt and invoice", icon: Scale, group: "payables" },
-  { key: "accounting", title: "Accounting integration", description: "Control account map", icon: BookOpenCheck, group: "payables" },
+  { key: "accounting", title: "Accounting integration", description: "Control accounts (where each role posts)", icon: BookOpenCheck, group: "payables" },
   { key: "approvals", title: "Approvals", description: "Purchasing workflows", icon: Workflow },
   { key: "reference-data", title: "Reference data", description: "Vendors, catalog and stock", icon: Tags },
 ];
@@ -78,7 +78,7 @@ const GROUPS: ConsoleSettingsGroup[] = [
 ];
 
 const PROCUREMENT_ACCOUNTS = [
-  ["ACCOUNTS_PAYABLE", "Accounts payable", "Vendor sub-ledger control account."],
+  ["ACCOUNTS_PAYABLE", "Accounts payable", "Control account for the vendor sub-ledger (the total owed to every vendor)."],
   ["GRIR_CLEARING", "GR/IR clearing (goods received, not yet billed)", "Temporary liability between goods receipt and vendor invoice."],
   ["WHT_PAYABLE", "WHT payable (withholding tax)", "Withholding tax deducted from vendor payments."],
   ["INVENTORY_ASSET", "Inventory asset", "Value of stock held for future issue."],
