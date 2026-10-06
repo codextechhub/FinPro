@@ -5,8 +5,11 @@ import { useState } from "react";
 import { SearchSelect } from "@/components/custom/search-select";
 import { toArray } from "@/components/finance-ui";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useCan } from "@/components/finance-ui/can";
+import { P } from "../../permissions";
+import { completeFreeLineIds, requisitionSourcing, sourcingMark, sourcingNote, type SourcingPurpose } from "./requisition-sourcing";
 import { useGetVendorsQuery, useGetCategoriesQuery, useGetRequisitionsQuery, useGetPurchaseOrdersQuery } from "@/redux/services/procurement/procurement-api";
-import { useGetRfqsQuery, useGetContractsQuery, useGetStockTransferDestinationsQuery } from "@/redux/services/procurement/procurement-ext-api";
+import { useGetRfqsQuery, useGetContractsQuery, useGetFreeRequisitionLinesQuery, useGetStockTransferDestinationsQuery } from "@/redux/services/procurement/procurement-ext-api";
 import type { StockLocation, StockTransferDestination, VendorCategory } from "@/redux/services/procurement/procurement-types";
 
 const adapt = (onChange: (v: string) => void) =>
@@ -49,10 +52,35 @@ export function CategoryPicker({ entity, value, onChange, label, placeholder = "
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} />;
 }
 
-export function RequisitionPicker({ entity, value, onChange, label, placeholder = "Select requisition", isRequired, status }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string; isRequired?: boolean; status?: string }) {
+/**
+ * An approved requisition to raise an RFQ or an order from.
+ *
+ * With `sourcing`, each requisition whose lines another live RFQ or order
+ * already holds is marked, and choosing one says why the save will be
+ * refused (requisition-sourcing.ts). The marks come from the server's free
+ * requisition lines, which only a reader who may view RFQs can ask for;
+ * anyone else sees the plain list and meets the server's refusal on save.
+ */
+export function RequisitionPicker({ entity, value, onChange, label, placeholder = "Select requisition", isRequired, status, sourcing }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string; isRequired?: boolean; status?: string; sourcing?: SourcingPurpose }) {
   const { data, isLoading } = useGetRequisitionsQuery({ entity, page_size: 100, ...(status ? { status } : {}) });
-  const options = toArray(data?.data).map((r) => ({ value: String(r.id), label: `${r.document_number} (${r.status})` }));
-  return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} revealOnSearch />;
+  const canAsk = useCan().can(P.PROC_VIEW_RFQS) && !!sourcing;
+  const { data: freeData } = useGetFreeRequisitionLinesQuery({ entity, page_size: 100 }, { skip: !canAsk });
+  const { data: chosenFree } = useGetFreeRequisitionLinesQuery({ entity, page_size: 100, requisition: Number(value) }, { skip: !canAsk || !value });
+  const listFree = completeFreeLineIds(freeData?.data ? toArray(freeData.data) : undefined, freeData?.pagination?.totalItems);
+  const rows = toArray(data?.data);
+  const options = rows.map((r) => {
+    const mark = listFree ? sourcingMark(requisitionSourcing(r.lines.map((line) => line.id), listFree)) : "";
+    return { value: String(r.id), label: `${r.document_number} (${r.status})${mark}` };
+  });
+  const chosen = rows.find((r) => String(r.id) === value);
+  const chosenIds = completeFreeLineIds(chosenFree?.data ? toArray(chosenFree.data) : undefined, chosenFree?.pagination?.totalItems);
+  const note = sourcing && chosen && chosenIds
+    ? sourcingNote(requisitionSourcing(chosen.lines.map((line) => line.id), chosenIds), sourcing, chosen.document_number)
+    : null;
+  return <>
+    <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} revealOnSearch />
+    {note ? <p role="status" className="mt-1 font-mont text-[11px] leading-5 text-amber-700">{note}</p> : null}
+  </>;
 }
 
 export function RfqPicker({ entity, value, onChange, label, placeholder = "Select RFQ", isRequired, status }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string; isRequired?: boolean; status?: string }) {

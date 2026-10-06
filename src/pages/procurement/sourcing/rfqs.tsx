@@ -14,7 +14,7 @@ import { SearchSelect } from "@/components/custom/search-select";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, LineEditor,
   LoadingState, Money, MoneyInput, StatCard, StatusPill, ActionButton, TabStrip, emptyLine, toArray,
-  useActiveEntity, useFieldAccess, type Column, type DocLine, type TabStripItem,
+  useActiveEntity, useFieldAccess, type Column, type TabStripItem,
   RaisingBranchChoiceField, useRaisingBranchChoice, useReaderBranchLens, Segmented,
 } from "@/components/finance-ui";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
@@ -46,6 +46,7 @@ import { useReaderReach } from "../../../host";
 import { SharedSourcingEditor, useFreeSourceLines } from "./shared-sourcing-editor";
 import { useDebounce } from "@/hooks/use-debounce";
 import { groupSharedLines, sharedRfqLinesBody, sharedSourcingProblem } from "./shared-sourcing";
+import { requisitionDocLines, rfqDocLines, rfqLinesBody, rfqLinesChanged, type RfqDocLine } from "./rfq-lines";
 
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["lines", "Lines", List],
@@ -290,15 +291,15 @@ function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entit
   </>;
 }
 
-function RfqAmendmentForm({ rfq, entity, onClose }: { rfq: RfqDetail; entity: string; onClose: () => void }) {
+export function RfqAmendmentForm({ rfq, entity, onClose }: { rfq: RfqDetail; entity: string; onClose: () => void }) {
   const dates = useDates();
   const [summary, setSummary] = useState("");
   const [responseRequired, setResponseRequired] = useState(true);
   const [deadline, setDeadline] = useState<DeadlineValue>(NO_DEADLINE);
   const [changeLines, setChangeLines] = useState(false);
-  const [lines, setLines] = useState<DocLine[]>(rfq.lines.map((line) => ({ ...emptyLine(), description: line.description, quantity: Number(line.quantity), account: line.expense_code || "", taxCode: line.tax_code_id ? String(line.tax_code_id) : "" })));
+  const [lines, setLines] = useState<RfqDocLine[]>(() => rfqDocLines(rfq.lines));
   const [create, { isLoading }] = useCreateRfqAmendmentMutation();
-  const apiLines = lines.filter((line) => line.description.trim()).map((line) => ({ description: line.description.trim(), quantity: line.quantity || 1, ...(line.account ? { expense_account: line.account } : {}), ...(line.taxCode ? { tax_code: line.taxCode } : {}) }));
+  const apiLines = rfqLinesBody(lines);
   const deadlineAt = deadlineInstant(deadline, dates.zoneFor(rfq.branch_id));
   const deadlinePartial = Boolean(deadline.date || deadline.time) && !deadlineAt;
   const publish = async () => {
@@ -380,10 +381,6 @@ function DeadlineInput({
   );
 }
 
-// requisition_line linkage is carried only when the prefilled line is unchanged
-// (same description + quantity at the same index) - never mis-linked after edits.
-type ReqSnapshot = { requisition_line: number; description: string; quantity: number }[];
-
 /**
  * An RFQ is a request sent to invited vendors. This editor adds purchase-eligible
  * vendors (active, not on-hold, KYC ≠ REJECTED) as removable chips. A vendor that has
@@ -426,7 +423,7 @@ function InviteVendorsEditor({ entity, invited, onChange }: { entity: string; in
   );
 }
 
-function RfqForm({ entity, currency, initial, onClose }: { entity: string; currency?: string | null; initial?: RfqDetail; onClose: () => void }) {
+export function RfqForm({ entity, currency, initial, onClose }: { entity: string; currency?: string | null; initial?: RfqDetail; onClose: () => void }) {
   const dates = useDates();
   const [title, setTitle] = useState(initial?.title || "");
   const [issueDate, setIssueDate] = useState(() => initial?.issue_date || dates.today());
@@ -434,15 +431,10 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
   const [budgetKobo, setBudgetKobo] = useState(initial?.budget_estimate ?? 0);
   const [notes, setNotes] = useState(initial?.notes || "");
   const [requisition, setRequisition] = useState("");
-  const [reqSnapshot, setReqSnapshot] = useState<ReqSnapshot>([]);
   const [invited, setInvited] = useState<InviteRow[]>(
     initial?.invitations.map((i) => ({ code: i.vendor_code, name: i.vendor_name, responded: i.responded })) ?? [],
   );
-  const [lines, setLines] = useState<DocLine[]>(
-    initial?.lines.length
-      ? initial.lines.map((l) => ({ ...emptyLine(), description: l.description, quantity: Number(l.quantity), account: l.expense_code || "", taxCode: l.tax_code_id ? String(l.tax_code_id) : "" }))
-      : [emptyLine()],
-  );
+  const [lines, setLines] = useState<RfqDocLine[]>(() => (initial?.lines.length ? rfqDocLines(initial.lines) : [emptyLine()]));
   const [create, { isLoading: creating }] = useCreateRfqMutation();
   const [update, { isLoading: updating }] = useUpdateRfqMutation();
   const [issue, { isLoading: issuing }] = useIssueRfqMutation();
@@ -469,26 +461,10 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
   const [filledFrom, setFilledFrom] = useState<string>("");
   if (!initial && reqData?.data && filledFrom !== requisition) {
     setFilledFrom(requisition);
-    const reqLines = reqData.data.lines;
-    setReqSnapshot(reqLines.map((l) => ({ requisition_line: l.id, description: l.description, quantity: Number(l.quantity) })));
-    setLines(reqLines.map((l) => ({ ...emptyLine(), description: l.description, quantity: Number(l.quantity), account: l.expense_code || "" })));
+    setLines(requisitionDocLines(reqData.data.lines));
   }
 
-  // RFQ lines are unpriced: description required, expense account/tax optional; never send unit_price.
-  const apiLines = lines
-    .map((l, i) => ({ line: l, index: i }))
-    .filter(({ line }) => line.description.trim())
-    .map(({ line, index }) => {
-      const snap = reqSnapshot[index];
-      const linked = snap && snap.description === line.description && snap.quantity === line.quantity;
-      return {
-        description: line.description.trim(),
-        quantity: line.quantity || 1,
-        ...(line.account ? { expense_account: line.account } : {}),
-        ...(line.taxCode ? { tax_code: line.taxCode } : {}),
-        ...(linked ? { requisition_line: snap.requisition_line } : {}),
-      };
-    });
+  const apiLines = rfqLinesBody(lines);
 
   const saving = creating || updating || issuing;
   const valid = !!title.trim() && !!issueDate && (shared ? !sharedProblem : sharedEdit || apiLines.length > 0) && (!dueDate || dueDate >= issueDate) && branch.ready;
@@ -500,7 +476,7 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
   const dirty = !initial || title !== (initial.title || "") || issueDate !== (initial.issue_date || "") ||
     dueDate !== (initial.response_due_date || "") || notes !== (initial.notes || "") ||
     budgetKobo !== (initial.budget_estimate ?? 0) || currentInvited !== initialInvited ||
-    JSON.stringify(apiLines) !== JSON.stringify(initial.lines.map((l) => ({ description: l.description, quantity: Number(l.quantity), ...(l.expense_code ? { expense_account: l.expense_code } : {}), ...(l.tax_code_id ? { tax_code: String(l.tax_code_id) } : {}) })));
+    rfqLinesChanged(lines, initial.lines);
 
   const save = async (issueAfter: boolean) => {
     if (!valid || (issueAfter && !canIssue)) return;
@@ -550,7 +526,7 @@ function RfqForm({ entity, currency, initial, onClose }: { entity: string; curre
       <div className="space-y-4">
         <FormField label="Title" required><Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-white" /></FormField>
         {canShare && <Segmented label="Who is buying" value={mode} onChange={setMode} options={[["single", "One branch"], ["shared", "Several branches together"]] as const} />}
-        {!initial && !shared && <FormField label="From requisition"><RequisitionPicker entity={entity} value={requisition} onChange={setRequisition} status="APPROVED" placeholder="Optional - prefill from an approved requisition" /></FormField>}
+        {!initial && !shared && <FormField label="From requisition"><RequisitionPicker entity={entity} value={requisition} onChange={setRequisition} status="APPROVED" sourcing="rfq" placeholder="Optional - prefill from an approved requisition" /></FormField>}
         <RaisingBranchChoiceField choice={branch} hint="The branch the goods are for. An RFQ from a requisition takes the requisition's branch." />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField label="Issue date" required><DatePickerInput value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="bg-white" /></FormField>
