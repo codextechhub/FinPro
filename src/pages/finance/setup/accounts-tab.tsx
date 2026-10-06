@@ -26,6 +26,7 @@ import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
+import { useBranches } from "../../../host";
 import {
   useGetChartOfAccountsQuery, useCreateAccountMutation, useGetAccountDetailQuery, useGetAccountActivityQuery, useUpdateAccountMutation,
 } from "@/redux/services/finance/setup-api";
@@ -741,17 +742,44 @@ function GroupLedger({ initialView, entity, account, accounts, summary, currency
 }
 
 /**
+ * Why an account's settings are read-only for this reader, in their terms.
+ *
+ * Three reasons, each true of a different account. Without the update key,
+ * nobody may edit any account. The ledger account behind a branch's own bank
+ * belongs to that branch, so a reader who does not work there reads that,
+ * never that every branch posts to it: Ikeja's bank ledger is Ikeja's, and
+ * Lekki's bursar may not change it however wide her keys. Any other account
+ * is the whole chart's, which only a whole-school reader changes.
+ */
+export function accountReadOnlyReason({ holdsKey, bankBranchId, bankBranchName }: {
+  holdsKey: boolean;
+  bankBranchId: number | null | undefined;
+  bankBranchName: string | null;
+}): string {
+  if (!holdsKey) return "You don’t have permission to edit accounts.";
+  if (bankBranchId != null) {
+    const branch = bankBranchName ?? "its branch";
+    return `This is the ledger account behind ${branch}'s own bank account, so only someone who works in ${branch} can change it.`;
+  }
+  return "Only a school-wide administrator can change this account, because every branch posts to it.";
+}
+
+/**
  * An account's Settings tab: its name, subtype and whether it is active.
  *
  * Editable by a holder of the update key who may change this account: the
  * branch of the bank behind it, or anyone covering the whole school when no
- * bank backs it. Anyone else reads why it is read-only.
+ * bank backs it. Anyone else reads why it is read-only (accountReadOnlyReason).
  */
 export function AccountSettings({ entity, account, onSaved }: { entity: string; account: Account; onSaved: () => void }) {
   const [update, { isLoading }] = useUpdateAccountMutation();
   const { can } = useCan();
   const { canChange } = useWholeSchoolAccess();
   const mayEdit = canChange(P.FIN_UPDATE_ACCOUNT, [account.bank_branch_id]);
+  const { data: branches } = useBranches();
+  const bankBranchName = account.bank_branch_id == null
+    ? null
+    : branches?.find((b) => Number(b.id) === account.bank_branch_id)?.name ?? null;
   const [name, setName] = useState(account.name);
   const [subtype, setSubtype] = useState(account.subtype ?? "");
   const [active, setActive] = useState(account.is_active);
@@ -769,9 +797,9 @@ export function AccountSettings({ entity, account, onSaved }: { entity: string; 
     return (
       <EmptyState
         title="Read-only"
-        message={can(P.FIN_UPDATE_ACCOUNT)
-          ? "Only a school-wide administrator can change this account, because every branch posts to it."
-          : "You don’t have permission to edit accounts."}
+        message={accountReadOnlyReason({
+          holdsKey: can(P.FIN_UPDATE_ACCOUNT), bankBranchId: account.bank_branch_id, bankBranchName,
+        })}
       />
     );
   }

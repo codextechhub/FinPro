@@ -4,6 +4,9 @@
  * a reader who covers the whole school. Bright Star's proprietor covers every
  * branch; Mrs Adeyemi keeps Lekki's books and holds the same keys; Corona has
  * one branch, and its bursar, pinned to it, covers the whole school.
+ *
+ * Ikeja's bank ledger belongs to Ikeja. Mrs Adeyemi, at Lekki, reads that it
+ * is Ikeja's to change, not that every branch posts to it.
  */
 
 import { act } from "react";
@@ -33,6 +36,7 @@ vi.mock("../../../host", async (importOriginal) => ({
     branchIds: mocks.branchIds,
     covers: (ids: number[]) => mocks.wholeSchool || (ids.length > 0 && ids.every((id) => mocks.branchIds?.includes(id))),
   }),
+  useBranches: () => ({ data: [{ id: 2, name: "Lekki" }, { id: 3, name: "Ikeja" }], isLoading: false, isError: false }),
 }));
 vi.mock("../../../lib/display-prefs", () => ({ useDates: () => ({ day: (v: string) => v }) }));
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
@@ -56,7 +60,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { P } from "../../../permissions";
 import type { Account } from "@/redux/services/finance/setup-types";
-import { AccountSettings, AccountsTab } from "./accounts-tab";
+import { AccountSettings, AccountsTab, accountReadOnlyReason } from "./accounts-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -132,6 +136,8 @@ describe("Account settings", () => {
     asLekkiBursar();
     act(() => root.render(<AccountSettings entity="BSS" account={account(3)} onSaved={vi.fn()} />));
     expect(button("Save changes")).toBeUndefined();
+    expect(container.textContent).toContain("This is the ledger account behind Ikeja's own bank account, so only someone who works in Ikeja can change it.");
+    expect(container.textContent).not.toContain("every branch posts to it");
   });
 
   it("are read-only without the update key, whatever the reach", () => {
@@ -139,5 +145,19 @@ describe("Account settings", () => {
     act(() => root.render(<AccountSettings entity="BSS" account={account(null)} onSaved={vi.fn()} />));
     expect(button("Save changes")).toBeUndefined();
     expect(container.textContent).toContain("permission to edit accounts");
+  });
+});
+
+describe("accountReadOnlyReason", () => {
+  it("names the missing key first, whatever the account", () => {
+    expect(accountReadOnlyReason({ holdsKey: false, bankBranchId: 3, bankBranchName: "Ikeja" })).toBe("You don’t have permission to edit accounts.");
+  });
+
+  it("names the branch a bank ledger belongs to", () => {
+    expect(accountReadOnlyReason({ holdsKey: true, bankBranchId: 3, bankBranchName: "Ikeja" })).toContain("only someone who works in Ikeja can change it");
+  });
+
+  it("keeps the whole-chart reason for an account no bank backs", () => {
+    expect(accountReadOnlyReason({ holdsKey: true, bankBranchId: null, bankBranchName: null })).toContain("every branch posts to it");
   });
 });

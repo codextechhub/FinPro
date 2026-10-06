@@ -21,6 +21,11 @@
  * declines what it was asked for, and only somebody in both branches voids.
  * Moving a customer's whole balance binds two branches' books and another
  * branch's lists, so it is offered only to a whole-school reader.
+ *
+ * Each branch's journal opens in the General Ledger only for a reader who
+ * works in that branch. Lekki's bursar cannot read Ikeja's books, so for
+ * Ikeja's side she sees that the journal is posted there, not a link that
+ * opens on a refusal.
  */
 
 import { useState } from "react";
@@ -252,11 +257,12 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
                   {t.journals.map((leg) => (
                     <li key={leg.role} className="flex flex-wrap items-center gap-x-1.5 font-mont text-xs text-gray-01">
                       <span>{reader.nameOf(leg.branch_id)}:</span>
-                      {leg.journal_id ? (
+                      {leg.journal_id && reader.reach.covers([leg.branch_id]) ? (
                         <Link to={journalLink(leg.journal_id)} onClick={onClose} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
                           Open its journal <ArrowRight className="size-3.5" />
                         </Link>
-                      ) : leg.role === "RECEIVING" && t.receipt_id ? "booked by the receipt" : "the adjusting document's own journal"}
+                      ) : leg.journal_id ? <span className="text-gray-05">{`posted in ${reader.nameOf(leg.branch_id)}'s books`}</span>
+                        : leg.role === "RECEIVING" && t.receipt_id ? "booked by the receipt" : "the adjusting document's own journal"}
                     </li>
                   ))}
                 </ul>

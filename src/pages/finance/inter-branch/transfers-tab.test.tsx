@@ -13,6 +13,9 @@
  *      carried and says Lekki owes Ikeja N10,000.
  *   6. An income given back opens the register narrowed to its document, and
  *      the register asks the list for that document's journal.
+ *   7. Mrs Adeyemi opens Ikeja's transfer to Lekki: Lekki's journal opens in
+ *      the General Ledger, Ikeja's is named without a link because she cannot
+ *      read Ikeja's books. Mrs Bello, who covers both, can open both.
  */
 
 import { act } from "react";
@@ -176,6 +179,23 @@ describe("the inter-branch register", () => {
     const link = Array.from(document.body.querySelectorAll("a")).find((a) => a.textContent?.includes("Everything the same document gave back"));
     expect(link?.getAttribute("href")).toBe("/finance/inter-branch/transfers?adjustment=77");
     expect(text()).not.toContain("What it carried");
+  });
+
+  it("links only the journals of the branches the reader works in", () => {
+    mocks.transfer = SENT;
+    const journalLinks = () => Array.from(document.body.querySelectorAll("a"))
+      .filter((a) => a.textContent?.includes("Open its journal"))
+      .map((a) => a.getAttribute("href"));
+
+    render("/finance/inter-branch/transfers?document=9", false);
+    expect(journalLinks()).toEqual(["/finance/ledger?document=502"]);
+    expect(text()).toContain("Ikeja:posted in Ikeja's books");
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    render("/finance/inter-branch/transfers?document=9", true);
+    expect(journalLinks()).toEqual(["/finance/ledger?document=501", "/finance/ledger?document=502"]);
+    expect(text()).not.toContain("posted in Ikeja's books");
   });
 
   it("narrows the register to one document's income given back", () => {
