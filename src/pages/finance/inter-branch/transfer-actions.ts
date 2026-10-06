@@ -22,7 +22,7 @@
  */
 
 import type { InterBranchKind, InterBranchStage, InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
-import { SENT_BACK_FILTER, SENT_BACK_WORD, financeReturnedFacts } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, WITH_APPROVERS_NOTE, financeReturnedFacts } from "@/components/finance-ui/returned-correction";
 
 /** The reach question the host answers (`useReaderReach`). */
 export interface TransferReach {
@@ -182,6 +182,43 @@ export function notSentNote(t: Pick<InterBranchTransfer, "kind" | "stage" | "bra
     return `Not sent: its approval ended without approving it, and nothing was booked. ${t.branch_name} holds the receipt again, to forward to ${t.to_branch_name} or void.`;
   }
   return `Not sent: its approval ended without approving it, and nothing was booked. To send the money, make a new transfer.`;
+}
+
+/**
+ * Who the transfer waits on, in a sentence, or null when it waits on nobody or
+ * the drawer already says (a send sent back has its own note).
+ *
+ * The sentence names whoever can act next, never the reader's own branch as if
+ * it were somebody else:
+ * - a request the asked branch has sent for approval waits on the approver, not
+ *   on that branch ({@link WITH_APPROVERS_NOTE});
+ * - a request still to be sent waits on the asked branch, and a reader who works
+ *   there but may not send money is told it waits on someone there who may;
+ * - money sent and not yet confirmed waits on the receiving branch, said the
+ *   same way.
+ *
+ * Mrs Adeyemi at Lekki sends Ikeja's request for approval. Her drawer says it
+ * is with the approver, not "Waiting for Lekki to send it".
+ */
+export function waitingNote(
+  t: Pick<InterBranchTransfer, "kind" | "status" | "requested_at" | "received_at" | "branch_id" | "to_branch_id" | "branch_name" | "to_branch_name" | "approval_state" | "approval_returned">,
+  actions: TransferAction[],
+  reach: TransferReach,
+): string | null {
+  const facts = financeReturnedFacts(t);
+  if (facts?.approval_returned) return null;
+  if (t.approval_state === "PENDING" && (t.status === "DRAFT" || t.status === "PENDING_APPROVAL")) return WITH_APPROVERS_NOTE;
+  if (isOpenRequest(t) && !actions.includes("send")) {
+    return reach.covers([t.branch_id])
+      ? `Waiting for someone at ${t.branch_name} who may send money to send it or decline it.`
+      : `Waiting for ${t.branch_name} to send it or decline it.`;
+  }
+  if (t.status === "POSTED" && !t.received_at && MONEY_KINDS.includes(t.kind) && !actions.includes("confirm")) {
+    return reach.covers([t.to_branch_id])
+      ? `Waiting for someone at ${t.to_branch_name} who may confirm arrivals to confirm the money arrived.`
+      : `Waiting for ${t.to_branch_name} to confirm the money arrived.`;
+  }
+  return null;
 }
 
 /** What each kind is called on screen. */

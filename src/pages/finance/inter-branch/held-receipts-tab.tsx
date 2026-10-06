@@ -47,6 +47,7 @@ import { useDates } from "../../../lib/display-prefs";
 import { transferLink } from "./links";
 import { BranchSelect, Fact, Note, TonePill } from "./parts";
 import type { InterBranchReader } from "./use-inter-branch";
+import { SENT_BACK_WORD } from "@/components/finance-ui/returned-correction";
 
 const METHODS = [
   ["BANK_TRANSFER", "Bank transfer"], ["CASH", "Cash"], ["CARD", "Card"],
@@ -63,16 +64,46 @@ export function heldActions(h: HeldReceipt, { canForward, canVoid, covers }: {
 }
 
 /**
+ * Whether a held receipt's forward is back with whoever sent it. A forward
+ * returned by its approver is a DRAFT again with its request open (a forward
+ * whose approval ended is dropped, so `forwarded_by` names only a live one).
+ */
+export function forwardSentBack(h: Pick<HeldReceipt, "forwarded_by">): boolean {
+  const f = h.forwarded_by as (HeldReceipt["forwarded_by"] & { approval_returned?: boolean }) | null;
+  if (!f) return false;
+  return f.approval_returned ?? f.status === "DRAFT";
+}
+
+/**
  * Where a held receipt stands. A forward whose approval ended unapproved no
  * longer holds it (the server's `forwarded_by` is then null), so it reads
- * "Held" again, with Forward and Void offered, never "Forwarding".
+ * "Held" again, with Forward and Void offered, never "Forwarding". One whose
+ * forward an approver sent back reads "Sent back": it waits on whoever sent
+ * the forward, not on the approver.
  */
-export function heldStage(h: Pick<HeldReceipt, "status" | "forwarded_by">): { label: string; tone: "good" | "waiting" | "closed" } {
+export function heldStage(h: Pick<HeldReceipt, "status" | "forwarded_by">): { label: string; tone: "good" | "waiting" | "closed" | "sentBack" } {
   if (h.status === "REVERSED") return { label: "Voided", tone: "closed" };
   if (h.forwarded_by) {
-    return h.forwarded_by.status === "POSTED" ? { label: "Forwarded", tone: "good" } : { label: "Forwarding", tone: "waiting" };
+    if (h.forwarded_by.status === "POSTED") return { label: "Forwarded", tone: "good" };
+    return forwardSentBack(h) ? { label: SENT_BACK_WORD, tone: "sentBack" } : { label: "Forwarding", tone: "waiting" };
   }
   return { label: "Held", tone: "waiting" };
+}
+
+/**
+ * What the drawer says about a forward, by where the forward stands. Only a
+ * posted forward can be voided; one with its approver or sent back is a
+ * request, which whoever sent it withdraws under Workflow, My Submissions, and
+ * the receipt is then held here again.
+ */
+export function forwardNote(h: Pick<HeldReceipt, "forwarded_by">): string | null {
+  const f = h.forwarded_by;
+  if (!f) return null;
+  if (f.status === "POSTED") return `Forwarded by ${f.document_number}. To void this receipt, void that transfer first.`;
+  if (forwardSentBack(h)) {
+    return `Its forward, ${f.document_number}, was sent back by the approver. Whoever sent it resumes it, or withdraws it, under Workflow, My Submissions. Withdrawn, this receipt is held here again.`;
+  }
+  return `Being forwarded by ${f.document_number}, which is with the approver. To stop it, whoever sent it withdraws it under Workflow, My Submissions.`;
 }
 
 function HeldStatus({ h }: { h: HeldReceipt }) {
@@ -170,7 +201,7 @@ function HeldReceiptDrawer({ id, entity, currency, reader, onClose }: {
             </dl>
             {held.forwarded_by ? (
               <div className="space-y-2">
-                <Note>{`Forwarded by ${held.forwarded_by.document_number}. To void this receipt, void that transfer first.`}</Note>
+                <Note>{forwardNote(held)}</Note>
                 <Link to={transferLink(held.forwarded_by.id)} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline">
                   Open the transfer <ArrowRight className="size-3.5" />
                 </Link>

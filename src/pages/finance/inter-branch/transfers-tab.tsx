@@ -60,7 +60,7 @@ import { moveDebtSentence, movedDebt, movedItemAmount, movedItemLabel } from "./
 import { MoveBalanceDrawer } from "./move-balance-drawer";
 import { BranchSelect, Fact, Note, StagePill } from "./parts";
 import {
-  KIND_LABELS, MONEY_KINDS, STATUS_FILTERS, isOpenRequest, notSentNote, transferActions, transferMeaning, voidBlockedByKind,
+  KIND_LABELS, STATUS_FILTERS, notSentNote, transferActions, transferMeaning, voidBlockedByKind, waitingNote,
   voidConditions, voidReachNote, type TransferAction,
 } from "./transfer-actions";
 import type { InterBranchReader } from "./use-inter-branch";
@@ -288,12 +288,9 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
                 Open the recharge <ArrowRight className="size-3.5" />
               </Link>
             ) : null}
-            {standing === "sender" || standing === "returned" ? <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={t.requested_at ? RETURNED_HINT.resumeOnly : RETURNED_HINT.resumeOrCancel} /> : isOpenRequest(t) && !actions.includes("send") ? (
-              <Note>{`Waiting for ${t.branch_name} to send it or decline it.`}</Note>
-            ) : null}
-            {t.status === "POSTED" && !t.received_at && MONEY_KINDS.includes(t.kind) && !actions.includes("confirm") ? (
-              <Note>{`Waiting for ${t.to_branch_name} to confirm the money arrived.`}</Note>
-            ) : null}
+            {standing === "sender" || standing === "returned"
+              ? <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={t.requested_at ? RETURNED_HINT.resumeOnly : RETURNED_HINT.resumeOrCancel} />
+              : waitingNote(t, actions, reader.reach) ? <Note>{waitingNote(t, actions, reader.reach)}</Note> : null}
             {notSentNote(t) ? <Note>{notSentNote(t)}</Note> : null}
             {blocked ? <Note tone="warn">{blocked}</Note> : null}
             {reachNote ? <Note tone="warn">{reachNote}</Note> : null}

@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/redux/services/finance/interbranch-api", () => ({}));
 
 import type { HeldReceipt } from "@/redux/services/finance/interbranch-types";
-import { heldActions, heldStage, lookupNote } from "./held-receipts-tab";
+import { forwardNote, heldActions, heldStage, lookupNote } from "./held-receipts-tab";
 
 const HELD: HeldReceipt = {
   id: 4, document_number: "HR-0004", status: "POSTED", branch_id: 1, branch_name: "Ikeja",
@@ -61,5 +61,26 @@ describe("the customer code looked up at the other branch", () => {
   it("says nothing before a code is typed or while it is being checked", () => {
     expect(lookupNote({ ...base, code: "" })).toBeNull();
     expect(lookupNote({ ...base, fetching: true, missing: true })).toBeNull();
+  });
+});
+
+describe("a held receipt whose forward was sent back", () => {
+  const sentBack = { ...HELD, forwarded_by: { id: 70, document_number: "IBT-0070", status: "DRAFT" } };
+
+  it("reads Sent back, not Forwarding, and offers no Void", () => {
+    expect(heldStage(sentBack)).toEqual({ label: "Sent back", tone: "sentBack" });
+    expect(heldActions(sentBack, { ...keys, covers: ikeja })).toEqual({ forward: false, void: false });
+  });
+
+  it("tells the sender to resume or withdraw the forward, not to void a transfer that is a draft", () => {
+    const note = forwardNote(sentBack) ?? "";
+    expect(note).toContain("was sent back by the approver");
+    expect(note).toContain("Workflow, My Submissions");
+    expect(note).not.toContain("void that transfer");
+  });
+
+  it("says a forward with its approver is withdrawn, and only a posted one is voided", () => {
+    expect(forwardNote({ forwarded_by: { id: 70, document_number: "IBT-0070", status: "PENDING_APPROVAL" } })).toContain("with the approver");
+    expect(forwardNote({ forwarded_by: { id: 70, document_number: "IBT-0070", status: "POSTED" } })).toContain("void that transfer first");
   });
 });

@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import type { InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
 import {
   STATUS_FILTERS, notSentNote, stageLabel, stageTone, transferActions, transferMeaning, voidBlockedByKind, voidConditions,
-  voidReachNote, type TransferKeys,
+  voidReachNote, waitingNote, type TransferKeys,
 } from "./transfer-actions";
 
 const IKEJA = 1;
@@ -150,5 +150,29 @@ describe("a request whose send was not approved", () => {
 
   it("offers neither while an approver has sent Ikeja's send back to it", () => {
     expect(transferActions({ ...back, approval_state: "PENDING" } as InterBranchTransfer, ALL, ikejaBursar)).toEqual([]);
+  });
+});
+
+describe("waitingNote", () => {
+  // Ikeja asked Lekki for N1,000,000; Mrs Adeyemi works at Lekki.
+  const request = t({ status: "DRAFT", stage: "REQUESTED", requested_at: "2026-01-09T09:00:00Z", sent_at: null, branch_id: LEKKI, branch_name: "Lekki", to_branch_id: IKEJA, to_branch_name: "Ikeja" });
+
+  it("says a request Lekki sent for approval is with the approver, not waiting on Lekki", () => {
+    const sent = { ...request, approval_state: "PENDING", approval_returned: false };
+    expect(waitingNote(sent, transferActions(sent, ALL, adeyemi), adeyemi)).toBe("With the approver. Nobody can change it until they decide or send it back.");
+  });
+
+  it("says a request still to be sent waits on Lekki, to Ikeja's bursar", () => {
+    expect(waitingNote(request, transferActions(request, ALL, ikejaBursar), ikejaBursar)).toBe("Waiting for Lekki to send it or decline it.");
+  });
+
+  it("tells Lekki's own staff without the key that it waits on someone there who may send money", () => {
+    const keys = { ...ALL, transfer: false };
+    expect(waitingNote(request, transferActions(request, keys, adeyemi), adeyemi)).toBe("Waiting for someone at Lekki who may send money to send it or decline it.");
+  });
+
+  it("says nothing of a send sent back, which has its own note", () => {
+    const back = { ...request, approval_state: "PENDING", approval_returned: true };
+    expect(waitingNote(back, [], adeyemi)).toBeNull();
   });
 });

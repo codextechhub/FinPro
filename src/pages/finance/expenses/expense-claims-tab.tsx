@@ -35,7 +35,7 @@ import { FilePreviewDialog, type PreviewFile } from "../../../components/finance
 import { printExpenseClaim } from "../../../utils/finance-print";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
-import { SENT_BACK_FILTER, SENT_BACK_WORD, isSentBack, statusFilterArgs } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, exportStatus, isSentBack, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import {
   useGetExpenseClaimsQuery, useGetExpenseClaimSummaryQuery, useGetExpenseClaimQuery, useCreateExpenseClaimMutation,
   usePostExpenseClaimMutation, useRejectExpenseClaimMutation, useSettleExpenseClaimMutation, useVoidExpenseClaimMutation,
@@ -149,7 +149,7 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
               binding expands it the same way the list endpoint does. */}
           <QuickExportButton
             screen="finance.expense_claims"
-            params={{ display_status: status, q: search }}
+            params={{ display_status: exportStatus(status), q: search }}
             entity={entity}
             typeface="geist"
             defaultName="Expense claims"

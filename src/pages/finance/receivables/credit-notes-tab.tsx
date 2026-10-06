@@ -79,6 +79,15 @@ const STATUS_PILL: Record<string, string> = {
   APPLIED: "bg-green-01/10 text-green-01",
   REVERSED: "bg-gray-03/60 text-gray-05",
 };
+/**
+ * The states the Status filter offers, each the word its rows wear
+ * ({@link noteStatus}), and each a `status` value the list takes: DRAFT and
+ * PENDING_APPROVAL as the note's own status, ISSUED and APPLIED derived from a
+ * posted note's allocation, REVERSED a voided note. Sent back follows them, as
+ * `?approval=returned`.
+ */
+export const CREDIT_NOTE_FILTER_STATUSES = ["DRAFT", "PENDING_APPROVAL", "ISSUED", "APPLIED", "REVERSED"] as const;
+
 const STATUS_LABEL: Record<string, string> = { DRAFT: "Draft", SENT_BACK: SENT_BACK_WORD, PENDING_APPROVAL: "Awaiting approval", ISSUED: "Issued", APPLIED: "Applied", REVERSED: "Voided" };
 
 function TypeChip({ kind }: { kind: string }) {
@@ -125,7 +134,7 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
   const dates = useDates();
   const [searchParams] = useSearchParams();
   const [typeFilter, setTypeFilter] = useState("");   // "" | CREDIT | DEBIT
-  const [statusFilter, setStatusFilter] = useState(""); // "" | ISSUED | APPLIED | SENT_BACK
+  const [statusFilter, setStatusFilter] = useState(""); // "" | a CREDIT_NOTE_FILTER_STATUSES value | SENT_BACK
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
   const search = useDebounce(searchInput.trim(), 350);
   const [page, setPage] = useState(1);
@@ -185,8 +194,7 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
           </select>
           <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }} className={selectCls} aria-label="Status">
             <option value="">All status</option>
-            <option value="ISSUED">{STATUS_LABEL.ISSUED}</option>
-            <option value="APPLIED">{STATUS_LABEL.APPLIED}</option>
+            {CREDIT_NOTE_FILTER_STATUSES.map((code) => <option key={code} value={code}>{STATUS_LABEL[code]}</option>)}
             <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
           </select>
         </div>

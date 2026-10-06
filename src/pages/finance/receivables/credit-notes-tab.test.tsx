@@ -57,6 +57,10 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   PostingDateField: () => null,
   AccountPicker: () => null,
   CostCenterPicker: () => null,
+  CustomerPicker: () => null,
+  useCustomerBranch: () => null,
+  useRaisingBranchChoice: () => ({ ready: true, body: () => ({}), reset: () => undefined }),
+  RaisingBranchChoiceField: () => null,
   MoneyInput: ({ valueKobo, onChangeKobo }: { valueKobo: number; onChangeKobo: (v: number) => void }) => (
     <input aria-label="Amount in kobo" value={valueKobo} onChange={(e) => onChangeKobo(Number(e.target.value))} />
   ),
@@ -68,6 +72,7 @@ vi.mock("@/redux/services/finance/ar-api", () => {
   return {
     useGetCreditNotesQuery: () => ({ data: undefined, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
     useGetInvoicesQuery: () => ({ data: undefined }),
+    useGetCustomersQuery: () => ({ data: undefined, isLoading: false, isFetching: false }),
     useCreateCreditNoteMutation: call(vi.fn()),
     useUpdateCreditNoteMutation: call((body) => mocks.update(body)),
     useAllocateCreditNoteMutation: call(vi.fn()),
@@ -77,7 +82,8 @@ vi.mock("@/redux/services/finance/ar-api", () => {
 });
 
 import { P } from "../../../permissions";
-import { NoteDetailDrawer } from "./credit-notes-tab";
+import { MemoryRouter } from "react-router";
+import { CreditNotesTab, NoteDetailDrawer } from "./credit-notes-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -189,5 +195,13 @@ describe("a credit note an approver sent back", () => {
     expect(document.body.textContent).toContain("Only the person who sent it can correct it and resume it.");
     expect(button("Edit")).toBeUndefined();
     expect(button("Resume")).toBeUndefined();
+  });
+});
+
+describe("the credit notes Status filter", () => {
+  it("offers every state a row can wear, in the rows' words, then Sent back", () => {
+    act(() => root.render(<MemoryRouter><CreditNotesTab entity="BSS" currency="NGN" /></MemoryRouter>));
+    const options = [...container.querySelectorAll('select[aria-label="Status"] option')].map((o) => o.textContent);
+    expect(options).toEqual(["All status", "Draft", "Awaiting approval", "Issued", "Applied", "Voided", "Sent back"]);
   });
 });
