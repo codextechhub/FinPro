@@ -170,3 +170,38 @@ describe("a vendor payment with its approver", () => {
     expect(button("Resume")).toBeUndefined();
   });
 });
+
+/**
+ * Ade Stationers is paid ₦90,000 with ₦4,500 withholding tax kept back. The
+ * posted payment's detail says "Withholding tax kept back", as the form that
+ * raised it does, never "WHT withheld". Its journal names each account as the
+ * server sends it; before it posts, the preview names the liability "WHT
+ * payable (withholding tax)", as the new-payment preview does.
+ */
+describe("a vendor payment with withholding tax", () => {
+  const withWht = { ...PAYMENT, approval_returned: false, wht_amount: 450_000, net_amount: 8_550_000, wht_tax_code_value: "WHT5" };
+  const openPosting = () => act(() => button("Posting")!.click());
+
+  it("says withholding tax kept back in the posted detail, and shows the journal's accounts as the server names them", () => {
+    mocks.state.doc = { ...withWht, status: "POSTED", approval_state: "APPROVED", posting_lines: [
+      { account_code: "2100", account_name: "Accounts payable", debit: 9_000_000, credit: 0 },
+      { account_code: "1010", account_name: "Bank", debit: 0, credit: 8_550_000 },
+      { account_code: "2310", account_name: "WHT payable (withholding tax)", debit: 0, credit: 450_000 },
+    ] };
+    mocks.state.workflow = undefined;
+    render();
+    expect(document.body.textContent).toContain("Withholding tax kept back");
+    expect(document.body.textContent).not.toContain("WHT withheld");
+    openPosting();
+    expect(document.body.textContent).toContain("WHT payable (withholding tax)");
+  });
+
+  it("names the liability WHT payable (withholding tax) in the preview before it posts", () => {
+    mocks.state.doc = { ...withWht, status: "DRAFT", approval_state: "NOT_SUBMITTED" };
+    mocks.state.workflow = undefined;
+    render();
+    openPosting();
+    expect(document.body.textContent).toContain("WHT payable (withholding tax)");
+    expect(document.body.textContent).not.toContain("Withholding tax payable");
+  });
+});

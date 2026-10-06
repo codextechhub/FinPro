@@ -32,7 +32,7 @@ import { P } from "../../permissions";
 import { useGetPayoutBatchesQuery, useGetPayoutBatchesSummaryQuery, useCreatePayoutBatchMutation, useGetPayoutBatchQuery, useSubmitPayoutBatchMutation, useSubmitPayoutBatchForApprovalMutation } from "@/redux/services/payments/payments-api";
 import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
 import { useGetTaxCodesQuery } from "@/redux/services/finance/setup-api";
-import { computedWht } from "../procurement/withholding-tax";
+import { WHT_KEPT_BACK_LABEL, WHT_PAYABLE_LABEL, computedWht } from "../procurement/withholding-tax";
 import type { PayoutBatchSummary, PayoutInstruction, PayoutBatchItemPayload } from "@/redux/services/payments/payments-types";
 import type { Vendor } from "@/redux/services/procurement/procurement-types";
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
@@ -214,7 +214,7 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
   const dr: RecapRow[] = [{ code: "", name: "Accounts payable (vendor)", amount: gross }];
   const cr: RecapRow[] = [
     { code: sourceAccount, name: "Bank / cash", amount: net },
-    ...(wht > 0 ? [{ code: "", name: "WHT payable (withholding tax)", amount: wht }] : []),
+    ...(wht > 0 ? [{ code: "", name: WHT_PAYABLE_LABEL, amount: wht }] : []),
   ];
 
   return (
@@ -230,7 +230,7 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
         <div className="grid grid-cols-3 gap-3">
           <Metric label="Items" value={String(validItems.length)} />
           <Metric label="Batch total" value={formatMoney(gross, currency)} />
-          <Metric label="Withholding tax kept back" value={formatMoney(wht, currency)} />
+          <Metric label={WHT_KEPT_BACK_LABEL} value={formatMoney(wht, currency)} />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -363,7 +363,7 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
         <div className="grid grid-cols-3 gap-3">
           <Metric label="Items" value={String(batch?.item_count ?? items.length)} />
           <Metric label="Batch total" value={formatMoney(batch?.total_amount ?? 0, currency)} />
-          <Metric label="Withholding tax kept back" value={formatMoney(whtTotal, currency)} />
+          <Metric label={WHT_KEPT_BACK_LABEL} value={formatMoney(whtTotal, currency)} />
         </div>
 
         <DataTable columns={itemCols} rows={items} rowKey={(p) => p.id} loading={isFetching && !items.length}

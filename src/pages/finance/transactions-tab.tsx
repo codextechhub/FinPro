@@ -19,6 +19,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Receipt, Banknote } from "lucide-react";
 import { DataTable, Money, KpiCard, DetailDrawer, toArray, useFieldAccess, type Column } from "@/components/finance-ui";
+import { WHT_KEPT_BACK_LABEL } from "../procurement/withholding-tax";
 import { QuickExportButton } from "../../host";
 import { cn } from "@/lib/utils";
 import { PROVIDER_CHOICES, providerInfo } from "./payment-providers";
@@ -209,7 +210,7 @@ function MovementDrawer({ move, currency, onClose }: { move: Movement | null; cu
           {move.wht_amount > 0 ? (
             <>
               <Field label="Line amount" mono>{formatMoney(move.gross_amount, currency)}</Field>
-              <Field label="Withholding tax kept back" mono>{formatMoney(move.wht_amount, currency)}</Field>
+              <Field label={WHT_KEPT_BACK_LABEL} mono>{formatMoney(move.wht_amount, currency)}</Field>
             </>
           ) : null}
           <Field label="Status"><StatusPill status={move.status} /></Field>

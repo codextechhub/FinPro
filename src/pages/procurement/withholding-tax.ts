@@ -59,3 +59,14 @@ export function whtSourceLabel(source: string | null | undefined): string | null
   if (source === "ENTERED") return "Entered by hand";
   return null;
 }
+
+/**
+ * The withholding tax liability as a posting preview names it, the paired
+ * form an accountant reads: the term, then the plain words. Every preview
+ * that books withholding tax (a vendor payment, new or posted, and a payout
+ * batch) uses this one label, the same one the server gives the account.
+ */
+export const WHT_PAYABLE_LABEL = "WHT payable (withholding tax)";
+
+/** What a bursar reads beside the amount kept back from a vendor payment. */
+export const WHT_KEPT_BACK_LABEL = "Withholding tax kept back";
