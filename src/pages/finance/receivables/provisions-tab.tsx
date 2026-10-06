@@ -25,8 +25,8 @@ import {
   PostingRecap, StatusPill, toArray, type Column,
 } from "@/components/finance-ui";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
-import { sentBackForChanges } from "@/components/finance-ui/sent-back";
-import { SentBackNote } from "@/components/finance-ui/sent-back-note";
+import { RETURNED_HINT } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { statusWord } from "@/components/finance-ui/status-words";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -172,9 +172,11 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
   const [submit, { isLoading: submitting }] = useSubmitProvisionMutation();
   const [post, { isLoading: posting }] = usePostProvisionMutation();
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "provision run" });
+  // No edit route: one sent back is resumed as it is, or withdrawn to change it.
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(provision, { path: "provisions", entity });
   if (!provision) return null;
 
-  const isDraft = provision.status === "DRAFT" && !sentBackForChanges(provision);
+  const isDraft = provision.status === "DRAFT" && !standing;
   const partOnly = isPartOfRun(provision);
   const gated = provision.approval_required !== false;
   const allowed = !partOnly && (gated ? canWholeSchool(P.FIN_SUBMIT_PROVISION) : canWholeSchool(P.FIN_POST_PROVISION));
@@ -205,7 +207,9 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
         title={provision.document_number}
         description={`Doubtful debts aged to ${dates.day(provision.as_of)}`}
         widthClass="sm:max-w-2xl"
-        footer={isDraft && allowed ? (
+        footer={standing === "sender" ? (
+          <ResumeButton workflowId={workflowId} tags={["FinanceProvisions"]} onResumed={onClose} />
+        ) : isDraft && allowed ? (
           <Button onClick={() => setConfirming(true)} className="gap-1.5">
             {gated ? <><Send className="size-4" /> Submit for approval</> : <><Check className="size-4" /> Post provision</>}
           </Button>
@@ -220,7 +224,7 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
             <DetailField label="Allowance required"><Money kobo={provision.required_total} currency={currency} /></DetailField>
             <DetailField label="Change to the allowance"><Money kobo={provision.movement_total} currency={currency} /></DetailField>
           </div>
-          <SentBackNote doc={provision} />
+          <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} />
           {isDraft ? (
             <Note>
               {gated && !partOnly

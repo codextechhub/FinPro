@@ -53,8 +53,8 @@ import {
 } from "@/redux/services/finance/interbranch-api";
 import type { InterBranchKind, InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
 import { useDates } from "../../../lib/display-prefs";
-import { sentBackForChanges } from "@/components/finance-ui/sent-back";
-import { SentBackNote } from "@/components/finance-ui/sent-back-note";
+import { RETURNED_HINT } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { adjustmentLink, heldReceiptLink, journalLink, rechargeLink } from "./links";
 import { moveDebtSentence, movedDebt, movedItemAmount, movedItemLabel } from "./move-summary";
 import { MoveBalanceDrawer } from "./move-balance-drawer";
@@ -183,6 +183,8 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
   const dates = useDates();
   const { data, isLoading, isError, refetch } = useGetInterBranchTransferQuery(id ? { id, entity } : skipToken);
   const t = id ? data?.data : undefined;
+  // No edit route: a send sent back is resumed as it is, or withdrawn to change it.
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(t);
   const [action, setAction] = useState<TransferAction | null>(null);
   const money = (kobo: number) => formatMoney(kobo, currency);
   const actions = t ? transferActions(t, reader.keys, reader.reach) : [];
@@ -197,8 +199,9 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
         title={t ? (t.document_number || `Transfer #${t.id}`) : "Transfer"}
         description={t ? `${KIND_LABELS[t.kind] ?? t.kind_label} · ${t.branch_name} to ${t.to_branch_name}` : undefined}
         widthClass="sm:max-w-xl"
-        footer={t && actions.length ? (
+        footer={t && (actions.length || standing === "sender") ? (
           <div className="flex w-full flex-wrap justify-end gap-2">
+            {standing === "sender" ? <ResumeButton workflowId={workflowId} tags={["FinanceInterBranch"]} /> : null}
             {actions.includes("void") ? (
               <Button variant="outline" onClick={() => setAction("void")} className="gap-1.5 text-destructive hover:text-destructive"><Ban className="size-4" /> Void</Button>
             ) : null}
@@ -285,7 +288,7 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
                 Open the recharge <ArrowRight className="size-3.5" />
               </Link>
             ) : null}
-            {sentBackForChanges(t) && reader.reach.covers([t.branch_id]) ? <SentBackNote doc={t} /> : isOpenRequest(t) && !actions.includes("send") ? (
+            {standing === "sender" || standing === "returned" ? <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} /> : isOpenRequest(t) && !actions.includes("send") ? (
               <Note>{`Waiting for ${t.branch_name} to send it or decline it.`}</Note>
             ) : null}
             {t.status === "POSTED" && !t.received_at && MONEY_KINDS.includes(t.kind) && !actions.includes("confirm") ? (

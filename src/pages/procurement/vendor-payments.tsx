@@ -51,8 +51,8 @@ import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 import { isForbidden } from "../../lib/api-errors";
 import { approvalStateWord } from "./document-status";
-import { WITH_APPROVERS_NOTE, approvalPillWord } from "./returned-correction";
-import { ResumeButton, ReturnedNote, useReturnedStanding } from "./returned-note";
+import { WITH_APPROVERS_NOTE, approvalPillWord } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 import { vendorPaymentChanges } from "./vendor-payment-edit";
 
 const DETAIL_TABS = [

@@ -7,7 +7,9 @@
  * changed, and the server keeps the rest. The withholding figure follows the
  * server's rule for it: a figure the server did not work out itself is kept
  * when left out, so it is sent only when it differs from that; a computed one
- * is worked out again.
+ * is worked out again. A typed figure the reader asks to have worked out again
+ * ("Work it out again") is sent as null, which makes the server work it out
+ * from the payment's WHT code and its bills.
  *
  * The same body corrects a draft and a payment an approver sent back. A
  * returned payment keeps its branch, so the server refuses (400) a correction
@@ -38,7 +40,7 @@ export interface VendorPaymentChanges {
   reference?: string;
   narration?: string;
   wht_tax_code?: string | null;
-  wht_amount?: number;
+  wht_amount?: number | null;
   allocations: { vendor_invoice: number; amount: number }[];
 }
 
@@ -54,5 +56,7 @@ export function vendorPaymentChanges(saved: VendorPayment, form: VendorPaymentFo
   if (form.whtCode !== (saved.wht_tax_code_value || "")) out.wht_tax_code = form.whtCode || null;
   const keptAsSaved = saved.wht_source !== "COMPUTED" && form.whtToSend === saved.wht_amount;
   if (form.whtToSend !== undefined && !keptAsSaved) out.wht_amount = form.whtToSend;
+  // A typed figure dropped for the worked-out one.
+  if (form.whtToSend === undefined && saved.wht_source === "ENTERED") out.wht_amount = null;
   return out;
 }

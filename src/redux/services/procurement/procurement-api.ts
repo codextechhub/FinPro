@@ -311,7 +311,7 @@ export const procurementApi = baseApi.injectEndpoints({
       query: ({ entity, ...body }) => ({ url: `/procurement/vendor-payments/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcVendorPayments"],
     }),
-    updateVendorPayment: b.mutation<ApiEnvelope<VendorPayment>, { id: number; entity: string; vendor?: string; payment_date?: string; method?: string; bank_account?: number; wht_amount?: number; wht_tax_code?: string | null; reference?: string; narration?: string; allocations: { vendor_invoice: number; amount: number }[] }>({
+    updateVendorPayment: b.mutation<ApiEnvelope<VendorPayment>, { id: number; entity: string; vendor?: string; payment_date?: string; method?: string; bank_account?: number; wht_amount?: number | null; wht_tax_code?: string | null; reference?: string; narration?: string; allocations: { vendor_invoice: number; amount: number }[] }>({
       query: ({ id, entity, ...body }) => ({ url: `/procurement/vendor-payments/${id}/${qs({ entity })}`, method: "PATCH", body }),
       invalidatesTags: ["ProcVendorPayments"],
     }),

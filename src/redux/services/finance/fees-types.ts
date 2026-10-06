@@ -139,6 +139,12 @@ export interface DoubtfulDebtProvision {
   /** True when the response is the reader's branches' part of the run. Absent
    *  from older servers, which never send such a part. */
   partial_view?: boolean;
+  /** Where its approval stands: NOT_SUBMITTED, PENDING, APPROVED or REJECTED; absent from an older server. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }
 
 export type DepositStatus = "HELD" | "RELEASED" | "FORFEITED" | "CANCELLED";
@@ -184,6 +190,12 @@ export interface CustomerCreditTransfer {
   receipt_id: number | null;
   receipt_number: string | null;
   approval_required?: boolean;
+  /** Where its approval stands: NOT_SUBMITTED, PENDING, APPROVED or REJECTED; absent from an older server. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }
 
 export type SubmittedTransfer = CustomerCreditTransfer & { approval?: ApprovalParkState };

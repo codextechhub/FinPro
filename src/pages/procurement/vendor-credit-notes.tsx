@@ -54,8 +54,8 @@ import {
   creditInstruction, creditNoteHeaderChanges, creditNoteStage, type CreditMode, type LineCredit,
 } from "./vendor-credit-note-model";
 import { VENDOR_CREDIT_NOTE_TABS, approvalStateWord, vendorCreditNoteWord } from "./document-status";
-import { approvalPillWord } from "./returned-correction";
-import { ResumeButton, ReturnedNote, useReturnedStanding } from "./returned-note";
+import { approvalPillWord } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 
 const STATUS_TABS: TabStripItem<string>[] = VENDOR_CREDIT_NOTE_TABS.map((tab) => ({ ...tab }));
 

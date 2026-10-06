@@ -17,6 +17,17 @@ const mocks = vi.hoisted(() => ({
   mutation: () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }],
 }));
 
+/** The approval request a returned document names, and who is signed in. */
+const returned = vi.hoisted(() => ({ uid: 4, request: undefined as unknown, resume: vi.fn() }));
+vi.mock("@/redux/services/finance/approval-request-api", () => ({
+  useGetDocumentApprovalRequestQuery: () => ({ data: undefined }),
+  approvalRequestApi: { util: { invalidateTags: () => ({ type: "test/invalidate" }) } },
+}));
+vi.mock("@/redux/services/dashboard/workflow-api", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetWorkflowInstanceQuery: () => ({ data: returned.request }),
+  useResubmitWorkflowInstanceMutation: () => [(id: string) => { returned.resume(id); return { unwrap: async () => ({}) }; }, { isLoading: false }],
+}));
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
     hasPermission: () => false,
@@ -27,7 +38,7 @@ vi.mock("@/hooks/use-permissions", () => ({
   }),
 }));
 vi.mock("@/redux/store", () => ({
-  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {} } }),
+  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {}, user: { id: returned.uid } } }),
   useAppDispatch: () => vi.fn(),
 }));
 vi.mock("../../../host", async (importOriginal) => ({

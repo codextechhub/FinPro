@@ -115,6 +115,12 @@ export const arApi = baseApi.injectEndpoints({
       query: ({ entity, ...body }) => ({ url: `/finance/credit-notes/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceCreditNotes"],
     }),
+    // A credit or debit note's correction: a draft back from approval, or one its
+    // approver returned, which only its sender may correct. `lines` replaces every line.
+    updateCreditNote: builder.mutation<ApiEnvelope<CreditNote>, { id: number; entity: string; note_date?: string; reason?: string; reference?: string; lines?: Record<string, unknown>[] }>({
+      query: ({ id, entity, ...body }) => ({ url: `/finance/credit-notes/${id}/${qs({ entity })}`, method: "PATCH", body }),
+      invalidatesTags: ["FinanceCreditNotes"],
+    }),
     // Posting defaults to auto-allocating on the backend; pass auto_allocate:false
     // to leave the note "Issued" (unallocated) so applying stays an explicit step.
     submitCreditNote: builder.mutation<ApiEnvelope<SubmittedDocument<CreditNote>>, { id: number; entity: string }>({
@@ -452,6 +458,7 @@ export const {
   useVoidArDocumentMutation,
   useGetCreditNotesQuery,
   useCreateCreditNoteMutation,
+  useUpdateCreditNoteMutation,
   usePostCreditNoteMutation,
   useSubmitCreditNoteMutation,
   useAllocateCreditNoteMutation,

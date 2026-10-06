@@ -13,8 +13,8 @@ import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
 import { useServesPath } from "../../lib/host-routes";
 import { approvalWorkflowLink } from "./approval-workflow-link";
-import { WITH_APPROVERS_NOTE } from "./returned-correction";
-import { ResumeButton, ReturnedNote, useReturnedStanding } from "./returned-note";
+import { WITH_APPROVERS_NOTE } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 import {
   blankRequisitionLine, requisitionApiLines, requisitionChanges, requisitionForm,
   type RequisitionFormLine,

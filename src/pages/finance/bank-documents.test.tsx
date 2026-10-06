@@ -25,6 +25,21 @@ const ok = (fn: (args: unknown) => void) => (args: unknown) => {
   return { unwrap: () => Promise.resolve({ message: "Done." }) };
 };
 
+/** The approval request a returned document names, and who is signed in. */
+const returned = vi.hoisted(() => ({ uid: 4, request: undefined as unknown, resume: vi.fn() }));
+vi.mock("@/redux/services/finance/approval-request-api", () => ({
+  useGetDocumentApprovalRequestQuery: () => ({ data: undefined }),
+  approvalRequestApi: { util: { invalidateTags: () => ({ type: "test/invalidate" }) } },
+}));
+vi.mock("@/redux/services/dashboard/workflow-api", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetWorkflowInstanceQuery: () => ({ data: returned.request }),
+  useResubmitWorkflowInstanceMutation: () => [(id: string) => { returned.resume(id); return { unwrap: async () => ({}) }; }, { isLoading: false }],
+}));
+vi.mock("@/redux/store", () => ({
+  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {}, user: { id: returned.uid } } }),
+  useAppDispatch: () => vi.fn(),
+}));
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
     hasPermission: (code: string) => mocks.held.has(code),
@@ -76,6 +91,7 @@ vi.mock("@/redux/services/finance/bank-documents-api", () => {
     useCancelBankTransferMutation: () => [ok(mocks.cancelTransfer), idle],
   };
 });
+vi.mock("../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { P } from "../../permissions";
@@ -164,6 +180,37 @@ describe("a rejected bank transaction", () => {
     setText(form.querySelector("textarea")!, "Owner's capital, second tranche");
     await act(async () => { button("Save changes")?.click(); });
     expect(mocks.update).toHaveBeenCalledWith({ id: 5, entity: "BSS", narration: "Owner's capital, second tranche" });
+  });
+});
+
+describe("a bank transaction an approver sent back", () => {
+  const RETURNED = {
+    id: "wf-5", status: "RETURNED", requested_by: 4,
+    stage_instances: [{ actions: [{ action: "RETURNED", actor: 7, acted_label: "Mr Eze", comment: "Wrong date", acted_at: "2026-10-03T09:00:00Z", reversed_at: null, is_reversal_of: null }] }],
+  };
+  beforeEach(() => {
+    returned.uid = 4;
+    returned.request = RETURNED;
+    returned.resume.mockReset();
+    mocks.transaction = transaction({ approval_state: "PENDING", approval_returned: true, workflow_instance_id: "wf-5" });
+  });
+
+  it("offers its sender Edit and Resume, not Send again or Cancel", async () => {
+    open();
+    expect(drawer("BT-0005")?.textContent).toContain("Sent back by Mr Eze");
+    expect(button("Edit")).toBeDefined();
+    expect(button("Send again")).toBeUndefined();
+    expect(button("Cancel")).toBeUndefined();
+    await act(async () => { button("Resume")?.click(); });
+    expect(returned.resume).toHaveBeenCalledWith("wf-5");
+  });
+
+  it("offers anybody else nothing", () => {
+    returned.uid = 9;
+    open();
+    expect(drawer("BT-0005")?.textContent).toContain("Only the person who sent it can correct it and resume it.");
+    expect(button("Edit")).toBeUndefined();
+    expect(button("Resume")).toBeUndefined();
   });
 });
 

@@ -1,12 +1,13 @@
 /**
- * Where a procurement document stands while its approval request is open, and
- * who may correct it.
+ * Where a finance or procurement document stands while its approval request is
+ * open, and who may correct it.
  *
- * A requisition, purchase order, vendor bill, vendor payment or vendor credit
- * note keeps `approval_state` PENDING for as long as its request is open, and
- * that includes the time an approver has handed it back to be corrected. The
- * read shapes say which with `approval_returned`: true while the document is
- * back with whoever sent it, false while it is with its approvers.
+ * A document keeps `approval_state` PENDING for as long as its request is open,
+ * and that includes the time an approver has handed it back to be corrected (a
+ * finance document is a DRAFT again meanwhile; a requisition stays
+ * PENDING_APPROVAL). The read shapes say which with `approval_returned`: true
+ * while the document is back with whoever sent it, false while it is with its
+ * approvers.
  *
  * Only the person who sent it for approval may correct a returned document and
  * resume its request; the server refuses anybody else (403), even holding the
@@ -23,12 +24,23 @@
  * Eze, neither of them could change it.
  */
 
-import { sameId } from "../../components/workflow/workflow-format";
+import { sameId } from "../workflow/workflow-format";
 
-/** The facts the rule reads off a procurement document. */
+/** The facts the rule reads off a document. */
 export interface ReturnedFacts {
+  status?: string | null;
   approval_state?: string | null;
   approval_returned?: boolean | null;
+}
+
+/**
+ * A finance document's facts, read the way a server from before
+ * `approval_returned` meant them: a DRAFT still PENDING is one an approver sent
+ * back, since a finance document with its approvers is PENDING_APPROVAL.
+ */
+export function financeReturnedFacts<T extends ReturnedFacts>(doc: T | null | undefined): (T & ReturnedFacts) | null | undefined {
+  if (!doc || doc.approval_returned != null) return doc;
+  return { ...doc, approval_returned: doc.status === "DRAFT" && doc.approval_state === "PENDING" };
 }
 
 /** The facts the rule reads off the document's approval request. */
@@ -114,8 +126,9 @@ export function sentBackLine(
 }
 
 /** What the reader is told under the sent-back line, by standing. */
-export const RETURNED_HINT: Readonly<Record<"sender" | "returned" | "unread", string>> = {
+export const RETURNED_HINT: Readonly<Record<"sender" | "resumeOnly" | "returned" | "unread", string>> = {
   sender: "Correct it with Edit, then Resume to send it back to the approver.",
+  resumeOnly: "Resume sends it back to the approver as it is. To change it, withdraw it from your approvals and send it again.",
   returned: "Only the person who sent it can correct it and resume it.",
   unread: "Whoever sent it can resume it from their approvals.",
 };

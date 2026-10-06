@@ -34,8 +34,7 @@ import { fetchAttachmentBlob } from "@/utils/attachment-download";
 import { FilePreviewDialog, type PreviewFile } from "../../../components/finance-ui/file-preview-dialog";
 import { printExpenseClaim } from "../../../utils/finance-print";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
-import { sentBackForChanges } from "@/components/finance-ui/sent-back";
-import { SentBackNote } from "@/components/finance-ui/sent-back-note";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import {
   useGetExpenseClaimsQuery, useGetExpenseClaimSummaryQuery, useGetExpenseClaimQuery, useCreateExpenseClaimMutation,
   usePostExpenseClaimMutation, useRejectExpenseClaimMutation, useSettleExpenseClaimMutation, useVoidExpenseClaimMutation,
@@ -193,6 +192,9 @@ function Step({ done, active, title, sub }: { done: boolean; active?: boolean; t
   );
 }
 
+/** What the sender of a claim sent back is told: its receipts are what they can change. */
+const SENDER_HINT = "Attach or remove receipts if asked, then Resume to send it back to the approver. To change anything else, withdraw it from your approvals.";
+
 function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: ExpenseClaim | null; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
   const { can } = useCan();
@@ -205,16 +207,18 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
   const [reject, { isLoading: rejecting }] = useRejectExpenseClaimMutation();
   const [voidClaim, { isLoading: voiding }] = useVoidExpenseClaimMutation();
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "expense claim" });
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(full);
   if (!claim || !full) return null;
 
   const d = disp(full);
-  const isDraft = full.status === "DRAFT" && !sentBackForChanges(full);
+  const isDraft = full.status === "DRAFT" && !standing;
   const isPending = full.status === "PENDING_APPROVAL";
   const isApprovedUnpaid = full.status === "POSTED" && full.payment_status !== "PAID";
   // Void needs a posted claim with NO reimbursement yet (the backend refuses once
   // amount_paid > 0 - including partial); reject is the DRAFT path.
   const canVoid = full.status === "POSTED" && full.payment_status === "UNPAID";
-  const attachable = full.status === "DRAFT";
+  // A claim an approver sent back has its receipts changed by whoever sent it alone.
+  const attachable = full.status === "DRAFT" && (standing === null || standing === "sender");
 
   const doPost = async () => { try { const r = await post({ id: full.id, entity }).unwrap(); toast.success(r.message || "Claim approved."); } catch { /* central */ } };
   const doSubmit = async () => {
@@ -249,6 +253,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
                 <Button disabled={posting} onClick={doPost} className="gap-1.5"><Check className="size-4" />{posting ? "Approving…" : "Approve"}</Button>
               </Can>
             ) : null}
+            {standing === "sender" ? <ResumeButton workflowId={workflowId} tags={["FinanceExpenseClaims"]} /> : null}
             {canVoid ? (
               <Can permission={P.FIN_POST_EXPENSE_CLAIM}>
                 <Button variant="outline" disabled={voiding} onClick={() => setVoidOpen(true)} className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/5"><Ban className="size-4" /> Void</Button>
@@ -263,7 +268,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
         }
       >
         <div className="space-y-5">
-          <SentBackNote doc={full} />
+          <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={SENDER_HINT} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Total</p><p className="mt-1 font-mont text-base font-semibold tabular-nums text-black-01">{formatMoney(full.total, currency)}</p></div>
             <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Subtotal · Tax</p><p className="mt-1 font-mont text-sm font-semibold tabular-nums text-black-01">{formatMoney(full.subtotal, currency)} · {formatMoney(full.tax_total, currency)}</p></div>

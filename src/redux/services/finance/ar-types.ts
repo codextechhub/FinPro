@@ -98,6 +98,12 @@ export interface CreditNote {
   lines: CreditNoteLine[];
   /** Empty for a note that took nothing from another branch, and for a draft. */
   income_given_back?: IncomeGivenBackRow[];
+  /** Where its approval stands: NOT_SUBMITTED, PENDING, APPROVED or REJECTED; absent from an older server. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }
 
 export interface Refund {
@@ -116,6 +122,12 @@ export interface Refund {
   narration: string;
   /** See {@link Concession.approval_required} - same rule, same caveat. */
   approval_required?: boolean;
+  /** Where its approval stands: NOT_SUBMITTED, PENDING, APPROVED or REJECTED; absent from an older server. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }
 
 /**
@@ -158,6 +170,12 @@ export interface WriteOffRequest {
   allowance_used?: number;
   /** What later receipts have recovered of it. */
   recovered_amount?: number;
+  /** Where its approval stands: NOT_SUBMITTED, PENDING, APPROVED or REJECTED; absent from an older server. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }
 
 export type InvoiceWriteOffResult = Invoice | WriteOffRequest;
@@ -210,7 +228,12 @@ export interface ArAdjustment {
    * adjustment threshold. It therefore changes when the amount changes, so re-read
    * it after an edit rather than caching it against a document id.
    */
-  approval_required?: boolean;
+  approval_required?: boolean;  /** Where its approval stands; absent from an older server. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, where the row names it. */
+  workflow_instance_id?: string | number | null;
 }
 
 export interface Concession {
@@ -240,6 +263,12 @@ export interface Concession {
   approval_required?: boolean;
   /** Empty for a concession that took nothing from another branch, and for a draft. */
   income_given_back?: IncomeGivenBackRow[];
+  /** Where its approval stands: NOT_SUBMITTED, PENDING, APPROVED or REJECTED; absent from an older server. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }
 
 export interface PaymentPlanInstallment {

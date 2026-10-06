@@ -85,6 +85,12 @@ export interface InterBranchTransfer {
   moved_items?: MovedItem[];
   /** Who owes whom for a RECEIVABLE move; null for every other kind. */
   net_owed?: MoveNetOwed | null;
+  /** Where its approval stands: NOT_SUBMITTED, PENDING, APPROVED or REJECTED; absent from an older server. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }
 
 /**

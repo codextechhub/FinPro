@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  approvalPillWord, latestReturn, returnedHint, returnedStanding, sentBackLine, type ReturnedRequest,
+  approvalPillWord, financeReturnedFacts, latestReturn, returnedHint, returnedStanding, sentBackLine, type ReturnedRequest,
 } from "./returned-correction";
 
 const REQUEST: ReturnedRequest = {
@@ -76,5 +76,16 @@ describe("returnedHint and approvalPillWord", () => {
   it("reads Sent back on a returned document's approval pill", () => {
     expect(approvalPillWord(RETURNED_DOC, "Awaiting approval")).toBe("Sent back");
     expect(approvalPillWord({ approval_state: "PENDING", approval_returned: false }, "Awaiting approval")).toBe("Awaiting approval");
+  });
+});
+
+describe("financeReturnedFacts", () => {
+  it("reads a finance DRAFT still PENDING as sent back when the server does not say", () => {
+    expect(financeReturnedFacts({ status: "DRAFT", approval_state: "PENDING" })?.approval_returned).toBe(true);
+    expect(financeReturnedFacts({ status: "PENDING_APPROVAL", approval_state: "PENDING" })?.approval_returned).toBe(false);
+  });
+
+  it("keeps what the server says", () => {
+    expect(financeReturnedFacts({ status: "DRAFT", approval_state: "PENDING", approval_returned: false })?.approval_returned).toBe(false);
   });
 });

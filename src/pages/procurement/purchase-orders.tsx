@@ -47,8 +47,8 @@ import { useCancelPurchaseOrderMutation } from "@/redux/services/procurement/pay
 import { SOURCE_DOCUMENT_ID_PARAM } from "@/lib/source-document-route";
 import { PURCHASE_ORDER_TABS, purchaseOrderWord } from "./document-status";
 import { purchaseOrderChanges, purchaseOrderForm } from "./purchase-order-edit";
-import { WITH_APPROVERS_NOTE } from "./returned-correction";
-import { ResumeButton, ReturnedNote, useReturnedStanding } from "./returned-note";
+import { WITH_APPROVERS_NOTE } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 
 const STATUS_TABS = PURCHASE_ORDER_TABS;
 

@@ -3,17 +3,34 @@
  *
  * Mrs Bello's ₦15,000 credit note for Tunde needs approval at its amount. Its
  * request was withdrawn, so it is a draft again: the drawer offers Submit for
- * approval, and submitting sends it to the submit route. Ada's, which an
- * approver sent back, waits in the approvals screen, so it offers no Submit
- * and says where to go. Below the threshold a draft is posted instead.
+ * approval, and submitting sends it to the submit route. Below the threshold
+ * a draft is posted instead.
+ *
+ * Ada's, which the bursar (user 7) sent back to Mrs Bello (user 4) asking for
+ * the right amount, offers no Submit. Mrs Bello sees Edit and Resume; her
+ * correction of the amount sends the note's line again and nothing else.
+ * Mr Ade (user 9) sees who sent it back, and neither button. Where the read
+ * does not name the request, nobody is offered either, and the note says the
+ * sender resumes it from their approvals.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CreditNote } from "@/redux/services/finance/ar-types";
 
-const mocks = vi.hoisted(() => ({ held: new Set<string>(), submit: vi.fn(), post: vi.fn() }));
+const mocks = vi.hoisted(() => ({ held: new Set<string>(), submit: vi.fn(), post: vi.fn(), update: vi.fn() }));
 
+/** The approval request a returned document names, and who is signed in. */
+const returned = vi.hoisted(() => ({ uid: 4, request: undefined as unknown, resume: vi.fn() }));
+vi.mock("@/redux/services/finance/approval-request-api", () => ({
+  useGetDocumentApprovalRequestQuery: () => ({ data: undefined }),
+  approvalRequestApi: { util: { invalidateTags: () => ({ type: "test/invalidate" }) } },
+}));
+vi.mock("@/redux/services/dashboard/workflow-api", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetWorkflowInstanceQuery: () => ({ data: returned.request }),
+  useResubmitWorkflowInstanceMutation: () => [(id: string) => { returned.resume(id); return { unwrap: async () => ({}) }; }, { isLoading: false }],
+}));
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
     hasPermission: (code: string) => mocks.held.has(code),
@@ -24,7 +41,7 @@ vi.mock("@/hooks/use-permissions", () => ({
   }),
 }));
 vi.mock("@/redux/store", () => ({
-  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {} } }),
+  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {}, user: { id: returned.uid } } }),
   useAppDispatch: () => vi.fn(),
 }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({
@@ -34,6 +51,16 @@ vi.mock("./use-adjustment-gate", () => ({ useAdjustmentGate: () => ({ rule: { ki
 vi.mock("./document-void-action", () => ({ DocumentVoidAction: () => null }));
 vi.mock("./income-given-back", () => ({ IncomeGivenBack: () => null }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("../../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
+vi.mock("@/components/finance-ui", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  PostingDateField: () => null,
+  AccountPicker: () => null,
+  CostCenterPicker: () => null,
+  MoneyInput: ({ valueKobo, onChangeKobo }: { valueKobo: number; onChangeKobo: (v: number) => void }) => (
+    <input aria-label="Amount in kobo" value={valueKobo} onChange={(e) => onChangeKobo(Number(e.target.value))} />
+  ),
+}));
 vi.mock("@/redux/services/finance/ar-api", () => {
   const call = (spy: (body: unknown) => void) => () => [
     (body: unknown) => { spy(body); return { unwrap: async () => ({ message: "Done.", data: {} }) }; }, { isLoading: false },
@@ -42,6 +69,7 @@ vi.mock("@/redux/services/finance/ar-api", () => {
     useGetCreditNotesQuery: () => ({ data: undefined, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
     useGetInvoicesQuery: () => ({ data: undefined }),
     useCreateCreditNoteMutation: call(vi.fn()),
+    useUpdateCreditNoteMutation: call((body) => mocks.update(body)),
     useAllocateCreditNoteMutation: call(vi.fn()),
     useSubmitCreditNoteMutation: call((body) => mocks.submit(body)),
     usePostCreditNoteMutation: call((body) => mocks.post(body)),
@@ -84,10 +112,12 @@ describe("a draft credit note", () => {
     expect(mocks.post).not.toHaveBeenCalled();
   });
 
-  it("offers no Submit when an approver sent it back, and says where to go", () => {
+  it("offers no Submit when an approver sent it back, and without its request says where to resume it", () => {
     render(note({ approval_state: "PENDING" }));
     expect(button("Submit for approval")).toBeUndefined();
-    expect(document.body.textContent).toContain("An approver sent this back to you.");
+    expect(button("Edit")).toBeUndefined();
+    expect(button("Resume")).toBeUndefined();
+    expect(document.body.textContent).toContain("Whoever sent it can resume it from their approvals.");
   });
 
   it("is posted instead below the approval threshold", async () => {
@@ -108,5 +138,56 @@ describe("a draft credit note", () => {
     render(note({ status: "POSTED" }));
     expect(button("Submit for approval")).toBeUndefined();
     expect(button("Post note")).toBeUndefined();
+  });
+});
+
+const RETURNED_REQUEST = {
+  id: "wf-7", status: "RETURNED", requested_by: 4,
+  stage_instances: [{ actions: [{ action: "RETURNED", actor: 7, acted_label: "Mr Eze", comment: "It should be N12,000", acted_at: "2026-10-03T09:00:00Z", reversed_at: null, is_reversal_of: null }] }],
+};
+const sentBack = () => note({
+  approval_state: "PENDING", approval_returned: true, workflow_instance_id: "wf-7",
+  lines: [{ id: 1, line_no: 1, description: "Overbilled", revenue_account: "4000", quantity: "1.0000", unit_price: 1_500_000, tax_code: null, net_amount: 1_500_000, tax_amount: 0, cost_center: null }],
+});
+
+describe("a credit note an approver sent back", () => {
+  beforeEach(() => {
+    mocks.held = new Set([P.FIN_SUBMIT_CREDIT_NOTE, P.FIN_CREATE_CREDIT_NOTE]);
+    mocks.update.mockReset();
+    returned.resume.mockReset();
+    returned.uid = 4;
+    returned.request = RETURNED_REQUEST;
+  });
+
+  it("offers its sender Edit and Resume, and says who sent it back and why", async () => {
+    render(sentBack());
+    expect(document.body.textContent).toContain("Sent back by Mr Eze on");
+    expect(document.body.textContent).toContain("It should be N12,000");
+    expect(button("Submit for approval")).toBeUndefined();
+    await act(async () => { button("Resume")!.click(); });
+    expect(returned.resume).toHaveBeenCalledWith("wf-7");
+  });
+
+  it("sends a corrected amount as the note's line, and nothing else", async () => {
+    render(sentBack());
+    act(() => button("Edit")!.click());
+    const amount = document.body.querySelector('input[aria-label="Amount in kobo"]') as HTMLInputElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(amount, "1200000");
+      amount.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => { button("Save changes")!.click(); });
+    expect(mocks.update).toHaveBeenCalledWith({
+      id: 7, entity: "BSS",
+      lines: [{ revenue_account: "4000", description: "Overbilled", quantity: 1, unit_price: 1_200_000 }],
+    });
+  });
+
+  it("offers neither to a colleague who did not send it", () => {
+    returned.uid = 9;
+    render(sentBack());
+    expect(document.body.textContent).toContain("Only the person who sent it can correct it and resume it.");
+    expect(button("Edit")).toBeUndefined();
+    expect(button("Resume")).toBeUndefined();
   });
 });

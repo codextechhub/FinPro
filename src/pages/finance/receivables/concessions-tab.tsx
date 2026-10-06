@@ -38,7 +38,7 @@ import { DocumentVoidAction } from "./document-void-action";
 import { IncomeGivenBack } from "./income-given-back";
 import { useDates } from "../../../lib/display-prefs";
 import { DOCUMENT_STATUS_WORDS, statusWord } from "@/components/finance-ui/status-words";
-import { SENT_BACK_NOTE, sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { concessionChanges, concessionForm, concessionFormProblem, type ConcessionForm } from "./concession-edit";
 
 /** The states a concession list filters on, each named as its pill names it. */
@@ -167,9 +167,9 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
  * A draft is sent on (submitted or posted, as the server's `approval_required`
  * says) and may be corrected first by a holder of the create key: a draft
  * never sent, or one back from approval because it was rejected or its request
- * was withdrawn or cancelled. One an approver sent back is still with its
- * approvers, so it offers neither and points to the approvals screen
- * (sent-back.ts). The list holds only concessions in the reader's branches, and
+ * was withdrawn or cancelled. One an approver sent back is corrected (Edit) and
+ * resumed by whoever sent it, and offers anybody else neither
+ * (returned-correction.ts). The list holds only concessions in the reader's branches, and
  * the server answers a correction outside them as not found.
  */
 export function ConcessionDetailDrawer({ concession, entity, currency, onClose, onCorrected }: {
@@ -183,10 +183,10 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
   const [post, { isLoading: posting }] = usePostConcessionMutation();
   const [submit, { isLoading: submitting }] = useSubmitConcessionMutation();
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "concession" });
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(concession, { path: "concessions", entity });
   if (!concession) return null;
 
-  const sentBack = sentBackForChanges(concession);
-  const isDraft = concession.status === "DRAFT" && !sentBack;
+  const isDraft = concession.status === "DRAFT" && !standing;
   // The server's own answer, computed by the same function `post` calls - so the
   // button can never be the one the endpoint refuses. Above the tenant's threshold
   // a concession must be submitted; below it, posting is still the ordinary route.
@@ -230,9 +230,10 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
                 onVoided={onClose}
               />
             ) : null}
-            {isDraft && can(P.FIN_CREATE_CONCESSION) ? (
+            {(isDraft || standing === "sender") && can(P.FIN_CREATE_CONCESSION) ? (
               <Button variant="outline" onClick={() => setEditing(true)} className="gap-1.5"><FilePenLine className="size-4" /> Edit</Button>
             ) : null}
+            {standing === "sender" ? <ResumeButton workflowId={workflowId} tags={["FinanceConcessions"]} onResumed={onClose} /> : null}
             {isDraft && can(gated ? P.FIN_SUBMIT_CONCESSION : P.FIN_POST_CONCESSION) ? (
               <Button onClick={() => setConfirmPost(true)} className="gap-1.5">
                 {gated ? <><Send className="size-4" /> Submit for approval</> : <><Check className="size-4" /> Post concession</>}
@@ -248,9 +249,7 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
             <Field label="Against invoice">{concession.invoice_number ?? "-"}</Field>
             <Field label="Date">{dates.day(concession.concession_date)}</Field>
           </div>
-          {sentBack ? (
-            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">{SENT_BACK_NOTE}</p>
-          ) : null}
+          <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} />
           {isDraft && gated ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">
               At this amount the concession needs a second person's approval, so it is submitted

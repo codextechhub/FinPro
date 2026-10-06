@@ -17,7 +17,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
-import { Plus, Printer, Check, Search, Send } from "lucide-react";
+import { FilePenLine, Plus, Printer, Check, Search, Send } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, ConfirmActionModal, DetailDrawer, FormField,
   CustomerPicker, AccountPicker, CostCenterPicker, PostingRecap, Segmented, toArray, type Column, type RecapRow,
@@ -36,11 +36,12 @@ import { useAdjustmentGate } from "./use-adjustment-gate";
 import {
   useGetCreditNotesQuery, useCreateCreditNoteMutation, usePostCreditNoteMutation,
   useSubmitCreditNoteMutation,
-  useAllocateCreditNoteMutation, useGetInvoicesQuery,
+  useAllocateCreditNoteMutation, useGetInvoicesQuery, useUpdateCreditNoteMutation,
 } from "@/redux/services/finance/ar-api";
 import type { CreditNote } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
-import { SENT_BACK_NOTE, sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
+import { creditNoteChanges, creditNoteCorrection, creditNoteCorrectionProblem, singleLine } from "./credit-note-edit";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { IncomeGivenBack } from "./income-given-back";
 import { useDates } from "../../../lib/display-prefs";
@@ -210,8 +211,8 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
  * this note needs it (`approval_required`), posted otherwise. That covers a
  * note created before its approval route existed, and one whose request was
  * rejected or withdrawn, which comes back as a draft. A draft an approver sent
- * back is neither: its request still waits, so the drawer points to the
- * approvals screen instead (sent-back.ts).
+ * back is neither: its request still waits. Its sender corrects it (Edit) and
+ * resumes it; anybody else is told only its sender may (returned-correction.ts).
  */
 export function NoteDetailDrawer({ note, entity, currency, onClose }: {
   note: CreditNote | null; entity: string; currency?: string | null; onClose: () => void;
@@ -224,11 +225,12 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
   const [submitNote, { isLoading: submitting }] = useSubmitCreditNoteMutation();
   const [postNote, { isLoading: posting }] = usePostCreditNoteMutation();
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "credit note" });
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(note, { path: "credit-notes", entity });
+  const [editing, setEditing] = useState(false);
 
   if (!note) return null;
   const status = noteStatus(note);
-  const sentBack = sentBackForChanges(note);
-  const isDraft = note.status === "DRAFT" && !sentBack;
+  const isDraft = note.status === "DRAFT" && !standing;
   const gated = note.approval_required === true;
   const canSend = isDraft && can(gated ? P.FIN_SUBMIT_CREDIT_NOTE : P.FIN_POST_CREDIT_NOTE);
   const doSend = async () => {
@@ -286,6 +288,10 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
             {canApply ? (
               <Button onClick={() => setConfirmApply(true)} className="gap-1.5"><Check className="size-4" /> Apply to balance</Button>
             ) : null}
+            {standing === "sender" && can(P.FIN_CREATE_CREDIT_NOTE) ? (
+              <Button variant="outline" onClick={() => setEditing(true)} className="gap-1.5"><FilePenLine className="size-4" /> Edit</Button>
+            ) : null}
+            {standing === "sender" ? <ResumeButton workflowId={workflowId} tags={["FinanceCreditNotes"]} onResumed={onClose} /> : null}
             {canSend ? (
               <Button onClick={() => setConfirmSend(true)} className="gap-1.5">
                 {gated ? <><Send className="size-4" /> Submit for approval</> : <><Check className="size-4" /> Post note</>}
@@ -302,8 +308,8 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
             <Field label="Date">{dates.day(note.note_date)}</Field>
           </div>
           <Field label="Reason"><span className="font-normal">{note.reason || "-"}</span></Field>
-          {sentBack ? (
-            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">{SENT_BACK_NOTE}</p>
+          {standing ? (
+            <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} />
           ) : isDraft && gated && !can(P.FIN_SUBMIT_CREDIT_NOTE) ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">
               {`This note needs a second person's approval before it reaches the ledger. ${noAccessMessage("submit credit notes")}`}
@@ -347,8 +353,74 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
           : `Posts ${note.document_number} to the ledger.`}
         confirmText={gated ? "Submit" : "Post"} loading={submitting || posting} onConfirm={doSend}
       />
+      {editing ? <CorrectNoteDrawer note={note} entity={entity} currency={currency} onClose={() => setEditing(false)} onSaved={onClose} /> : null}
       {noApproverDialog}
     </>
+  );
+}
+
+/**
+ * Correct a credit or debit note an approver sent back, or a draft back from
+ * approval: its date, reason and reference, and its line where it has one.
+ * Only what changed is sent (credit-note-edit.ts); the note keeps its customer,
+ * invoice, kind and branch.
+ */
+function CorrectNoteDrawer({ note, entity, currency, onClose, onSaved }: {
+  note: CreditNote; entity: string; currency?: string | null; onClose: () => void; onSaved: () => void;
+}) {
+  const saved = creditNoteCorrection(note);
+  const [date, setDate] = useState(saved.date);
+  const [reason, setReason] = useState(saved.reason);
+  const [reference, setReference] = useState(saved.reference);
+  const [account, setAccount] = useState(saved.account);
+  const [amount, setAmount] = useState(saved.amount);
+  const [costCenter, setCostCenter] = useState(saved.costCenter);
+  const [update, { isLoading }] = useUpdateCreditNoteMutation();
+  const lineEditable = singleLine(note);
+  const form = { date, reason, reference, account, amount, costCenter };
+  const problem = creditNoteCorrectionProblem(form, lineEditable);
+  const save = async () => {
+    if (problem) return;
+    const changes = creditNoteChanges(note, form);
+    // Nothing changed: nothing to send.
+    if (!Object.keys(changes).length) { onClose(); return; }
+    try {
+      const res = await update({ id: note.id, entity, ...changes }).unwrap();
+      toast.success(res.message || "Changes saved. Resume it to send it back to the approver.");
+      onClose();
+      onSaved();
+    } catch { /* central */ }
+  };
+  return (
+    <DetailDrawer
+      open onOpenChange={(o) => (o || isLoading ? undefined : onClose())}
+      title={`Correct ${note.document_number}`}
+      description={`${kindLabel(note.kind)} · ${note.customer_name}${note.invoice_number ? ` · ${note.invoice_number}` : ""}`}
+      widthClass={DRAWER_W}
+      footer={<>
+        <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
+        <Button disabled={!!problem || isLoading} onClick={save} className="gap-1.5">{isLoading ? "Saving…" : "Save changes"}</Button>
+      </>}
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
+          <FormField label="Reference"><Input aria-label="Reference" value={reference} onChange={(e) => setReference(e.target.value)} className="bg-white" /></FormField>
+        </div>
+        {lineEditable ? <>
+          <FormField label={note.kind === "DEBIT" ? "Income account" : "Revenue account"} required>
+            <AccountPicker entity={entity} value={account} onChange={setAccount} accountType="INCOME" postableOnly />
+          </FormField>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} /></FormField>
+            <FormField label="Cost centre"><CostCenterPicker entity={entity} value={costCenter} onChange={setCostCenter} /></FormField>
+          </div>
+        </> : (
+          <p className="rounded-md border border-white-02 bg-gray-50 px-3 py-2 font-mont text-xs leading-5 text-gray-05">This note has several lines, which stay as they are: {formatMoney(note.total, currency)}.</p>
+        )}
+        <FormField label="Reason" required><Input aria-label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} className="bg-white" /></FormField>
+      </div>
+    </DetailDrawer>
   );
 }
 

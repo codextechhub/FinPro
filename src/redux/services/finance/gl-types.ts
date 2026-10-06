@@ -23,6 +23,10 @@ export interface JournalListItem {
   created_by_id: number | null;
   /** True once the person who raised it has left the school; null when nobody is named. */
   created_by_is_exited?: boolean | null;
+  /** Where its approval stands: NOT_SUBMITTED, PENDING, APPROVED or REJECTED. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
 }
 
 export interface JournalSummary {
@@ -50,6 +54,8 @@ export interface JournalLine extends JournalLineView {
 
 /** JournalEntryDetailSerializer. */
 export interface JournalDetail extends JournalListItem {
+  /** The latest approval request, null before it is first sent; absent from an older server. */
+  workflow_instance_id?: string | number | null;
   lines: JournalLine[];
   total_debit: number;
   total_credit: number;
@@ -104,6 +110,14 @@ export interface DirectEntryLine {
   credit: number;
   cost_center?: string;
   dimensions?: Record<string, string>; // analytical axis → value (each an allowed value)
+}
+
+/** A direct entry's correction: each part optional, `lines` replacing every line. */
+export interface DirectEntryChanges {
+  date?: string;
+  narration?: string;
+  reference?: string;
+  lines?: DirectEntryLine[];
 }
 
 export interface DirectEntryPayload {

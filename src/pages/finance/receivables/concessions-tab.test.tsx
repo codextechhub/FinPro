@@ -8,8 +8,8 @@
  *
  * Tunde's scholarship comes back rejected for a vague reason. Mrs Bello, who
  * may create concessions, corrects the reason alone and only the reason is
- * sent. Ada's, sent back by an approver, waits in the approvals screen, so it
- * offers no Edit and no Submit, and says where to go.
+ * sent. Ada's, sent back to Mrs Bello (user 4) by an approver, offers her Edit
+ * and Resume and no Submit; Mr Ade (user 9) is offered none of them.
  */
 import { act } from "react";
 import { MemoryRouter } from "react-router";
@@ -24,6 +24,17 @@ const mocks = vi.hoisted(() => ({
   mutation: () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }],
 }));
 
+/** The approval request a returned document names, and who is signed in. */
+const returned = vi.hoisted(() => ({ uid: 4, request: undefined as unknown, resume: vi.fn() }));
+vi.mock("@/redux/services/finance/approval-request-api", () => ({
+  useGetDocumentApprovalRequestQuery: () => ({ data: undefined }),
+  approvalRequestApi: { util: { invalidateTags: () => ({ type: "test/invalidate" }) } },
+}));
+vi.mock("@/redux/services/dashboard/workflow-api", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetWorkflowInstanceQuery: () => ({ data: returned.request }),
+  useResubmitWorkflowInstanceMutation: () => [(id: string) => { returned.resume(id); return { unwrap: async () => ({}) }; }, { isLoading: false }],
+}));
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
     hasPermission: (code: string) => mocks.held.has(code),
@@ -34,7 +45,7 @@ vi.mock("@/hooks/use-permissions", () => ({
   }),
 }));
 vi.mock("@/redux/store", () => ({
-  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {} } }),
+  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {}, user: { id: returned.uid } } }),
   useAppDispatch: () => vi.fn(),
 }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({
@@ -60,6 +71,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   AccountPicker: () => null,
   MoneyInput: () => null,
 }));
+vi.mock("../../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { P } from "../../../permissions";
@@ -124,13 +136,28 @@ describe("correcting a concession", () => {
     expect(mocks.update).toHaveBeenCalledWith({ id: 1, entity: "BSS", reason: "Academic scholarship, 2026 entrance exam" });
   });
 
-  it("offers neither Edit nor Submit on a draft an approver sent back, and says where to go", () => {
+  it("offers the sender of a draft an approver sent back Edit and Resume, and no Submit", async () => {
     mocks.held = new Set([P.FIN_CREATE_CONCESSION, P.FIN_SUBMIT_CONCESSION]);
-    const sentBack = { ...concession(2, "Ada Okafor", "DRAFT"), approval_required: true, approval_state: "PENDING" };
+    returned.uid = 4;
+    returned.request = { id: "wf-2", status: "RETURNED", requested_by: 4, stage_instances: [] };
+    const sentBack = { ...concession(2, "Ada Okafor", "DRAFT"), approval_required: true, approval_state: "PENDING", approval_returned: true, workflow_instance_id: "wf-2" };
+    act(() => root.render(<ConcessionDetailDrawer concession={sentBack} entity="BSS" currency="NGN" onClose={vi.fn()} />));
+    expect(button("Edit")).toBeDefined();
+    expect(button("Submit for approval")).toBeUndefined();
+    await act(async () => { button("Resume")!.click(); });
+    expect(returned.resume).toHaveBeenCalledWith("wf-2");
+  });
+
+  it("offers neither Edit nor Submit to anybody else, and says only the sender may", () => {
+    mocks.held = new Set([P.FIN_CREATE_CONCESSION, P.FIN_SUBMIT_CONCESSION]);
+    returned.uid = 9;
+    returned.request = { id: "wf-2", status: "RETURNED", requested_by: 4, stage_instances: [] };
+    const sentBack = { ...concession(2, "Ada Okafor", "DRAFT"), approval_required: true, approval_state: "PENDING", approval_returned: true, workflow_instance_id: "wf-2" };
     act(() => root.render(<ConcessionDetailDrawer concession={sentBack} entity="BSS" currency="NGN" onClose={vi.fn()} />));
     expect(button("Edit")).toBeUndefined();
+    expect(button("Resume")).toBeUndefined();
     expect(button("Submit for approval")).toBeUndefined();
-    expect(document.body.textContent).toContain("An approver sent this back to you.");
+    expect(document.body.textContent).toContain("Only the person who sent it can correct it and resume it.");
   });
 
   it("offers no Edit without the key to create concessions, nor on a posted one", () => {

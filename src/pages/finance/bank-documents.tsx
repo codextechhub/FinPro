@@ -27,6 +27,11 @@
  * nothing posted. A refusal (422, the approvers took it back in the meantime)
  * is worded by the central handler.
  *
+ * One an approver sent back offers its sender Edit and Resume, with who sent
+ * it back and why; Send again and Cancel are refused while its request is open.
+ * A correction keeps it on its branch: the server refuses an account of
+ * another branch (400). Anybody else is told only its sender may act on it.
+ *
  * The section reads `?bank_document=transaction|transfer` and `?document=<id>`,
  * which is where an approval's link to a bank document lands.
  */
@@ -42,6 +47,7 @@ import {
   type Column, type TabStripItem,
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,7 +179,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return <div><dt className="font-mont text-[11px] text-gray-05">{label}</dt><dd className="mt-1 font-mont text-sm font-semibold tabular-nums text-black-01">{value || "-"}</dd></div>;
 }
 
-/** One bank document, with Void while it stands, and Edit, Send again and Cancel while it is a draft back from approval. */
+/** One bank document, with Void while it stands, Edit, Send again and Cancel while it is a draft back from approval, and Edit and Resume for the sender of one sent back. */
 function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
   kind: Kind; id: number; entity: string; currency?: string | null; onClose: () => void;
 }) {
@@ -188,7 +194,9 @@ function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
   const [voidTransaction, { isLoading: voidingTransaction }] = useVoidBankTransactionMutation();
   const [voidTransfer, { isLoading: voidingTransfer }] = useVoidBankTransferMutation();
   const doc = kind === "transaction" ? transaction : transfer;
-  const approvalNote = doc ? bankDocumentApprovalNote(doc) : null;
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(doc);
+  const returned = standing === "sender" || standing === "returned";
+  const approvalNote = doc && !returned ? bankDocumentApprovalNote(doc) : null;
   const busy = voidingTransaction || voidingTransfer;
   const { canChange } = useWholeSchoolAccess();
   const createCode = kind === "transaction" ? P.FIN_CREATE_BANK_TRANSACTION : P.FIN_CREATE_BANK_TRANSFER;
@@ -221,7 +229,12 @@ function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
   };
   const footer = doc && doc.status === "POSTED"
     ? <Can permission={kind === "transaction" ? P.FIN_REVERSE_BANK_TRANSACTION : P.FIN_REVERSE_BANK_TRANSFER}><Button variant="outline-dest" onClick={() => setConfirming(true)}><Ban className="size-4" /> Void</Button></Can>
-    : mayRework
+    : standing === "sender"
+      ? <div className="flex w-full flex-wrap justify-end gap-2">
+        <Can permission={createCode}><Button variant="outline" onClick={() => setEditing(true)}><PencilLine className="size-4" /> Edit</Button></Can>
+        <ResumeButton workflowId={workflowId} tags={["FinanceBankDocuments"]} />
+      </div>
+      : mayRework
       ? <div className="flex w-full flex-wrap justify-end gap-2">
         <Button variant="outline-dest" disabled={sending} onClick={() => setCancelling(true)}><XCircle className="size-4" /> Cancel</Button>
         <Button variant="outline" disabled={sending} onClick={() => setEditing(true)}><PencilLine className="size-4" /> Edit</Button>
@@ -257,6 +270,7 @@ function BankDocumentDrawer({ kind, id, entity, currency, onClose }: {
         {branches.multiBranch && <Field label="Branch" value={branches.name(doc)} />}
         <Field label="Reference" value={doc.reference} />
         <div className="sm:col-span-2"><Field label="Narration" value={doc.narration} /></div>
+        {returned && <div className="sm:col-span-2"><ReturnedNote standing={standing} request={request} requestNamed={requestNamed} /></div>}
         {approvalNote && <p data-testid="bank-document-approval" className={cn("sm:col-span-2 rounded-md border px-3 py-2 font-mont text-xs", approvalNote.tone === "rejected" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-amber-200 bg-amber-50 text-amber-900")}>{approvalNote.text}</p>}
       </dl>}
     </DetailDrawer>

@@ -4,6 +4,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fetchAttachmentBlob } = vi.hoisted(() => ({ fetchAttachmentBlob: vi.fn() }));
 
+/** The approval request a returned document names, and who is signed in. */
+const returned = vi.hoisted(() => ({ uid: 4, request: undefined as unknown, resume: vi.fn() }));
+vi.mock("@/redux/services/finance/approval-request-api", () => ({
+  useGetDocumentApprovalRequestQuery: () => ({ data: undefined }),
+  approvalRequestApi: { util: { invalidateTags: () => ({ type: "test/invalidate" }) } },
+}));
+vi.mock("@/redux/services/dashboard/workflow-api", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetWorkflowInstanceQuery: () => ({ data: returned.request }),
+  useResubmitWorkflowInstanceMutation: () => [(id: string) => { returned.resume(id); return { unwrap: async () => ({}) }; }, { isLoading: false }],
+}));
+vi.mock("@/redux/store", () => ({
+  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {}, user: { id: returned.uid } } }),
+  useAppDispatch: () => vi.fn(),
+}));
 vi.mock("@/utils/attachment-download", () => ({ fetchAttachmentBlob }));
 vi.mock("../../../components/finance-ui/file-preview-dialog", () => ({
   FilePreviewDialog: ({ files, index }: { files: Array<{ name: string; loadPreview: (signal: AbortSignal) => Promise<Blob> }>; index: number | null }) =>

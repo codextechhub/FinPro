@@ -34,6 +34,10 @@ describe("vendorPaymentChanges", () => {
       .toEqual({ allocations: ALLOCATIONS, wht_amount: 0, wht_tax_code: null });
   });
 
+  it("asks the server to work a typed WHT figure out again with null", () => {
+    expect(vendorPaymentChanges(SAVED, form({ whtToSend: undefined }))).toEqual({ allocations: ALLOCATIONS, wht_amount: null });
+  });
+
   it("leaves a computed WHT figure for the server to work out again", () => {
     const computed = { ...SAVED, wht_source: "COMPUTED" } as VendorPayment;
     expect(vendorPaymentChanges(computed, form({ whtToSend: undefined }))).toEqual({ allocations: ALLOCATIONS });

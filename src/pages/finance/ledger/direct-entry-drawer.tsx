@@ -11,6 +11,12 @@
  * message rather than claiming a posting, and the no-approver prompt opens when
  * nobody can approve it. With an empty route the host asks the reader to
  * confirm posting without approval before anything is written.
+ *
+ * Given a saved draft entry (`existing`), the same drawer corrects it: it opens
+ * with the entry's own fields and lines, keeps the branch it was raised for, and
+ * sends only what changed to the journal's own route (direct-entry-edit.ts). A
+ * correction posts nothing; an entry an approver returned is resumed from its
+ * drawer afterwards.
  */
 import { useState } from "react";
 import { toast } from "sonner";
@@ -22,24 +28,30 @@ import { P } from "../../../permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { usePostDirectEntryMutation } from "@/redux/services/finance/gl-api";
+import { usePostDirectEntryMutation, useUpdateJournalMutation } from "@/redux/services/finance/gl-api";
+import type { JournalDetail } from "@/redux/services/finance/gl-types";
+import { directEntryChanges, directEntryForm, directEntryLines, type DirectEntryRow } from "./direct-entry-edit";
 import { useGetDimensionsQuery } from "@/redux/services/finance/setup-api";
 import type { Dimension } from "@/redux/services/finance/setup-types";
 
-interface Row { account: string; amountKobo: number; side: "debit" | "credit"; costCenter: string; dimensions: Record<string, string>; }
+type Row = DirectEntryRow;
 const emptyRow = (): Row => ({ account: "", amountKobo: 0, side: "debit", costCenter: "", dimensions: {} });
 const fieldLabel = "font-mont text-xs text-gray-05";
 
-export function DirectEntryDrawer({ open, onClose, entity, currency }: {
-  open: boolean; onClose: () => void; entity: string; currency?: string | null;
+export function DirectEntryDrawer({ open, onClose, entity, currency, existing }: {
+  open: boolean; onClose: () => void; entity: string; currency?: string | null; existing?: JournalDetail;
 }) {
-  const [date, setDate] = useState("");
-  const [narration, setNarration] = useState("");
-  const [reference, setReference] = useState("");
-  const [rows, setRows] = useState<Row[]>([emptyRow(), emptyRow()]);
-  const [post, { isLoading }] = usePostDirectEntryMutation();
+  const saved = existing ? directEntryForm(existing) : null;
+  const [date, setDate] = useState(saved?.date ?? "");
+  const [narration, setNarration] = useState(saved?.narration ?? "");
+  const [reference, setReference] = useState(saved?.reference ?? "");
+  const [rows, setRows] = useState<Row[]>(saved?.rows.length ? saved.rows : [emptyRow(), emptyRow()]);
+  const [post, { isLoading: posting }] = usePostDirectEntryMutation();
+  const [update, { isLoading: updating }] = useUpdateJournalMutation();
+  const isLoading = posting || updating;
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "journal entry" });
-  const branch = useRaisingBranchChoice();
+  // A saved entry keeps the branch it was raised for.
+  const branch = useRaisingBranchChoice({ unless: !!existing });
   // Analytical dimensions are optional: a product that does not use them grants
   // nobody finance.dimension.view, and asking anyway answered 403 on every
   // visit to this screen - a red toast for a field the caller was never going
@@ -62,16 +74,16 @@ export function DirectEntryDrawer({ open, onClose, entity, currency }: {
 
   const submit = async () => {
     try {
-      const lines = rows.filter((r) => r.amountKobo > 0 && r.account.trim()).map((r) => {
-        const dimensions = Object.fromEntries(Object.entries(r.dimensions).filter(([, v]) => v));
-        return {
-          account: r.account.trim(),
-          debit: r.side === "debit" ? r.amountKobo : 0,
-          credit: r.side === "credit" ? r.amountKobo : 0,
-          cost_center: r.costCenter || undefined,
-          ...(Object.keys(dimensions).length ? { dimensions } : {}),
-        };
-      });
+      if (existing) {
+        const changes = directEntryChanges(existing, { date, narration, reference, rows });
+        // Nothing changed: nothing to send.
+        if (!Object.keys(changes).length) { onClose(); return; }
+        const res = await update({ id: existing.id, entity, ...changes }).unwrap();
+        toast.success(res.message || "Journal entry corrected.");
+        onClose();
+        return;
+      }
+      const lines = directEntryLines(rows);
       const res = await post({ entity, date: date || undefined, narration, reference, lines, ...branch.body() }).unwrap();
       const waiting = res.data?.status === "PENDING_APPROVAL";
       toast.success(res.message || (waiting ? "Journal entry sent for approval." : "Direct entry posted."));
@@ -85,14 +97,14 @@ export function DirectEntryDrawer({ open, onClose, entity, currency }: {
       <DetailDrawer
         open={open}
         onOpenChange={(o) => (o ? undefined : close())}
-        title="New journal entry"
-        description="Raw debit/credit postings for capital, opening balances, loans or adjustments. Must balance."
+        title={existing ? `Correct ${existing.document_number}` : "New journal entry"}
+        description={existing ? "Your changes reach the approver when you resume the request. Must balance." : "Raw debit/credit postings for capital, opening balances, loans or adjustments. Must balance."}
         widthClass="sm:max-w-2xl"
         footer={
           <>
             <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
             <Button data-guide="finance-journal.post" disabled={isLoading || !balanced || hasBlankAccount || !branch.ready} onClick={submit} className="gap-1.5">
-              <BookCheck className="size-4" />{isLoading ? "Posting…" : "Post entry"}
+              <BookCheck className="size-4" />{existing ? (isLoading ? "Saving…" : "Save changes") : isLoading ? "Posting…" : "Post entry"}
             </Button>
           </>
         }

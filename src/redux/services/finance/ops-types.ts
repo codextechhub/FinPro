@@ -164,6 +164,12 @@ export interface ExpenseClaim {
   journal_id: number | null;
   approval_required: boolean;
   lines: ExpenseClaimLine[];
+  /** Where its approval stands: NOT_SUBMITTED, PENDING, APPROVED or REJECTED; absent from an older server. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }
 
 // ── Petty cash ───────────────────────────────────────────────────────────────

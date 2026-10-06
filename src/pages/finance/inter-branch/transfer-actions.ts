@@ -7,8 +7,8 @@
  * - **Send** and **Decline** meet or refuse a request, and belong to the branch
  *   that was asked (the sending branch). Only a request still waiting can be
  *   sent or declined. Nothing was booked yet, so a decline reverses nothing.
- *   A send an approver sent back waits in the approvals screen, so it is
- *   offered neither until it is resumed or withdrawn there.
+ *   A send an approver sent back is offered neither: whoever sent it resumes
+ *   it as it is, or withdraws it from their approvals to change it.
  * - **Confirm arrival** belongs to the receiving branch, for money only (cash
  *   and forwarded receipts), once it is sent and not yet confirmed.
  * - **Void** reverses both branches' books, so it needs somebody who works in
@@ -22,7 +22,7 @@
  */
 
 import type { InterBranchKind, InterBranchStage, InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
-import { sentBackForChanges } from "@/components/finance-ui/sent-back";
+import { financeReturnedFacts } from "@/components/finance-ui/returned-correction";
 
 /** The reach question the host answers (`useReaderReach`). */
 export interface TransferReach {
@@ -72,7 +72,7 @@ export function transferActions(
   reach: TransferReach,
 ): TransferAction[] {
   const actions: TransferAction[] = [];
-  if (isOpenRequest(t) && !sentBackForChanges(t) && keys.transfer && reach.covers([t.branch_id])) {
+  if (isOpenRequest(t) && !financeReturnedFacts(t)?.approval_returned && keys.transfer && reach.covers([t.branch_id])) {
     actions.push("send", "decline");
   }
   if (

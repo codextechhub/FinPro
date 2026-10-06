@@ -5,16 +5,21 @@
  * + the safe reversal/void action for this journal's source + Print. A journal
  * whose document is corrected elsewhere (a goods return, received again on a
  * new receipt) says how, and links to where.
+ *
+ * A direct entry an approver sent back offers its sender Edit (the direct entry
+ * drawer, correcting it) and Resume, with who sent it back and why. Anybody
+ * else is told only its sender may act on it. A journal another document
+ * raised is corrected through that document, so it offers Resume alone.
  */
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Check, Printer, Send } from "lucide-react";
+import { Check, FilePenLine, Printer, Send } from "lucide-react";
 import { DetailDrawer, Money, StatusPill, ConfirmActionModal, InfoHint } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
-import { sentBackForChanges } from "@/components/finance-ui/sent-back";
-import { SentBackNote } from "@/components/finance-ui/sent-back-note";
+import { RETURNED_HINT } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
@@ -24,6 +29,7 @@ import { isVoidableDocument } from "../receivables/document-void-config";
 import { DocumentCorrectionAction, SourceDocumentGuidanceLink } from "./document-correction-action";
 import { isCorrectableDocument, sourceDocumentGuidance } from "./document-correction";
 import { useDates } from "../../../lib/display-prefs";
+import { DirectEntryDrawer } from "./direct-entry-drawer";
 
 const cap = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 const th = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -49,6 +55,10 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmReverse, setConfirmReverse] = useState(false);
   const j = data?.data;
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(j);
+  const [editing, setEditing] = useState(false);
+  // Only a direct entry has an edit route; another document's journal is corrected through it.
+  const directEntry = j?.source === "MANUAL" || j?.source === "OPENING";
   const diff = j ? j.total_debit - j.total_credit : 0;
   const reversalAction = j?.reversal_action;
   const guidance = sourceDocumentGuidance(reversalAction);
@@ -85,7 +95,13 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
               Created by {j?.created_by ?? "-"}{j?.posted_at ? ` · Posted ${dates.day(j.posted_at)}` : ""}
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              {j?.status === "DRAFT" && !sentBackForChanges(j) && (
+              {standing === "sender" && directEntry && (
+                <Can permission={P.FIN_POST_DIRECT_ENTRY}>
+                  <Button variant="outline" onClick={() => setEditing(true)} className="gap-1.5"><FilePenLine className="size-4" /> Edit</Button>
+                </Can>
+              )}
+              {standing === "sender" && <ResumeButton workflowId={workflowId} tags={["FinanceJournals"]} />}
+              {j?.status === "DRAFT" && !standing && (
                 <Can permission={P.FIN_SUBMIT_JOURNAL}>
                   <Button onClick={() => setConfirmSubmit(true)} className="gap-1.5"><Send className="size-4" /> Submit</Button>
                 </Can>
@@ -121,7 +137,7 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
       >
         {isLoading ? <LoadingState rows={5} /> : isError || !j ? <ErrorState onRetry={refetch} /> : (
           <div className="space-y-4">
-            <SentBackNote doc={j} />
+            <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={directEntry ? undefined : RETURNED_HINT.resumeOnly} />
             {/* stat cards */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Stat label="Status"><StatusPill status={j.status} /></Stat>
@@ -179,6 +195,8 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
           </div>
         )}
       </DetailDrawer>
+
+      {editing && j ? <DirectEntryDrawer open existing={j} entity={entity} currency={currency} onClose={() => setEditing(false)} /> : null}
 
       <ConfirmActionModal
         open={confirmSubmit}

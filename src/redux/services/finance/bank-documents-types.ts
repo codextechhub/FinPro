@@ -37,6 +37,10 @@ export interface BankTransactionDocument {
   /** The branch's name; null for a document not yet given a branch. */
   branch_name?: string | null;
   approval_state?: BankDocumentApprovalState;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }
 
 export interface BankTransferDocument {
@@ -56,4 +60,8 @@ export interface BankTransferDocument {
   /** The branch's name; null for a document not yet given a branch. */
   branch_name?: string | null;
   approval_state?: BankDocumentApprovalState;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
+  /** The latest approval request, null before it is first sent; absent where the read does not name it. */
+  workflow_instance_id?: string | number | null;
 }

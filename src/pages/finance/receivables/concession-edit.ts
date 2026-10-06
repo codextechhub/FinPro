@@ -9,9 +9,10 @@
  * rewrite the amount a colleague set a moment ago.
  *
  * A draft is corrected whether it was never sent or came back from approval
- * (rejected, or its request withdrawn or cancelled). One an approver sent back
- * is still with its approvers, and the server refuses it (422) like one
- * waiting for approval or posted.
+ * (rejected, or its request withdrawn or cancelled), and one an approver sent
+ * back is corrected by whoever sent it, then resumed. The server refuses (422)
+ * one waiting for approval or posted, and (403) anybody but the sender of a
+ * returned one.
  */
 
 import type { Concession } from "@/redux/services/finance/ar-types";

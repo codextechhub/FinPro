@@ -21,8 +21,8 @@ import {
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
-import { sentBackForChanges } from "@/components/finance-ui/sent-back";
-import { SentBackNote } from "@/components/finance-ui/sent-back-note";
+import { RETURNED_HINT } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/utils/money";
@@ -196,6 +196,8 @@ function TransferDrawer({ transfer, entity, currency, onClose }: {
   const [submit, { isLoading: submitting }] = useSubmitCreditTransferMutation();
   const [voidTransfer, { isLoading: voiding }] = useVoidCreditTransferMutation();
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "credit transfer" });
+  // No edit route: one sent back is resumed as it is, or withdrawn to change it.
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(transfer, { path: "credit-transfers", entity });
   if (!transfer) return null;
 
   const act = async () => {
@@ -226,13 +228,14 @@ function TransferDrawer({ transfer, entity, currency, onClose }: {
           {transfer.status === "POSTED" && can(P.FIN_REVERSE_CREDIT_TRANSFER) ? (
             <Button variant="outline" onClick={() => setConfirm("void")} className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/5"><Ban className="size-4" /> Void</Button>
           ) : null}
-          {transfer.status === "DRAFT" && !sentBackForChanges(transfer) && can(P.FIN_SUBMIT_CREDIT_TRANSFER) ? (
+          {standing === "sender" ? <ResumeButton workflowId={workflowId} tags={["FinanceCreditTransfers"]} onResumed={onClose} /> : null}
+          {transfer.status === "DRAFT" && !standing && can(P.FIN_SUBMIT_CREDIT_TRANSFER) ? (
             <Button onClick={() => setConfirm("submit")} className="gap-1.5"><Send className="size-4" /> Submit for approval</Button>
           ) : null}
         </>}
       >
         <div className="space-y-4">
-          <SentBackNote doc={transfer} />
+          <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} />
           <div className="grid grid-cols-2 gap-4">
             <DetailField label="Amount"><Money kobo={transfer.amount} currency={currency} /></DetailField>
             <DetailField label="Status"><StatusPill status={transfer.status} label={CREDIT_TRANSFER_STATUS[transfer.status]} /></DetailField>

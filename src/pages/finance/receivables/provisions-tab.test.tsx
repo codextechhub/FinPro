@@ -23,6 +23,17 @@ const mocks = vi.hoisted(() => ({
 }));
 const holds = (code: PermissionCode) => mocks.held.has(FINANCE_PERMISSION_REGISTRY[code]);
 
+/** The approval request a returned document names, and who is signed in. */
+const returned = vi.hoisted(() => ({ uid: 4, request: undefined as unknown, resume: vi.fn() }));
+vi.mock("@/redux/services/finance/approval-request-api", () => ({
+  useGetDocumentApprovalRequestQuery: () => ({ data: undefined }),
+  approvalRequestApi: { util: { invalidateTags: () => ({ type: "test/invalidate" }) } },
+}));
+vi.mock("@/redux/services/dashboard/workflow-api", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetWorkflowInstanceQuery: () => ({ data: returned.request }),
+  useResubmitWorkflowInstanceMutation: () => [(id: string) => { returned.resume(id); return { unwrap: async () => ({}) }; }, { isLoading: false }],
+}));
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
     hasPermission: holds,
@@ -33,9 +44,10 @@ vi.mock("@/hooks/use-permissions", () => ({
   }),
 }));
 vi.mock("@/redux/store", () => ({
-  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {} } }),
+  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {}, user: { id: returned.uid } } }),
   useAppDispatch: () => vi.fn(),
 }));
+vi.mock("../../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
 vi.mock("../../../host", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useBranches: () => ({ data: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false, isError: false }),
@@ -169,5 +181,31 @@ describe("provision runs", () => {
     expect(provisionRecap(RUN.lines)).toMatchObject({ net: 60_000_00, dr: [{ code: "5350" }], cr: [{ code: "1290" }] });
     const release = provisionRecap([{ ...RUN.lines[0], movement: -5_000_00 }]);
     expect(release).toMatchObject({ net: -5_000_00, dr: [{ code: "1290", amount: 5_000_00 }], cr: [{ code: "5350" }] });
+  });
+});
+
+describe("a provision run an approver sent back", () => {
+  const SENT_BACK = { ...RUN, approval_state: "PENDING", approval_returned: true, workflow_instance_id: "wf-4" };
+  beforeEach(() => {
+    returned.request = { id: "wf-4", status: "RETURNED", requested_by: 4, stage_instances: [] };
+    returned.resume.mockReset();
+  });
+
+  it("offers its sender Resume alone, and says to withdraw it to change it", async () => {
+    returned.uid = 4;
+    renderRows([SENT_BACK], true, ...ALL_KEYS);
+    const text = openRun();
+    expect(text).toContain("To change it, withdraw it from your approvals");
+    expect(text).not.toContain("Submit for approval");
+    const resume = [...document.body.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Resume")!;
+    await act(async () => { resume.click(); });
+    expect(returned.resume).toHaveBeenCalledWith("wf-4");
+  });
+
+  it("offers anybody else nothing", () => {
+    returned.uid = 9;
+    renderRows([SENT_BACK], true, ...ALL_KEYS);
+    openRun();
+    expect([...document.body.querySelectorAll("button")].some((b) => b.textContent?.trim() === "Resume")).toBe(false);
   });
 });

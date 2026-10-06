@@ -32,8 +32,8 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
-import { sentBackForChanges } from "@/components/finance-ui/sent-back";
-import { SentBackNote } from "@/components/finance-ui/sent-back-note";
+import { RETURNED_HINT } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { gateExplanation, predictsApproval } from "./adjustment-approval";
 import { useAdjustmentGate } from "./use-adjustment-gate";
 import {
@@ -212,11 +212,15 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({
     documentLabel: row?.kind === "WRITEOFF" ? "write-off" : "refund",
   });
+  // Neither has an edit route: one sent back is resumed as it is, or withdrawn to change it.
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(row, row?.kind === "WRITEOFF"
+    ? { path: "write-offs", entity, id: row.write_off_id }
+    : { path: "refunds", entity, id: row?.refund_id });
   if (!row) return null;
 
   const wo = row.kind === "WRITEOFF";
   const posted = row.status === "POSTED";
-  const isDraft = row.status === "DRAFT" && !sentBackForChanges(row);
+  const isDraft = row.status === "DRAFT" && !standing;
   // Server-computed. Refunds and write-offs are gated at any amount once the
   // ladder is published, so this is normally true - but it is read rather than
   // assumed, because a tenant that switched its own ladder off posts directly.
@@ -278,6 +282,7 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
           {wo && posted && row.write_off_id && can(P.FIN_RECOVER_WRITE_OFF) ? (
             <Button variant="outline" onClick={() => setRecovering(true)} className="gap-1.5"><HandCoins className="size-4" /> Recover</Button>
           ) : null}
+          {standing === "sender" ? <ResumeButton workflowId={workflowId} tags={["FinanceRefunds", "FinanceWriteOffs"]} onResumed={onClose} /> : null}
           {isDraft && gated && can(wo ? P.FIN_SUBMIT_WRITE_OFF : P.FIN_SUBMIT_REFUND) ? (
             <Button onClick={doSubmit} disabled={submittingRefund || submittingWriteOff} className="gap-1.5">
               <Send className="size-4" />{submittingRefund || submittingWriteOff ? "Submitting…" : "Submit for approval"}
@@ -290,7 +295,7 @@ function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
       }
     >
       <div className="space-y-5">
-        <SentBackNote doc={row} />
+        <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} />
         {isDraft && gated ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">
             {wo ? "A write-off concedes income" : "A refund moves cash out"}, so it needs a second

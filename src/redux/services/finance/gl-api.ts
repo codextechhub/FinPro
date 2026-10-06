@@ -1,9 +1,11 @@
 /**
  * General Ledger RTK Query endpoints (vs_finance, /v1/finance/). Read-only GL +
- * the two sanctioned writes: Direct Entry and journal reversal. There is NO
- * free-form journal editor (spec §1.4).
+ * the sanctioned writes: Direct Entry, its correction, and journal reversal.
+ * There is NO free-form journal editor (spec §1.4): only a draft direct entry is
+ * corrected, and a journal another document raised is corrected through it.
  *   GET  /finance/journals/                 finance.journal.view
  *   GET  /finance/journals/{id}/            finance.journal.view
+ *   PATCH /finance/journals/{id}/           finance.directentry.post
  *   POST /finance/journals/{id}/submit/     finance.journal.submit
  *   POST /finance/journals/{id}/reverse/    finance.journal.reverse
  *   POST /finance/direct-entries/           finance.directentry.post
@@ -15,6 +17,7 @@ import { baseApi } from "@/redux/services/base-api";
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
 import type { ApiEnvelope, PaginatedEnvelope } from "./api-types";
 import type {
+  DirectEntryChanges,
   DirectEntryPayload,
   JournalDetail,
   JournalListItem,
@@ -62,6 +65,16 @@ export const glApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["FinanceJournals", "FinanceReports"],
     }),
+    // A direct entry's correction: a draft back from approval, or one its
+    // approver returned, which only its sender may correct.
+    updateJournal: builder.mutation<ApiEnvelope<JournalDetail>, { id: number; entity: string } & DirectEntryChanges>({
+      query: ({ id, entity, ...body }) => ({
+        url: `/finance/journals/${id}/${generateQueryString({ entity })}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["FinanceJournals"],
+    }),
     // A school whose journal route has steps gets the entry back waiting for
     // approval rather than posted; `approval` then says whether anyone can decide it.
     postDirectEntry: builder.mutation<ApiEnvelope<JournalDetail & { approval?: ApprovalParkState }>, DirectEntryPayload>({
@@ -82,4 +95,5 @@ export const {
   useSubmitJournalMutation,
   useReverseJournalMutation,
   usePostDirectEntryMutation,
+  useUpdateJournalMutation,
 } = glApi;
