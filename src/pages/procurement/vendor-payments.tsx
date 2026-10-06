@@ -51,6 +51,9 @@ import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 import { isForbidden } from "../../lib/api-errors";
 import { approvalStateWord } from "./document-status";
+import { WITH_APPROVERS_NOTE, approvalPillWord } from "./returned-correction";
+import { ResumeButton, ReturnedNote, useReturnedStanding } from "./returned-note";
+import { vendorPaymentChanges } from "./vendor-payment-edit";
 
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["invoices", "Invoices", ListChecks],
@@ -94,7 +97,7 @@ export default function VendorPaymentsPage() {
     { header: "Date", cell: (payment) => dates.day(payment.payment_date) },
     { header: "Method", cell: (payment) => paymentMethodLabel(payment.method) },
     { header: "Net Paid", align: "right", cell: (payment) => <span className="font-semibold tabular-nums">{formatMoney(payment.net_amount, currency)}</span> },
-    { header: "Status", cell: (payment) => <div className="flex min-w-28 flex-wrap gap-1"><StatusPill status={payment.status} />{payment.status !== "REVERSED" && <StatusPill status={payment.approval_state} label={approvalStateWord(payment.approval_state)} />}{payment.status === "POSTED" && <StatusPill status={payment.allocation_status} />}</div> },
+    { header: "Status", cell: (payment) => <div className="flex min-w-28 flex-wrap gap-1"><StatusPill status={payment.status} />{payment.status !== "REVERSED" && <StatusPill status={payment.approval_state} label={approvalPillWord(payment, approvalStateWord(payment.approval_state))} />}{payment.status === "POSTED" && <StatusPill status={payment.allocation_status} />}</div> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
@@ -108,7 +111,7 @@ export default function VendorPaymentsPage() {
   </ProcurementShell>;
 }
 
-function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+export function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
   const user = useAppSelector((state) => state.auth.user);
   const uid = user?.id == null ? "" : String(user.id);
@@ -141,6 +144,7 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
   const activeStage = useMemo(() => (workflow?.stage_instances || []).filter((stage) => stage.status === "ACTIVE").at(-1), [workflow]);
   const canVote = !!activeStage && workflow?.status === "IN_PROGRESS" && activeStage.eligible_approvers.some((approver) => sameId(approver.user, uid) && approver.attempt === activeStage.attempt) && !activeStage.actions.some((action) => sameId(action.actor, uid) && !action.reversed_at && !action.is_reversal_of && action.attempt === activeStage.attempt);
   const editable = payment?.status === "DRAFT" && ["NOT_SUBMITTED", "REJECTED"].includes(payment.approval_state);
+  const standing = useReturnedStanding(payment, workflow);
   const vote = async (action: VoteAction) => {
     if (!workflowId || ((action === "REJECTED" || action === "RETURNED") && !comment.trim())) return;
     try { await recordAction({ id: workflowId, action, comment: comment.trim() }).unwrap(); toast.success(action === "APPROVED" ? "Approval recorded." : action === "RETURNED" ? "Revision requested." : "Payment rejected."); setComment(""); refetch(); } catch { /* central */ }
@@ -165,7 +169,8 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
   return <>
     <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={payment?.document_number || "Vendor payment"} description={payment ? `${payment.vendor_name || payment.vendor_code} · ${dates.day(payment.payment_date)} · ${paymentMethodLabel(payment.method)}` : "Loading vendor payment"} widthClass="sm:max-w-[720px]" footer={payment && <>
       <Button variant="outline" onClick={() => window.print()}><Printer className="size-4" /> Print</Button>
-      {editable && <Can permission={P.PROC_UPDATE_VENDOR_PAYMENT}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
+      {(editable || standing === "sender") && <Can permission={P.PROC_UPDATE_VENDOR_PAYMENT}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
+      {standing === "sender" && <ResumeButton workflowId={workflowId} />}
       {editable && <Can permission={P.PROC_SUBMIT_VENDOR_PAYMENT}><Button loading={submitting} onClick={() => run("submit")}><Send className="size-4" /> Submit for Approval</Button></Can>}
       {payment.status === "DRAFT" && payment.approval_state === "APPROVED" && <Can permission={P.PROC_CANCEL_VENDOR_PAYMENT}><Button variant="outline-dest" loading={cancelling} onClick={() => run("cancel")}><X className="size-4" /> Cancel</Button></Can>}
       {payment.status === "DRAFT" && payment.approval_state === "APPROVED" && <Can permission={P.PROC_POST_VENDOR_PAYMENT}><Button loading={posting} onClick={() => run("post")}><Banknote className="size-4" /> Post Payment</Button></Can>}
@@ -173,7 +178,7 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
       {payment.status === "POSTED" && <Can permission={P.PROC_REVERSE_VENDOR_PAYMENT}><Button variant="outline-dest" loading={reversing} onClick={() => run("reverse")}><Undo2 className="size-4" /> Reverse</Button></Can>}
     </>}>
       {isLoading ? <LoadingState rows={8} /> : isError || !payment ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={payment.status} /><StatusPill status={payment.approval_state} label={approvalStateWord(payment.approval_state)} />{payment.status === "POSTED" && <StatusPill status={payment.allocation_status} />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(payment.net_amount, currency)}</p></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={payment.status} /><StatusPill status={payment.approval_state} label={approvalPillWord(payment, approvalStateWord(payment.approval_state))} />{payment.status === "POSTED" && <StatusPill status={payment.allocation_status} />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(payment.net_amount, currency)}</p></div>
         <TabStrip
           items={DETAIL_TAB_ITEMS}
           value={tab}
@@ -184,7 +189,8 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
           buttonClassName="flex items-center gap-1.5 px-0"
         />
         {tab === "overview" && <div className="space-y-5">
-          {payment.approval_state === "PENDING" && <section className="rounded-md border border-amber-200 bg-amber-50 p-4"><p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>{canVote && <><Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" loading={voting} onClick={() => vote("APPROVED")}><Check className="size-4" /> Approve</Button><Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button><Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button></div></>}</section>}
+          <ReturnedNote standing={standing} request={workflow} />
+          {payment.approval_state === "PENDING" && !payment.approval_returned && <section className="rounded-md border border-amber-200 bg-amber-50 p-4"><p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>{!canVote && <p className="mt-1 font-mont text-xs text-amber-800">{WITH_APPROVERS_NOTE}</p>}{canVote && <><Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" loading={voting} onClick={() => vote("APPROVED")}><Check className="size-4" /> Approve</Button><Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button><Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button></div></>}</section>}
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Payment reference" value={payment.reference} /><Field label="Vendor" value={payment.vendor_name || payment.vendor_code} /><Field label="Payment date" value={dates.day(payment.payment_date)} /><Field label="Method" value={paymentMethodLabel(payment.method)} /><Field label="Bank account" value={payment.bank_account_name || payment.payment_account_name || payment.payment_code} /><Field label="WHT code" value={payment.wht_tax_code_value} /><Field label="Gross settled" value={formatMoney(payment.gross_amount, currency)} /><Field label="WHT withheld" value={<WhtFigure amount={payment.wht_amount} source={payment.wht_source} currency={currency} />} /><Field label="Net cash paid" value={formatMoney(payment.net_amount, currency)} /><Field label="Allocated to bills" value={formatMoney(payment.allocated_amount, currency)} />{payment.status === "POSTED" && payment.advance_remaining > 0 && <Field label="Paid in advance" value={formatMoney(payment.advance_remaining, currency)} />}</dl>
           {payment.narration && <div className="rounded-md border border-white-02 p-4"><p className="font-mont text-[11px] text-gray-05">Narration</p><p className="mt-1 font-mont text-sm">{payment.narration}</p></div>}
         </div>}
@@ -206,7 +212,7 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
       </div>}
       {noApproverDialog}
     </DetailDrawer>
-    {payment && editing && <PaymentForm key={`edit-${payment.id}`} entity={entity} currency={currency} initial={payment} onClose={() => setEditing(false)} />}
+    {payment && editing && <PaymentForm key={`edit-${payment.id}`} entity={entity} currency={currency} initial={payment} returned={standing === "sender"} onClose={() => setEditing(false)} />}
   </>;
 }
 
@@ -225,7 +231,14 @@ function PaymentActivity({ payment, workflow, name }: { payment: VendorPayment; 
   return <ActivityFeed workflowLogs={workflow?.audit_logs} activity={payment.activity} resolveActorName={name} created={{ key: `payment-created-${payment.id}`, message: "Payment draft created", actorName: payment.created_by_name, occurredAt: payment.created_at }} />;
 }
 
-function PaymentForm({ entity, currency, initial, onClose }: { entity: string; currency?: string | null; initial?: VendorPayment; onClose: () => void }) {
+/**
+ * Create a payment, edit a draft, or correct one an approver sent back
+ * (`returned`). A correction is saved without a Submit: its request is still
+ * open, and the drawer's Resume sends it back to the approver. An edit sends
+ * the allocations and only the other fields that changed (see
+ * vendor-payment-edit.ts).
+ */
+function PaymentForm({ entity, currency, initial, returned = false, onClose }: { entity: string; currency?: string | null; initial?: VendorPayment; returned?: boolean; onClose: () => void }) {
   const [vendor, setVendor] = useState(initial?.vendor_code || "");
   const [paymentDate, setPaymentDate] = useState(initial?.payment_date || "");
   const [method, setMethod] = useState(initial?.method || "BANK_TRANSFER");
@@ -271,16 +284,18 @@ function PaymentForm({ entity, currency, initial, onClose }: { entity: string; c
   const canSave = !!vendor && !!paymentDate && !!bank && allocations.length > 0 && gross > 0 && wht <= gross && !mixedBranches;
   const save = async (andSubmit: boolean) => {
     if (!canSave) return;
-    const body = { entity, vendor, payment_date: paymentDate, method, bank_account: Number(bank), wht_amount: whtToSend, wht_tax_code: whtCode || (initial ? null : undefined), reference: reference.trim() || undefined, narration: narration.trim() || undefined, allocations };
+    const body = { entity, vendor, payment_date: paymentDate, method, bank_account: Number(bank), wht_amount: whtToSend, wht_tax_code: whtCode || undefined, reference: reference.trim() || undefined, narration: narration.trim() || undefined, allocations };
     try {
-      const response = initial ? await update({ id: initial.id, ...body }).unwrap() : await create(body).unwrap();
+      const response = initial
+        ? await update({ id: initial.id, entity, ...vendorPaymentChanges(initial, { vendor, paymentDate, method, bank, reference, narration, whtCode, whtToSend, allocations }) }).unwrap()
+        : await create(body).unwrap();
       if (andSubmit) await submit({ id: response.data.id, entity }).unwrap();
-      toast.success(andSubmit ? "Payment created and submitted for approval." : initial ? "Payment draft updated." : "Payment draft saved.");
+      toast.success(andSubmit ? "Payment created and submitted for approval." : returned ? "Changes saved. Resume it to send it back to the approver." : initial ? "Payment draft updated." : "Payment draft saved.");
       onClose();
     } catch { /* central */ }
   };
   const setVendorAndReset = (value: string) => { setVendor(value); setAmounts({}); setWhtCode(vendorWhtCode(value)); setTypedWht(null); };
-  return <DetailDrawer open onOpenChange={(open) => !open && onClose()} title={initial ? `Edit ${initial.document_number}` : "New Payment"} description="Disburse against approved and posted invoices" widthClass="sm:max-w-[720px]" footer={<><Button variant="outline" disabled={loading} onClick={onClose}>Cancel</Button><Button variant="outline" loading={loading} disabled={!canSave} onClick={() => save(false)}>Save Draft</Button><Button loading={loading} disabled={!canSave} onClick={() => save(true)}>{initial ? "Save & Submit" : "Create & Submit"}</Button></>}>
+  return <DetailDrawer open onOpenChange={(open) => !open && onClose()} title={initial ? `${returned ? "Correct" : "Edit"} ${initial.document_number}` : "New Payment"} description={returned ? "Your changes reach the approver when you resume the request. The payment stays with its branch." : "Disburse against approved and posted invoices"} widthClass="sm:max-w-[720px]" footer={<><Button variant="outline" disabled={loading} onClick={onClose}>Cancel</Button><Button variant="outline" loading={loading} disabled={!canSave} onClick={() => save(false)}>{returned ? "Save changes" : "Save Draft"}</Button>{!returned && <Button loading={loading} disabled={!canSave} onClick={() => save(true)}>{initial ? "Save & Submit" : "Create & Submit"}</Button>}</>}>
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={setVendorAndReset} /></FormField><FormField label="Method" required><select value={method} onChange={(event) => setMethod(event.target.value)} className="h-9 w-full rounded-md border bg-white px-3 font-mont text-sm">{PAYMENT_METHODS.map((value) => <option key={value} value={value}>{paymentMethodLabel(value)}</option>)}</select></FormField><PostingDateField label="Payment date" entity={entity} value={paymentDate} onChange={setPaymentDate} /><FormField label="Pay from" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={paymentBranch} disabled={mixedBranches} /></FormField><FormField label="Reference"><Input value={reference} onChange={(event) => setReference(event.target.value)} className="bg-white" /></FormField><FormField label="WHT code"><TaxCodePicker entity={entity} value={whtCode} onChange={setWhtCode} placeholder="No WHT code" /></FormField></div>
       <FormField label="Narration"><Textarea value={narration} onChange={(event) => setNarration(event.target.value)} className="min-h-20 bg-white" /></FormField>

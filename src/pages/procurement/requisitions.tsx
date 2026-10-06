@@ -13,6 +13,12 @@ import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
 import { useServesPath } from "../../lib/host-routes";
 import { approvalWorkflowLink } from "./approval-workflow-link";
+import { WITH_APPROVERS_NOTE } from "./returned-correction";
+import { ResumeButton, ReturnedNote, useReturnedStanding } from "./returned-note";
+import {
+  blankRequisitionLine, requisitionApiLines, requisitionChanges, requisitionForm,
+  type RequisitionFormLine,
+} from "./requisition-edit";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LoadingState,
@@ -238,7 +244,7 @@ export default function RequisitionsPage() {
   );
 }
 
-function RequisitionDrawer({ id, entity, currency, onClose }: {
+export function RequisitionDrawer({ id, entity, currency, onClose }: {
   id: number | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
@@ -266,6 +272,7 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
   }, [workflow]);
   const canViewInstances = useCan().can(HOST_P.VIEW_WORKFLOW_INSTANCES);
   const workflowLink = approvalWorkflowLink(workflowId, workflow?.requested_by, uid, servesPath, canViewInstances);
+  const standing = useReturnedStanding(req, workflow);
   const canVote = !!activeStage && workflow?.status === "IN_PROGRESS"
     && activeStage.eligible_approvers.some((approver) => sameId(approver.user, uid) && approver.attempt === activeStage.attempt)
     && !activeStage.actions.some((action) => sameId(action.actor, uid) && !action.reversed_at && !action.is_reversal_of && action.attempt === activeStage.attempt);
@@ -299,7 +306,8 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
         title={req?.title || req?.document_number || "Requisition"}
         description={req ? `${req.document_number} · ${req.requested_by_name} · ${req.cost_center_name || "No cost centre"}` : "Loading requisition"}
         footer={req && <>
-          {req.status === "DRAFT" && <Can permission={P.PROC_UPDATE_REQUISITION}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
+          {(req.status === "DRAFT" || standing === "sender") && <Can permission={P.PROC_UPDATE_REQUISITION}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
+          {standing === "sender" && <ResumeButton workflowId={workflowId} />}
           {req.status === "DRAFT" && <Can permission={P.PROC_SUBMIT_REQUISITION}><Button loading={submitting} onClick={submit}><Send className="size-4" /> Submit for Approval</Button></Can>}
         </>}
       >
@@ -320,9 +328,11 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
             />
 
             {tab === "overview" && <div className="space-y-5">
-              {req.status === "PENDING_APPROVAL" && (
+              <ReturnedNote standing={standing} request={workflow} />
+              {req.status === "PENDING_APPROVAL" && !req.approval_returned && (
                 <section className="rounded-md border border-amber-200 bg-amber-50 p-4">
                   <p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>
+                  {!canVote && <p className="mt-1 font-mont text-xs text-amber-800">{WITH_APPROVERS_NOTE}</p>}
                   <p className="mt-1 font-mont text-xs text-amber-800">{canVote ? "Review the request and record your decision below." : workflowLink ? "Open the approval workflow to see who owns the current step." : "The Approval tab shows each step and the decisions recorded so far."}</p>
                   {canVote ? <>
                     <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" />
@@ -365,7 +375,7 @@ function RequisitionDrawer({ id, entity, currency, onClose }: {
         )}
         {noApproverDialog}
       </DetailDrawer>
-      {req && editing && <RequisitionForm open onClose={() => setEditing(false)} entity={entity} currency={currency} initial={req} onSaved={refetch} />}
+      {req && editing && <RequisitionForm open onClose={() => setEditing(false)} entity={entity} currency={currency} initial={req} returned={standing === "sender"} onSaved={refetch} />}
     </>
   );
 }
@@ -378,24 +388,27 @@ function EmptyBlock({ text }: { text: string }) {
   return <div className="flex min-h-36 items-center justify-center rounded-md border border-dashed border-white-02 px-4 text-center font-mont text-xs text-gray-05">{text}</div>;
 }
 
-type FormLine = { catalogItem: string; description: string; quantity: number; unit: string; unitPriceKobo: number };
-const blankLine = (): FormLine => ({ catalogItem: "", description: "", quantity: 1, unit: "Unit", unitPriceKobo: 0 });
+type FormLine = RequisitionFormLine;
+const blankLine = blankRequisitionLine;
 
-function RequisitionForm({ open, onClose, entity, currency, initial, onSaved }: {
+/**
+ * Raise a requisition, edit a draft, or correct one an approver sent back
+ * (`returned`). A correction is saved without a Submit: its request is still
+ * open, and the drawer's Resume sends it back to the approver. An edit sends
+ * only what changed (see requisition-edit.ts).
+ */
+function RequisitionForm({ open, onClose, entity, currency, initial, returned = false, onSaved }: {
   open: boolean; onClose: () => void; entity: string; currency?: string | null;
-  initial?: Requisition; onSaved?: () => void;
+  initial?: Requisition; returned?: boolean; onSaved?: () => void;
 }) {
   const dates = useDates();
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [costCenter, setCostCenter] = useState(initial?.cost_center_code ?? "");
-  const [requestDate, setRequestDate] = useState(() => initial?.request_date ?? dates.today());
-  const [neededBy, setNeededBy] = useState(initial?.needed_by ?? "");
-  const [justification, setJustification] = useState(initial?.justification ?? "");
-  const [lines, setLines] = useState<FormLine[]>(initial?.lines.length ? initial.lines.map((line) => ({
-    catalogItem: line.catalog_item_id ? String(line.catalog_item_id) : "",
-    description: line.description, quantity: Number(line.quantity), unit: line.unit,
-    unitPriceKobo: line.estimated_unit_price,
-  })) : [blankLine()]);
+  const saved = initial ? requisitionForm(initial) : null;
+  const [title, setTitle] = useState(saved?.title ?? "");
+  const [costCenter, setCostCenter] = useState(saved?.costCenter ?? "");
+  const [requestDate, setRequestDate] = useState(() => saved?.requestDate || dates.today());
+  const [neededBy, setNeededBy] = useState(saved?.neededBy ?? "");
+  const [justification, setJustification] = useState(saved?.justification ?? "");
+  const [lines, setLines] = useState<FormLine[]>(saved?.lines ?? [blankLine()]);
   const [create, { isLoading: creating }] = useCreateRequisitionMutation();
   const [update, { isLoading: updating }] = useUpdateRequisitionMutation();
   const [submitReq, { isLoading: submitting }] = useSubmitRequisitionMutation();
@@ -411,11 +424,7 @@ function RequisitionForm({ open, onClose, entity, currency, initial, onSaved }: 
   const catalog = toArray(catalogData?.data);
   const costCenters = toArray(costCenterData?.data).map((center) => ({ value: center.code, label: `${center.code} - ${center.name}` }));
   const catalogOptions = catalog.map((item) => ({ value: String(item.id), label: `${item.code} - ${item.name}` }));
-  const apiLines = lines.filter((line) => line.description.trim() && line.quantity > 0).map((line, index) => ({
-    line_no: index + 1, ...(line.catalogItem ? { catalog_item: line.catalogItem } : {}),
-    description: line.description.trim(), quantity: line.quantity, unit: line.unit.trim() || "Unit",
-    estimated_unit_price: line.unitPriceKobo,
-  }));
+  const apiLines = requisitionApiLines(lines);
   const estimate = apiLines.reduce((total, line) => total + Math.round(line.quantity * line.estimated_unit_price), 0);
   const canSave = !!title.trim() && !!requestDate && apiLines.length > 0 && branch.ready;
 
@@ -433,13 +442,16 @@ function RequisitionForm({ open, onClose, entity, currency, initial, onSaved }: 
     try {
       let id = initial?.id;
       if (initial) {
-        await update({ id: initial.id, entity, title: title.trim(), cost_center: costCenter || undefined, request_date: requestDate, needed_by: neededBy || undefined, justification: justification.trim(), lines: apiLines }).unwrap();
+        const changes = requisitionChanges(initial, { title, costCenter, requestDate, neededBy, justification, lines });
+        // Nothing changed: nothing to send.
+        if (!Object.keys(changes).length) { onClose(); return; }
+        await update({ id: initial.id, entity, ...changes }).unwrap();
       } else {
         const response = await create({ entity, title: title.trim(), cost_center: costCenter || undefined, request_date: requestDate, needed_by: neededBy || undefined, justification: justification.trim(), lines: apiLines, ...branch.body() }).unwrap();
         id = response.data.id;
       }
       if (submitAfter && id) await submitReq({ id, entity }).unwrap();
-      toast.success(submitAfter ? "Requisition created and submitted." : initial ? "Draft updated." : "Draft saved.");
+      toast.success(submitAfter ? "Requisition created and submitted." : returned ? "Changes saved. Resume it to send it back to the approver." : initial ? "Draft updated." : "Draft saved.");
       onSaved?.();
       onClose();
     } catch { /* Central API handling shows the server message. */ }
@@ -451,11 +463,11 @@ function RequisitionForm({ open, onClose, entity, currency, initial, onSaved }: 
       open={open}
       onOpenChange={(value) => !saving && !value && onClose()}
       widthClass="sm:max-w-[760px]"
-      title={initial ? "Edit Requisition" : "New Requisition"}
-      description="Capture the request details and estimated line costs."
+      title={returned ? "Correct Requisition" : initial ? "Edit Requisition" : "New Requisition"}
+      description={returned ? "Your changes reach the approver when you resume the request." : "Capture the request details and estimated line costs."}
       footer={<>
         <Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button>
-        <Button variant="outline" disabled={!canSave} loading={creating || updating} onClick={() => save(false)}>Save Draft</Button>
+        <Button variant="outline" disabled={!canSave} loading={creating || updating} onClick={() => save(false)}>{returned ? "Save changes" : "Save Draft"}</Button>
         {!initial && <Button disabled={!canSave} loading={saving} onClick={() => save(true)}>Create Requisition</Button>}
       </>}
     >

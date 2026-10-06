@@ -55,3 +55,31 @@ export function creditNoteStage(note: Pick<VendorCreditNote, "status" | "approva
   if (note.approval_state === "PENDING") return "pending";
   return "editable";
 }
+
+/** The header fields of a credit note edit, as the form holds them. */
+export interface CreditNoteHeaderForm {
+  noteDate: string;
+  reason: string;
+  vendorReference: string;
+}
+
+/** The header fields of a credit note PATCH. */
+export interface CreditNoteHeaderChanges {
+  note_date?: string;
+  reason?: string;
+  vendor_reference?: string;
+}
+
+/**
+ * Only the header fields the form changed from `saved`. The crediting part is
+ * sent beside these only when the reader picked a new way of crediting; left
+ * out, the server keeps the draft's lines. The same body corrects a draft and
+ * a note an approver sent back.
+ */
+export function creditNoteHeaderChanges(saved: Pick<VendorCreditNote, "note_date" | "reason" | "vendor_reference">, form: CreditNoteHeaderForm): CreditNoteHeaderChanges {
+  const out: CreditNoteHeaderChanges = {};
+  if (form.noteDate !== saved.note_date) out.note_date = form.noteDate;
+  if (form.reason.trim() !== (saved.reason || "").trim()) out.reason = form.reason.trim();
+  if (form.vendorReference.trim() !== (saved.vendor_reference || "").trim()) out.vendor_reference = form.vendorReference.trim();
+  return out;
+}

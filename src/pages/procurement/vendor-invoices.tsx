@@ -63,6 +63,9 @@ import { useDates } from "../../lib/display-prefs";
 import { useVoidVendorInvoiceMutation } from "@/redux/services/procurement/payables-corrections-api";
 import { BillCreditNotes, CreditNoteForm, CreditNotesView } from "./vendor-credit-notes";
 import { VENDOR_INVOICE_TABS, approvalStateWord, vendorInvoiceWord } from "./document-status";
+import { WITH_APPROVERS_NOTE, approvalPillWord } from "./returned-correction";
+import { ResumeButton, ReturnedNote, useReturnedStanding } from "./returned-note";
+import { vendorInvoiceChanges } from "./vendor-invoice-edit";
 import { OpeningBillsDrawer } from "./opening-bills-drawer";
 import { billCorrection } from "./bill-correction";
 
@@ -189,7 +192,7 @@ function BillsView({ entity, currency, switcher }: { entity: string; currency?: 
   </ProcurementShell>;
 }
 
-function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+export function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
   const user = useAppSelector((state) => state.auth.user);
   const uid = user?.id == null ? "" : String(user.id);
@@ -237,12 +240,14 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
     } catch { /* central */ }
   };
   const editable = invoice?.status === "DRAFT" && ["NOT_SUBMITTED", "REJECTED"].includes(invoice.approval_state);
+  const standing = useReturnedStanding(invoice, workflow);
   const postEligible = invoice?.status === "DRAFT" && invoice.approval_state === "APPROVED";
   const blockingVariance = !!invoice && isBlockingInvoiceVariance(invoice.match_status);
   return <>
     <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={invoice?.document_number || "Vendor invoice"} description={invoice ? `${invoice.vendor_name || invoice.vendor_code} · ${invoice.purchase_order_number || "Direct invoice"} · due ${dates.day(invoice.due_date)}` : "Loading vendor invoice"} widthClass="sm:max-w-[720px]" footer={invoice && <>
       <Button variant="outline" onClick={() => window.print()}><Printer className="size-4" /> Print</Button>
-      {editable && <Can permission={P.PROC_UPDATE_VENDOR_INVOICE}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
+      {(editable || standing === "sender") && <Can permission={P.PROC_UPDATE_VENDOR_INVOICE}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
+      {standing === "sender" && <ResumeButton workflowId={workflowId} />}
       {editable && <Can permission={P.PROC_MATCH_VENDOR_INVOICE}><Button variant="outline" loading={matching} onClick={() => action("match")}><Check className="size-4" /> Run Match</Button></Can>}
       {editable && <Can permission={P.PROC_SUBMIT_VENDOR_INVOICE}><Button loading={submitting} onClick={() => action("submit")}><Send className="size-4" /> Submit for Approval</Button></Can>}
       {postEligible && !blockingVariance && <Can permission={P.PROC_POST_VENDOR_INVOICE}><Button loading={posting} onClick={() => action("post")}><Send className="size-4" /> Post Invoice</Button></Can>}
@@ -251,7 +256,7 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
       {correction?.posted && <Can permission={P.PROC_VOID_VENDOR_INVOICE}><Button variant="outline-dest" onClick={() => setVoidOpen(true)}><Ban className="size-4" /> Void</Button></Can>}
     </>}>
       {isLoading ? <LoadingState rows={8} /> : isError || !invoice ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={invoice.status} label={vendorInvoiceWord(invoice.status)} /><StatusPill status={invoice.approval_state} label={approvalStateWord(invoice.approval_state)} /><StatusPill status={invoice.match_status} /><StatusPill status={invoice.payment_status} label={vendorInvoiceWord(invoice.payment_status)} />{invoice.is_overdue && <StatusPill status="OVERDUE" />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(invoice.total, currency)}</p></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={invoice.status} label={vendorInvoiceWord(invoice.status)} /><StatusPill status={invoice.approval_state} label={approvalPillWord(invoice, approvalStateWord(invoice.approval_state))} /><StatusPill status={invoice.match_status} /><StatusPill status={invoice.payment_status} label={vendorInvoiceWord(invoice.payment_status)} />{invoice.is_overdue && <StatusPill status="OVERDUE" />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(invoice.total, currency)}</p></div>
         <TabStrip
           items={DETAIL_TAB_ITEMS}
           value={tab}
@@ -262,7 +267,8 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
           buttonClassName="flex items-center gap-1.5 px-0"
         />
         {tab === "overview" && <div className="space-y-5">
-          {invoice.approval_state === "PENDING" && <section className="rounded-md border border-amber-200 bg-amber-50 p-4"><p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>{canVote && <><Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" loading={voting} onClick={() => vote("APPROVED")}><Check className="size-4" /> Approve</Button><Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button><Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button></div></>}</section>}
+          <ReturnedNote standing={standing} request={workflow} />
+          {invoice.approval_state === "PENDING" && !invoice.approval_returned && <section className="rounded-md border border-amber-200 bg-amber-50 p-4"><p className="font-mont text-sm font-semibold text-amber-900">{canVote ? "Your approval is required" : activeStage ? `Awaiting ${activeStage.stage_label}` : "Approval in progress"}</p>{!canVote && <p className="mt-1 font-mont text-xs text-amber-800">{WITH_APPROVERS_NOTE}</p>}{canVote && <><Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment (required for revision or rejection)" className="mt-3 min-h-20 bg-white" /><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" loading={voting} onClick={() => vote("APPROVED")}><Check className="size-4" /> Approve</Button><Button size="sm" variant="outline" disabled={!comment.trim() || voting} onClick={() => vote("RETURNED")}><RotateCcw className="size-4" /> Request Revision</Button><Button size="sm" variant="outline-dest" disabled={!comment.trim() || voting} onClick={() => vote("REJECTED")}><X className="size-4" /> Reject</Button></div></>}</section>}
           <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Vendor invoice #" value={invoice.vendor_reference} /><Field label="Internal invoice #" value={invoice.document_number} /><Field label="Vendor" value={invoice.vendor_name || invoice.vendor_code} /><Field label="PO reference" value={invoice.purchase_order_number || "Direct invoice"} /><Field label="Invoice date" value={dates.day(invoice.invoice_date)} /><Field label="Due date" value={dates.day(invoice.due_date)} /><Field label="Subtotal" value={formatMoney(invoice.subtotal, currency)} /><Field label="Tax" value={formatMoney(invoice.tax_total, currency)} /><Field label="Paid" value={formatMoney(invoice.amount_paid, currency)} />{!!invoice.amount_credited && <Field label="Credited" value={formatMoney(invoice.amount_credited, currency)} />}<Field label="Balance due" value={formatMoney(invoice.balance_due, currency)} />{invoice.is_opening && <Field label="Carried in" value="Opening balance from before go-live" />}</dl>
           <InvoicePostingRecap invoice={invoice} currency={currency} />
         </div>}
@@ -286,7 +292,7 @@ function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | null; e
       </div>}
       {noApproverDialog}
     </DetailDrawer>
-    {invoice && editing && <InvoiceForm entity={entity} currency={currency} initial={invoice} onClose={() => setEditing(false)} />}
+    {invoice && editing && <InvoiceForm entity={entity} currency={currency} initial={invoice} returned={standing === "sender"} onClose={() => setEditing(false)} />}
     {invoice && crediting && <CreditNoteForm entity={entity} currency={currency} bill={invoice} onClose={() => setCrediting(false)} onCreated={() => setTab("credits")} />}
     {invoice && correction && <ConfirmActionModal
       open={voidOpen}
@@ -352,7 +358,13 @@ function ActivityPanel({ invoice, workflow, name }: { invoice: VendorInvoice; wo
 }
 
 type POLineDraft = { po_line: number; description: string; expense_account: string; quantity: number; unit_price: number };
-function InvoiceForm({ entity, currency, initial, onClose }: { entity: string; currency?: string | null; initial?: VendorInvoice; onClose: () => void }) {
+/**
+ * Record a bill, edit a draft, or correct one an approver sent back
+ * (`returned`). A correction is saved without a Submit: its request is still
+ * open, and the drawer's Resume sends it back to the approver. An edit sends
+ * only what changed (see vendor-invoice-edit.ts).
+ */
+function InvoiceForm({ entity, currency, initial, returned = false, onClose }: { entity: string; currency?: string | null; initial?: VendorInvoice; returned?: boolean; onClose: () => void }) {
   const dates = useDates();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [mode, setMode] = useState<"po" | "direct">(initial ? (initial.purchase_order_id ? "po" : "direct") : "po");
@@ -427,6 +439,8 @@ function InvoiceForm({ entity, currency, initial, onClose }: { entity: string; c
     };
   }, [checkReference, entity, initial, reference, vendor]);
   const lines = mode === "po" ? poLines.map((line, index) => ({ ...line, line_no: index + 1 })) : toApiLines(directLines, "expense_account");
+  // The lines the form opened with, which an edit leaves out when they are unchanged.
+  const [savedLines] = useState(() => lines);
   const total = mode === "po" ? poLines.reduce((sum, line) => sum + Math.round(line.quantity * line.unit_price), 0) : directLines.reduce((sum, line) => sum + Math.round(Number(line.quantity || 0) * Number(line.unitPriceKobo || 0)), 0);
   const saving = creating || updating || submitting;
   const canSave = !!vendor && !!invoiceDate && !!reference.trim() && !referenceError && lines.length > 0 && (mode === "direct" || !!po) && total > 0;
@@ -477,8 +491,13 @@ function InvoiceForm({ entity, currency, initial, onClose }: { entity: string; c
         confirm_cross_vendor_reference: confirmed,
         lines,
       };
+      const changes = initial ? vendorInvoiceChanges(initial, {
+        vendor, purchaseOrder: body.purchase_order, invoiceDate, dueDate, reference, narration, lines,
+      }, savedLines) : null;
+      // Nothing changed: nothing to send.
+      if (changes && !Object.keys(changes).length) { onClose(); return; }
       const result = initial
-        ? await update({ id: initial.id, entity, ...body }).unwrap()
+        ? await update({ id: initial.id, entity, ...changes, ...(confirmed ? { confirm_cross_vendor_reference: true } : {}) }).unwrap()
         : await create({
             entity,
             idempotency_key: idempotencyKey,
@@ -486,7 +505,7 @@ function InvoiceForm({ entity, currency, initial, onClose }: { entity: string; c
             purchase_order: body.purchase_order || undefined,
           }).unwrap();
       if (submitAfter) await submit({ id: result.data.id, entity }).unwrap();
-      toast.success(submitAfter ? "Vendor invoice created and submitted." : initial ? "Vendor invoice updated." : "Vendor invoice saved as draft.");
+      toast.success(submitAfter ? "Vendor invoice created and submitted." : returned ? "Changes saved. Resume it to send it back to the approver." : initial ? "Vendor invoice updated." : "Vendor invoice saved as draft.");
       onClose();
     } catch (error) {
       const fieldError = apiFieldError(error, "vendor_reference");
@@ -518,7 +537,7 @@ function InvoiceForm({ entity, currency, initial, onClose }: { entity: string; c
   };
   const otherMatches = referenceCheck?.other_vendor_matches || [];
   return <>
-  <DetailDrawer open onOpenChange={(open) => !saving && !open && onClose()} title={initial ? "Edit Vendor Invoice" : "Record Invoice"} description={initial ? "Update this unsubmitted draft; its prior match will be cleared." : "Capture a supplier bill for matching and approval."} widthClass="sm:max-w-[720px]" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button variant="outline" disabled={!canSave} loading={creating || updating} onClick={() => save(false)}>Save Draft</Button>{!initial && <Button disabled={!canSave} loading={saving} onClick={() => save(true)}>Create & Submit</Button>}</>}>
+  <DetailDrawer open onOpenChange={(open) => !saving && !open && onClose()} title={returned ? "Correct Vendor Invoice" : initial ? "Edit Vendor Invoice" : "Record Invoice"} description={returned ? "Your changes reach the approver when you resume the request; the bill is matched again then." : initial ? "Update this unsubmitted draft; its prior match will be cleared." : "Capture a supplier bill for matching and approval."} widthClass="sm:max-w-[720px]" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button variant="outline" disabled={!canSave} loading={creating || updating} onClick={() => save(false)}>{returned ? "Save changes" : "Save Draft"}</Button>{!initial && <Button disabled={!canSave} loading={saving} onClick={() => save(true)}>Create & Submit</Button>}</>}>
     <div className="space-y-5">
       <div className="grid grid-cols-2 rounded-md bg-gray-100 p-1">{(["po", "direct"] as const).map((value) => { const off = value === "direct" && directDisabled; return <button key={value} disabled={off} title={off ? "This entity does not allow bills without a purchase order." : undefined} onClick={() => { setMode(value); if (value === "direct") setPo(""); }} className={cn("rounded px-3 py-2 font-mont text-xs font-medium", mode === value ? "bg-white text-primary shadow-sm" : "text-gray-05", off && "cursor-not-allowed opacity-50")}>{value === "po" ? "PO-backed invoice" : "Direct invoice"}</button>; })}</div>
       {directDisabled && <p className="font-mont text-[11px] leading-5 text-gray-05">Bills without a purchase order are turned off for this entity. A non-PO bill has no ordered quantity, no receipt and no agreed price to check against, so approval is its only control. An administrator can turn it on under Procurement settings.</p>}

@@ -49,8 +49,13 @@ import {
 import type {
   VendorCreditInstruction, VendorCreditNote, VendorInvoice,
 } from "@/redux/services/procurement/procurement-types";
-import { creditInstruction, creditNoteStage, type CreditMode, type LineCredit } from "./vendor-credit-note-model";
+import { useGetWorkflowInstanceQuery } from "@/redux/services/dashboard/workflow-api";
+import {
+  creditInstruction, creditNoteHeaderChanges, creditNoteStage, type CreditMode, type LineCredit,
+} from "./vendor-credit-note-model";
 import { VENDOR_CREDIT_NOTE_TABS, approvalStateWord, vendorCreditNoteWord } from "./document-status";
+import { approvalPillWord } from "./returned-correction";
+import { ResumeButton, ReturnedNote, useReturnedStanding } from "./returned-note";
 
 const STATUS_TABS: TabStripItem<string>[] = VENDOR_CREDIT_NOTE_TABS.map((tab) => ({ ...tab }));
 
@@ -81,7 +86,7 @@ export function CreditNotesView({ entity, currency }: { entity: string; currency
     { header: "Date", cell: (note) => dates.day(note.note_date) },
     { header: "Total", align: "right", cell: (note) => <span className="tabular-nums">{money(note.total)}</span> },
     { header: "Credit left", align: "right", cell: (note) => <span className="tabular-nums">{note.status === "POSTED" && note.advance_remaining > 0 ? money(note.advance_remaining) : "-"}</span> },
-    { header: "Status", cell: (note) => <div className="flex flex-wrap gap-1"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill status={note.approval_state} label={approvalStateWord(note.approval_state)} />}</div> },
+    { header: "Status", cell: (note) => <div className="flex flex-wrap gap-1"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill status={note.approval_state} label={approvalPillWord(note, approvalStateWord(note.approval_state))} />}</div> },
   ];
   return <>
     <section className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
@@ -105,7 +110,7 @@ export function BillCreditNotes({ bill, entity, currency }: { bill: VendorInvoic
   return <div className="space-y-2">
     {notes.length ? notes.map((note) => <button key={note.id} type="button" onClick={() => setOpenId(note.id)} className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border border-white-02 p-3 text-left hover:border-primary/40">
       <div className="min-w-0"><p className="font-mont text-sm font-semibold text-primary">{note.document_number || "Draft credit note"}</p><p className="mt-1 truncate font-mont text-xs text-gray-05">{dates.day(note.note_date)} · {note.reason}</p></div>
-      <div className="text-right"><p className="font-mont text-sm font-semibold tabular-nums">{formatMoney(note.total, currency)}</p><div className="mt-1 flex justify-end gap-1"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill status={note.approval_state} label={approvalStateWord(note.approval_state)} />}</div></div>
+      <div className="text-right"><p className="font-mont text-sm font-semibold tabular-nums">{formatMoney(note.total, currency)}</p><div className="mt-1 flex justify-end gap-1"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill status={note.approval_state} label={approvalPillWord(note, approvalStateWord(note.approval_state))} />}</div></div>
     </button>) : <p className="rounded-md border border-dashed border-white-02 px-4 py-6 text-center font-mont text-xs text-gray-05">No credit notes have been raised on this bill.</p>}
     <CreditNoteDrawer key={openId ?? "closed"} id={openId} entity={entity} currency={currency} onClose={() => setOpenId(null)} />
   </div>;
@@ -117,6 +122,9 @@ export function CreditNoteDrawer({ id, entity, currency, onClose }: { id: number
   const { applies: multiBranch } = useReaderBranchLens();
   const { data, isLoading, isError, refetch } = useGetVendorCreditNoteQuery({ id: id!, entity }, { skip: id == null });
   const note = data?.data;
+  const workflowId = note?.workflow_instance_id ?? "";
+  const { data: workflow } = useGetWorkflowInstanceQuery(workflowId, { skip: !workflowId });
+  const standing = useReturnedStanding(note, workflow);
   const [editing, setEditing] = useState(false);
   const [allocating, setAllocating] = useState(false);
   const [voiding, setVoiding] = useState(false);
@@ -151,15 +159,17 @@ export function CreditNoteDrawer({ id, entity, currency, onClose }: { id: number
 
   return <>
     <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={note?.document_number || "Vendor credit note"} description={note ? `${note.vendor_name || note.vendor_code} · bill ${note.vendor_invoice_number}${multiBranch && note.branch_name ? ` · ${note.branch_name}` : ""}` : "Loading credit note"} widthClass="sm:max-w-[680px]" footer={note && <>
-      {stage === "editable" && <Can permission={P.PROC_UPDATE_VENDOR_CREDIT_NOTE}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
+      {(stage === "editable" || standing === "sender") && <Can permission={P.PROC_UPDATE_VENDOR_CREDIT_NOTE}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
+      {standing === "sender" && <ResumeButton workflowId={workflowId} onResumed={refetch} />}
       {stage === "editable" && <Can permission={P.PROC_SUBMIT_VENDOR_CREDIT_NOTE}><Button loading={submitting} onClick={() => run("submit")}><Send className="size-4" /> Submit for approval</Button></Can>}
       {stage === "approved" && <Can permission={P.PROC_POST_VENDOR_CREDIT_NOTE}><Button loading={posting} onClick={() => run("post")}><Send className="size-4" /> Post credit note</Button></Can>}
       {stage === "posted" && note.advance_remaining > 0 && <Can permission={P.PROC_ALLOCATE_VENDOR_CREDIT_NOTE}><Button variant="outline" onClick={() => setAllocating(true)}><Coins className="size-4" /> Apply credit</Button></Can>}
       {stage === "posted" && <Can permission={P.PROC_REVERSE_VENDOR_CREDIT_NOTE}><Button variant="outline-dest" onClick={() => setVoiding(true)}><Ban className="size-4" /> Void</Button></Can>}
     </>}>
       {isLoading ? <LoadingState rows={6} /> : isError || !note ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill status={note.approval_state} label={approvalStateWord(note.approval_state)} />}</div><p className="font-mont text-lg font-semibold tabular-nums">{money(note.total)}</p></div>
-        {stage === "pending" && <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs text-amber-900">Waiting for approval. Approvers decide it under Workflow, Approvals; it posts once approved.</p>}
+        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={note.status} label={vendorCreditNoteWord(note.status)} />{note.status === "DRAFT" && <StatusPill status={note.approval_state} label={approvalPillWord(note, approvalStateWord(note.approval_state))} />}</div><p className="font-mont text-lg font-semibold tabular-nums">{money(note.total)}</p></div>
+        <ReturnedNote standing={standing} request={workflow} requestNamed={!!workflowId} />
+        {standing === "with-approvers" && <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs text-amber-900">With the approver. Nobody can change it until they decide or send it back; it posts once approved.</p>}
         <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2">
           <Field label="Bill" value={note.vendor_invoice_number} />
           <Field label="Vendor" value={note.vendor_name || note.vendor_code} />
@@ -176,21 +186,25 @@ export function CreditNoteDrawer({ id, entity, currency, onClose }: { id: number
       </div>}
       {noApproverDialog}
     </DetailDrawer>
-    {note && editing && <CreditNoteForm entity={entity} currency={currency} note={note} onClose={() => setEditing(false)} />}
+    {note && editing && <CreditNoteForm entity={entity} currency={currency} note={note} returned={standing === "sender"} onClose={() => setEditing(false)} />}
     {note && allocating && <ApplyCreditDrawer note={note} entity={entity} currency={currency} onClose={() => setAllocating(false)} />}
     <ConfirmActionModal open={voiding} onOpenChange={setVoiding} title={`Void ${note?.document_number}?`} description="Reverses the credit note and every bill it was applied to. The bills owe again what it settled." confirmText="Void credit note" destructive loading={voidBusy} onConfirm={doVoid} />
   </>;
 }
 
 /**
- * Raise a credit note on `bill`, or rewrite a draft `note`. A rewrite that names
- * no way of crediting leaves the draft's lines as they are.
+ * Raise a credit note on `bill`, rewrite a draft `note`, or correct one an
+ * approver sent back (`returned`). A rewrite that names no way of crediting
+ * leaves the draft's lines as they are, and only the changed header fields are
+ * sent. A correction stays with its request, which the drawer's Resume sends
+ * back to the approver.
  */
-export function CreditNoteForm({ entity, currency, bill, note, onClose, onCreated }: {
+export function CreditNoteForm({ entity, currency, bill, note, returned = false, onClose, onCreated }: {
   entity: string;
   currency?: string | null;
   bill?: VendorInvoice;
   note?: VendorCreditNote;
+  returned?: boolean;
   onClose: () => void;
   onCreated?: (note: VendorCreditNote) => void;
 }) {
@@ -212,8 +226,11 @@ export function CreditNoteForm({ entity, currency, bill, note, onClose, onCreate
     const header = { note_date: noteDate, reason: reason.trim(), vendor_reference: vendorReference.trim() || undefined };
     try {
       if (note) {
-        await update({ id: note.id, entity, ...header, ...(instruction ?? {}) }).unwrap();
-        toast.success("Credit note draft updated.");
+        const changes = { ...creditNoteHeaderChanges(note, { noteDate, reason, vendorReference }), ...(instruction ?? {}) };
+        // Nothing changed: nothing to send.
+        if (!Object.keys(changes).length) { onClose(); return; }
+        await update({ id: note.id, entity, ...changes }).unwrap();
+        toast.success(returned ? "Changes saved. Resume it to send it back to the approver." : "Credit note draft updated.");
       } else if (bill && instruction) {
         const response = await create({ entity, vendor_invoice: bill.id, ...header, ...instruction }).unwrap();
         toast.success(`Credit note saved as a draft. Submit it for approval to post it.`);
@@ -223,7 +240,7 @@ export function CreditNoteForm({ entity, currency, bill, note, onClose, onCreate
     } catch { /* central */ }
   };
   const modeOptions = note ? [["keep", "Keep lines"] as const, ...MODES] : MODES;
-  return <DetailDrawer open onOpenChange={(open) => !saving && !open && onClose()} title={note ? `Edit ${note.document_number || "credit note"}` : "Credit note"} description={bill ? `Against bill ${bill.document_number} · ${formatMoney(bill.balance_due, currency)} still owed of ${formatMoney(bill.total, currency)}` : note ? `Against bill ${note.vendor_invoice_number}` : undefined} widthClass="sm:max-w-[680px]" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={!canSave} loading={saving} onClick={save}>{note ? "Save changes" : "Save draft"}</Button></>}>
+  return <DetailDrawer open onOpenChange={(open) => !saving && !open && onClose()} title={note ? `${returned ? "Correct" : "Edit"} ${note.document_number || "credit note"}` : "Credit note"} description={bill ? `Against bill ${bill.document_number} · ${formatMoney(bill.balance_due, currency)} still owed of ${formatMoney(bill.total, currency)}` : note ? `Against bill ${note.vendor_invoice_number}` : undefined} widthClass="sm:max-w-[680px]" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={!canSave} loading={saving} onClick={save}>{note ? "Save changes" : "Save draft"}</Button></>}>
     <div className="space-y-5">
       <p className="rounded-md border border-white-02 bg-gray-50 px-3 py-2 font-mont text-[11px] leading-5 text-gray-05">The credit note takes the bill&rsquo;s vendor and branch. Once approved and posted it lowers what the bill owes; on a bill already paid, the credit stays with the vendor for the branch&rsquo;s later bills.</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

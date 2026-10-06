@@ -165,6 +165,12 @@ export interface Requisition {
   branch_id?: number | null;
   branch_name?: string | null;
   approval_state: string;
+  /**
+   * True while an approver has handed the document back to whoever sent it for
+   * approval; approval_state stays PENDING meanwhile. False otherwise, and absent
+   * from an older server.
+   */
+  approval_returned?: boolean;
   title: string;
   request_date: string;
   needed_by: string | null;
@@ -252,6 +258,12 @@ export interface PurchaseOrder {
   document_number: string;
   status: string;
   approval_state: string;
+  /**
+   * True while an approver has handed the document back to whoever sent it for
+   * approval; approval_state stays PENDING meanwhile. False otherwise, and absent
+   * from an older server.
+   */
+  approval_returned?: boolean;
   display_status: string;
   vendor_id: number;
   vendor_code: string;
@@ -398,6 +410,12 @@ export interface VendorInvoice {
   document_number: string;
   status: string;
   approval_state: string;
+  /**
+   * True while an approver has handed the document back to whoever sent it for
+   * approval; approval_state stays PENDING meanwhile. False otherwise, and absent
+   * from an older server.
+   */
+  approval_returned?: boolean;
   match_status: string;
   payment_status: string;
   display_status: string;
@@ -490,6 +508,12 @@ export interface VendorPayment {
   document_number: string;
   status: string;
   approval_state: string;
+  /**
+   * True while an approver has handed the document back to whoever sent it for
+   * approval; approval_state stays PENDING meanwhile. False otherwise, and absent
+   * from an older server.
+   */
+  approval_returned?: boolean;
   allocation_status: string;
   vendor_id: number;
   vendor_code: string;
@@ -938,6 +962,12 @@ export interface VendorCreditNote {
   document_number: string;
   status: string;
   approval_state: string;
+  /**
+   * True while an approver has handed the document back to whoever sent it for
+   * approval; approval_state stays PENDING meanwhile. False otherwise, and absent
+   * from an older server.
+   */
+  approval_returned?: boolean;
   branch_id: number | null;
   branch_name: string | null;
   vendor_id: number;

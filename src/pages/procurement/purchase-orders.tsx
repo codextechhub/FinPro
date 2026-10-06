@@ -46,6 +46,9 @@ import { ReasonField } from "@/components/finance-ui/reason-field";
 import { useCancelPurchaseOrderMutation } from "@/redux/services/procurement/payables-corrections-api";
 import { SOURCE_DOCUMENT_ID_PARAM } from "@/lib/source-document-route";
 import { PURCHASE_ORDER_TABS, purchaseOrderWord } from "./document-status";
+import { purchaseOrderChanges, purchaseOrderForm } from "./purchase-order-edit";
+import { WITH_APPROVERS_NOTE } from "./returned-correction";
+import { ResumeButton, ReturnedNote, useReturnedStanding } from "./returned-note";
 
 const STATUS_TABS = PURCHASE_ORDER_TABS;
 
@@ -184,7 +187,7 @@ export default function PurchaseOrdersPage() {
   );
 }
 
-function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+export function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
   const navigate = useNavigate();
   const { name } = useUserDirectory();
@@ -213,6 +216,7 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
   const money = (value: number) => formatMoney(value, currency);
   const approvalPending = po?.status === "PENDING_APPROVAL" || po?.approval_state === "PENDING";
   const draftEditable = po?.status === "DRAFT" && !approvalPending;
+  const standing = useReturnedStanding(po, workflow);
   const cancellable = !!po && !["CANCELLED", "REVERSED"].includes(po.status) && !approvalPending;
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -271,8 +275,8 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
   return <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} widthClass="sm:max-w-[720px]" title={po?.document_number || "Purchase order"} description={po ? `${po.vendor_name || po.vendor_code} · ${dates.day(po.order_date)}` : "Loading purchase order"} footer={po && <>
     <Button variant="outline" onClick={() => window.print()}><Printer className="size-4" /> Print</Button>
     {po.can_email_vendor && <Can permission={P.PROC_EMAIL_PURCHASE_ORDER_VENDOR}><Button variant="outline" onClick={() => openEmail()}><Mail className="size-4" /> Email Vendor</Button></Can>}
-    {draftEditable && <Can permission={P.PROC_UPDATE_PURCHASE_ORDER}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
-    {approvalPending && <span className="font-mont text-xs text-gray-05">Locked while approval is pending</span>}
+    {(draftEditable || standing === "sender") && <Can permission={P.PROC_UPDATE_PURCHASE_ORDER}><Button variant="outline" onClick={() => setEditing(true)}><FilePenLine className="size-4" /> Edit</Button></Can>}
+    {standing === "sender" && <ResumeButton workflowId={workflowId} />}
     {draftEditable && <Can permission={P.PROC_SUBMIT_PURCHASE_ORDER}><Button loading={submitting} onClick={() => setConfirmApproval(true)}><Send className="size-4" /> Submit for Approval</Button></Can>}
     {cancellable && <Can permission={P.PROC_UPDATE_PURCHASE_ORDER}><Button variant="outline-dest" onClick={() => setCancelOpen(true)}><Ban className="size-4" /> Cancel order</Button></Can>}
   </>}>
@@ -289,6 +293,8 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
       />
 
       {tab === "overview" && <div className="space-y-5">
+        <ReturnedNote standing={standing} request={workflow} />
+        {approvalPending && !po.approval_returned && <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mont text-xs leading-5 text-amber-900">{WITH_APPROVERS_NOTE}</p>}
         <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Vendor" value={po.vendor_name || po.vendor_code} /><Field label="Order date" value={dates.day(po.order_date)} /><Field label="Expected delivery" value={dates.day(po.expected_date)} /><Field label="Payment terms" value={po.payment_terms || "Not specified"} /><Field label="Delivery address" value={po.delivery_address || "Not specified"} /><Field label="Invoice progress" value={percent(po.invoiced_pct)} /></dl>
         <section className="rounded-md border border-white-02 p-4"><p className="font-mont text-sm font-semibold">Document Flow</p><div className="mt-3 grid gap-2 sm:grid-cols-2">
           <DocumentLink label="Source requisition" value={po.requisition_number || "Not linked"} disabled={!po.requisition_id} onClick={() => openRoute(routesPath.PROTECTED.PROCUREMENT.REQUISITIONS)} />
@@ -316,7 +322,7 @@ function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: number | n
       {tab === "approval" && (workflow?.stage_instances.length ? <div className="space-y-3">{workflow.stage_instances.map((stage) => <section key={stage.id} className="rounded-md border border-white-02 p-3"><div className="flex items-center justify-between gap-3"><p className="font-mont text-sm font-semibold">{stage.stage_label}</p><StatusPill status={stage.status} /></div>{stage.actions.length ? <div className="mt-3 space-y-2">{stage.actions.filter((action) => !action.is_reversal_of).map((action) => <div key={action.id} className="border-t border-white-02 pt-2 font-mont text-xs"><p><span className="font-semibold">{name(action.actor)}</span> · {action.action.toLowerCase()}</p><p className="mt-0.5 text-gray-05">{action.comment || "No comment"}</p></div>)}</div> : <p className="mt-2 font-mont text-xs text-gray-05">No decision recorded for this stage.</p>}</section>)}</div> : <EmptyBlock text={po.status === "DRAFT" ? "Submit this draft to begin its approval trail." : "No approval trail is available."} />)}
       {tab === "email" && (po.email_deliveries?.length ? <div className="space-y-3">{po.email_deliveries.map((delivery) => <section key={delivery.id} className="rounded-md border border-white-02 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-mont text-sm font-semibold">{delivery.source === "AUTOMATIC" ? "Automatic after approval" : delivery.source === "RETRY" ? "Retry" : "Manual send"}</p><p className="mt-1 font-mont text-[11px] text-gray-05">Requested by {delivery.requested_by_name} · {dates.dateTime(delivery.created_at)}</p></div><StatusPill status={delivery.status} /></div><div className="mt-3 grid grid-cols-2 gap-2 rounded bg-gray-50 p-2 font-mont text-xs"><span className="text-gray-05">Recipients</span><span className="text-right font-semibold">{delivery.recipient_count}</span><span className="text-gray-05">BCC recipients</span><span className="text-right font-semibold">{delivery.bcc_count}</span></div>{delivery.buyer_message && <p className="mt-3 whitespace-pre-wrap font-mont text-xs leading-5 text-gray-05">{delivery.buyer_message}</p>}{delivery.failure_reason && <div className="mt-3 rounded border border-red-200 bg-red-50 p-2 font-mont text-xs text-red-700">{delivery.failure_reason}</div>}{delivery.status === "FAILED" && canVendorEmail && <div className="mt-3 flex justify-end"><Button size="sm" variant="outline" onClick={() => openEmail(delivery)}>Retry Email</Button></div>}</section>)}</div> : <EmptyBlock text={po.can_email_vendor ? "This approved purchase order has not been emailed yet." : "Email Vendor becomes available after the purchase order is fully approved."} />)}
     </div>}
-    {po && editing && <EditPurchaseOrderDrawer po={po} entity={entity} currency={currency} onClose={() => setEditing(false)} />}
+    {po && editing && <EditPurchaseOrderDrawer po={po} entity={entity} currency={currency} returned={standing === "sender"} onClose={() => setEditing(false)} />}
     {po && <ConfirmActionModal open={confirmApproval} onOpenChange={setConfirmApproval} title="Raise this purchase order for approval?" description="Submitting locks the purchase order while approvers review it. You can email the vendor only after full approval." confirmText="Raise for Approval" onConfirm={submitForApproval} loading={submitting} confirmDisabled={autoEmailVendor && (previewLoading || previewError || !emailPreview?.recipients.length)}>
       <div className="space-y-4">
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 font-mont text-xs leading-5 text-amber-900">The vendor will not receive this draft. Approval must finish first.</div>
@@ -359,13 +365,19 @@ function DocumentLink({ label, value, disabled, onClick }: { label: string; valu
   return <button type="button" disabled={disabled} onClick={onClick} className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-white-02 px-3 py-2 text-left enabled:hover:bg-gray-50 disabled:cursor-default disabled:opacity-60"><span className="min-w-0"><span className="block font-mont text-[11px] text-gray-05">{label}</span><span className="mt-1 block truncate font-mont text-sm font-semibold text-black-01">{value}</span></span>{!disabled && <ChevronRight className="size-4 shrink-0 text-gray-05" />}</button>;
 }
 
-function EditPurchaseOrderDrawer({ po, entity, currency, onClose }: { po: PurchaseOrder; entity: string; currency?: string | null; onClose: () => void }) {
-  const [vendor, setVendor] = useState(po.vendor_code);
-  const [orderDate, setOrderDate] = useState(po.order_date);
-  const [expectedDate, setExpectedDate] = useState(po.expected_date || "");
-  const [deliveryAddress, setDeliveryAddress] = useState(po.delivery_address || "");
-  const [paymentTerms, setPaymentTerms] = useState(po.payment_terms || "");
-  const [contract, setContract] = useState(po.contract_id ? String(po.contract_id) : "");
+/**
+ * Edit a draft order's terms, or correct those of one an approver sent back
+ * (`returned`). Lines stay the approved requisition's snapshot either way, and
+ * only the changed terms are sent (see purchase-order-edit.ts).
+ */
+function EditPurchaseOrderDrawer({ po, entity, currency, returned = false, onClose }: { po: PurchaseOrder; entity: string; currency?: string | null; returned?: boolean; onClose: () => void }) {
+  const saved = purchaseOrderForm(po);
+  const [vendor, setVendor] = useState(saved.vendor);
+  const [orderDate, setOrderDate] = useState(saved.orderDate);
+  const [expectedDate, setExpectedDate] = useState(saved.expectedDate);
+  const [deliveryAddress, setDeliveryAddress] = useState(saved.deliveryAddress);
+  const [paymentTerms, setPaymentTerms] = useState(saved.paymentTerms);
+  const [contract, setContract] = useState(saved.contract);
   const [update, { isLoading }] = useUpdatePurchaseOrderMutation();
   const canSave = !!vendor && !!orderDate;
   // A contract belongs to one vendor - changing vendor drops a now-invalid link.
@@ -374,13 +386,16 @@ function EditPurchaseOrderDrawer({ po, entity, currency, onClose }: { po: Purcha
   const save = async () => {
     if (!canSave) return;
     try {
-      await update({ id: po.id, entity, vendor, order_date: orderDate, expected_date: expectedDate, delivery_address: deliveryAddress.trim(), payment_terms: paymentTerms.trim(), contract }).unwrap();
-      toast.success("Purchase order draft updated.");
+      const changes = purchaseOrderChanges(po, { vendor, orderDate, expectedDate, deliveryAddress, paymentTerms, contract });
+      // Nothing changed: nothing to send.
+      if (!Object.keys(changes).length) { onClose(); return; }
+      await update({ id: po.id, entity, ...changes }).unwrap();
+      toast.success(returned ? "Changes saved. Resume it to send it back to the approver." : "Purchase order draft updated.");
       onClose();
     } catch { /* Central API handling presents the server validation message. */ }
   };
 
-  return <DetailDrawer open onOpenChange={(open) => !isLoading && !open && onClose()} title={`Edit ${po.document_number}`} description="Update this draft purchase order" widthClass="sm:max-w-[720px]" footer={<><Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button><Button disabled={!canSave} loading={isLoading} onClick={save}>Save Changes</Button></>}>
+  return <DetailDrawer open onOpenChange={(open) => !isLoading && !open && onClose()} title={`${returned ? "Correct" : "Edit"} ${po.document_number}`} description={returned ? "Your changes reach the approver when you resume the request." : "Update this draft purchase order"} widthClass="sm:max-w-[720px]" footer={<><Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button><Button disabled={!canSave} loading={isLoading} onClick={save}>Save Changes</Button></>}>
     <div className="space-y-5">
       <section className="space-y-3"><p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Order</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FormField label="Source requisition"><Input value={po.requisition_number || "Not linked"} disabled /></FormField><FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={changeVendor} purchaseEligible /></FormField><FormField label="Order date" required><DatePickerInput value={orderDate} onChange={(event) => setOrderDate(event.target.value)} /></FormField><FormField label="Expected delivery"><DatePickerInput min={orderDate} value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} /></FormField><FormField label="Payment terms"><Input value={paymentTerms} onChange={(event) => setPaymentTerms(event.target.value)} /></FormField><FormField label="Against contract"><ContractPicker entity={entity} vendor={vendor} value={contract} onChange={setContract} /></FormField><FormField label="Delivery address"><Textarea value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} className="min-h-20" /></FormField></div></section>
       <section className="rounded-md border border-white-02 bg-gray-50 p-4"><p className="font-mont text-sm font-semibold">Copied Line Items</p><p className="mt-1 font-mont text-xs text-gray-05">These remain the approved requisition snapshot.</p><div className="mt-3 space-y-2">{po.lines.map((line) => <div key={line.id} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 font-mont text-xs"><span className="min-w-0 truncate">{line.description}<span className="ml-2 text-gray-05">×{formatQuantity(line.quantity)}</span></span><span className="shrink-0 font-semibold tabular-nums">{formatMoney(line.net_amount + line.tax_amount, currency)}</span></div>)}</div></section>

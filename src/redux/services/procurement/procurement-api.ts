@@ -151,7 +151,7 @@ export const procurementApi = baseApi.injectEndpoints({
       query: ({ entity, ...body }) => ({ url: `/procurement/requisitions/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcRequisitions"],
     }),
-    updateRequisition: b.mutation<ApiEnvelope<Requisition>, { id: number; entity: string; title?: string; request_date?: string; needed_by?: string; cost_center?: string; justification?: string; lines?: Record<string, unknown>[] }>({
+    updateRequisition: b.mutation<ApiEnvelope<Requisition>, { id: number; entity: string; title?: string; request_date?: string; needed_by?: string | null; cost_center?: string | null; justification?: string; lines?: Record<string, unknown>[] }>({
       query: ({ id, entity, ...body }) => ({ url: `/procurement/requisitions/${id}/${qs({ entity })}`, method: "PATCH", body }),
       invalidatesTags: ["ProcRequisitions"],
     }),
@@ -246,7 +246,7 @@ export const procurementApi = baseApi.injectEndpoints({
       extraOptions: { inlineValidation: true },
       invalidatesTags: ["ProcVendorInvoices"],
     }),
-    updateVendorInvoice: b.mutation<ApiEnvelope<VendorInvoice>, { id: number; entity: string; vendor?: string; purchase_order?: number | null; invoice_date?: string; due_date?: string; vendor_reference?: string; narration?: string; confirm_cross_vendor_reference?: boolean; lines?: Record<string, unknown>[] }>({
+    updateVendorInvoice: b.mutation<ApiEnvelope<VendorInvoice>, { id: number; entity: string; vendor?: string; purchase_order?: number | null; invoice_date?: string; due_date?: string | null; vendor_reference?: string; narration?: string; confirm_cross_vendor_reference?: boolean; lines?: Record<string, unknown>[] }>({
       query: ({ id, entity, ...body }) => ({ url: `/procurement/vendor-invoices/${id}/${qs({ entity })}`, method: "PATCH", body }),
       extraOptions: { inlineValidation: true },
       invalidatesTags: ["ProcVendorInvoices"],
@@ -311,7 +311,7 @@ export const procurementApi = baseApi.injectEndpoints({
       query: ({ entity, ...body }) => ({ url: `/procurement/vendor-payments/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcVendorPayments"],
     }),
-    updateVendorPayment: b.mutation<ApiEnvelope<VendorPayment>, { id: number; entity: string; vendor: string; payment_date: string; method?: string; bank_account: number; wht_amount?: number; wht_tax_code?: string | null; reference?: string; narration?: string; allocations: { vendor_invoice: number; amount: number }[] }>({
+    updateVendorPayment: b.mutation<ApiEnvelope<VendorPayment>, { id: number; entity: string; vendor?: string; payment_date?: string; method?: string; bank_account?: number; wht_amount?: number; wht_tax_code?: string | null; reference?: string; narration?: string; allocations: { vendor_invoice: number; amount: number }[] }>({
       query: ({ id, entity, ...body }) => ({ url: `/procurement/vendor-payments/${id}/${qs({ entity })}`, method: "PATCH", body }),
       invalidatesTags: ["ProcVendorPayments"],
     }),

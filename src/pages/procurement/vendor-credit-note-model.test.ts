@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { creditInstruction, creditNoteStage } from "./vendor-credit-note-model";
+import { creditInstruction, creditNoteHeaderChanges, creditNoteStage } from "./vendor-credit-note-model";
 
 describe("creditInstruction", () => {
   it("credits the whole bill with no figure", () => {
@@ -44,5 +44,19 @@ describe("creditNoteStage", () => {
   it("treats a posted note as posted and any other as voided", () => {
     expect(creditNoteStage({ status: "POSTED", approval_state: "APPROVED" })).toBe("posted");
     expect(creditNoteStage({ status: "REVERSED", approval_state: "APPROVED" })).toBe("voided");
+  });
+});
+
+describe("creditNoteHeaderChanges", () => {
+  // Mr Eze sends back Mrs Bello's credit note asking for the supplier's own number.
+  const saved = { note_date: "2026-10-04", reason: "10 reams returned damaged", vendor_reference: "" };
+
+  it("sends nothing when nothing changed", () => {
+    expect(creditNoteHeaderChanges(saved, { noteDate: "2026-10-04", reason: "10 reams returned damaged ", vendorReference: "" })).toEqual({});
+  });
+
+  it("sends only the corrected supplier reference", () => {
+    expect(creditNoteHeaderChanges(saved, { noteDate: "2026-10-04", reason: "10 reams returned damaged", vendorReference: " ADE-CN-12 " }))
+      .toEqual({ vendor_reference: "ADE-CN-12" });
   });
 });
