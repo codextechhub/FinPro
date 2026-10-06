@@ -26,7 +26,7 @@ import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-type
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
 type Act = { id: number; entity: string };
-type ListArgs = { entity: string; page?: number; bank_account?: number; status?: string };
+type ListArgs = { entity: string; page?: number; bank_account?: number; status?: string; approval?: "returned" };
 type TransactionFields = { bank_account: number; direction: BankTransactionDirection; amount: number; counter_account: string; transaction_date: string; narration: string; reference?: string };
 type TransferFields = { from_account: number; to_account: number; amount: number; transfer_date: string; narration: string; reference?: string };
 

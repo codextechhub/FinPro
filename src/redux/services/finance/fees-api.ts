@@ -82,7 +82,7 @@ export const feesApi = baseApi.injectEndpoints({
     }),
 
     // Doubtful-debt provision
-    getProvisions: builder.query<PaginatedEnvelope<DoubtfulDebtProvision>, { entity: string; page?: number } & BranchArg>({
+    getProvisions: builder.query<PaginatedEnvelope<DoubtfulDebtProvision>, { entity: string; page?: number; approval?: "returned" } & BranchArg>({
       query: (params) => ({ url: `/finance/provisions/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceProvisions"],
     }),
@@ -127,7 +127,7 @@ export const feesApi = baseApi.injectEndpoints({
 
     // Credit transfers between customers (always approval-gated)
     getCreditTransfers: builder.query<
-      PaginatedEnvelope<CustomerCreditTransfer>, { entity: string; page?: number; status?: string; customer?: string } & BranchArg
+      PaginatedEnvelope<CustomerCreditTransfer>, { entity: string; page?: number; status?: string; customer?: string; approval?: "returned" } & BranchArg
     >({
       query: (params) => ({ url: `/finance/credit-transfers/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceCreditTransfers"],

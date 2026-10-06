@@ -124,6 +124,8 @@ export interface InterBranchListParams {
   page_size?: number;
   kind?: string;
   status?: string;
+  /** "returned" keeps only sends an approver sent back to whoever sent them. */
+  approval?: "returned";
   /** Either side. */
   branch?: number;
   /** With `branch`, the other side. */

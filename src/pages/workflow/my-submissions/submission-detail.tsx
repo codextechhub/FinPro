@@ -25,6 +25,7 @@ import { DocumentPanel } from "@/pages/protected/workflow/components/document-pa
 import { StageTracker } from "@/pages/protected/workflow/components/stage-tracker";
 import { AuditTimeline } from "@/pages/protected/workflow/components/audit-timeline";
 import { PageShell } from "@/components/layout/page-shell";
+import { withdrawDescription } from "./withdraw-words";
 
 export default function SubmissionDetail() {
   const { id = "" } = useParams();
@@ -126,7 +127,7 @@ export default function SubmissionDetail() {
             </DialogTitle>
             <DialogDescription>
               {confirmKind === "withdraw"
-                ? "Withdrawing ends this approval request. You'll need to submit again from the module to restart."
+                ? withdrawDescription(instance?.document_type)
                 : "This re-enters the workflow at the stage it was returned from, with a fresh approver list."}
             </DialogDescription>
           </DialogHeader>

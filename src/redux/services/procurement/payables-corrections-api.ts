@@ -43,7 +43,7 @@ export type CreditNoteDraft = {
 
 export const payablesCorrectionsApi = baseApi.injectEndpoints({
   endpoints: (b) => ({
-    getVendorCreditNotes: b.query<PaginatedEnvelope<VendorCreditNote>, { entity: string; page?: number; page_size?: number; status?: string; vendor?: string; vendor_invoice?: number }>({
+    getVendorCreditNotes: b.query<PaginatedEnvelope<VendorCreditNote>, { entity: string; page?: number; page_size?: number; status?: string; vendor?: string; vendor_invoice?: number; approval?: "returned" }>({
       query: (p) => ({ url: `/procurement/vendor-credit-notes/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcVendorCreditNotes"],
     }),

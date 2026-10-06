@@ -39,7 +39,7 @@ import { IncomeGivenBack } from "./income-given-back";
 import { useDates } from "../../../lib/display-prefs";
 import { DOCUMENT_STATUS_WORDS, statusWord } from "@/components/finance-ui/status-words";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
-import { sentBackPill } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { concessionChanges, concessionForm, concessionFormProblem, type ConcessionForm } from "./concession-edit";
 
 /** The states a concession list filters on, each named as its pill names it. */
@@ -98,7 +98,7 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
   const params = useMemo(() => ({
     entity, page,
     ...(typeFilter ? { kind: typeFilter } : {}),
-    ...(statusFilter ? { status: statusFilter } : {}),
+    ...statusFilterArgs(statusFilter),
     ...(search ? { search } : {}),
   }), [entity, page, typeFilter, statusFilter, search]);
   const { data, isLoading, isFetching, isError, refetch } = useGetConcessionsQuery(params);
@@ -141,6 +141,7 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
           <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }} className={selectCls} aria-label="Status">
             <option value="">All statuses</option>
             {CONCESSION_FILTER_STATUSES.map((code) => <option key={code} value={code}>{DOCUMENT_STATUS_WORDS[code]}</option>)}
+            <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
           </select>
         </div>
         <Can permission={P.FIN_CREATE_CONCESSION}>

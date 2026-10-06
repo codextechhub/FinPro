@@ -126,9 +126,10 @@ export function sentBackLine(
 }
 
 /** What the reader is told under the sent-back line, by standing. */
-export const RETURNED_HINT: Readonly<Record<"sender" | "resumeOnly" | "returned" | "unread", string>> = {
+export const RETURNED_HINT: Readonly<Record<"sender" | "resumeOnly" | "resumeOrCancel" | "returned" | "unread", string>> = {
   sender: "Correct it with Edit, then Resume to send it back to the approver.",
   resumeOnly: "Resume sends it back to the approver as it is. To change it, withdraw it from your approvals and send it again.",
+  resumeOrCancel: "Resume sends it back to the approver as it is. Withdrawing it from your approvals cancels it, so to change it, raise a new one.",
   returned: "Only the person who sent it can correct it and resume it.",
   unread: "Whoever sent it can resume it from their approvals.",
 };
@@ -150,6 +151,37 @@ export const SENT_BACK_WORD = "Sent back";
 
 /** The status token that pill wears, so it reads apart from one awaiting approval. */
 export const SENT_BACK_STATUS = "SENT_BACK";
+
+/**
+ * The value every list's status filter uses for "Sent back".
+ *
+ * Sent back is not a status the server stores: a requisition sent back is
+ * still PENDING_APPROVAL, a finance document a DRAFT. So the option asks the
+ * list for `?approval=returned` (the documents whose latest approval request
+ * an approver returned) instead of a `status`, and its word is the one the
+ * rows it lists wear ({@link SENT_BACK_WORD}).
+ */
+export const SENT_BACK_FILTER = SENT_BACK_STATUS;
+
+/** The `?approval=` value that asks a list for what was sent back. */
+export type ApprovalListFilter = "returned";
+
+/**
+ * A list's query arguments for its status filter's `value`: nothing for "all",
+ * `{ approval: "returned" }` for Sent back, else `{ [key]: value }` (most lists
+ * filter on `status`; vendor bills on `display_status`).
+ */
+export function statusFilterArgs(value: string | null | undefined, key = "status"): Record<string, string> {
+  if (!value) return {};
+  if (value === SENT_BACK_FILTER) return { approval: "returned" };
+  return { [key]: value };
+}
+
+/**
+ * The status an export is asked for. Exports filter on status alone, so the
+ * Sent back option exports the list unfiltered by status.
+ */
+export const exportStatus = (value: string | null | undefined): string => (value === SENT_BACK_FILTER ? "" : value ?? "");
 
 /**
  * Whether a document is back with whoever sent it. A finance document is read

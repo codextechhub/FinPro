@@ -93,6 +93,8 @@ export interface JournalListParams {
   entity: string;
   page?: number;
   status?: JournalStatus;
+  /** "returned" keeps only journals an approver sent back to whoever sent them. */
+  approval?: "returned";
   source?: JournalSource;
   date_from?: string;
   date_to?: string;

@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
-import { RETURNED_HINT, SENT_BACK_STATUS, SENT_BACK_WORD, isSentBack } from "@/components/finance-ui/returned-correction";
+import { RETURNED_HINT, SENT_BACK_FILTER, SENT_BACK_STATUS, SENT_BACK_WORD, isSentBack, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { useGetDocumentApprovalRequestQuery } from "@/redux/services/finance/approval-request-api";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { gateExplanation, predictsApproval } from "./adjustment-approval";
@@ -113,6 +113,8 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
   const [searchParams] = useSearchParams();
   const { can, canAny } = useCan();
   const [filter, setFilter] = useState<"" | Mode>("");
+  // The list has no status filter: the one choice is everything, or what was sent back.
+  const [approval, setApproval] = useState("");
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
   const search = useDebounce(searchInput.trim(), 350);
   const [page, setPage] = useState(1);
@@ -125,8 +127,9 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
   const params = useMemo(() => ({
     entity, page,
     ...(filter ? { type: filter.toLowerCase() } : {}),
+    ...statusFilterArgs(approval),
     ...(search ? { search } : {}),
-  }), [entity, page, filter, search]);
+  }), [entity, page, filter, approval, search]);
   const { data, isLoading, isFetching, isError, refetch } = useGetArAdjustmentsQuery(params);
 
   const rows = useMemo(() => toArray(data?.data), [data]);
@@ -174,6 +177,10 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
               <option value="WRITEOFF">Write-offs</option>
             </select>
           )}
+          <select value={approval} onChange={(e) => { setApproval(e.target.value); resetPage(); }} className={selectCls} aria-label="Status">
+            <option value="">All statuses</option>
+            <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
+          </select>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {can(P.FIN_CREATE_REFUND) || can(P.FIN_CREATE_WRITE_OFF) ? (

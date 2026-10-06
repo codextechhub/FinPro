@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers, failedWarnings,
-  forceCanClose,
-} from "./close-checklist";
+import { checklistItemLabel, checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers, failedWarnings, forceCanClose } from "./close-checklist";
 import type { CloseChecklistItem } from "@/redux/services/finance/setup-types";
 
 const item = (over: Partial<CloseChecklistItem>): CloseChecklistItem => ({
@@ -96,5 +93,21 @@ describe("check labels", () => {
 
   it("falls back to the generic label for a check it does not know", () => {
     expect(checklistLabel("new_check", (v) => v.toUpperCase())).toBe("NEW_CHECK");
+  });
+});
+
+describe("the server's label and the close order under All branches", () => {
+  it("reads the server's label before this screen's name for a check", () => {
+    expect(checklistItemLabel({ name: "ap_reconciled", label: "Payables agree with the ledger" }, (v) => v)).toBe("Payables agree with the ledger");
+    expect(checklistItemLabel({ name: "ap_reconciled" }, (v) => v)).toBe("AP reconciled");
+  });
+
+  it("keeps Force close when the close order only warns, as it does while a branch can still close", () => {
+    const items = [
+      { name: "earlier_periods_closed", passed: false, blocking: false, detail: "Lekki has August open; Ikeja can close now." },
+      { name: "ap_reconciled", passed: false, blocking: true, detail: "" },
+    ];
+    expect(forceCanClose(items)).toBe(true);
+    expect(forceCanClose(items.map((i) => (i.name === "earlier_periods_closed" ? { ...i, blocking: true } : i)))).toBe(false);
   });
 });

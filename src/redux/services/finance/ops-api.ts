@@ -41,7 +41,7 @@ import type { ImportBatch } from "@/redux/services/dashboard/import-types";
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
-type E = { entity: string; page?: number; page_size?: number; status?: string };
+type E = { entity: string; page?: number; page_size?: number; status?: string; approval?: "returned" };
 type Act = { id: number; entity: string };
 
 /** What a petty cash return or its void moves: the fund, its journal, the bank
@@ -188,7 +188,7 @@ export const opsApi = baseApi.injectEndpoints({
     }),
 
     // Expense claims
-    getExpenseClaims: b.query<PaginatedEnvelope<ExpenseClaim>, E & { payment_status?: string; display_status?: string; q?: string }>({
+    getExpenseClaims: b.query<PaginatedEnvelope<ExpenseClaim>, E & { payment_status?: string; display_status?: string; q?: string; approval?: "returned" }>({
       query: (p) => ({ url: `/finance/expense-claims/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceExpenseClaims"],
     }),

@@ -38,6 +38,8 @@ import type { Vendor } from "@/redux/services/procurement/procurement-types";
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
 import { useDates } from "../../lib/display-prefs";
 import { showBlobPreview } from "../../components/finance-ui/file-preview-dialog";
+import { RETURNED_HINT, SENT_BACK_WORD, isSentBack } from "@/components/finance-ui/returned-correction";
+import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 /** Field Access resource for a payout instruction, which is what a batch line becomes. */
@@ -50,8 +52,10 @@ const BATCH_STATUS: Record<string, { label: string; cls: string }> = {
   PARTIALLY_COMPLETED: { label: "Partial", cls: "bg-amber-50 text-amber-700" },
   FAILED: { label: "Failed", cls: "bg-destructive/10 text-destructive" },
 };
-function BatchStatusPill({ status }: { status: string }) {
-  const s = BATCH_STATUS[status] ?? { label: status, cls: "bg-gray-02 text-gray-01" };
+/** A batch's status, or "Sent back" while an approver has handed it back to whoever sent it. */
+export function BatchStatusPill({ batch }: { batch: PayoutBatchSummary }) {
+  if (isSentBack(batch, true)) return <span className={cn(PILL, "bg-orange-500/10 text-yellow-01-text")}>{SENT_BACK_WORD}</span>;
+  const s = BATCH_STATUS[batch.status] ?? { label: batch.status, cls: "bg-gray-02 text-gray-01" };
   return <span className={cn(PILL, s.cls)}>{s.label}</span>;
 }
 
@@ -103,7 +107,7 @@ export function BatchesTab({ entity, currency }: { entity: string; currency?: st
     { header: "Items", align: "right", cell: (b) => <span className="tabular-nums">{b.item_count}</span> },
     { header: "Total", align: "right", cell: (b) => <Money kobo={b.total_amount} currency={currency} align="right" /> },
     { header: "Provider", cell: (b) => <ProviderTag provider={b.provider} /> },
-    { header: "Status", cell: (b) => <BatchStatusPill status={b.status} /> },
+    { header: "Status", cell: (b) => <BatchStatusPill batch={b} /> },
   ];
 
   return (
@@ -277,6 +281,8 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "payout batch" });
   const batch = data?.data ?? null;
   const access = useFieldAccess(PAYOUT);
+  // A batch has no edit route: one sent back is resumed as it is, or withdrawn to change it.
+  const { standing, request, workflowId, requestNamed } = useFinanceReturned(batch);
   if (batchId == null) return null;
 
   const items = batch?.instructions ?? [];
@@ -287,7 +293,8 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
   // Maker-checker: a batch already routed shows as awaiting approval (no re-submit).
   // `approval_required` (when the serializer exposes it) picks the right action; while it's
   // undefined we offer both - direct submit 400s if gated, approval errors if no template.
-  const awaitingApproval = batch?.approval_status === "PENDING";
+  const awaitingApproval = batch?.approval_status === "PENDING" || batch?.approval_state === "PENDING";
+  const sentBack = standing === "sender" || standing === "returned";
   const gated = batch?.approval_required;
   const canSubmit = batch ? ((batch.status === "DRAFT" || hasPending) && !awaitingApproval) : false;
 
@@ -327,7 +334,8 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
       footer={<>
         <span className="font-mont text-xs text-gray-05">{settled} settled · {failed} failed · {items.length} items</span>
         <div className="flex-1" />
-        {awaitingApproval ? <span className={cn(PILL, "bg-amber-50 text-amber-700")}>Awaiting approval</span> : null}
+        {sentBack && batch ? <BatchStatusPill batch={batch} /> : awaitingApproval ? <span className={cn(PILL, "bg-amber-50 text-amber-700")}>Awaiting approval</span> : null}
+        {standing === "sender" ? <ResumeButton workflowId={workflowId} tags={["PaymentsPayoutBatches"]} /> : null}
         <Button variant="outline" disabled={!items.length} onClick={() => batch && exportBankFile(batch.reference, items, access, currency)} className="gap-1.5"><Eye className="size-4" /> View bank file</Button>
         {canSubmit && gated !== false ? (
           <Can permission={P.PAY_SUBMIT_PAYOUT_BATCH}>
@@ -341,6 +349,7 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
         ) : null}
       </>}>
       <div className="space-y-5">
+        <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} />
         <div className="grid grid-cols-3 gap-3">
           <Metric label="Items" value={String(batch?.item_count ?? items.length)} />
           <Metric label="Batch total" value={formatMoney(batch?.total_amount ?? 0, currency)} />

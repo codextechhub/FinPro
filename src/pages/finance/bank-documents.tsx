@@ -48,7 +48,7 @@ import {
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
-import { sentBackPill } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,7 +138,8 @@ function TransactionsList({ entity, currency, openId, onOpen }: { entity: string
   const dates = useDates();
   const branches = useBranchNames();
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching, isError, error, refetch } = useGetBankTransactionsQuery({ entity, page });
+  const [approval, setApproval] = useState("");
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetBankTransactionsQuery({ entity, page, ...statusFilterArgs(approval) });
   const rows = toArray(data?.data);
   const columns: Column<BankTransactionDocument>[] = [
     { header: "Document", cell: (t) => <span className="font-mont text-sm font-semibold text-primary">{t.document_number}</span> },
@@ -150,7 +151,8 @@ function TransactionsList({ entity, currency, openId, onOpen }: { entity: string
     { header: "Status", cell: (t) => <StatusPill {...sentBackPill(t, bankDocumentStatus(t), undefined, true)} /> },
   ];
   return <>
-    <DataTable columns={columns} rows={rows} rowKey={(t) => t.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(t) => onOpen(t.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle="No bank transactions" emptyMessage="Record capital, a loan, drawings, interest or charges here." />
+    <SentBackSelect value={approval} onChange={(v) => { setApproval(v); setPage(1); }} />
+    <DataTable columns={columns} rows={rows} rowKey={(t) => t.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(t) => onOpen(t.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle={approval ? "Nothing sent back" : "No bank transactions"} emptyMessage="Record capital, a loan, drawings, interest or charges here." />
     {openId !== null && <BankDocumentDrawer kind="transaction" id={openId} entity={entity} currency={currency} onClose={() => onOpen(null)} />}
   </>;
 }
@@ -159,7 +161,8 @@ function TransfersList({ entity, currency, openId, onOpen }: { entity: string; c
   const dates = useDates();
   const branches = useBranchNames();
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching, isError, error, refetch } = useGetBankTransfersQuery({ entity, page });
+  const [approval, setApproval] = useState("");
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetBankTransfersQuery({ entity, page, ...statusFilterArgs(approval) });
   const rows = toArray(data?.data);
   const columns: Column<BankTransferDocument>[] = [
     { header: "Document", cell: (t) => <span className="font-mont text-sm font-semibold text-primary">{t.document_number}</span> },
@@ -171,9 +174,22 @@ function TransfersList({ entity, currency, openId, onOpen }: { entity: string; c
     { header: "Status", cell: (t) => <StatusPill {...sentBackPill(t, bankDocumentStatus(t), undefined, true)} /> },
   ];
   return <>
-    <DataTable columns={columns} rows={rows} rowKey={(t) => t.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(t) => onOpen(t.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle="No transfers" emptyMessage="Move money between two accounts of the same branch here." />
+    <SentBackSelect value={approval} onChange={(v) => { setApproval(v); setPage(1); }} />
+    <DataTable columns={columns} rows={rows} rowKey={(t) => t.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(t) => onOpen(t.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle={approval ? "Nothing sent back" : "No transfers"} emptyMessage="Move money between two accounts of the same branch here." />
     {openId !== null && <BankDocumentDrawer kind="transfer" id={openId} entity={entity} currency={currency} onClose={() => onOpen(null)} />}
   </>;
+}
+
+/** The bank lists' one filter: every document, or those an approver sent back. */
+function SentBackSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Status" className="h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01">
+        <option value="">All statuses</option>
+        <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
+      </select>
+    </div>
+  );
 }
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {

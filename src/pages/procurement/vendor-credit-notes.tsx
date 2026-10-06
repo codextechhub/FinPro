@@ -54,7 +54,7 @@ import {
   creditInstruction, creditNoteHeaderChanges, creditNoteStage, type CreditMode, type LineCredit,
 } from "./vendor-credit-note-model";
 import { VENDOR_CREDIT_NOTE_TABS, approvalStateWord, vendorCreditNoteWord } from "./document-status";
-import { sentBackPill } from "@/components/finance-ui/returned-correction";
+import { sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 
 const STATUS_TABS: TabStripItem<string>[] = VENDOR_CREDIT_NOTE_TABS.map((tab) => ({ ...tab }));
@@ -74,7 +74,7 @@ export function CreditNotesView({ entity, currency }: { entity: string; currency
   const [selectedId, setSelectedId] = useState<number | null>(null);
   useSourceDocumentParam(setSelectedId);
   const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetVendorCreditNotesQuery(
-    { entity, page, ...(status ? { status } : {}) },
+    { entity, page, ...statusFilterArgs(status) },
   );
   const rows = toArray(data?.data);
   const money = (value: number) => formatMoney(value, currency);

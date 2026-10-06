@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
     uid: 4,
     doc: null as unknown,
     rows: [] as unknown[],
+    listArgs: undefined as unknown,
     workflow: undefined as unknown,
     update: (() => undefined) as (body: unknown) => void,
     resume: (() => undefined) as (id: unknown) => void,
@@ -76,7 +77,7 @@ vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverProm
 vi.mock("sonner", () => ({ toast: { success: () => undefined, error: () => undefined } }));
 vi.mock("@/redux/services/procurement/procurement-api", () => mocks.api({
   useGetRequisitionQuery: () => ({ ...mocks.query(), data: { data: mocks.state.doc } }),
-  useGetRequisitionsQuery: () => ({ ...mocks.query(), currentData: { data: mocks.state.rows, pagination: { currentPage: 1, totalPages: 1 } } }),
+  useGetRequisitionsQuery: (args: unknown) => { mocks.state.listArgs = args; return { ...mocks.query(), currentData: { data: mocks.state.rows, pagination: { currentPage: 1, totalPages: 1 } } }; },
   useUpdateRequisitionMutation: mocks.mutation((body) => mocks.state.update(body)),
 }));
 vi.mock("@/redux/services/finance/setup-api", () => mocks.api({}));
@@ -185,5 +186,16 @@ describe("the requisitions list", () => {
     expect(rows.find((t) => t.includes("REQ-0009"))).toContain("Sent back");
     expect(rows.find((t) => t.includes("REQ-0010"))).toContain("Pending Approval");
     expect(rows.find((t) => t.includes("REQ-0010"))).not.toContain("Sent back");
+  });
+});
+
+describe("the requisitions Sent back tab", () => {
+  it("asks the list for what was sent back", () => {
+    mocks.state.held = new Set([P.PROC_VIEW_REQUISITIONS]);
+    mocks.state.rows = [];
+    act(() => root.render(<MemoryRouter><RequisitionsPage /></MemoryRouter>));
+    const tab = [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Sent back")!;
+    act(() => tab.click());
+    expect(mocks.state.listArgs).toEqual({ entity: "BSS", page: 1, approval: "returned" });
   });
 });

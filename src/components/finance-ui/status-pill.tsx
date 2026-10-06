@@ -75,6 +75,7 @@ const VARIANT_BY_STATUS: Record<string, BadgeVariant> = {
 // and the label drifting apart is how one outcome ends up with two names.
 const LABEL_BY_STATUS: Record<string, string> = {
   COMPLETED_WITH_OMISSIONS: "Partly complete",
+  SENT_BACK: "Sent back",
 };
 
 function humanise(status: string): string {

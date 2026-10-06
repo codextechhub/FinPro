@@ -40,7 +40,7 @@ import { useDates } from "../../../lib/display-prefs";
 import { VoidReturnDialog } from "./petty-cash-return-drawers";
 import { branchQueryArg, inBranch, rowBranchName, type PettyCashBranch } from "./petty-cash-branch";
 import { returnVoidable, voidBlocker } from "./petty-cash-returns";
-import { RETURNED_HINT, sentBackPill } from "@/components/finance-ui/returned-correction";
+import { RETURNED_HINT, SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 
 /** The page size the list asks for: the server's ceiling. */
@@ -63,9 +63,12 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
 }) {
   const dates = useDates();
   const [fundFilter, setFundFilter] = useState("");
+  // Returns have no status filter: the one choice is all of them, or those sent back.
+  const [approval, setApproval] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
   const { data, isLoading, isError, refetch } = useGetPettyCashReturnsQuery({
     entity, page_size: RETURNS_PAGE, ...branchQueryArg(view), ...(fundFilter ? { fund: Number(fundFilter) } : {}),
+    ...statusFilterArgs(approval),
   });
   const all = useMemo(() => toArray(data?.data), [data]);
   const total = data?.pagination?.totalItems ?? all.length;
@@ -90,6 +93,12 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
           <NativeSelect value={fundFilter} onChange={(e) => setFundFilter(e.target.value)} aria-label="Fund" className="h-9">
             <option value="">All funds</option>
             {fundOptions.map((f) => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
+          </NativeSelect>
+        </div>
+        <div className="w-full sm:w-48">
+          <NativeSelect value={approval} onChange={(e) => setApproval(e.target.value)} aria-label="Status" className="h-9">
+            <option value="">All statuses</option>
+            <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
           </NativeSelect>
         </div>
         {total > all.length ? <span className="font-mont text-[11px] text-gray-05">Showing the latest {all.length} of {total}.</span> : null}
@@ -199,7 +208,7 @@ export function ReturnDetailDrawer({ ret: row, entity, currency, view, fund, ret
       >
         <div className="space-y-4">
           <StatusPill {...sentBackPill(ret, ret.status, undefined, true)} />
-          <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} />
+          <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOrCancel} />
           {ret.status === "PENDING_APPROVAL" ? (
             <p className="font-mont text-xs text-gray-05">Waiting for a second person under the school's approval route. It reaches the books once approved.</p>
           ) : null}

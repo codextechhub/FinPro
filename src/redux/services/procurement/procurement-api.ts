@@ -36,7 +36,8 @@ import type {
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
-type E = { entity: string; page?: number; page_size?: number; status?: string; search?: string };
+/** `approval: "returned"` keeps only documents an approver sent back to whoever sent them. */
+type E = { entity: string; page?: number; page_size?: number; status?: string; search?: string; approval?: "returned" };
 type Act = { id: number; entity: string };
 
 /**

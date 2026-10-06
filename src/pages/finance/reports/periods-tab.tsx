@@ -45,7 +45,7 @@ import { EmptyState, ErrorState, ForbiddenState, LoadingState } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { checklistLabel, checklistSeverity, closeOutcomeMessage, failedBlockers, forceCanClose } from "./close-checklist";
+import { checklistItemLabel, checklistSeverity, closeOutcomeMessage, failedBlockers, forceCanClose } from "./close-checklist";
 import { P } from "../../../permissions";
 import {
   useCloseFiscalYearMutation,
@@ -1124,7 +1124,7 @@ export function PeriodCloseDrawer({
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-mont text-sm font-medium text-gray-01">{checklistLabel(item.name, humanize)}</p>
+                          <p className="font-mont text-sm font-medium text-gray-01">{checklistItemLabel(item, humanize)}</p>
                           {severity === "blocker" ? (
                             <span className="rounded bg-destructive/10 px-1.5 py-0.5 font-mont text-[10px] font-medium text-destructive">Blocks the close</span>
                           ) : severity === "done-by-close" ? (
@@ -1178,7 +1178,7 @@ export function PeriodCloseDrawer({
                 <p className="font-mont text-xs font-semibold text-gray-01">Checks you are overriding</p>
                 <ul className="mt-1 list-disc space-y-0.5 pl-4 font-mont text-xs text-gray-05">
                   {blockers.map((item) => (
-                    <li key={item.name}>{checklistLabel(item.name, humanize)}{item.detail ? `: ${item.detail}` : ""}</li>
+                    <li key={item.name}>{checklistItemLabel(item, humanize)}{item.detail ? `: ${item.detail}` : ""}</li>
                   ))}
                 </ul>
               </div>

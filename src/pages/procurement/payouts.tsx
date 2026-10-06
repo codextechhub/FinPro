@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
+import { sentBackPill } from "@/components/finance-ui/returned-correction";
 
 function PayoutsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [page, setPage] = useState(1);
@@ -51,11 +52,11 @@ function BatchesTab({ entity, currency }: { entity: string; currency?: string | 
     { header: "Title", cell: (b) => b.title },
     { header: "Items", align: "right", cell: (b) => b.item_count },
     { header: "Total", align: "right", cell: (b) => <Money kobo={b.total_amount} currency={currency} align="right" /> },
-    { header: "Status", cell: (b) => <StatusPill status={b.status} /> },
+    { header: "Status", cell: (b) => <StatusPill {...sentBackPill(b, b.status, undefined, true)} /> },
     {
       header: "", cell: (b) => (
         <div onClick={(e) => e.stopPropagation()}>
-          {(b.status === "DRAFT" || b.status === "PENDING") && (
+          {(b.status === "DRAFT" || b.status === "PENDING") && b.approval_state !== "PENDING" && (
             <ActionButton asLink label="Submit" permission={P.PAY_CREATE_PAYOUT} title="Submit payout batch?"
               description={`Submits ${b.reference}'s pending instructions to the gateway. Only settled items book.`}
               onConfirm={async () => { const r = await submit({ id: b.id, entity }).unwrap(); toast.success(r.message || "Submitted."); }} />

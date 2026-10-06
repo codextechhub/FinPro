@@ -9,12 +9,16 @@
  *
  * A vendor bill or credit note undone by Void reads "Voided"; a vendor
  * payment undone by Reverse keeps the pill's own "Reversed".
+ *
+ * Each list's last tab is Sent back, which the list asks for as
+ * `?approval=returned` rather than a status (statusFilterArgs), and whose rows
+ * wear "Sent back" too.
  */
 
 import {
   APPROVAL_STATE_WORDS, DOCUMENT_STATUS_WORDS, PAYMENT_PROGRESS_WORDS, statusWord,
 } from "@/components/finance-ui/status-words";
-import { sentBackPill } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill } from "@/components/finance-ui/returned-correction";
 import type { PurchaseOrder } from "@/redux/services/procurement/procurement-types";
 
 /** A vendor bill's states: its lifecycle, then the list's headline overlay (display_status). */
@@ -31,12 +35,14 @@ export const VENDOR_INVOICE_TABS: readonly (readonly [string, string])[] = [
   ["All", ""],
   ...(["DRAFT", "PENDING_APPROVAL", "APPROVED", "POSTED", "OVERDUE", "DISPUTED", "PARTIAL", "PAID"] as const)
     .map((code) => [VENDOR_INVOICE_WORDS[code], code] as const),
+  [SENT_BACK_WORD, SENT_BACK_FILTER],
 ];
 
 /** The vendor credit note list's status tabs. */
 export const VENDOR_CREDIT_NOTE_TABS: readonly { value: string; label: string }[] = [
   { value: "", label: "All" },
   ...(["DRAFT", "POSTED", "REVERSED"] as const).map((code) => ({ value: code, label: DOCUMENT_STATUS_WORDS[code] })),
+  { value: SENT_BACK_FILTER, label: SENT_BACK_WORD },
 ];
 
 /**
@@ -55,6 +61,7 @@ export const PURCHASE_ORDER_TABS: readonly { value: string; label: string }[] = 
   { value: "PARTIAL", label: PURCHASE_ORDER_WORDS.PARTIAL },
   { value: "PENDING_APPROVAL", label: "Pending Approval" },
   { value: "DRAFT", label: "Draft" },
+  { value: SENT_BACK_FILTER, label: SENT_BACK_WORD },
 ];
 
 /** A vendor bill's word for `status`, or undefined for the pill's own label. */
@@ -68,20 +75,14 @@ export const purchaseOrderWord = (status: string | null | undefined) => statusWo
 
 /**
  * A purchase order's pill: "Sent back" while an approver has handed it back to
- * whoever sent it, "Pending Approval" while its approvers have it, else its
- * `display_status`.
- *
- * An order sent for approval stays a DRAFT with `approval_state` PENDING, and
- * the server's `display_status` reads such an order as DRAFT. Mrs Bello's order
- * for 40 chairs waits on Mr Eze: its row says Pending Approval, as the tab that
- * lists it and the requisitions beside it do, rather than Draft.
+ * whoever sent it, else its `display_status`, which the server reads as
+ * PENDING_APPROVAL for as long as an approval is open. Mrs Bello's order for 40
+ * chairs waits on Mr Eze: its row says Pending Approval, as the tab that lists
+ * it and the requisitions beside it do.
  */
 export function purchaseOrderPill(
   po: Pick<PurchaseOrder, "display_status" | "approval_state" | "approval_returned">,
 ): { status: string | null | undefined; label?: string } {
-  if (po.approval_state === "PENDING" && !po.approval_returned && po.display_status === "DRAFT") {
-    return { status: "PENDING_APPROVAL", label: purchaseOrderWord("PENDING_APPROVAL") };
-  }
   return sentBackPill(po, po.display_status, purchaseOrderWord(po.display_status));
 }
 

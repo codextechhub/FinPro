@@ -41,7 +41,7 @@ import {
 import type { CreditNote } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
-import { SENT_BACK_WORD, isSentBack } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, isSentBack, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { creditNoteChanges, creditNoteCorrection, creditNoteCorrectionProblem, singleLine } from "./credit-note-edit";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { IncomeGivenBack } from "./income-given-back";
@@ -125,7 +125,7 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
   const dates = useDates();
   const [searchParams] = useSearchParams();
   const [typeFilter, setTypeFilter] = useState("");   // "" | CREDIT | DEBIT
-  const [statusFilter, setStatusFilter] = useState(""); // "" | ISSUED | APPLIED
+  const [statusFilter, setStatusFilter] = useState(""); // "" | ISSUED | APPLIED | SENT_BACK
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
   const search = useDebounce(searchInput.trim(), 350);
   const [page, setPage] = useState(1);
@@ -138,7 +138,7 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
   const params = useMemo(() => ({
     entity, page,
     ...(typeFilter ? { kind: typeFilter } : {}),
-    ...(statusFilter ? { status: statusFilter } : {}),
+    ...statusFilterArgs(statusFilter),
     ...(search ? { search } : {}),
   }), [entity, page, typeFilter, statusFilter, search]);
   const { data, isLoading, isFetching, isError, refetch } = useGetCreditNotesQuery(params);
@@ -183,10 +183,11 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
             <option value="CREDIT">Credit notes</option>
             <option value="DEBIT">Debit notes</option>
           </select>
-          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }} className={selectCls}>
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }} className={selectCls} aria-label="Status">
             <option value="">All status</option>
-            <option value="ISSUED">Issued</option>
-            <option value="APPLIED">Applied</option>
+            <option value="ISSUED">{STATUS_LABEL.ISSUED}</option>
+            <option value="APPLIED">{STATUS_LABEL.APPLIED}</option>
+            <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
           </select>
         </div>
         <Can permission={P.FIN_CREATE_CREDIT_NOTE}>

@@ -97,7 +97,7 @@ describe("concession states", () => {
     act(() => root.render(<MemoryRouter><ConcessionsTab entity="BSS" currency="NGN" /></MemoryRouter>));
 
     const options = [...container.querySelectorAll('select[aria-label="Status"] option')].map((o) => o.textContent);
-    expect(options).toEqual(["All statuses", "Draft", "Awaiting approval", "Posted", "Voided"]);
+    expect(options).toEqual(["All statuses", "Draft", "Awaiting approval", "Posted", "Voided", "Sent back"]);
 
     const rows = [...container.querySelectorAll("tbody tr")].map((tr) => tr.textContent ?? "");
     expect(rows.find((t) => t.includes("CON-0001"))).toContain("Awaiting approval");

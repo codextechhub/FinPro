@@ -13,7 +13,9 @@ import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
 import { useServesPath } from "../../lib/host-routes";
 import { approvalWorkflowLink } from "./approval-workflow-link";
-import { WITH_APPROVERS_NOTE, sentBackPill } from "@/components/finance-ui/returned-correction";
+import {
+  SENT_BACK_FILTER, SENT_BACK_WORD, WITH_APPROVERS_NOTE, exportStatus, sentBackPill, statusFilterArgs,
+} from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 import {
   blankRequisitionLine, requisitionApiLines, requisitionChanges, requisitionForm,
@@ -65,6 +67,7 @@ const STATUS_TABS = [
   { label: "Approved", value: "APPROVED" },
   { label: "Draft", value: "DRAFT" },
   { label: "Rejected", value: "REJECTED" },
+  { label: SENT_BACK_WORD, value: SENT_BACK_FILTER },
 ];
 
 /** Strip items for the two switchers, built once so the sliding bar re-measures only when the active tab changes. */
@@ -115,7 +118,7 @@ export default function RequisitionsPage() {
   if (!search.trim() && debouncedSearch !== "") setDebouncedSearch("");
 
   const params = useMemo(() => ({
-    entity: entity!, page, ...(status ? { status } : {}),
+    entity: entity!, page, ...statusFilterArgs(status),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   }), [entity, page, status, debouncedSearch]);
   const { currentData: data, isLoading, isFetching, isError, refetch } = useGetRequisitionsQuery(
@@ -191,7 +194,7 @@ export default function RequisitionsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <QuickExportButton
               screen="procurement.requisitions"
-              params={{ status, search: debouncedSearch }}
+              params={{ status: exportStatus(status), search: debouncedSearch }}
               entity={entity}
               typeface="geist"
               defaultName="Purchase requisitions"

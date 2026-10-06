@@ -25,7 +25,9 @@ import {
   PostingRecap, StatusPill, toArray, type Column,
 } from "@/components/finance-ui";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
-import { RETURNED_HINT, sentBackPill } from "@/components/finance-ui/returned-correction";
+import { RETURNED_HINT, SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
+
+const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { statusWord } from "@/components/finance-ui/status-words";
 import { Button } from "@/components/ui/button";
@@ -74,10 +76,12 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
   const { wholeSchool, canWholeSchool, heldWithoutReach } = useWholeSchoolAccess();
   const list = useListBranch();
   const [page, setPage] = useState(1);
+  // Runs have no status filter: the one choice is all runs, or those sent back.
+  const [approval, setApproval] = useState("");
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<DoubtfulDebtProvision | null>(null);
   // A run names no branch; a branch's list keeps the runs with a line for it.
-  const { data, isLoading, isFetching, isError, refetch } = useGetProvisionsQuery({ entity, page, ...listBranchArg(list.view) });
+  const { data, isLoading, isFetching, isError, refetch } = useGetProvisionsQuery({ entity, page, ...statusFilterArgs(approval), ...listBranchArg(list.view) });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
   const open = selected ? rows.find((r) => r.id === selected.id) ?? selected : null;
@@ -103,6 +107,10 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
+          <select value={approval} onChange={(e) => { setApproval(e.target.value); setPage(1); }} className={selectCls} aria-label="Status">
+            <option value="">All runs</option>
+            <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
+          </select>
           <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
           <p className="font-mont text-xs text-gray-05">One journal per branch, worked out from each branch&apos;s aged debts.</p>
         </div>

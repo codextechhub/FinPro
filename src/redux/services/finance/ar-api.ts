@@ -36,7 +36,8 @@ import type {
   DocumentEmailPreview,
 } from "./ar-types";
 
-type EntityList = { entity: string; page?: number; status?: string; customer?: string };
+/** `approval: "returned"` keeps only documents an approver sent back to whoever sent them. */
+type EntityList = { entity: string; page?: number; status?: string; customer?: string; approval?: "returned" };
 type FeeLineInput = { code?: string; description: string; revenue_account: string; amount: number; tax_code?: string; is_optional?: boolean; kind?: "CHARGE" | "DEPOSIT" };
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
 
@@ -212,7 +213,7 @@ export const arApi = baseApi.injectEndpoints({
         kinds: ("REFUND" | "WRITEOFF")[];
         data: ArAdjustment[];
       },
-      { entity: string; type?: string; search?: string; page?: number }
+      { entity: string; type?: string; search?: string; page?: number; approval?: "returned" }
     >({
       query: (params) => ({ url: `/finance/ar-adjustments/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceRefunds", "FinanceInvoices", "FinanceWriteOffs"],

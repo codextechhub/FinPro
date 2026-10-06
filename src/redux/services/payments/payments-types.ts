@@ -138,9 +138,15 @@ export interface PayoutBatchSummary {
   // batch's scope, so direct submit is refused and it must be routed for approval instead.
   approval_status?: "PENDING" | "APPROVED" | "REJECTED" | null;
   approval_required?: boolean;
+  /** Where its approval stands: NOT_SUBMITTED, PENDING, APPROVED or REJECTED. */
+  approval_state?: string;
+  /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
+  approval_returned?: boolean;
 }
 
 export interface PayoutBatch extends PayoutBatchSummary {
+  /** The latest approval request, null before it is first sent; read on the detail only. */
+  workflow_instance_id?: string | number | null;
   narration: string;
   instructions: PayoutInstruction[];
 }

@@ -35,7 +35,7 @@ import { FilePreviewDialog, type PreviewFile } from "../../../components/finance
 import { printExpenseClaim } from "../../../utils/finance-print";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
-import { SENT_BACK_WORD, isSentBack } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, isSentBack, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import {
   useGetExpenseClaimsQuery, useGetExpenseClaimSummaryQuery, useGetExpenseClaimQuery, useCreateExpenseClaimMutation,
   usePostExpenseClaimMutation, useRejectExpenseClaimMutation, useSettleExpenseClaimMutation, useVoidExpenseClaimMutation,
@@ -82,6 +82,7 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "DRAFT", label: "Draft" }, { value: "PENDING", label: "Awaiting approval" }, { value: "APPROVED", label: "Approved" },
   { value: "PAID", label: "Paid" }, { value: "REJECTED", label: "Rejected" },
+  { value: SENT_BACK_FILTER, label: SENT_BACK_WORD },
 ];
 
 export function ExpenseClaimsTab({ entity, currency }: { entity: string; currency?: string | null }) {
@@ -104,7 +105,7 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
     ?? (linkedDocumentDismissed ? null : linkedClaimQuery.data?.data ?? null);
 
   const { data, isLoading, isFetching, isError, refetch } = useGetExpenseClaimsQuery({
-    entity, page, ...(search ? { q: search } : {}), ...(status ? { display_status: status } : {}),
+    entity, page, ...(search ? { q: search } : {}), ...statusFilterArgs(status, "display_status"),
   });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;

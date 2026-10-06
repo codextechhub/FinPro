@@ -51,7 +51,7 @@ import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 import { isForbidden } from "../../lib/api-errors";
 import { approvalStateWord } from "./document-status";
-import { WITH_APPROVERS_NOTE, sentBackPill } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, WITH_APPROVERS_NOTE, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 import { vendorPaymentChanges } from "./vendor-payment-edit";
 
@@ -83,8 +83,10 @@ export default function VendorPaymentsPage() {
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
   useActionParam("new", can(P.PROC_CREATE_VENDOR_PAYMENT), () => setCreating(true));
+  // Payments have no status filter: the one choice is all of them, or those sent back.
+  const [approval, setApproval] = useState("");
   const { data, isLoading, isFetching, isError, error, refetch } = useGetVendorPaymentsQuery(
-    { entity: entity!, page }, { skip: !entity },
+    { entity: entity!, page, ...statusFilterArgs(approval) }, { skip: !entity },
   );
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view vendor payments." /></PageShell></ProcurementShell>;
 
@@ -104,6 +106,7 @@ export default function VendorPaymentsPage() {
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
       <header data-guide="procurement-vendor-payments.heading" className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-1.5"><h1 className="font-mont text-lg font-semibold text-gray-01">Vendor Payments</h1><InfoHint ariaLabel="About vendor payments">Payments settle approved supplier invoices and post through Accounts Payable.</InfoHint></div><p className="mt-0.5 font-mont text-xs text-gray-05">Disbursements against approved and posted vendor invoices.</p></div><Can permission={P.PROC_CREATE_VENDOR_PAYMENT}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Payment</Button></Can></header>
+      <div className="flex flex-wrap items-center gap-2"><select value={approval} onChange={(event) => { setApproval(event.target.value); setPage(1); }} aria-label="Payment status" className="h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01"><option value="">All payments</option><option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option></select></div>
       <section data-guide="procurement-vendor-payments.list">{isForbidden(error) ? <EmptyState title="Access restricted" message="You do not have permission to view vendor payments." /> : <DataTable columns={columns} rows={rows} rowKey={(payment) => payment.id} loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(payment) => setSelectedId(payment.id)} page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage} emptyTitle="No vendor payments" emptyMessage="Approved supplier disbursements will appear here." />}</section>
     </PageShell>
     <PaymentDrawer id={selectedId} entity={entity} currency={currency} onClose={() => setSelectedId(null)} />

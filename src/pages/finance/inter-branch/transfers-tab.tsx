@@ -53,7 +53,7 @@ import {
 } from "@/redux/services/finance/interbranch-api";
 import type { InterBranchKind, InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
 import { useDates } from "../../../lib/display-prefs";
-import { RETURNED_HINT } from "@/components/finance-ui/returned-correction";
+import { RETURNED_HINT, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { adjustmentLink, heldReceiptLink, journalLink, rechargeLink } from "./links";
 import { moveDebtSentence, movedDebt, movedItemAmount, movedItemLabel } from "./move-summary";
@@ -94,7 +94,7 @@ export function TransfersTab({ entity, currency, reader }: { entity: string; cur
   const adjustment = Number(filters.value("adjustment")) || undefined;
   const { data, isLoading, isFetching, isError, refetch } = useGetInterBranchTransfersQuery({
     entity, page, page_size: 25,
-    status: filters.value("status") || undefined,
+    ...statusFilterArgs(filters.value("status")),
     kind: filters.value("kind") || undefined,
     branch: branch ? Number(branch) : undefined,
     counterparty: branch && counterparty ? Number(counterparty) : undefined,
@@ -288,7 +288,7 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
                 Open the recharge <ArrowRight className="size-3.5" />
               </Link>
             ) : null}
-            {standing === "sender" || standing === "returned" ? <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} /> : isOpenRequest(t) && !actions.includes("send") ? (
+            {standing === "sender" || standing === "returned" ? <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={t.requested_at ? RETURNED_HINT.resumeOnly : RETURNED_HINT.resumeOrCancel} /> : isOpenRequest(t) && !actions.includes("send") ? (
               <Note>{`Waiting for ${t.branch_name} to send it or decline it.`}</Note>
             ) : null}
             {t.status === "POSTED" && !t.received_at && MONEY_KINDS.includes(t.kind) && !actions.includes("confirm") ? (

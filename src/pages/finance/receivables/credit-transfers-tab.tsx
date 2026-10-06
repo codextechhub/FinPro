@@ -21,7 +21,7 @@ import {
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
-import { RETURNED_HINT, sentBackPill } from "@/components/finance-ui/returned-correction";
+import { RETURNED_HINT, SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +58,7 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<CustomerCreditTransfer | null>(null);
-  const params = useMemo(() => ({ entity, page, ...(status ? { status } : {}), ...listBranchArg(list.view) }), [entity, page, status, list.view]);
+  const params = useMemo(() => ({ entity, page, ...statusFilterArgs(status), ...listBranchArg(list.view) }), [entity, page, status, list.view]);
   const { data, isLoading, isFetching, isError, refetch } = useGetCreditTransfersQuery(params);
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
@@ -81,6 +81,7 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
           <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectCls} aria-label="Status">
             <option value="">All statuses</option>
             {FILTER_STATUSES.map((code) => <option key={code} value={code}>{CREDIT_TRANSFER_STATUS[code]}</option>)}
+            <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
           </select>
           <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
         </div>

@@ -22,7 +22,7 @@
  */
 
 import type { InterBranchKind, InterBranchStage, InterBranchTransfer } from "@/redux/services/finance/interbranch-types";
-import { financeReturnedFacts } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, financeReturnedFacts } from "@/components/finance-ui/returned-correction";
 
 /** The reach question the host answers (`useReaderReach`). */
 export interface TransferReach {
@@ -72,7 +72,7 @@ export function transferActions(
   reach: TransferReach,
 ): TransferAction[] {
   const actions: TransferAction[] = [];
-  if (isOpenRequest(t) && !financeReturnedFacts(t)?.approval_returned && keys.transfer && reach.covers([t.branch_id])) {
+  if (isOpenRequest(t) && t.approval_state !== "PENDING" && !financeReturnedFacts(t)?.approval_returned && keys.transfer && reach.covers([t.branch_id])) {
     actions.push("send", "decline");
   }
   if (
@@ -196,13 +196,15 @@ export const KIND_LABELS: Record<InterBranchKind, string> = {
 };
 
 /**
- * The register's stage filter, as the list endpoint's `status` values. A send
- * an approver sent back is a DRAFT, so the filter that lists requests lists it
- * too, under the word its row wears as well.
+ * The register's stage filter, as the list endpoint's `status` values, and
+ * Sent back, which asks the list for `?approval=returned`. A send an approver
+ * sent back is a DRAFT, so the filter that lists requests lists it too, under
+ * the word its row wears as well.
  */
 export const STATUS_FILTERS: readonly (readonly [string, string])[] = [
   ["", "Any stage"],
   ["DRAFT", "Requested or sent back"],
+  [SENT_BACK_FILTER, SENT_BACK_WORD],
   ["PENDING_APPROVAL", "Waiting for approval"],
   ["POSTED", "Sent or booked"],
   ["CANCELLED", "Declined or not sent"],

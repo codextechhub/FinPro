@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 import { exitedOutline, exitedTitle } from "@/components/finance-ui/exited-person";
 import { P } from "../../../permissions";
 import { useGetJournalsQuery, useGetJournalSummaryQuery } from "@/redux/services/finance/gl-api";
-import type { JournalListItem, JournalSource, JournalStatus } from "@/redux/services/finance/gl-types";
+import type { JournalListItem, JournalListParams, JournalSource, JournalStatus } from "@/redux/services/finance/gl-types";
 import { DirectEntryDrawer } from "./direct-entry-drawer";
 import { JournalDetailDrawer } from "./journal-detail-drawer";
 import { useSourceDocumentParam } from "../../../lib/source-document-route";
@@ -38,7 +38,7 @@ import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { useDates } from "../../../lib/display-prefs";
 import { presetRange } from "../../../utils/date-presets";
-import { sentBackPill } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, exportStatus, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
 const SOURCES: JournalSource[] = ["MANUAL", "SALES", "PURCHASE", "BANK", "PAYROLL", "CLOSING", "OPENING", "FX", "SYSTEM"];
@@ -56,7 +56,7 @@ export default function GeneralLedgerPage() {
   const dates = useDates();
   const [searchParams] = useSearchParams();
   const { code: entity, currency } = useActiveEntity();
-  const [status, setStatus] = useState<JournalStatus | "">("");
+  const [status, setStatus] = useState<JournalStatus | typeof SENT_BACK_FILTER | "">("");
   const [source, setSource] = useState<JournalSource | "">("");
   const [preset, setPreset] = useState("all");
   const [custom, setCustom] = useState({ from: "", to: "" });
@@ -81,7 +81,7 @@ export default function GeneralLedgerPage() {
   }), [entity, source, range.from, range.to, search]);
 
   const { data, isLoading, isFetching, isError, refetch } = useGetJournalsQuery(
-    { ...filters, page, ...(status ? { status } : {}), ...includeArchivedArg(showArchived) }, { skip: !entity },
+    { ...filters, page, ...(statusFilterArgs(status) as Pick<JournalListParams, "status" | "approval">), ...includeArchivedArg(showArchived) }, { skip: !entity },
   );
   const summaryQ = useGetJournalSummaryQuery({ ...filters, ...includeArchivedArg(showArchived) }, { skip: !entity });
   const summary = summaryQ.data?.data;
@@ -90,12 +90,14 @@ export default function GeneralLedgerPage() {
 
   const count = (key?: JournalStatus) => key ? (summary?.by_status?.[key] ?? 0) : (summary?.total ?? 0);
 
-  const statusTabs: TabStripItem<JournalStatus | "">[] = [
+  const statusTabs: TabStripItem<JournalStatus | typeof SENT_BACK_FILTER | "">[] = [
     { value: "", label: <>All <span className="ml-1 opacity-70">{count()}</span></> },
     ...STATUS_TABS.map((t) => ({
       value: t.key,
       label: <>{t.label} <span className="ml-1 opacity-70">{count(t.key)}</span></>,
     })),
+    // Sent back is not a status, so the summary has no count for it.
+    { value: SENT_BACK_FILTER, label: SENT_BACK_WORD },
   ];
 
   const columns: Column<JournalListItem>[] = [
@@ -142,7 +144,7 @@ export default function GeneralLedgerPage() {
                 is on screen. That is the dataset a trial balance needs. */}
             <QuickExportButton
               screen="finance.gl_postings"
-              params={{ status, source, date_from: range.from, date_to: range.to, search }}
+              params={{ status: exportStatus(status), source, date_from: range.from, date_to: range.to, search }}
               entity={entity}
               typeface="geist"
               defaultName="General ledger postings"

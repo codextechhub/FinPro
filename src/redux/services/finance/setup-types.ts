@@ -131,6 +131,8 @@ export interface PostingWindow {
 
 export interface ChecklistItem {
   name: string;
+  /** The check in words ("Payables agree with the ledger"); absent from an older server. */
+  label?: string;
   passed: boolean;
   blocking: boolean;
   /**
@@ -334,6 +336,8 @@ export interface FinanceAuditFacets {
 
 export interface CloseChecklistItem {
   name: string;
+  /** The check in words; absent from an older server. */
+  label?: string;
   passed: boolean;
   blocking: boolean;
   /** See {@link ChecklistItem.done_by_close}. */

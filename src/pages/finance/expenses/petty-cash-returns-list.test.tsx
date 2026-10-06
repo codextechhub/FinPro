@@ -169,9 +169,20 @@ describe("petty cash returns", () => {
     expect(tableRows()[0].textContent).toContain("Sent back");
     act(() => (tableRows()[0] as HTMLElement).click());
     expect(button("Cancel return")).toBeUndefined();
-    expect(document.body.textContent).toContain("To change it, withdraw it from your approvals");
+    expect(document.body.textContent).toContain("Withdrawing it from your approvals cancels it");
     await act(async () => button("Resume")!.click());
     expect(returned.resume).toHaveBeenCalledWith("wf-10");
+  });
+
+  it("asks for what was sent back when the Status filter says Sent back", () => {
+    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    const select = container.querySelector('select[aria-label="Status"]') as HTMLSelectElement;
+    expect([...select.options].map((o) => o.textContent)).toEqual(["All statuses", "Sent back"]);
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "SENT_BACK");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(mocks.list).toHaveBeenLastCalledWith({ entity: "BSS", page_size: 100, approval: "returned" });
   });
 
   it("keeps Draft and Cancel return on a draft no approver holds", () => {

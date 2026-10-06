@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  approvalPillWord, financeReturnedFacts, isSentBack, latestReturn, sentBackPill, returnedHint, returnedStanding, sentBackLine, type ReturnedRequest,
+  approvalPillWord, exportStatus, financeReturnedFacts, isSentBack, latestReturn, sentBackPill, statusFilterArgs, returnedHint, returnedStanding, sentBackLine, type ReturnedRequest,
 } from "./returned-correction";
 
 const REQUEST: ReturnedRequest = {
@@ -102,5 +102,19 @@ describe("sentBackPill", () => {
     expect(isSentBack(old)).toBe(false);
     expect(isSentBack(old, true)).toBe(true);
     expect(sentBackPill(old, "DRAFT", "Draft", true).label).toBe("Sent back");
+  });
+});
+
+describe("the Sent back filter", () => {
+  it("asks a list for ?approval=returned rather than a status", () => {
+    expect(statusFilterArgs("SENT_BACK")).toEqual({ approval: "returned" });
+    expect(statusFilterArgs("DRAFT")).toEqual({ status: "DRAFT" });
+    expect(statusFilterArgs("OVERDUE", "display_status")).toEqual({ display_status: "OVERDUE" });
+    expect(statusFilterArgs("")).toEqual({});
+  });
+
+  it("exports unfiltered by status when Sent back is chosen", () => {
+    expect(exportStatus("SENT_BACK")).toBe("");
+    expect(exportStatus("POSTED")).toBe("POSTED");
   });
 });

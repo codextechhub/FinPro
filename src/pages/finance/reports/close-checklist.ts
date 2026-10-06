@@ -44,7 +44,12 @@ export const failedBlockers = (items: CloseChecklistItem[]) =>
  */
 export const CLOSE_ORDER_CHECK = "earlier_periods_closed";
 
-/** Whether a force close could get past these blockers: never past the close order. */
+/**
+ * Whether a force close could get past these blockers: never past the close
+ * order while it blocks. Under All branches the close-order row is a warning
+ * (`blocking` false) while some branch can still close the month, so it is not
+ * among the blockers then and Force close stays available for that branch.
+ */
 export const forceCanClose = (items: CloseChecklistItem[]) => {
   const blockers = failedBlockers(items);
   return blockers.length > 0 && !blockers.some((item) => item.name === CLOSE_ORDER_CHECK);
@@ -101,3 +106,10 @@ export const CHECK_LABELS: Record<string, string> = {
 
 export const checklistLabel = (name: string, fallback: (value: string) => string) =>
   CHECK_LABELS[name] ?? fallback(name);
+
+/**
+ * A checklist row's words: the server's own `label`, else this screen's name for
+ * the check, else the humanised machine name.
+ */
+export const checklistItemLabel = (item: { name: string; label?: string }, fallback: (value: string) => string) =>
+  item.label?.trim() || checklistLabel(item.name, fallback);
