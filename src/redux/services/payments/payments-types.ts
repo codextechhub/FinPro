@@ -269,6 +269,12 @@ export interface SettlementReconciliation {
 }
 
 // Append-only gateway action log (PaymentEvent) - the transactions log.
+/**
+ * One request made to the payment provider, from GET /payments/transactions/.
+ *
+ * The server also sends a filtered `metadata`; it is left out of this type on
+ * purpose, so no screen shows it. A screen reads only the named fields.
+ */
 export interface TransactionLogEntry {
   id: number;
   entity_code: string | null;
@@ -278,9 +284,16 @@ export interface TransactionLogEntry {
   reference: string;
   succeeded: boolean;
   message: string;
-  metadata: Record<string, unknown>;
   actor_email: string | null;
   created_at: string;
+  /** Who acted, ready to show; "Ada Obi for Chioma Okafor" under a proxy. */
+  acted_label?: string | null;
+  real_actor_name?: string | null;
+  proxied_user_name?: string | null;
+  /** Whether the person in whose name it ran has left. */
+  actor_user_is_exited?: boolean | null;
+  /** Whether the person who really acted under a proxy has left. */
+  proxied_by_is_exited?: boolean | null;
 }
 
 // ── Header KPI summaries (computed over ALL rows, accurate while lists paginate) ──

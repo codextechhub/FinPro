@@ -85,6 +85,8 @@ export const PAYMENTS_SECTIONS = [
   "batches",
   "settlement",
   "transactions",
+  // Every request made to the payment provider, refused and failed ones included.
+  "provider-activity",
   "webhooks",
   "held-settlements",
   // Platform only: the daily held-ledger check and the provider account settings.

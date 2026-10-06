@@ -8,6 +8,7 @@ import { PayoutsTab } from "./payouts-tab";
 import { BatchesTab } from "./batches-tab";
 import { SettlementTab } from "./settlement-tab";
 import { TransactionsTab } from "./transactions-tab";
+import { ProviderActivityTab } from "./provider-activity-tab";
 import { WebhooksTab } from "./webhooks-tab";
 import { HeldSettlementsTab, PlatformHeldSettlementsTab } from "./held-settlements-tab";
 import { HeldReconciliationsTab } from "./held-reconciliations";
@@ -17,12 +18,14 @@ import { useCan } from "@/components/finance-ui/can";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { P } from "../../permissions";
+import { platformName } from "../../host";
 
 const HEADINGS: Record<PaymentsSection, { label: string; subtitle: string }> = {
   payouts: { label: "Payouts", subtitle: "Money out - single disbursements to recipients." },
   batches: { label: "Payout Batches", subtitle: "Assemble a batch of payouts and submit them in one run." },
   settlement: { label: "Settlement", subtitle: "Match the provider's payouts to the bank, and book them as settlements." },
   transactions: { label: "Transactions Log", subtitle: "Every collection, payout and transfer in one feed." },
+  "provider-activity": { label: "Payment provider activity", subtitle: `Every request ${platformName} made to the payment provider, including refused and failed ones.` },
   webhooks: { label: "Needs Attention", subtitle: "Provider events that did not make it into the books." },
   "held-settlements": { label: "Held Settlements", subtitle: "Online payments held for each branch, paid into its bank." },
   "held-reconciliations": { label: "Held Reconciliations", subtitle: "The daily check of held money against the payment provider." },
@@ -68,6 +71,8 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
           <SettlementTab entity={entity!} currency={currency} />
         ) : section === "transactions" ? (
           <TransactionsTab entity={entity!} currency={currency} />
+        ) : section === "provider-activity" ? (
+          <ProviderActivityTab entity={entity!} />
         ) : section === "webhooks" ? (
           <WebhooksTab entity={entity!} currency={currency} />
         ) : (

@@ -173,6 +173,12 @@ describe("what a reader is offered", () => {
     expect(consoleOffersScreens(financeNav, { ...reader("payments.payout.view"), custody: "DIRECT" })).toBe(false);
   });
 
+  it("offers Payment provider activity only to a holder of the payments report key", () => {
+    const shown = (...keys: string[]) => titles(visibleConsoleNav(financeNav, reader(...keys)));
+    expect(shown("payments.report.view")).toContain("Payment provider activity");
+    expect(shown("payments.payout.view", "payments.collection.view")).not.toContain("Payment provider activity");
+  });
+
   it("drops a group whose every screen is closed rather than showing an empty heading", () => {
     const labels = visibleConsoleNav(financeNav, reader("finance.invoice.view")).map((g) => g.label);
     expect(labels).toEqual([undefined, "Receivables"]);

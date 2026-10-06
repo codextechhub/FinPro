@@ -11,7 +11,7 @@ import {
   LayoutDashboard, BookOpen, ListTree, Building2, CalendarDays,
   Coins, Percent, Layers, ReceiptText, Users, CreditCard, FileMinus, Undo2,
   CalendarClock, BadgePercent, BellRing, ListChecks, Landmark, Wallet,
-  PiggyBank, Boxes, Scale, TrendingUp, ArrowLeftRight, GitBranch, ScrollText,
+  PiggyBank, Boxes, Scale, TrendingUp, ArrowLeftRight, GitBranch, ScrollText, Activity,
   CircleDollarSign, Send, Settings, AlertTriangle, ArrowRightLeft, HandCoins, Split, Handshake,
   Gavel, ShieldCheck, Hourglass, ShieldAlert, Lock,
 } from "lucide-react";
@@ -105,6 +105,8 @@ export const financeNav: ConsoleNavGroup[] = [
       // the platform's own provider account settings.
       { title: "Held Reconciliations", url: `${F.PAYMENTS}/held-reconciliations`, icon: ShieldCheck, permissions: [P.PAY_VIEW_PLATFORM_SETTLEMENTS, P.PAY_VIEW_PLATFORM_PROVIDER, P.PAY_UPDATE_PLATFORM_PROVIDER], resources: ["payments.platform_provider"] },
       { title: "Transactions Log", url: `${F.PAYMENTS}/transactions`, icon: ScrollText, permissions: [P.PAY_VIEW_PAYMENT_REPORTS] },
+      // Requests made to the payment provider, as against money that moved (Transactions Log).
+      { title: "Payment provider activity", url: `${F.PAYMENTS}/provider-activity`, icon: Activity, permissions: [P.PAY_VIEW_PAYMENT_REPORTS] },
       { title: "Needs Attention", url: `${F.PAYMENTS}/webhooks`, icon: AlertTriangle, permissions: [P.PAY_VIEW_WEBHOOKS] },
     ],
   },
