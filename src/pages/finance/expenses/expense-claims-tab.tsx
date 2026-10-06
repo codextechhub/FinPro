@@ -35,7 +35,7 @@ import { FilePreviewDialog, type PreviewFile } from "../../../components/finance
 import { printExpenseClaim } from "../../../utils/finance-print";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
-import { SENT_BACK_FILTER, SENT_BACK_WORD, exportStatus, isSentBack, statusFilterArgs } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, isSentBack, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import {
   useGetExpenseClaimsQuery, useGetExpenseClaimSummaryQuery, useGetExpenseClaimQuery, useCreateExpenseClaimMutation,
   usePostExpenseClaimMutation, useRejectExpenseClaimMutation, useSettleExpenseClaimMutation, useVoidExpenseClaimMutation,
@@ -49,10 +49,15 @@ const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium"
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const tdCls = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
 
-// Our model: status DRAFT/PENDING_APPROVAL/POSTED/CANCELLED × payment status.
-// Collapse to the prototype's display states.
 type DispKey = "DRAFT" | "SENT_BACK" | "PENDING" | "APPROVED" | "PART_PAID" | "PAID" | "REJECTED";
-function disp(c: ExpenseClaim): { key: DispKey; label: string; cls: string } {
+
+/**
+ * The word a claim's pill wears: its status (DRAFT, PENDING_APPROVAL, POSTED,
+ * CANCELLED) read with its reimbursement, so a posted claim reads Approved
+ * while nothing is reimbursed, Part-paid while some is, and Paid once all is.
+ * Its `key` is the server's `display_status` word for the same claims.
+ */
+export function claimDisplay(c: ExpenseClaim): { key: DispKey; label: string; cls: string } {
   if (c.status === "CANCELLED") return { key: "REJECTED", label: "Rejected", cls: "bg-destructive/10 text-destructive" };
   if (c.status === "PENDING_APPROVAL") return { key: "PENDING", label: "Awaiting approval", cls: "bg-amber-50 text-amber-700" };
   if (isSentBack(c, true)) return { key: "SENT_BACK", label: SENT_BACK_WORD, cls: "bg-orange-500/10 text-yellow-01-text" };
@@ -62,7 +67,7 @@ function disp(c: ExpenseClaim): { key: DispKey; label: string; cls: string } {
   return { key: "APPROVED", label: "Approved", cls: "bg-blue-50 text-blue-700" };
 }
 function StatusPill({ claim }: { claim: ExpenseClaim }) {
-  const d = disp(claim);
+  const d = claimDisplay(claim);
   return <span className={cn(PILL, d.cls)}>{d.label}</span>;
 }
 function Initials({ name }: { name: string }) {
@@ -79,11 +84,21 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
   );
 }
 
-const STATUS_OPTIONS: { value: string; label: string }[] = [
+/**
+ * The claims filter: each option the word its claims' pills wear
+ * ({@link claimDisplay}), sent as `display_status`, and Sent back, sent as
+ * `approval=returned`. No word lists a claim sent back.
+ */
+export const CLAIM_STATUS_OPTIONS: readonly { value: string; label: string }[] = [
   { value: "DRAFT", label: "Draft" }, { value: "PENDING", label: "Awaiting approval" }, { value: "APPROVED", label: "Approved" },
-  { value: "PAID", label: "Paid" }, { value: "REJECTED", label: "Rejected" },
+  { value: "PART_PAID", label: "Part-paid" }, { value: "PAID", label: "Paid" }, { value: "REJECTED", label: "Rejected" },
   { value: SENT_BACK_FILTER, label: SENT_BACK_WORD },
 ];
+
+/** The claims list's filter arguments, which its export sends unchanged. */
+export function claimListArgs(status: string, search: string): Record<string, string> {
+  return { ...(search ? { q: search } : {}), ...statusFilterArgs(status, "display_status") };
+}
 
 export function ExpenseClaimsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
@@ -105,7 +120,7 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
     ?? (linkedDocumentDismissed ? null : linkedClaimQuery.data?.data ?? null);
 
   const { data, isLoading, isFetching, isError, refetch } = useGetExpenseClaimsQuery({
-    entity, page, ...(search ? { q: search } : {}), ...statusFilterArgs(status, "display_status"),
+    entity, page, ...claimListArgs(status, search),
   });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
@@ -140,16 +155,14 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
           </div>
           <select value={status} onChange={(e) => { setStatus(e.target.value); resetPage(); }} className="h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01">
             <option value="">All statuses</option>
-            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {CLAIM_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <div className="flex gap-2">
-          {/* Replaces a client-side CSV of `rows` - the current page only. The
-              screen's display status collapses (status x payment_status); the
-              binding expands it the same way the list endpoint does. */}
+          {/* The server reads the list's own filters, so the file holds the claims the list shows. */}
           <QuickExportButton
             screen="finance.expense_claims"
-            params={{ display_status: exportStatus(status), q: search }}
+            params={claimListArgs(status, search)}
             entity={entity}
             typeface="geist"
             defaultName="Expense claims"
@@ -213,7 +226,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
   const { standing, request, workflowId, requestNamed } = useFinanceReturned(full);
   if (!claim || !full) return null;
 
-  const d = disp(full);
+  const d = claimDisplay(full);
   const isDraft = full.status === "DRAFT" && !standing;
   const isPending = full.status === "PENDING_APPROVAL";
   const isApprovedUnpaid = full.status === "POSTED" && full.payment_status !== "PAID";
@@ -245,7 +258,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
           <>
             <StatusPill claim={full} />
             <div className="flex-1" />
-            <Button variant="outline" onClick={() => printExpenseClaim(full, disp(full).label, currency, dates.prefs)} className="gap-1.5"><Printer className="size-4" /> Print</Button>
+            <Button variant="outline" onClick={() => printExpenseClaim(full, claimDisplay(full).label, currency, dates.prefs)} className="gap-1.5"><Printer className="size-4" /> Print</Button>
             {isDraft && full.approval_required ? (
               <Can permission={P.FIN_CREATE_EXPENSE_CLAIM}>
                 <Button disabled={submitting} onClick={doSubmit} className="gap-1.5"><Send className="size-4" />{submitting ? "Submitting…" : "Submit for approval"}</Button>

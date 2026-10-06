@@ -91,20 +91,37 @@ export function heldStage(h: Pick<HeldReceipt, "status" | "forwarded_by">): { la
 }
 
 /**
- * What the drawer says about a forward, by where the forward stands. Only a
- * posted forward can be voided; one with its approver or sent back is a
- * request, which whoever sent it withdraws under Workflow, My Submissions, and
- * the receipt is then held here again.
+ * What the drawer says about a forward, by where the forward stands, in the
+ * server's own advice when Void is refused. Only a posted forward can be
+ * voided. One approved and not yet sent is sent first. One with its approver
+ * is withdrawn, and one sent back resumed or withdrawn, by whoever sent it
+ * under Workflow, My Submissions; withdrawn, the receipt is held here again.
  */
 export function forwardNote(h: Pick<HeldReceipt, "forwarded_by">): string | null {
   const f = h.forwarded_by;
   if (!f) return null;
   if (f.status === "POSTED") return `Forwarded by ${f.document_number}. To void this receipt, void that transfer first.`;
+  if (f.status === "APPROVED") {
+    return `Being forwarded by ${f.document_number}, which is approved and not yet sent. The receipt can be voided only once that transfer is sent and voided.`;
+  }
   if (forwardSentBack(h)) {
     return `Its forward, ${f.document_number}, was sent back by the approver. Whoever sent it resumes it, or withdraws it, under Workflow, My Submissions. Withdrawn, this receipt is held here again.`;
   }
   return `Being forwarded by ${f.document_number}, which is with the approver. To stop it, whoever sent it withdraws it under Workflow, My Submissions.`;
 }
+
+/**
+ * The held receipts filter: each status the list takes, worded as its rows'
+ * pills ({@link heldStage}). The server lists a receipt whose forward was sent
+ * back under Forwarding, since its forward is still live, so that option says
+ * so: its row wears Sent back.
+ */
+export const HELD_FILTERS: readonly (readonly [string, string])[] = [
+  ["HELD", "Held"],
+  ["FORWARDING", `Forwarding or ${SENT_BACK_WORD.toLowerCase()}`],
+  ["FORWARDED", "Forwarded"],
+  ["VOIDED", "Voided"],
+];
 
 function HeldStatus({ h }: { h: HeldReceipt }) {
   const stage = heldStage(h);
@@ -137,9 +154,8 @@ export function HeldReceiptsTab({ entity, currency, reader }: { entity: string; 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="w-full sm:w-60">
           <NativeSelect value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Status" className="h-9">
-            <option value="">Held, forwarded and voided</option>
-            <option value="POSTED">Held or forwarded</option>
-            <option value="REVERSED">Voided</option>
+            <option value="">All statuses</option>
+            {HELD_FILTERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </NativeSelect>
         </div>
         {can(P.FIN_RECORD_PAYMENT) ? (

@@ -136,8 +136,9 @@ describe("a send whose approval ended unapproved", () => {
     expect(notSentNote(t({}))).toBeNull();
   });
 
-  it("is found under the cancelled filter with the declined ones", () => {
-    expect(STATUS_FILTERS.find(([value]) => value === "CANCELLED")?.[1]).toBe("Declined or not sent");
+  it("is found under its own Not sent option, apart from the declined ones", () => {
+    expect(STATUS_FILTERS.find(([value]) => value === "NOT_SENT")?.[1]).toBe(stageLabel(notSent));
+    expect(STATUS_FILTERS.find(([value]) => value === "DECLINED")?.[1]).toBe("Declined");
   });
 });
 
@@ -174,5 +175,25 @@ describe("waitingNote", () => {
   it("says nothing of a send sent back, which has its own note", () => {
     const back = { ...request, approval_state: "PENDING", approval_returned: true };
     expect(waitingNote(back, [], adeyemi)).toBeNull();
+  });
+});
+
+/**
+ * Mrs Adeyemi at Lekki filters the register by stage. Each option is a stage
+ * the server takes and reads as the pill its rows wear: Sent and Arrived
+ * apart, Requested apart from Sent back. No option sends a stored status.
+ */
+describe("the register's stage filter", () => {
+  it("offers each stage the server reads, worded as its rows' pills", () => {
+    expect(STATUS_FILTERS.map(([value]) => value)).toEqual([
+      "", "REQUESTED", "PENDING_APPROVAL", "SENT_BACK", "SENT", "RECEIVED", "DECLINED", "NOT_SENT", "VOIDED",
+    ]);
+    const word = (value: string) => STATUS_FILTERS.find(([v]) => v === value)?.[1];
+    for (const stage of ["REQUESTED", "PENDING_APPROVAL", "RECEIVED", "DECLINED", "NOT_SENT", "VOIDED"] as const) {
+      expect(word(stage)).toBe(stageLabel(t({ stage })));
+    }
+    expect(word("RECEIVED")).toBe("Arrived");
+    expect(word("SENT_BACK")).toBe("Sent back");
+    expect(STATUS_FILTERS.some(([, label]) => label.includes("sent back"))).toBe(false);
   });
 });

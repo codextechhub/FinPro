@@ -14,7 +14,7 @@ import { sameId } from "../../components/workflow/workflow-format";
 import { useServesPath } from "../../lib/host-routes";
 import { approvalWorkflowLink } from "./approval-workflow-link";
 import {
-  SENT_BACK_FILTER, SENT_BACK_WORD, WITH_APPROVERS_NOTE, exportStatus, sentBackPill, statusFilterArgs,
+  SENT_BACK_FILTER, SENT_BACK_WORD, WITH_APPROVERS_NOTE, sentBackPill, statusFilterArgs,
 } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 import {
@@ -194,7 +194,7 @@ export default function RequisitionsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <QuickExportButton
               screen="procurement.requisitions"
-              params={{ status: exportStatus(status), search: debouncedSearch }}
+              params={{ ...statusFilterArgs(status), search: debouncedSearch }}
               entity={entity}
               typeface="geist"
               defaultName="Purchase requisitions"

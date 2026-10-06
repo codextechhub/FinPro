@@ -169,19 +169,18 @@ export type ApprovalListFilter = "returned";
 /**
  * A list's query arguments for its status filter's `value`: nothing for "all",
  * `{ approval: "returned" }` for Sent back, else `{ [key]: value }` (most lists
- * filter on `status`; vendor bills on `display_status`).
+ * filter on `status`; vendor bills and expense claims on `display_status`).
+ *
+ * The quick export behind a list takes the same arguments, because the server
+ * reads the list's own query parameters into the file: a list filtered to
+ * Sent back exports what was sent back, and a status word exports the rows
+ * wearing that word and none sent back, as the list shows them.
  */
 export function statusFilterArgs(value: string | null | undefined, key = "status"): Record<string, string> {
   if (!value) return {};
   if (value === SENT_BACK_FILTER) return { approval: "returned" };
   return { [key]: value };
 }
-
-/**
- * The status an export is asked for. Exports filter on status alone, so the
- * Sent back option exports the list unfiltered by status.
- */
-export const exportStatus = (value: string | null | undefined): string => (value === SENT_BACK_FILTER ? "" : value ?? "");
 
 /**
  * Whether a document is back with whoever sent it. A finance document is read

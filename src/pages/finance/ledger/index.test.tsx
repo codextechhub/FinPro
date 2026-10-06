@@ -8,6 +8,8 @@
  *      outline and its "No longer on the staff" title.
  *   3. A link from another screen (`?document=501`, an inter-branch transfer's
  *      journal) opens that journal.
+ *   4. The export asks for what the list asks for: the Sent back tab exports
+ *      the journals sent back (approval=returned), and Drafts the drafts.
  */
 
 import { act } from "react";
@@ -15,7 +17,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ journals: vi.fn(), summary: vi.fn(), rows: [] as unknown[], opened: [] as (number | null)[] }));
+const mocks = vi.hoisted(() => ({ journals: vi.fn(), summary: vi.fn(), exported: vi.fn(), rows: [] as unknown[], opened: [] as (number | null)[] }));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
@@ -37,7 +39,7 @@ vi.mock("@/components/finance-ui/archived-years", async (importOriginal) => ({
 }));
 vi.mock("../../../host", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  QuickExportButton: () => null,
+  QuickExportButton: (props: { params?: Record<string, unknown> }) => { mocks.exported(props.params); return null; },
   UserAvatar: ({ name, className }: { name?: string; className?: string }) => <span data-avatar={name} className={className} />,
 }));
 vi.mock("@/redux/services/finance/gl-api", () => ({
@@ -115,5 +117,21 @@ describe("a link to one journal", () => {
     mocks.opened = [];
     mount("/finance/ledger?document=501");
     expect(mocks.opened.at(-1)).toBe(501);
+  });
+});
+
+describe("the journal export", () => {
+  const tab = (label: string) => [...container.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith(label))!;
+
+  it("exports what was sent back from the Sent back tab, and the drafts from Drafts", () => {
+    mount();
+    act(() => tab("Sent back").click());
+    expect(mocks.journals.mock.lastCall?.[0]).toMatchObject({ approval: "returned" });
+    expect(mocks.exported.mock.lastCall?.[0]).toMatchObject({ approval: "returned" });
+    expect(mocks.exported.mock.lastCall?.[0]).not.toHaveProperty("status");
+
+    act(() => tab("Drafts").click());
+    expect(mocks.exported.mock.lastCall?.[0]).toMatchObject({ status: "DRAFT" });
+    expect(mocks.exported.mock.lastCall?.[0]).not.toHaveProperty("approval");
   });
 });

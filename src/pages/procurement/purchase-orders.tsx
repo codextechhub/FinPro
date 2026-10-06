@@ -47,7 +47,7 @@ import { useCancelPurchaseOrderMutation } from "@/redux/services/procurement/pay
 import { SOURCE_DOCUMENT_ID_PARAM } from "@/lib/source-document-route";
 import { PURCHASE_ORDER_TABS, purchaseOrderPill } from "./document-status";
 import { purchaseOrderChanges, purchaseOrderForm } from "./purchase-order-edit";
-import { WITH_APPROVERS_NOTE, exportStatus, statusFilterArgs } from "@/components/finance-ui/returned-correction";
+import { WITH_APPROVERS_NOTE, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 
 const STATUS_TABS = PURCHASE_ORDER_TABS;
@@ -146,7 +146,7 @@ export default function PurchaseOrdersPage() {
           <div className="flex flex-wrap items-center gap-2">
             <QuickExportButton
               screen="procurement.purchase_orders"
-              params={{ status: exportStatus(status), search: debouncedSearch }}
+              params={{ ...statusFilterArgs(status), search: debouncedSearch }}
               entity={entity}
               typeface="geist"
               defaultName="Purchase orders"

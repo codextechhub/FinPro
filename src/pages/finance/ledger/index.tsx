@@ -38,7 +38,7 @@ import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { useDates } from "../../../lib/display-prefs";
 import { presetRange } from "../../../utils/date-presets";
-import { SENT_BACK_FILTER, SENT_BACK_WORD, exportStatus, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
+import { SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
 const SOURCES: JournalSource[] = ["MANUAL", "SALES", "PURCHASE", "BANK", "PAYROLL", "CLOSING", "OPENING", "FX", "SYSTEM"];
@@ -80,8 +80,10 @@ export default function GeneralLedgerPage() {
     ...(search ? { search } : {}),
   }), [entity, source, range.from, range.to, search]);
 
+  // The list and its export ask for the same status, Sent back as approval=returned.
+  const statusArgs = statusFilterArgs(status) as Pick<JournalListParams, "status" | "approval">;
   const { data, isLoading, isFetching, isError, refetch } = useGetJournalsQuery(
-    { ...filters, page, ...(statusFilterArgs(status) as Pick<JournalListParams, "status" | "approval">), ...includeArchivedArg(showArchived) }, { skip: !entity },
+    { ...filters, page, ...statusArgs, ...includeArchivedArg(showArchived) }, { skip: !entity },
   );
   const summaryQ = useGetJournalSummaryQuery({ ...filters, ...includeArchivedArg(showArchived) }, { skip: !entity });
   const summary = summaryQ.data?.data;
@@ -144,7 +146,7 @@ export default function GeneralLedgerPage() {
                 is on screen. That is the dataset a trial balance needs. */}
             <QuickExportButton
               screen="finance.gl_postings"
-              params={{ status: exportStatus(status), source, date_from: range.from, date_to: range.to, search }}
+              params={{ ...statusArgs, source, date_from: range.from, date_to: range.to, search }}
               entity={entity}
               typeface="geist"
               defaultName="General ledger postings"

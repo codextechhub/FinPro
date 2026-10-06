@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => {
     doc: null as unknown,
     rows: [] as unknown[],
     listArgs: undefined as unknown,
+    exported: undefined as unknown,
     workflow: undefined as unknown,
     update: (() => undefined) as (body: unknown) => void,
     resume: (() => undefined) as (id: unknown) => void,
@@ -70,7 +71,10 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 }));
 vi.mock("./procurement-shell", () => ({ ProcurementShell: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/components/layout/page-shell", () => ({ PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
-vi.mock("../../host", async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), QuickExportButton: () => null }));
+vi.mock("../../host", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  QuickExportButton: (props: { params?: unknown }) => { mocks.state.exported = props.params; return null; },
+}));
 vi.mock("@/lib/source-document-route", async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), useSourceDocumentParam: () => undefined }));
 vi.mock("@/hooks/use-action-param", () => ({ useActionParam: () => undefined }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverPrompt: () => ({ promptIfParked: () => undefined, noApproverDialog: null }) }));
@@ -197,5 +201,16 @@ describe("the requisitions Sent back tab", () => {
     const tab = [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Sent back")!;
     act(() => tab.click());
     expect(mocks.state.listArgs).toEqual({ entity: "BSS", page: 1, approval: "returned" });
+  });
+
+  it("exports what the tab lists: Sent back as approval=returned, Pending Approval as its status", () => {
+    mocks.state.held = new Set([P.PROC_VIEW_REQUISITIONS]);
+    mocks.state.rows = [];
+    act(() => root.render(<MemoryRouter><RequisitionsPage /></MemoryRouter>));
+    const tab = (label: string) => [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === label)!;
+    act(() => tab("Sent back").click());
+    expect(mocks.state.exported).toEqual({ approval: "returned", search: "" });
+    act(() => tab("Pending Approval").click());
+    expect(mocks.state.exported).toEqual({ status: "PENDING_APPROVAL", search: "" });
   });
 });

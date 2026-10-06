@@ -14,7 +14,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ invoices: vi.fn(), summary: vi.fn(), rows: [] as unknown[] }));
+const mocks = vi.hoisted(() => ({ invoices: vi.fn(), summary: vi.fn(), exported: vi.fn(), rows: [] as unknown[] }));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
@@ -28,7 +28,7 @@ vi.mock("@/components/finance-ui/archived-years", async (importOriginal) => ({
 }));
 vi.mock("../../../host", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  QuickExportButton: () => null,
+  QuickExportButton: (props: { params?: unknown }) => { mocks.exported(props.params); return null; },
 }));
 vi.mock("@/redux/services/finance/ar-api", () => ({
   useGetInvoicesQuery: (args: unknown) => {
@@ -107,5 +107,15 @@ describe("the invoice states", () => {
     expect(container.textContent).not.toContain("Partially Paid");
     expect(container.textContent).not.toContain("PENDING_APPROVAL");
     expect(container.textContent).not.toContain("REVERSED");
+  });
+});
+
+describe("the invoice export", () => {
+  it("asks for the tab the list shows, as bucket", () => {
+    mount("/finance/receivables/invoices");
+    const tab = [...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith("Overdue"))!;
+    act(() => tab.click());
+    expect(mocks.invoices.mock.lastCall?.[0]).toMatchObject({ bucket: "overdue" });
+    expect(mocks.exported.mock.lastCall?.[0]).toMatchObject({ bucket: "overdue" });
   });
 });

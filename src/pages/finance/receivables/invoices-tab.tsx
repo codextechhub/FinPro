@@ -178,7 +178,7 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <ShowArchivedToggle entity={entity} />
-          {/* Screen params, not export filter ids: the backend binding is what knows `bucket=overdue` is a due-date window. */}
+          {/* The list's own params: the server reads each tab by the list's rules, so the file holds the invoices the tab shows. */}
           <QuickExportButton
             screen="finance.invoices"
             params={{ bucket, search }}

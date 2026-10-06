@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/redux/services/finance/interbranch-api", () => ({}));
 
 import type { HeldReceipt } from "@/redux/services/finance/interbranch-types";
-import { forwardNote, heldActions, heldStage, lookupNote } from "./held-receipts-tab";
+import { HELD_FILTERS, forwardNote, heldActions, heldStage, lookupNote } from "./held-receipts-tab";
 
 const HELD: HeldReceipt = {
   id: 4, document_number: "HR-0004", status: "POSTED", branch_id: 1, branch_name: "Ikeja",
@@ -82,5 +82,32 @@ describe("a held receipt whose forward was sent back", () => {
   it("says a forward with its approver is withdrawn, and only a posted one is voided", () => {
     expect(forwardNote({ forwarded_by: { id: 70, document_number: "IBT-0070", status: "PENDING_APPROVAL" } })).toContain("with the approver");
     expect(forwardNote({ forwarded_by: { id: 70, document_number: "IBT-0070", status: "POSTED" } })).toContain("void that transfer first");
+  });
+});
+
+describe("the held receipts filter", () => {
+  const forward = (status: string) => ({ ...HELD, forwarded_by: { id: 70, document_number: "IBT-0070", status } });
+
+  it("offers each status the list takes, worded as its rows' pills", () => {
+    expect(HELD_FILTERS.map(([value]) => value)).toEqual(["HELD", "FORWARDING", "FORWARDED", "VOIDED"]);
+    const word = (value: string) => HELD_FILTERS.find(([v]) => v === value)?.[1];
+    expect(word("HELD")).toBe(heldStage(HELD).label);
+    expect(word("FORWARDED")).toBe(heldStage(forward("POSTED")).label);
+    expect(word("VOIDED")).toBe(heldStage({ ...HELD, status: "REVERSED" }).label);
+  });
+
+  it("says Forwarding also lists a receipt whose forward was sent back, as its row says Sent back", () => {
+    expect(HELD_FILTERS.find(([v]) => v === "FORWARDING")?.[1]).toBe("Forwarding or sent back");
+    expect(heldStage(forward("PENDING_APPROVAL")).label).toBe("Forwarding");
+    expect(heldStage(forward("DRAFT")).label).toBe("Sent back");
+  });
+});
+
+describe("a held receipt whose forward is approved and not yet sent", () => {
+  it("says the transfer is sent and voided first, as the server does, not that it is with the approver", () => {
+    const note = forwardNote({ forwarded_by: { id: 70, document_number: "IBT-0070", status: "APPROVED" } }) ?? "";
+    expect(note).toContain("approved and not yet sent");
+    expect(note).toContain("only once that transfer is sent and voided");
+    expect(note).not.toContain("with the approver");
   });
 });

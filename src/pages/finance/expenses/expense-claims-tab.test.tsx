@@ -29,7 +29,8 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useDeleteExpenseReceiptMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
-import { ReceiptCell } from "./expense-claims-tab";
+import type { ExpenseClaim } from "@/redux/services/finance/ops-types";
+import { CLAIM_STATUS_OPTIONS, ReceiptCell, claimDisplay, claimListArgs } from "./expense-claims-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -84,5 +85,38 @@ describe("expense claim receipt", () => {
     });
 
     expect(container.querySelector('[role="dialog"]')?.textContent).toBe("taxi-receipt.pdf");
+  });
+});
+
+/**
+ * Mrs Okafor's taxi claim at Bright Star is posted and half reimbursed. Its
+ * pill reads Part-paid, and the filter offers Part-paid, which lists it and
+ * exports it; Approved lists only the claims posted with nothing reimbursed.
+ */
+describe("the claims filter", () => {
+  const claim = (over: Partial<ExpenseClaim>) => ({ status: "POSTED", payment_status: "UNPAID", approval_state: "APPROVED", ...over }) as ExpenseClaim;
+  const worn: Record<string, ExpenseClaim> = {
+    DRAFT: claim({ status: "DRAFT", approval_state: "NOT_SUBMITTED" }),
+    PENDING: claim({ status: "PENDING_APPROVAL", approval_state: "PENDING" }),
+    APPROVED: claim({}),
+    PART_PAID: claim({ payment_status: "PARTIAL" }),
+    PAID: claim({ payment_status: "PAID" }),
+    REJECTED: claim({ status: "CANCELLED" }),
+  };
+
+  it("offers each word a claim's pill wears, Part-paid included, and Sent back", () => {
+    const words = CLAIM_STATUS_OPTIONS.filter((o) => o.value !== "SENT_BACK");
+    expect(words.map((o) => o.value)).toEqual(Object.keys(worn));
+    for (const option of words) {
+      expect(claimDisplay(worn[option.value])).toMatchObject({ key: option.value, label: option.label });
+    }
+    expect(CLAIM_STATUS_OPTIONS.find((o) => o.value === "PART_PAID")?.label).toBe("Part-paid");
+    expect(CLAIM_STATUS_OPTIONS.at(-1)).toEqual({ value: "SENT_BACK", label: "Sent back" });
+  });
+
+  it("asks the list, and its export, for the word as display_status and for Sent back as approval=returned", () => {
+    expect(claimListArgs("PART_PAID", "")).toEqual({ display_status: "PART_PAID" });
+    expect(claimListArgs("SENT_BACK", "taxi")).toEqual({ q: "taxi", approval: "returned" });
+    expect(claimListArgs("", "")).toEqual({});
   });
 });

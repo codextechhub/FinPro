@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  approvalPillWord, exportStatus, financeReturnedFacts, isSentBack, latestReturn, sentBackPill, statusFilterArgs, returnedHint, returnedStanding, sentBackLine, type ReturnedRequest,
+  approvalPillWord, financeReturnedFacts, isSentBack, latestReturn, sentBackPill, statusFilterArgs, returnedHint, returnedStanding, sentBackLine, type ReturnedRequest,
 } from "./returned-correction";
 
 const REQUEST: ReturnedRequest = {
@@ -113,8 +113,8 @@ describe("the Sent back filter", () => {
     expect(statusFilterArgs("")).toEqual({});
   });
 
-  it("exports unfiltered by status when Sent back is chosen", () => {
-    expect(exportStatus("SENT_BACK")).toBe("");
-    expect(exportStatus("POSTED")).toBe("POSTED");
+  it("never sends Sent back as a status word, which a list refuses", () => {
+    expect(statusFilterArgs("SENT_BACK", "display_status")).toEqual({ approval: "returned" });
+    expect(Object.values(statusFilterArgs("SENT_BACK"))).not.toContain("SENT_BACK");
   });
 });

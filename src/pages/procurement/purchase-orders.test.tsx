@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => {
     held: new Set<string>(),
     uid: 4,
     doc: null as unknown,
+    exported: undefined as unknown,
     workflow: undefined as unknown,
     update: (() => undefined) as (body: unknown) => void,
     resume: (() => undefined) as (id: unknown) => void,
@@ -63,12 +64,19 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRaisingBranchChoice: () => ({ ready: true, body: () => ({}) }),
   RaisingBranchChoiceField: () => null,
+  useActiveEntity: () => ({ code: "BSS", currency: "NGN", entity: null, isLoading: false }),
   useReaderBranchLens: () => ({ applies: false }),
   PostingDateField: () => null,
   BankAccountPicker: () => null,
   TaxCodePicker: () => null,
 }));
 vi.mock("@/redux/services/finance/setup-api", () => mocks.api({}));
+vi.mock("./procurement-shell", () => ({ ProcurementShell: ({ children }: { children: React.ReactNode }) => children }));
+vi.mock("@/components/layout/page-shell", () => ({ PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
+vi.mock("../../host", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  QuickExportButton: (props: { params?: unknown }) => { mocks.state.exported = props.params; return null; },
+}));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverPrompt: () => ({ promptIfParked: () => undefined, noApproverDialog: null }) }));
 vi.mock("sonner", () => ({ toast: { success: () => undefined, error: () => undefined } }));
 vi.mock("./pickers", () => ({ VendorPicker: () => null, ContractPicker: () => null, RequisitionPicker: () => null }));
@@ -83,7 +91,7 @@ vi.mock("@/redux/services/dashboard/workflow-api", () => mocks.api({
 }));
 
 import { P } from "../../permissions";
-import { PurchaseOrderDrawer } from "./purchase-orders";
+import PurchaseOrdersPage, { PurchaseOrderDrawer } from "./purchase-orders";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -163,5 +171,18 @@ describe("a purchase order with its approver", () => {
     expect(document.body.textContent).toContain("With the approver.");
     expect(button("Edit")).toBeUndefined();
     expect(button("Resume")).toBeUndefined();
+  });
+});
+
+/** The order list's export asks for what the tab lists, Sent back as approval=returned. */
+describe("the purchase order export", () => {
+  it("sends the tab's status, and Sent back as approval=returned", () => {
+    mocks.state.held = new Set([P.PROC_VIEW_PURCHASE_ORDERS]);
+    act(() => root.render(<MemoryRouter><PurchaseOrdersPage /></MemoryRouter>));
+    const tab = (label: string) => [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === label)!;
+    act(() => tab("Pending Approval").click());
+    expect(mocks.state.exported).toEqual({ status: "PENDING_APPROVAL", search: "" });
+    act(() => tab("Sent back").click());
+    expect(mocks.state.exported).toEqual({ approval: "returned", search: "" });
   });
 });

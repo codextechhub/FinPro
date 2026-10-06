@@ -233,17 +233,21 @@ export const KIND_LABELS: Record<InterBranchKind, string> = {
 };
 
 /**
- * The register's stage filter, as the list endpoint's `status` values, and
- * Sent back, which asks the list for `?approval=returned`. A send an approver
- * sent back is a DRAFT, so the filter that lists requests lists it too, under
- * the word its row wears as well.
+ * The register's stage filter: each stage the list endpoint's `status` takes,
+ * worded as its rows' pills ({@link stageLabel}), and Sent back, which asks
+ * the list for `?approval=returned`. No stage lists a send an approver sent
+ * back; it wears Sent back and only that option lists it. Sent lists money
+ * not yet confirmed arrived and, for a kind that moves no money, what is
+ * booked; Arrived lists money confirmed.
  */
 export const STATUS_FILTERS: readonly (readonly [string, string])[] = [
   ["", "Any stage"],
-  ["DRAFT", "Requested or sent back"],
+  ["REQUESTED", STAGE_WORDS.REQUESTED],
+  ["PENDING_APPROVAL", STAGE_WORDS.PENDING_APPROVAL],
   [SENT_BACK_FILTER, SENT_BACK_WORD],
-  ["PENDING_APPROVAL", "Waiting for approval"],
-  ["POSTED", "Sent or booked"],
-  ["CANCELLED", "Declined or not sent"],
-  ["REVERSED", "Voided"],
+  ["SENT", "Sent or booked"],
+  ["RECEIVED", STAGE_WORDS.RECEIVED],
+  ["DECLINED", STAGE_WORDS.DECLINED],
+  ["NOT_SENT", STAGE_WORDS.NOT_SENT],
+  ["VOIDED", STAGE_WORDS.VOIDED],
 ];
