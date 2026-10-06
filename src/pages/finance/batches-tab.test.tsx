@@ -1,7 +1,7 @@
 /**
  * The bursar sends back Mrs Bello's October salaries batch to correct an
  * account number. Its row reads "Sent back", not "Draft"; a batch still with
- * its approver, or never sent, keeps "Draft".
+ * its approver reads "Awaiting approval", and one never sent "Draft".
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -26,6 +26,11 @@ describe("BatchStatusPill", () => {
   it("reads Sent back on a batch an approver sent back", () => {
     act(() => root.render(<BatchStatusPill batch={batch({ approval_state: "PENDING", approval_returned: true })} />));
     expect(container.textContent).toBe("Sent back");
+  });
+
+  it("reads Awaiting approval on one still with its approver, not Draft", () => {
+    act(() => root.render(<BatchStatusPill batch={batch({ display_status: "PENDING_APPROVAL", approval_state: "PENDING", approval_returned: false })} />));
+    expect(container.textContent).toBe("Awaiting approval");
   });
 
   it("keeps Draft on one never sent", () => {

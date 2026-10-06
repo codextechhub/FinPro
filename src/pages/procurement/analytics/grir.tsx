@@ -52,7 +52,7 @@ export default function GrirScreen({ entity, currency }: SectionProps) {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <SectionHeader title="GR/IR & Control" subtitle="Goods-received vs invoice-received reconciliation." />
+      <SectionHeader title="GR/IR & Control (goods received, not yet billed)" subtitle="Goods received but not yet billed, checked against the clearing account." />
 
       {isForbidden(error) ? (
         <div className={cn(INFORMATION_CARD_SURFACE, "rounded-md")}><ForbiddenState /></div>
@@ -149,7 +149,7 @@ function GrirLinesTable({ entity, currency, onSelect }: {
       ) : isError ? (
         <ErrorState onRetry={refetch} />
       ) : rows.length === 0 ? (
-        <EmptyState title="GR/IR is clear" message="Every received good is invoiced - nothing is open on any PO line." />
+        <EmptyState title="Nothing is waiting for a bill" message="Every good received is billed - nothing is open on any order line." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] border-collapse">

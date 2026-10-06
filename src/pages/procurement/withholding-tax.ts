@@ -55,7 +55,7 @@ export function computedWht({ gross, rateBps, bills = [] }: {
 
 /** How a payment's WHT figure was arrived at, in the words the detail shows. */
 export function whtSourceLabel(source: string | null | undefined): string | null {
-  if (source === "COMPUTED") return "Worked out from the WHT code";
+  if (source === "COMPUTED") return "Worked out from the withholding tax code";
   if (source === "ENTERED") return "Entered by hand";
   return null;
 }

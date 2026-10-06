@@ -272,7 +272,7 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
           )}
 
           {tab === "gl" && (
-            d.gl_journals.length === 0 ? <EmptyState title="No GL postings" message="The AR journal posts when the invoice is posted." /> : (
+            d.gl_journals.length === 0 ? <EmptyState title="No GL postings" message="The journal posts when the invoice is posted." /> : (
               <div className="space-y-3">
                 {d.gl_journals.map((j, i) => (
                   <div key={i} className="overflow-hidden rounded-md border border-white-02">

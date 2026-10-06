@@ -38,25 +38,27 @@ import type { Vendor } from "@/redux/services/procurement/procurement-types";
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
 import { useDates } from "../../lib/display-prefs";
 import { showBlobPreview } from "../../components/finance-ui/file-preview-dialog";
-import { RETURNED_HINT, SENT_BACK_WORD, isSentBack } from "@/components/finance-ui/returned-correction";
+import { RETURNED_HINT, SENT_BACK_STATUS, SENT_BACK_WORD, statusFilterArgs } from "@/components/finance-ui/returned-correction";
+import { PAYOUT_BATCH_FILTERS, PAYOUT_BATCH_WORDS, payoutBatchStatus, payoutBatchWord } from "./payout-batch-words";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 /** Field Access resource for a payout instruction, which is what a batch line becomes. */
 const PAYOUT = "payments.payout";
 
-const BATCH_STATUS: Record<string, { label: string; cls: string }> = {
-  DRAFT: { label: "Draft", cls: "bg-gray-02/70 text-gray-01" },
-  PROCESSING: { label: "Processing", cls: "bg-amber-50 text-amber-700" },
-  COMPLETED: { label: "Completed", cls: "bg-green-01/10 text-green-01" },
-  PARTIALLY_COMPLETED: { label: "Partial", cls: "bg-amber-50 text-amber-700" },
-  FAILED: { label: "Failed", cls: "bg-destructive/10 text-destructive" },
+const BATCH_TONE: Record<string, string> = {
+  DRAFT: "bg-gray-02/70 text-gray-01",
+  PENDING_APPROVAL: "bg-amber-50 text-amber-700",
+  [SENT_BACK_STATUS]: "bg-orange-500/10 text-yellow-01-text",
+  PROCESSING: "bg-amber-50 text-amber-700",
+  COMPLETED: "bg-green-01/10 text-green-01",
+  PARTIALLY_COMPLETED: "bg-amber-50 text-amber-700",
+  FAILED: "bg-destructive/10 text-destructive",
 };
-/** A batch's status, or "Sent back" while an approver has handed it back to whoever sent it. */
+/** A batch's word ({@link payoutBatchWord}): Awaiting approval while with its approvers, Sent back once returned. */
 export function BatchStatusPill({ batch }: { batch: PayoutBatchSummary }) {
-  if (isSentBack(batch, true)) return <span className={cn(PILL, "bg-orange-500/10 text-yellow-01-text")}>{SENT_BACK_WORD}</span>;
-  const s = BATCH_STATUS[batch.status] ?? { label: batch.status, cls: "bg-gray-02 text-gray-01" };
-  return <span className={cn(PILL, s.cls)}>{s.label}</span>;
+  const cls = BATCH_TONE[payoutBatchStatus(batch)] ?? "bg-gray-02 text-gray-01";
+  return <span className={cn(PILL, cls)}>{payoutBatchWord(batch)}</span>;
 }
 
 const ITEM_GROUP: Record<string, { label: string; cls: string }> = {
@@ -94,7 +96,8 @@ export function BatchesTab({ entity, currency }: { entity: string; currency?: st
   ));
   const [building, setBuilding] = useState(false);
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching, isError, refetch } = useGetPayoutBatchesQuery({ entity, page });
+  const [status, setStatus] = useState("");
+  const { data, isLoading, isFetching, isError, refetch } = useGetPayoutBatchesQuery({ entity, page, ...statusFilterArgs(status) });
   const { data: summaryRes } = useGetPayoutBatchesSummaryQuery({ entity });
   const rows = useMemo(() => toArray<PayoutBatchSummary>(data?.data), [data]);
   const pg = data?.pagination;
@@ -112,24 +115,32 @@ export function BatchesTab({ entity, currency }: { entity: string; currency?: st
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="Batches" value={String(s?.total ?? 0)} foot="Total" />
         <KpiCard label="Queued value" value={formatMoney(s?.queued.kobo ?? 0, currency)} foot="Draft + processing" />
         <KpiCard label="Completed (7d)" value={String(s?.completed7d ?? 0)} foot="Fully settled" />
-        <KpiCard label="Drafts" value={String(s?.drafts ?? 0)} tone={(s?.drafts ?? 0) > 0 ? "warn" : "default"} foot="Awaiting submit" />
+        <KpiCard label="Drafts" value={String(s?.drafts ?? 0)} tone={(s?.drafts ?? 0) > 0 ? "warn" : "default"} foot="Not yet sent for approval" />
+        <KpiCard label={PAYOUT_BATCH_WORDS.PENDING_APPROVAL} value={String(s?.pending_approval ?? 0)} foot="With the approver" />
+        <KpiCard label={SENT_BACK_WORD} value={String(s?.sent_back ?? 0)} tone={(s?.sent_back ?? 0) > 0 ? "warn" : "default"} foot="Back with whoever sent them" />
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Select value={status} onChange={(v) => { setStatus(v); setPage(1); }} className="h-9">
+          <option value="">All statuses</option>
+          {PAYOUT_BATCH_FILTERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </Select>
+        <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" disabled title="CSV import is coming soon" className="gap-1.5"><Upload className="size-4" /> Upload CSV</Button>
         <Can permission={P.PAY_CREATE_PAYOUT}>
           <Button onClick={() => setBuilding(true)} className="gap-1.5"><Plus className="size-4" /> Build batch</Button>
         </Can>
+        </div>
       </div>
 
       <DataTable columns={columns} rows={rows} rowKey={(b) => b.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(b) => setSelectedId(b.id)}
         page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
-        emptyTitle="No payout batches" emptyMessage="Build a batch to disburse to many vendors at once." />
+        emptyTitle={status ? "No batches match" : "No payout batches"} emptyMessage={status ? "No batch reads this status." : "Build a batch to disburse to many vendors at once."} />
 
       <BatchDetailDrawer batchId={selectedId} entity={entity} currency={currency} onClose={() => setSelectedId(null)} />
       <BuildBatchDrawer open={building} onClose={() => setBuilding(false)} entity={entity} currency={currency} />
@@ -203,7 +214,7 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
   const dr: RecapRow[] = [{ code: "", name: "Accounts payable (vendor)", amount: gross }];
   const cr: RecapRow[] = [
     { code: sourceAccount, name: "Bank / cash", amount: net },
-    ...(wht > 0 ? [{ code: "", name: "WHT payable", amount: wht }] : []),
+    ...(wht > 0 ? [{ code: "", name: "WHT payable (withholding tax)", amount: wht }] : []),
   ];
 
   return (
@@ -219,7 +230,7 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
         <div className="grid grid-cols-3 gap-3">
           <Metric label="Items" value={String(validItems.length)} />
           <Metric label="Batch total" value={formatMoney(gross, currency)} />
-          <Metric label="WHT withheld" value={formatMoney(wht, currency)} />
+          <Metric label="Withholding tax kept back" value={formatMoney(wht, currency)} />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -248,14 +259,14 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
                       <VendorPicker entity={entity} value={l.vendor} onChange={(code) => setLine(l.id, { vendor: code })} label="Vendor" own />
                     </div>
                     <div><p className="mb-1 font-mont text-[11px] text-gray-05">Amount</p><MoneyInput valueKobo={l.amount} onChangeKobo={(k) => setLine(l.id, { amount: k })} currency={currency} className="[&_input]:h-9" /></div>
-                    <div><p className="mb-1 font-mont text-[11px] text-gray-05">WHT</p><MoneyInput valueKobo={lineWht(l)} onChangeKobo={(k) => setLine(l.id, { wht: k })} currency={currency} className="[&_input]:h-9" /></div>
+                    <div><p className="mb-1 font-mont text-[11px] text-gray-05">Withholding tax</p><MoneyInput valueKobo={lineWht(l)} onChangeKobo={(k) => setLine(l.id, { wht: k })} currency={currency} className="[&_input]:h-9" /></div>
                     <Button variant="ghost" size="icon" onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.id !== l.id) : ls))} className="size-9 text-gray-05 hover:text-destructive"><X className="size-4" /></Button>
                   </div>
                   <div className="mt-1.5 flex items-center justify-between font-mont text-[11px]">
                     <span className="text-gray-05">
                       {v ? `Paid to ${v.name}'s bank account on file` : "Pick a vendor to disburse to"}
                     </span>
-                    {l.amount > 0 ? <span className="tabular-nums text-gray-05">{l.wht === null ? "WHT from the vendor's code · " : <>WHT entered · <button type="button" className="text-primary hover:underline" onClick={() => setLine(l.id, { wht: null })}>work it out</button> · </>}Net {formatMoney(lineNet, currency)}</span> : null}
+                    {l.amount > 0 ? <span className="tabular-nums text-gray-05">{l.wht === null ? "Withholding tax from the vendor's tax code · " : <>Withholding tax entered · <button type="button" className="text-primary hover:underline" onClick={() => setLine(l.id, { wht: null })}>work it out</button> · </>}Net {formatMoney(lineNet, currency)}</span> : null}
                   </div>
                 </div>
               );
@@ -266,7 +277,7 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
         <div>
           <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">On batch settlement</p>
           <PostingRecap title="Will post as each item confirms" dr={dr} cr={cr} currency={currency}
-            helper="Each settled item clears its payable; WHT withheld credits the WHT liability." />
+            helper="Each settled item clears what is owed to its vendor; the withholding tax kept back is owed to the tax office." />
         </div>
       </div>
     </DetailDrawer>
@@ -294,7 +305,6 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
   // `approval_required` (when the serializer exposes it) picks the right action; while it's
   // undefined we offer both - direct submit 400s if gated, approval errors if no template.
   const awaitingApproval = batch?.approval_status === "PENDING" || batch?.approval_state === "PENDING";
-  const sentBack = standing === "sender" || standing === "returned";
   const gated = batch?.approval_required;
   const canSubmit = batch ? ((batch.status === "DRAFT" || hasPending) && !awaitingApproval) : false;
 
@@ -323,7 +333,7 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
       ),
     }] : []),
     { header: "Amount", align: "right", cell: (p) => <Money kobo={p.amount} currency={currency} align="right" /> },
-    { header: "WHT", align: "right", cell: (p) => <span className="tabular-nums text-gray-05">{p.wht_amount ? formatMoney(p.wht_amount, currency) : "-"}</span> },
+    { header: "Withholding tax", align: "right", cell: (p) => <span className="tabular-nums text-gray-05">{p.wht_amount ? formatMoney(p.wht_amount, currency) : "-"}</span> },
     { header: "Net", align: "right", cell: (p) => <span className="tabular-nums">{formatMoney(p.amount - (p.wht_amount || 0), currency)}</span> },
     { header: "Result", cell: (p) => <ItemStatusPill status={p.status} /> },
   ];
@@ -334,7 +344,7 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
       footer={<>
         <span className="font-mont text-xs text-gray-05">{settled} settled · {failed} failed · {items.length} items</span>
         <div className="flex-1" />
-        {sentBack && batch ? <BatchStatusPill batch={batch} /> : awaitingApproval ? <span className={cn(PILL, "bg-amber-50 text-amber-700")}>Awaiting approval</span> : null}
+        {batch ? <BatchStatusPill batch={batch} /> : null}
         {standing === "sender" ? <ResumeButton workflowId={workflowId} tags={["PaymentsPayoutBatches"]} /> : null}
         <Button variant="outline" disabled={!items.length} onClick={() => batch && exportBankFile(batch.reference, items, access, currency)} className="gap-1.5"><Eye className="size-4" /> View bank file</Button>
         {canSubmit && gated !== false ? (
@@ -353,7 +363,7 @@ function BatchDetailDrawer({ batchId, entity, currency, onClose }: { batchId: nu
         <div className="grid grid-cols-3 gap-3">
           <Metric label="Items" value={String(batch?.item_count ?? items.length)} />
           <Metric label="Batch total" value={formatMoney(batch?.total_amount ?? 0, currency)} />
-          <Metric label="WHT withheld" value={formatMoney(whtTotal, currency)} />
+          <Metric label="Withholding tax kept back" value={formatMoney(whtTotal, currency)} />
         </div>
 
         <DataTable columns={itemCols} rows={items} rowKey={(p) => p.id} loading={isFetching && !items.length}
@@ -370,7 +380,7 @@ function exportBankFile(reference: string, items: PayoutInstruction[], access: F
     ["beneficiary_name", "Beneficiary"], ["beneficiary_bank_code", "Bank code"], ["beneficiary_account_number", "Account"],
   ];
   const beneficiary = columns.filter(([name]) => !access.isHidden(name));
-  const head = [...beneficiary.map(([, header]) => header), "Amount", "WHT", "Net", "Status"];
+  const head = [...beneficiary.map(([, header]) => header), "Amount", "Withholding tax", "Net", "Status"];
   const esc = (v: string | number | undefined) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const body = items.map((p) => [
     ...beneficiary.map(([name]) => String(p[name] ?? "")),

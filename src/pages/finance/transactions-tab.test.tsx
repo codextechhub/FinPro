@@ -111,14 +111,14 @@ describe("A payout's WHT in the drawer", () => {
     act(() => root.render(<TransactionsTab entity="COD" />));
     act(() => row("PO-3").click());
     expect(document.body.textContent).toContain("Line amount");
-    expect(document.body.textContent).toContain("WHT withheld");
+    expect(document.body.textContent).toContain("Withholding tax kept back");
   });
 
   it("shows the amount alone where no WHT was withheld", () => {
     act(() => root.render(<TransactionsTab entity="COD" />));
     act(() => row("PO-2").click());
     expect(document.body.textContent).not.toContain("Line amount");
-    expect(document.body.textContent).not.toContain("WHT withheld");
+    expect(document.body.textContent).not.toContain("Withholding tax kept back");
   });
 });
 

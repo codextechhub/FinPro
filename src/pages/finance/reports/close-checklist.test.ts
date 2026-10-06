@@ -99,7 +99,7 @@ describe("check labels", () => {
 describe("the server's label and the close order under All branches", () => {
   it("reads the server's label before this screen's name for a check", () => {
     expect(checklistItemLabel({ name: "ap_reconciled", label: "Payables agree with the ledger" }, (v) => v)).toBe("Payables agree with the ledger");
-    expect(checklistItemLabel({ name: "ap_reconciled" }, (v) => v)).toBe("AP reconciled");
+    expect(checklistItemLabel({ name: "ap_reconciled" }, (v) => v)).toBe("AP reconciled (what is owed to suppliers)");
   });
 
   it("keeps Force close when the close order only warns, as it does while a branch can still close", () => {

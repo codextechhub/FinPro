@@ -299,7 +299,7 @@ function RecordInstallmentDrawer({ plan, installment, entity, currency, onClose 
     >
       <div className="space-y-4">
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
-          Posts a real receipt against invoice {plan.invoice_number} (Dr bank · Cr AR); the plan's progress updates automatically.
+          Records a receipt against invoice {plan.invoice_number}; the plan's progress updates automatically.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} /></FormField>

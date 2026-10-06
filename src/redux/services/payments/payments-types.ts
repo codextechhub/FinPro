@@ -142,6 +142,12 @@ export interface PayoutBatchSummary {
   approval_state?: string;
   /** True while an approver has handed it back to whoever sent it (a DRAFT still PENDING). */
   approval_returned?: boolean;
+  /**
+   * The word the batch list files it under: DRAFT, PENDING_APPROVAL, PROCESSING,
+   * COMPLETED, PARTIALLY_COMPLETED or FAILED. One sent back stays DRAFT with
+   * `approval_returned` true. Absent from an older server.
+   */
+  display_status?: string;
 }
 
 export interface PayoutBatch extends PayoutBatchSummary {
@@ -301,7 +307,12 @@ export interface PayoutBatchKpis {
   total: number;
   queued: Money;
   completed7d: number;
+  /** Batches nobody has sent for approval. */
   drafts: number;
+  /** Batches with their approvers; absent from an older server. */
+  pending_approval?: number;
+  /** Batches an approver sent back, which neither count above includes; absent from an older server. */
+  sent_back?: number;
 }
 
 // Unified money-movement feed row (collections in + payouts out). On a payout

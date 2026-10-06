@@ -260,7 +260,7 @@ function exceptionText(x: NonNullable<D["exceptions"]>[number]): { title: string
     case "vendor_on_hold":
       return { title: `${x.count === 1 ? "A bill" : plural(x.count, "bill")} from a vendor on hold`, detail: x.detail ?? "Payments are blocked", to: R.VENDOR_INVOICES };
     default:
-      return { title: `Goods received, no bill after ${x.days ?? 30} days`, detail: `${plural(x.count, "receipt")} sitting in GR/IR`, to: `${R.ANALYTICS}/grir` };
+      return { title: `Goods received, no bill after ${x.days ?? 30} days`, detail: `${plural(x.count, "receipt")} still waiting for a bill`, to: `${R.ANALYTICS}/grir` };
   }
 }
 
@@ -301,7 +301,7 @@ function BillsDueCard({ due, to, currency }: { due: NonNullable<D["bills_due"]>;
   const total = due.items.reduce((sum, b) => sum + b.amount.kobo, 0);
   const late = total - (due.items.find((b) => b.key === "current")?.amount.kobo ?? 0);
   return (
-    <Panel title="Bills falling due" subtitle={`${compactMoney(total, currency)} unpaid`} action={<LinkAction label="AP aging" to={to} />}
+    <Panel title="Bills falling due" subtitle={`${compactMoney(total, currency)} unpaid`} action={<LinkAction label="Unpaid bills by age" to={to} />}
       footer={total ? (late ? `${compactMoney(late, currency)} is past its due date` : "Nothing is late") : undefined}>
       {total === 0 ? <AllClear>No unpaid bills.</AllClear> : (
         <>

@@ -182,7 +182,7 @@ function FeeStructureDetailDrawer({ structure, entity, currency, onClose, onEdit
             {can(P.FIN_GENERATE_FEE_STRUCTURE) ? (
               <Button
                 onClick={() => setGenerating(true)} disabled={!isCustomer} className="gap-1.5"
-                title={isCustomer ? undefined : "Only customer structures generate AR invoices."}
+                title={isCustomer ? undefined : "Only customer structures generate invoices."}
               ><FileStack className="size-4" /> Generate invoices</Button>
             ) : null}
           </>

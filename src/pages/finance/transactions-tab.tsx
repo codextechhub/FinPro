@@ -209,7 +209,7 @@ function MovementDrawer({ move, currency, onClose }: { move: Movement | null; cu
           {move.wht_amount > 0 ? (
             <>
               <Field label="Line amount" mono>{formatMoney(move.gross_amount, currency)}</Field>
-              <Field label="WHT withheld" mono>{formatMoney(move.wht_amount, currency)}</Field>
+              <Field label="Withholding tax kept back" mono>{formatMoney(move.wht_amount, currency)}</Field>
             </>
           ) : null}
           <Field label="Status"><StatusPill status={move.status} /></Field>

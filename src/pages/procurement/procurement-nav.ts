@@ -69,7 +69,7 @@ export const procurementNav: ConsoleNavGroup[] = [
     label: "Analytics",
     items: [
       { title: "AP Aging", url: `${R.ANALYTICS}/ap-aging`, icon: BarChart3, permissions: [P.PROC_VIEW_ANALYTICS] },
-      { title: "GR/IR & Control", url: `${R.ANALYTICS}/grir`, icon: Scale, permissions: [P.PROC_VIEW_ANALYTICS] },
+      { title: "GR/IR (goods not yet billed)", url: `${R.ANALYTICS}/grir`, icon: Scale, permissions: [P.PROC_VIEW_ANALYTICS] },
       { title: "Spend", url: `${R.ANALYTICS}/spend`, icon: BarChart3, permissions: [P.PROC_VIEW_ANALYTICS] },
       { title: "Vendor Performance", url: `${R.ANALYTICS}/performance`, icon: TrendingUp, permissions: [P.PROC_VIEW_ANALYTICS], resources: ["procurement.vendor_assessment"] },
     ],

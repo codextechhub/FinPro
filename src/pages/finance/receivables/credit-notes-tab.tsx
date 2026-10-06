@@ -345,7 +345,7 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
               <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">GL posting</p>
               <PostingRecap
                 title={`${kindLabel(note.kind)} posting`} dr={recap.dr} cr={recap.cr} currency={currency}
-                helper="This recaps the journal booked when the note was posted. Applying the credit to invoices reclassifies it from customer credit (2140) back to AR - a new journal posts."
+                helper="This recaps the journal booked when the note was posted. Applying the credit to invoices moves it from customer credit (2140) to AR (what customers owe) - a new journal posts."
               />
             </div>
           ) : null}

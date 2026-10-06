@@ -90,9 +90,9 @@ export function closeOutcomeMessage(
  * appears with a readable label rather than not at all.
  */
 export const CHECK_LABELS: Record<string, string> = {
-  ap_reconciled: "AP reconciled",
-  ar_reconciled: "AR reconciled",
-  grir_explained: "GR/IR explained",
+  ap_reconciled: "AP reconciled (what is owed to suppliers)",
+  ar_reconciled: "AR reconciled (what customers owe)",
+  grir_explained: "GR/IR explained (goods received, not yet billed)",
   trial_balance_balanced: "Trial balance balanced",
   no_draft_journals: "No draft journals",
   depreciation_posted: "Depreciation posted",

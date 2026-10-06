@@ -24,10 +24,10 @@ const LABELS: Record<string, string> = {
 
 const HINTS: Record<string, string> = {
   entities: "A ledger entity is a self-contained set of books - its own chart of accounts, periods and document numbering. Switch entities with the top-bar picker; creating one provisions the chart of accounts and twelve open periods.",
-  accounts: "The spine of the GL: every journal line maps to one account here. Five top-level types govern the equation Assets = Liabilities + Equity, and Net income = Income − Expense. CTRL marks control accounts that reconcile back to sub-ledgers (AR/AP).",
+  accounts: "The spine of the GL: every journal line maps to one account here. Five top-level types govern the equation Assets = Liabilities + Equity, and Net income = Income − Expense. CTRL marks control accounts that reconcile back to sub-ledgers (AR, what customers owe; AP, what is owed to suppliers).",
   periods: "Periods control when journals can post: open accepts postings, soft-closed blocks new journals (admins can edit), closed locks non-admins, locked is permanent. Click a period to run its month-end close.",
   currencies: "FX rates convert foreign-currency amounts to your base currency for the GL; unrealised gains/losses on foreign balances are recognised by the FX revaluation step at period close.",
-  "tax-codes": "Tax codes attach rates and accounting rules to lines - a VAT code posts to VAT Payable; a WHT code reduces cash and credits WHT Payable. \"Recoverable\" marks input tax that offsets output tax.",
+  "tax-codes": "Tax codes attach rates and accounting rules to lines - a VAT code posts to VAT Payable; a WHT (withholding tax) code reduces cash and credits WHT Payable. \"Recoverable\" marks input tax that offsets output tax.",
   "cost-centers": "Cost centres tag journal lines with the department or branch that owns the spend, so reports can slice income and expense by unit.",
   "tax-tables": "The national PAYE tables, the states PAYE is remitted to and the pension fund administrators. Every payroll prices its months from these, so only platform staff change them; a change reaches the next payroll run, never a month already priced.",
   dimensions: "Dimensions are extra analytical axes (e.g. fund, project) you can tag on journal lines, each with a constrained value list. The Cost & Dimension Analysis report slices net activity per account by any axis.",

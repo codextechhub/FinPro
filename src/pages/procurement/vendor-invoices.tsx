@@ -312,7 +312,7 @@ export function InvoiceDrawer({ id, entity, currency, onClose }: { id: number | 
 
 function InvoicePostingRecap({ invoice, currency }: { invoice: VendorInvoice; currency?: string | null }) {
   if (invoice.posting_lines?.length) return <PostingRecap title="Posted journal" currency={currency} dr={invoice.posting_lines.filter((line) => line.debit).map((line) => ({ code: line.account_code, name: line.account_name, amount: line.debit }))} cr={invoice.posting_lines.filter((line) => line.credit).map((line) => ({ code: line.account_code, name: line.account_name, amount: line.credit }))} helper="This is the actual posted journal." />;
-  const dr = [{ code: invoice.purchase_order_id ? "GR/IR" : "Expense", name: invoice.purchase_order_id ? "Goods received / invoice received" : "Direct purchase expense", amount: invoice.subtotal }];
+  const dr = [{ code: invoice.purchase_order_id ? "GR/IR" : "Expense", name: invoice.purchase_order_id ? "Goods received, not yet billed" : "Direct purchase expense", amount: invoice.subtotal }];
   if (invoice.tax_total) dr.push({ code: "Input VAT", name: "Recoverable input tax", amount: invoice.tax_total });
   return <PostingRecap title="Posting preview" currency={currency} dr={dr} cr={[{ code: "AP", name: "Accounts payable", amount: invoice.total }]} helper="Posting revalidates approval and the three-way match under row locks." />;
 }
@@ -346,7 +346,7 @@ function MatchPanel({ invoice, currency }: { invoice: VendorInvoice; currency?: 
       <p className="mt-1 font-mont text-xs leading-5 text-gray-05">
         {reason
           ?? (invoice.match_status === "PRICE_VARIANCE"
-            ? "The unit price differs from the order beyond the price tolerance. GR/IR clears at the receipt basis and the difference posts to purchase price variance, so this bill posts without an override."
+            ? "The unit price differs from the order by more than the price tolerance. The goods are cleared at the price they were received at and the difference is booked as a price difference, so this bill posts without an override."
             : "Quantity and unit price are compared against the order and its posted receipts, within the tolerances set in procurement settings.")}
       </p>
     </div>
@@ -567,7 +567,7 @@ function InvoiceForm({ entity, currency, initial, returned = false, onClose }: {
           </div>;
         }) : <EmptyPanel>Select a PO with posted, uninvoiced receipt quantities.</EmptyPanel>}
       </div> : <LineEditor entity={entity} lines={directLines} onChange={setDirectLines} accountLabel="Expense account" accountType="EXPENSE" currency={currency} showCostCenter={false} taxUsage="purchase" />}
-      <PostingRecap title="Live posting preview" currency={currency} dr={[{ code: mode === "po" ? "GR/IR" : "Expense", name: mode === "po" ? "Goods received / invoice received" : "Direct purchase expense", amount: total }]} cr={[{ code: "AP", name: "Accounts payable", amount: total }]} helper="Tax, when selected on a direct line, is priced by the server and shown on the saved draft." />
+      <PostingRecap title="Live posting preview" currency={currency} dr={[{ code: mode === "po" ? "GR/IR" : "Expense", name: mode === "po" ? "Goods received, not yet billed" : "Direct purchase expense", amount: total }]} cr={[{ code: "AP", name: "Accounts payable", amount: total }]} helper="Tax, when selected on a direct line, is priced by the server and shown on the saved draft." />
     </div>
   </DetailDrawer>
   <AlertDialog open={confirmOpen} onOpenChange={(open) => !saving && setConfirmOpen(open)}>

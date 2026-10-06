@@ -125,7 +125,7 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
         <Stat label="Posted (YTD)" value={formatMoney(summary?.posted_ytd ?? 0, currency)} />
         <Stat label="Draft (pending)" value={formatMoney(summary?.draft_pending ?? 0, currency)} />
         <Stat label={SENT_BACK_WORD} value={formatMoney(summary?.sent_back ?? 0, currency)} />
-        <Stat label="Active concessions" value={String(summary?.active_count ?? 0)} />
+        <Stat label="Active concessions" value={String(summary?.active_count ?? 0)} hint="Concessions in force: posted and not voided." />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -284,7 +284,7 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
         title={gated ? "Submit this concession for approval?" : "Post this concession?"}
         description={gated
           ? `Sends ${concession.document_number} for approval. Nothing reaches the ledger until it is approved.`
-          : `Posts ${concession.document_number} - reduces ${concession.invoice_number}'s balance (Dr allowance · Cr AR).`}
+          : `Posts ${concession.document_number} - reduces ${concession.invoice_number}'s balance.`}
         confirmText={gated ? "Submit" : "Post"} loading={busy} onConfirm={doAct}
       />
       {editing ? (

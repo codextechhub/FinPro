@@ -90,7 +90,7 @@ export function NewCustomerDrawer({ open, onOpenChange, entity }: {
       open={open}
       onOpenChange={(o) => (o ? undefined : close())}
       title="New customer"
-      description="Add a customer / payer to the AR sub-ledger."
+      description="Add a customer or payer."
       widthClass="sm:max-w-xl"
       footer={
         <>

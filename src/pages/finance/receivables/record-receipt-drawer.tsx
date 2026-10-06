@@ -134,7 +134,7 @@ export function RecordReceiptDrawer({ open, onOpenChange, entity, currency, onCr
                 </tbody>
               </table>
             </div>
-            <p className="mt-1 font-mont text-[11px] text-gray-05">Cash debits the bank; the credit settles AR for what the customer owes and books any excess as customer credit (2140).</p>
+            <p className="mt-1 font-mont text-[11px] text-gray-05">The money goes into the bank account; it settles what the customer owes and keeps anything over as customer credit.</p>
           </div>
         )}
       </div>

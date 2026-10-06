@@ -236,7 +236,7 @@ function CollectionDrawer({ collectionId, collections, entity, currency, onClose
               </>
             )}
             <TimelineStep done={paid} current={!paid && !failed} title={failed ? "Payment failed" : deposit ? "Deposit confirmed" : "Payment confirmed"}
-              sub={paid ? `Verified with the provider - receipt booked (Dr bank / Cr ${linked ? "AR" : "customer credit"})${c.confirmed_at ? ` · ${dates.dateTime(c.confirmed_at)}` : ""}` : failed ? `The provider reported a failed or abandoned payment${c.provider_reference ? ". The payer can still finish paying; Re-verify asks the provider again" : ""}` : "Awaiting the provider's confirmation"} />
+              sub={paid ? `Verified with the provider - receipt booked${linked ? "" : " as customer credit"}${c.confirmed_at ? ` · ${dates.dateTime(c.confirmed_at)}` : ""}` : failed ? `The provider reported a failed or abandoned payment${c.provider_reference ? ". The payer can still finish paying; Re-verify asks the provider again" : ""}` : "Awaiting the provider's confirmation"} />
           </div>
         </div>
 

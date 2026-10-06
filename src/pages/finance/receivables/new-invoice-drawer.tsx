@@ -244,7 +244,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
           </div>
           <label className="mt-1 flex items-center gap-2 text-gray-01">
             <input type="checkbox" checked={post} onChange={(e) => setPost(e.target.checked)} className="size-3.5 accent-primary" />
-            Issue now (post the AR journal)
+            Issue now (post it to the books)
           </label>
         </div>
       </div>

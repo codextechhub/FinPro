@@ -219,7 +219,7 @@ export function PaymentAllocationDrawer({ id, entity, currency, onClose }: {
                   </tbody>
                 </table>
               </div>
-              <p className="mt-1 font-mont text-[11px] text-gray-05">Above is the receipt's own journal (posted when recorded). Applying the remaining credit to invoices reclassifies it from customer credit (2140) back to AR - a new journal posts on apply.</p>
+              <p className="mt-1 font-mont text-[11px] text-gray-05">Above is the receipt's own journal (posted when recorded). Applying the remaining credit to invoices moves it from customer credit back to what the customer owes on those invoices - a new journal posts on apply.</p>
             </div>
           )}
         </div>

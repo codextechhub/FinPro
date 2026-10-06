@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
-import { sentBackPill } from "@/components/finance-ui/returned-correction";
+import { payoutBatchStatus, payoutBatchWord } from "../finance/payout-batch-words";
 
 function PayoutsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [page, setPage] = useState(1);
@@ -52,7 +52,7 @@ function BatchesTab({ entity, currency }: { entity: string; currency?: string | 
     { header: "Title", cell: (b) => b.title },
     { header: "Items", align: "right", cell: (b) => b.item_count },
     { header: "Total", align: "right", cell: (b) => <Money kobo={b.total_amount} currency={currency} align="right" /> },
-    { header: "Status", cell: (b) => <StatusPill {...sentBackPill(b, b.status, undefined, true)} /> },
+    { header: "Status", cell: (b) => <StatusPill status={payoutBatchStatus(b)} label={payoutBatchWord(b)} /> },
     {
       header: "", cell: (b) => (
         <div onClick={(e) => e.stopPropagation()}>

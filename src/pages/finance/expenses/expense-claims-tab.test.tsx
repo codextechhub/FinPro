@@ -30,7 +30,7 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
 }));
 
 import type { ExpenseClaim } from "@/redux/services/finance/ops-types";
-import { CLAIM_STATUS_OPTIONS, ReceiptCell, claimDisplay, claimListArgs } from "./expense-claims-tab";
+import { CLAIM_STATUS_OPTIONS, ReceiptCell, claimDisplay, claimListArgs, claimPayAmountArgs, claimPayAmountProblem, claimPillText } from "./expense-claims-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -118,5 +118,33 @@ describe("the claims filter", () => {
     expect(claimListArgs("PART_PAID", "")).toEqual({ display_status: "PART_PAID" });
     expect(claimListArgs("SENT_BACK", "taxi")).toEqual({ q: "taxi", approval: "returned" });
     expect(claimListArgs("", "")).toEqual({});
+  });
+});
+
+/**
+ * Mr Adeyemi's ₦50,000 conference claim at Bright Star is approved. The bursar
+ * pays ₦15,000 now: the claim reads "Part-paid, ₦35,000.00 left" and offers Pay
+ * again. Paying the whole balance sends no amount, so the server pays it all.
+ */
+describe("paying part of a claim", () => {
+  const claim = (over: Partial<ExpenseClaim>) => ({
+    status: "POSTED", payment_status: "PARTIAL", approval_state: "APPROVED", total: 5_000_000, amount_paid: 1_500_000, balance_due: 3_500_000, ...over,
+  }) as ExpenseClaim;
+
+  it("says what is left on a part-paid claim, and only there", () => {
+    expect(claimPillText(claim({}), "NGN")).toBe("Part-paid, ₦35,000.00 left");
+    expect(claimPillText(claim({ payment_status: "PAID", amount_paid: 5_000_000, balance_due: 0 }), "NGN")).toBe("Paid");
+    expect(claimPillText(claim({ payment_status: "UNPAID", amount_paid: 0, balance_due: 5_000_000 }), "NGN")).toBe("Approved");
+  });
+
+  it("sends no amount for the whole balance, and the kobo typed for part", () => {
+    expect(claimPayAmountArgs(3_500_000, 3_500_000)).toEqual({});
+    expect(claimPayAmountArgs(1_500_000, 3_500_000)).toEqual({ amount: 1_500_000 });
+  });
+
+  it("refuses nothing, and more than is left, before it is sent", () => {
+    expect(claimPayAmountProblem(0, 3_500_000)).toBe("Enter an amount to pay.");
+    expect(claimPayAmountProblem(4_000_000, 3_500_000, "NGN")).toBe("Only ₦35,000.00 is left to pay on this claim.");
+    expect(claimPayAmountProblem(3_500_000, 3_500_000)).toBeNull();
   });
 });

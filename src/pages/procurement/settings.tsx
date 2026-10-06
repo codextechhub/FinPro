@@ -79,8 +79,8 @@ const GROUPS: ConsoleSettingsGroup[] = [
 
 const PROCUREMENT_ACCOUNTS = [
   ["ACCOUNTS_PAYABLE", "Accounts payable", "Vendor sub-ledger control account."],
-  ["GRIR_CLEARING", "GR/IR clearing", "Temporary liability between goods receipt and vendor invoice."],
-  ["WHT_PAYABLE", "WHT payable", "Withholding tax deducted from vendor payments."],
+  ["GRIR_CLEARING", "GR/IR clearing (goods received, not yet billed)", "Temporary liability between goods receipt and vendor invoice."],
+  ["WHT_PAYABLE", "WHT payable (withholding tax)", "Withholding tax deducted from vendor payments."],
   ["INVENTORY_ASSET", "Inventory asset", "Value of stock held for future issue."],
   ["INVENTORY_ADJUSTMENT", "Inventory adjustment", "Stock-count gains, losses and write-downs."],
   ["PURCHASE_PRICE_VARIANCE", "Purchase price variance", "Difference between receipt basis and vendor invoice price."],

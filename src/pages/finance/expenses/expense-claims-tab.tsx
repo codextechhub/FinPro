@@ -66,9 +66,17 @@ export function claimDisplay(c: ExpenseClaim): { key: DispKey; label: string; cl
   if (c.payment_status === "PARTIAL") return { key: "PART_PAID", label: "Part-paid", cls: "bg-amber-50 text-amber-700" };
   return { key: "APPROVED", label: "Approved", cls: "bg-blue-50 text-blue-700" };
 }
-function StatusPill({ claim }: { claim: ExpenseClaim }) {
+/**
+ * What a claim's pill says: its word, and on a part-paid claim what is still
+ * owed ("Part-paid, ₦35,000.00 left"), read from `balance_due`.
+ */
+export function claimPillText(c: ExpenseClaim, currency?: string | null): string {
+  const d = claimDisplay(c);
+  return d.key === "PART_PAID" ? `${d.label}, ${formatMoney(c.balance_due, currency)} left` : d.label;
+}
+function StatusPill({ claim, currency }: { claim: ExpenseClaim; currency?: string | null }) {
   const d = claimDisplay(claim);
-  return <span className={cn(PILL, d.cls)}>{d.label}</span>;
+  return <span className={cn(PILL, d.cls)}>{claimPillText(claim, currency)}</span>;
 }
 function Initials({ name }: { name: string }) {
   const init = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
@@ -135,13 +143,13 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
     { header: "Date", cell: (c) => <span className="tabular-nums text-gray-05">{dates.day(c.claim_date)}</span> },
     { header: "Purpose", cell: (c) => <span className="text-gray-01">{c.title || "-"}</span> },
     { header: "Total", align: "right", cell: (c) => <Money kobo={c.total} currency={currency} align="right" /> },
-    { header: "Status", cell: (c) => <StatusPill claim={c} /> },
+    { header: "Status", cell: (c) => <StatusPill claim={c} currency={currency} /> },
   ];
 
   return (
     <div className="space-y-4" data-guide="finance-expense-claims.workbench">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" data-guide="finance-expense-claims.summary">
-        <Kpi label="Open claims" value={String(kpis.open)} hint="Draft or awaiting payment" />
+        <Kpi label="Open claims" value={String(kpis.open)} hint="Draft, awaiting approval or awaiting payment" />
         <Kpi label="Submitted this month" value={formatMoney(kpis.month_total, currency)} />
         <Kpi label="Average claim" value={formatMoney(kpis.avg, currency)} />
         <Kpi label="Awaiting payment" value={formatMoney(kpis.awaiting, currency)} hint="Approved, not yet reimbursed" />
@@ -257,7 +265,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
         widthClass="sm:max-w-3xl"
         footer={
           <>
-            <StatusPill claim={full} />
+            <StatusPill claim={full} currency={currency} />
             <div className="flex-1" />
             <Button variant="outline" onClick={() => printExpenseClaim(full, claimDisplay(full).label, currency, dates.prefs)} className="gap-1.5"><Printer className="size-4" /> Print</Button>
             {isDraft && full.approval_required ? (
@@ -278,7 +286,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
             ) : null}
             {isApprovedUnpaid ? (
               <Can permission={P.FIN_SETTLE_EXPENSE_CLAIM}>
-                <Button onClick={() => setPaying(true)} className="gap-1.5"><Wallet className="size-4" /> Pay</Button>
+                <Button onClick={() => setPaying(true)} className="gap-1.5"><Wallet className="size-4" /> {full.payment_status === "PARTIAL" ? "Pay again" : "Pay"}</Button>
               </Can>
             ) : null}
           </>
@@ -289,7 +297,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Total</p><p className="mt-1 font-mont text-base font-semibold tabular-nums text-black-01">{formatMoney(full.total, currency)}</p></div>
             <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">Subtotal · Tax</p><p className="mt-1 font-mont text-sm font-semibold tabular-nums text-black-01">{formatMoney(full.subtotal, currency)} · {formatMoney(full.tax_total, currency)}</p></div>
-            <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">{full.payment_status === "PAID" ? "Reimbursed" : "Awaiting payment"}</p><p className="mt-1 font-mont text-base font-semibold tabular-nums text-black-01">{formatMoney(full.payment_status === "PAID" ? full.amount_paid : full.balance_due, currency)}</p></div>
+            <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont text-[11px] text-gray-05">{full.payment_status === "PAID" ? "Reimbursed" : full.payment_status === "PARTIAL" ? "Left to pay" : "Awaiting payment"}</p><p className="mt-1 font-mont text-base font-semibold tabular-nums text-black-01">{formatMoney(full.payment_status === "PAID" ? full.amount_paid : full.balance_due, currency)}</p>{full.payment_status === "PARTIAL" ? <p className="mt-0.5 font-mont text-[11px] text-gray-05">{formatMoney(full.amount_paid, currency)} paid so far</p> : null}</div>
           </div>
 
           <div>
@@ -298,9 +306,9 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
               <Step done title="Submitted" sub={`${full.claimant_name || "Staff"} · ${dates.day(full.claim_date)}`} />
               {d.key === "REJECTED"
                 ? <Step done={false} active title="Rejected" sub="The claim was rejected." />
-                : <Step done={full.status === "POSTED"} active={isDraft || isPending} title="Approved & accrued" sub={full.status === "POSTED" ? "Booked to Accrued Reimbursements" : isPending ? "Waiting in the approver queue" : "Ready to submit"} />}
+                : <Step done={full.status === "POSTED"} active={isDraft || isPending} title="Approved" sub={full.status === "POSTED" ? "Booked as owed to the staff member" : isPending ? "Waiting in the approver queue" : "Ready to submit"} />}
               {d.key !== "REJECTED"
-                ? <Step done={full.payment_status === "PAID"} active={isApprovedUnpaid} title="Reimbursed" sub={full.payment_status === "PAID" ? "Paid via bank transfer" : "Pending payment"} />
+                ? <Step done={full.payment_status === "PAID"} active={isApprovedUnpaid} title="Reimbursed" sub={full.payment_status === "PAID" ? "Paid in full" : full.payment_status === "PARTIAL" ? `Part-paid, ${formatMoney(full.balance_due, currency)} left` : "Pending payment"} />
                 : null}
             </div>
           </div>
@@ -337,7 +345,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
         open={voidOpen}
         onOpenChange={setVoidOpen}
         title={`Void ${full.document_number}?`}
-        description="Reverses the claim's posting journal (a mirror entry backing out the expense and accrued reimbursement) and cancels the claim. Use this to undo a claim posted in error - it can't be voided once any reimbursement has been paid."
+        description="Reverses the claim's journal (backing out the expense and what was owed to the staff member) and cancels the claim. Use this to undo a claim posted in error - it can't be voided once any reimbursement has been paid."
         confirmText="Void claim"
         destructive
         loading={voiding}
@@ -389,14 +397,39 @@ export function ReceiptCell({ line, siblings, claimId, entity, attachable }: { l
   );
 }
 
+/**
+ * The settle body's `amount` for `amountKobo` typed against `balanceDue`: left
+ * out when it is the whole balance, so the server pays in full, else the
+ * integer kobo typed. A figure over the balance is sent as typed; the server
+ * refuses it with the balance due rather than trimming it.
+ */
+export function claimPayAmountArgs(amountKobo: number, balanceDue: number): { amount?: number } {
+  return amountKobo === balanceDue ? {} : { amount: Math.round(amountKobo) };
+}
+
+/** Why the amount typed cannot be paid, or null when it can. */
+export function claimPayAmountProblem(amountKobo: number, balanceDue: number, currency?: string | null): string | null {
+  if (!(amountKobo > 0)) return "Enter an amount to pay.";
+  if (amountKobo > balanceDue) return `Only ${formatMoney(balanceDue, currency)} is left to pay on this claim.`;
+  return null;
+}
+
+/**
+ * Reimburses a claim, all of what is left or part of it. The amount starts at
+ * the whole balance due; a smaller one leaves the claim Part-paid, with Pay
+ * again offered for the rest.
+ */
 function PayDrawer({ claim, entity, currency, onClose }: { claim: ExpenseClaim; entity: string; currency?: string | null; onClose: () => void }) {
   const [bank, setBank] = useState("");
   const [payDate, setPayDate] = useState("");
+  const [amount, setAmount] = useState(claim.balance_due);
   const [settle, { isLoading }] = useSettleExpenseClaimMutation();
+  const problem = claimPayAmountProblem(amount, claim.balance_due, currency);
+  const left = claim.balance_due - amount;
 
   const submit = async () => {
     try {
-      const res = await settle({ id: claim.id, entity, bank_account: bank || undefined, pay_date: payDate }).unwrap();
+      const res = await settle({ id: claim.id, entity, bank_account: bank || undefined, pay_date: payDate, ...claimPayAmountArgs(amount, claim.balance_due) }).unwrap();
       toast.success(res.message || "Claim reimbursed.");
       onClose();
     } catch { /* central */ }
@@ -409,13 +442,18 @@ function PayDrawer({ claim, entity, currency, onClose }: { claim: ExpenseClaim; 
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !payDate} onClick={submit} className="gap-1.5"><Wallet className="size-4" />{isLoading ? "Paying…" : `Pay ${formatMoney(claim.balance_due, currency)}`}</Button>
+        <Button disabled={isLoading || !payDate || !!problem} onClick={submit} className="gap-1.5"><Wallet className="size-4" />{isLoading ? "Paying…" : `Pay ${formatMoney(amount, currency)}`}</Button>
       </>}
     >
       <div className="space-y-4">
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
-          Pays the staff member {formatMoney(claim.balance_due, currency)} - Dr Accrued Reimbursement, Cr bank - clearing the liability raised on approval.
+          {formatMoney(claim.balance_due, currency)} is left to pay {claim.claimant_name || "the staff member"}. Pay all of it, or part now and the rest later.
         </p>
+        <FormField label="Amount to pay">
+          <MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} />
+          {problem ? <p className="mt-1 font-mont text-[11px] text-destructive">{problem}</p>
+            : left > 0 ? <p className="mt-1 font-mont text-[11px] text-gray-05">{formatMoney(left, currency)} will be left to pay.</p> : null}
+        </FormField>
         <FormField label="Bank account"><BankAccountPicker entity={entity} value={bank} onChange={setBank} placeholder="Default cash/bank" documentBranchId={claim.branch_id} /></FormField>
         <PostingDateField
           label="Payment date" entity={entity} value={payDate} onChange={setPayDate}

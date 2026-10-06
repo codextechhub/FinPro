@@ -72,7 +72,7 @@ export function TaxCodesTab({ entity }: { entity: string }) {
         loading={isLoading || isFetching} error={isError} onRetry={refetch}
         onRowClick={canEdit ? setEditing : undefined}
         cardBreakpoint="lg"
-        emptyTitle="No tax codes" emptyMessage="VAT / WHT and other tax codes will appear here." />
+        emptyTitle="No tax codes" emptyMessage="VAT, WHT (withholding tax) and other tax codes will appear here." />
 
       {(creating || editing) && (
         <TaxCodeModal key={editing?.id ?? "new"} existing={editing} entity={entity}

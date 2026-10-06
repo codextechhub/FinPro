@@ -34,7 +34,7 @@ import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-acces
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 
-const OB_TYPES: [string, string][] = [["VAT", "VAT"], ["WHT", "WHT"], ["PAYE", "PAYE"], ["PENSION", "Pension"], ["OTHER", "Other levy"]];
+const OB_TYPES: [string, string][] = [["VAT", "VAT"], ["WHT", "WHT (withholding tax)"], ["PAYE", "PAYE"], ["PENSION", "Pension"], ["OTHER", "Other levy"]];
 const FREQ: [string, string][] = [["MONTHLY", "Monthly"], ["QUARTERLY", "Quarterly"], ["ANNUAL", "Annual"]];
 // filing_status → prototype label (Open / Filed / Paid)
 const STATUS: Record<string, { label: string; cls: string }> = {

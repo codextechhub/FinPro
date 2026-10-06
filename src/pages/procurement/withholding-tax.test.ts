@@ -39,7 +39,7 @@ describe("computedWht", () => {
 
 describe("whtSourceLabel", () => {
   it("names a computed and a typed figure, and nothing for an unknown one", () => {
-    expect(whtSourceLabel("COMPUTED")).toBe("Worked out from the WHT code");
+    expect(whtSourceLabel("COMPUTED")).toBe("Worked out from the withholding tax code");
     expect(whtSourceLabel("ENTERED")).toBe("Entered by hand");
     expect(whtSourceLabel(undefined)).toBeNull();
     expect(whtSourceLabel("")).toBeNull();

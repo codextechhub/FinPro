@@ -43,7 +43,7 @@ const SUBTITLES: Record<string, string> = {
   deposits: "Refundable deposits held for customers, returned when they leave or forfeited when unclaimed.",
 };
 const HINTS: Record<string, string> = {
-  "fee-structures": "A fee structure is a billing template. When you generate invoices, each line builds an invoice line from its GL account, amount and tax - so revenue posts to the right place automatically. Only customer structures generate AR invoices.",
+  "fee-structures": "A fee structure is a billing template. When you generate invoices, each line builds an invoice line from its GL account, amount and tax - so revenue posts to the right place automatically. Only customer structures generate invoices.",
 };
 
 /** `section` comes from the route table; see console-sections.ts. */

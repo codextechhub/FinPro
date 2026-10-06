@@ -119,7 +119,7 @@ export const paymentsApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["PaymentsPayouts", "PaymentsTransactions"],
     }),
-    getPayoutBatches: builder.query<PaginatedEnvelope<PayoutBatchSummary>, { entity: string; page?: number; status?: string }>({
+    getPayoutBatches: builder.query<PaginatedEnvelope<PayoutBatchSummary>, { entity: string; page?: number; status?: string; approval?: "returned" }>({
       query: (p) => ({ url: `/payments/payout-batches/${qs(p)}`, method: "GET" }),
       providesTags: ["PaymentsPayoutBatches"],
     }),

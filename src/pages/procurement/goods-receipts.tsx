@@ -209,7 +209,7 @@ function ReceiptDrawer({ id, entity, currency, onClose, onSelectReceipt }: {
           </section> : null}
           {receipt.status === "DRAFT" && <PostingRecap title="Posting preview" currency={currency}
             dr={[{ code: "Expense", name: "Accepted delivery value", amount: total }]}
-            cr={[{ code: "GR/IR", name: "Goods received / invoice received", amount: total }]}
+            cr={[{ code: "GR/IR", name: "Goods received, not yet billed", amount: total }]}
             helper="Posting records only accepted quantities; rejected quantities remain in the quality record."
           />}
         </div>}
@@ -385,7 +385,7 @@ function ReceiptForm({ entity, currency, onClose, onSaved, initial, sourcePurcha
 
         <PostingRecap title="Live posting preview" currency={currency}
           dr={[{ code: "Expense", name: "Accepted delivery value", amount: acceptedValue }]}
-          cr={[{ code: "GR/IR", name: "Goods received / invoice received", amount: acceptedValue }]}
+          cr={[{ code: "GR/IR", name: "Goods received, not yet billed", amount: acceptedValue }]}
           helper="This becomes the journal only when the receipt is posted. Rejected quantities never enter the GL."
         />
       </div>
