@@ -34,19 +34,17 @@ import {
 import type { CustomerCreditTransfer } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
 import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
+import { DOCUMENT_STATUS_WORDS } from "@/components/finance-ui/status-words";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
 
 /**
  * The one word for each state a credit transfer takes (vs_finance
  * DocumentStatus), read by the status filter, the row pill and the drawer
- * alike. A posted transfer undone by Void is REVERSED on the wire and "Voided"
- * here, after the action that put it there. APPROVED lasts only while an
- * approved transfer posts, so the filter does not offer it.
+ * alike: the receivables documents' shared words (status-words.ts). APPROVED
+ * lasts only while an approved transfer posts, so the filter does not offer it.
  */
-export const CREDIT_TRANSFER_STATUS: Record<string, string> = {
-  DRAFT: "Draft", PENDING_APPROVAL: "Awaiting approval", APPROVED: "Approved", POSTED: "Posted", REVERSED: "Voided",
-};
+export const CREDIT_TRANSFER_STATUS: Readonly<Record<string, string>> = DOCUMENT_STATUS_WORDS;
 const FILTER_STATUSES = ["DRAFT", "PENDING_APPROVAL", "POSTED", "REVERSED"] as const;
 
 export function CreditTransfersTab({ entity, currency }: { entity: string; currency?: string | null }) {

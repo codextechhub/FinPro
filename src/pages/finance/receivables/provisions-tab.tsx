@@ -25,6 +25,7 @@ import {
   PostingRecap, StatusPill, toArray, type Column,
 } from "@/components/finance-ui";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
+import { statusWord } from "@/components/finance-ui/status-words";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { P } from "../../../permissions";
@@ -93,7 +94,7 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
       ),
     },
     { header: "Change", align: "right", cell: (r) => <Money kobo={r.movement_total} currency={currency} align="right" /> },
-    { header: "Status", cell: (r) => <StatusPill status={r.status} /> },
+    { header: "Status", cell: (r) => <StatusPill status={r.status} label={statusWord(r.status)} /> },
   ];
 
   return (
@@ -213,7 +214,7 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
             <Note>{`This run covers the whole school. You are shown only ${yourBranchesPart(branchIds)}. Submitting and posting it are for someone who covers the whole school.`}</Note>
           ) : null}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <DetailField label="Status"><StatusPill status={provision.status} /></DetailField>
+            <DetailField label="Status"><StatusPill status={provision.status} label={statusWord(provision.status)} /></DetailField>
             <DetailField label="Allowance required"><Money kobo={provision.required_total} currency={currency} /></DetailField>
             <DetailField label="Change to the allowance"><Money kobo={provision.movement_total} currency={currency} /></DetailField>
           </div>

@@ -28,6 +28,7 @@ import { openInvoiceDocument } from "@/utils/finance-documents";
 import { RecordPaymentModal } from "./record-payment-modal";
 import { RequestPaymentModal } from "./request-payment-modal";
 import { DocumentVoidAction } from "./document-void-action";
+import { PAYMENT_PROGRESS_WORDS, statusWord } from "@/components/finance-ui/status-words";
 import { useDates } from "../../../lib/display-prefs";
 
 const TABS = [
@@ -170,7 +171,7 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
     >
       {isLoading ? <LoadingState rows={6} /> : isError || !d || !inv || !s ? <ErrorState onRetry={refetch} /> : (
         <div className="space-y-4">
-          <div><StatusPill status={inv.status} /> <span className="ml-1"><StatusPill status={inv.payment_status} /></span></div>
+          <div><StatusPill status={inv.status} label={statusWord(inv.status)} /> <span className="ml-1"><StatusPill status={inv.payment_status} label={statusWord(inv.payment_status, PAYMENT_PROGRESS_WORDS)} /></span></div>
 
           {inv.billing_period_label || inv.billing_period || inv.beneficiary_name ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

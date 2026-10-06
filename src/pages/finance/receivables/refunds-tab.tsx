@@ -49,6 +49,7 @@ import {
 } from "@/redux/services/finance/ar-api";
 import type { ArAdjustment, RefundAvailabilityCustomer } from "@/redux/services/finance/ar-types";
 import { DocumentVoidAction } from "./document-void-action";
+import { DOCUMENT_STATUS_WORDS, statusWord } from "@/components/finance-ui/status-words";
 import { WriteOffRecoverModal } from "./write-off-recover-modal";
 import { useDates } from "../../../lib/display-prefs";
 
@@ -65,7 +66,7 @@ function TypeChip({ kind }: { kind: Mode }) {
 }
 function StatusPill({ status }: { status: string }) {
   const normalized = status.toUpperCase();
-  const label = normalized.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  const label = statusWord(normalized) ?? normalized.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
   return (
     <span className={cn("inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium",
       normalized === "POSTED" ? "bg-green-01/10 text-green-01"
@@ -151,7 +152,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
         {data?.kpis.written_off_ytd !== null && (
           <Stat label="Written off (YTD)" value={formatMoney(data?.kpis.written_off_ytd ?? 0, currency)} />
         )}
-        <Stat label="Pending approval" value={String(data?.kpis.pending ?? 0)} />
+        <Stat label={DOCUMENT_STATUS_WORDS.PENDING_APPROVAL} value={String(data?.kpis.pending ?? 0)} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

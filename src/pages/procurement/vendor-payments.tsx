@@ -50,6 +50,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 import { isForbidden } from "../../lib/api-errors";
+import { approvalStateWord } from "./document-status";
 
 const DETAIL_TABS = [
   ["overview", "Overview", FileText], ["invoices", "Invoices", ListChecks],
@@ -93,7 +94,7 @@ export default function VendorPaymentsPage() {
     { header: "Date", cell: (payment) => dates.day(payment.payment_date) },
     { header: "Method", cell: (payment) => paymentMethodLabel(payment.method) },
     { header: "Net Paid", align: "right", cell: (payment) => <span className="font-semibold tabular-nums">{formatMoney(payment.net_amount, currency)}</span> },
-    { header: "Status", cell: (payment) => <div className="flex min-w-28 flex-wrap gap-1"><StatusPill status={payment.status} />{payment.status !== "REVERSED" && <StatusPill status={payment.approval_state} />}{payment.status === "POSTED" && <StatusPill status={payment.allocation_status} />}</div> },
+    { header: "Status", cell: (payment) => <div className="flex min-w-28 flex-wrap gap-1"><StatusPill status={payment.status} />{payment.status !== "REVERSED" && <StatusPill status={payment.approval_state} label={approvalStateWord(payment.approval_state)} />}{payment.status === "POSTED" && <StatusPill status={payment.allocation_status} />}</div> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
 
@@ -172,7 +173,7 @@ function PaymentDrawer({ id, entity, currency, onClose }: { id: number | null; e
       {payment.status === "POSTED" && <Can permission={P.PROC_REVERSE_VENDOR_PAYMENT}><Button variant="outline-dest" loading={reversing} onClick={() => run("reverse")}><Undo2 className="size-4" /> Reverse</Button></Can>}
     </>}>
       {isLoading ? <LoadingState rows={8} /> : isError || !payment ? <ErrorState onRetry={refetch} /> : <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={payment.status} /><StatusPill status={payment.approval_state} />{payment.status === "POSTED" && <StatusPill status={payment.allocation_status} />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(payment.net_amount, currency)}</p></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-1.5"><StatusPill status={payment.status} /><StatusPill status={payment.approval_state} label={approvalStateWord(payment.approval_state)} />{payment.status === "POSTED" && <StatusPill status={payment.allocation_status} />}</div><p className="font-mont text-lg font-semibold tabular-nums">{formatMoney(payment.net_amount, currency)}</p></div>
         <TabStrip
           items={DETAIL_TAB_ITEMS}
           value={tab}

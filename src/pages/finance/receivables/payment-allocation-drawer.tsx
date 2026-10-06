@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { CheckCircle2 } from "lucide-react";
 import { DetailDrawer, DocumentEmailAction, Money, StatusPill } from "@/components/finance-ui";
+import { statusWord } from "@/components/finance-ui/status-words";
 import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState, EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -135,7 +136,7 @@ export function PaymentAllocationDrawer({ id, entity, currency, onClose }: {
       {isLoading ? <LoadingState rows={6} /> : isError || !d || !p ? <ErrorState onRetry={refetch} /> : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-1.5" data-guide="finance-receipts.allocation">
-            <StatusPill status={p.status} />
+            <StatusPill status={p.status} label={statusWord(p.status)} />
             <span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[p.allocation_status])}>{STATUS_LABEL[p.allocation_status]}</span>
           </div>
 

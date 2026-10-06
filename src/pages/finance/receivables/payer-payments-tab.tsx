@@ -26,6 +26,7 @@ import {
   MoneyInput, PostingDateField, StatusPill, toArray, type Column,
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
+import { statusWord } from "@/components/finance-ui/status-words";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -81,7 +82,7 @@ export function PayerPaymentsTab({ entity, currency }: { entity: string; currenc
     ...(branches.show ? [{ header: "Received at", cell: (p: PayerPayment) => branches.name(p.branch_id, p.branch_name) }] : []),
     { header: "Date", cell: (p) => <span className="tabular-nums">{dates.day(p.payment_date)}</span> },
     { header: "Amount", align: "right", cell: (p) => <Money kobo={p.amount} currency={currency} align="right" /> },
-    { header: "Status", cell: (p) => <StatusPill status={p.status} /> },
+    { header: "Status", cell: (p) => <StatusPill status={p.status} label={statusWord(p.status)} /> },
   ];
 
   return (
@@ -349,7 +350,7 @@ function PayerPaymentDrawer({ payment, entity, currency, onClose }: {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <DetailField label="Amount"><Money kobo={payment.amount} currency={currency} /></DetailField>
-            <DetailField label="Status"><StatusPill status={payment.status} /></DetailField>
+            <DetailField label="Status"><StatusPill status={payment.status} label={statusWord(payment.status)} /></DetailField>
             <DetailField label="Received into">{payment.bank_account.name}</DetailField>
             {branches.show ? <DetailField label="Received at">{branches.name(payment.branch_id, payment.branch_name)}</DetailField> : null}
             <DetailField label="Method">{methodLabel(payment.method)}</DetailField>
@@ -371,7 +372,7 @@ function PayerPaymentDrawer({ payment, entity, currency, onClose }: {
                     <td className={td}><span className="font-medium">{s.customer.name}</span></td>
                     {branches.show ? <td className={td}>{branches.name(s.branch_id, s.branch_name)}</td> : null}
                     <td className={td}>
-                      <span className="tabular-nums">{s.document.document_number}</span> <StatusPill status={s.document.status} />
+                      <span className="tabular-nums">{s.document.document_number}</span> <StatusPill status={s.document.status} label={statusWord(s.document.status)} />
                       {s.kind === "HELD" ? (
                         <span className="block text-[11px] text-gray-05">
                           {s.forwarded_by ? `Forwarded by ${s.forwarded_by.document_number}` : `Held for ${s.branch_name}, not yet forwarded`}

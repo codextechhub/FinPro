@@ -25,18 +25,26 @@ import { BatchGenerateModal } from "./batch-generate-modal";
 import { NewInvoiceDrawer } from "./new-invoice-drawer";
 import { useDates } from "../../../lib/display-prefs";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
+import { DOCUMENT_STATUS_WORDS, PAYMENT_PROGRESS_WORDS } from "@/components/finance-ui/status-words";
 
 const TABS = [
   { key: "", label: "All" }, { key: "draft", label: "Draft" }, { key: "issued", label: "Issued" },
-  { key: "partial", label: "Partial" }, { key: "paid", label: "Paid" }, { key: "overdue", label: "Overdue" },
+  { key: "partial", label: PAYMENT_PROGRESS_WORDS.PARTIAL }, { key: "paid", label: "Paid" }, { key: "overdue", label: "Overdue" },
 ] as const;
 const STATUS_PILL: Record<string, string> = {
-  DRAFT: "bg-gray-03/60 text-gray-05", ISSUED: "bg-blue-50 text-blue-700",
+  DRAFT: "bg-gray-03/60 text-gray-05", PENDING_APPROVAL: "bg-amber-50 text-amber-700", ISSUED: "bg-blue-50 text-blue-700",
   PARTIAL: "bg-amber-50 text-amber-700", PAID: "bg-green-01/10 text-green-01",
-  OVERDUE: "bg-destructive/10 text-destructive",
+  OVERDUE: "bg-destructive/10 text-destructive", REVERSED: "bg-gray-03/60 text-gray-05",
 };
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Draft", ISSUED: "Issued", PARTIAL: "Partially Paid", PAID: "Paid", OVERDUE: "Overdue",
+/**
+ * The word each derived state reads as, the same in the status tabs and the
+ * row pill: an invoice part paid is "Partly paid" in both, and one waiting on
+ * an approver or voided reads as every other receivables document says it.
+ */
+export const INVOICE_STATUS_LABEL: Record<string, string> = {
+  DRAFT: DOCUMENT_STATUS_WORDS.DRAFT, PENDING_APPROVAL: DOCUMENT_STATUS_WORDS.PENDING_APPROVAL,
+  ISSUED: "Issued", PARTIAL: PAYMENT_PROGRESS_WORDS.PARTIAL, PAID: "Paid", OVERDUE: "Overdue",
+  REVERSED: DOCUMENT_STATUS_WORDS.REVERSED,
 };
 
 function derivedStatus(i: Invoice, today: string): string {
@@ -135,7 +143,7 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
     { header: "Total", align: "right", cell: (r) => <Money kobo={r.total} currency={currency} align="right" /> },
     { header: "Paid", align: "right", cell: (r) => r.amount_paid ? <Money kobo={r.amount_paid} currency={currency} align="right" /> : <span className="text-gray-05">-</span> },
     { header: "Balance", align: "right", cell: (r) => <Money kobo={r.balance_due} currency={currency} align="right" /> },
-    { header: "Status", cell: (r) => { const s = derivedStatus(r, dates.today()); return <span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[s] ?? "bg-gray-03/60 text-gray-05")}>{STATUS_LABEL[s] ?? s}</span>; } },
+    { header: "Status", cell: (r) => { const s = derivedStatus(r, dates.today()); return <span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[s] ?? "bg-gray-03/60 text-gray-05")}>{INVOICE_STATUS_LABEL[s] ?? s}</span>; } },
   ];
 
   return (
