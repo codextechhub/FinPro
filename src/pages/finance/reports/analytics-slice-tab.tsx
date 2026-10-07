@@ -20,6 +20,7 @@ import { ReportPeriodHeading } from "@/components/finance-ui/report-period-headi
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { periodParams } from "./period-params";
+import { ANALYTICS_NO_PERIOD } from "./report-period-words";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const TYPE_STYLE: Record<string, string> = {
@@ -78,9 +79,9 @@ export function AnalyticsSliceReport({ entity, currency }: { entity: string; cur
   return (
     <div className="space-y-5">
       {sl.narrowed && <BranchReportNote />}
-      <ReportPeriodHeading label={sl.period_label} fallback="All periods" />
+      <ReportPeriodHeading label={sl.period_label} fallback={ANALYTICS_NO_PERIOD} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Axis" value={axisLabel} foot={sl.period_label || "All periods"} />
+        <KpiCard label="Axis" value={axisLabel} foot={sl.period_label || ANALYTICS_NO_PERIOD} />
         <KpiCard label="Buckets" value={String(Object.keys(sl.bucket_totals).length)} foot="Distinct values" />
         <KpiCard label="Accounts" value={String(sl.rows.length)} foot={acctType ? `${acctType.toLowerCase()} only` : "with activity"} />
         <KpiCard label="Total net" value={signed(sl.total_net.kobo, currency)} foot="Debit − credit" />

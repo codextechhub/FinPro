@@ -1,0 +1,26 @@
+/**
+ * The headings a report shows with no month chosen read as its downloaded file does.
+ *
+ * Mrs Bello opens Changes in equity with no month and prints the file for the
+ * board: the file is headed "Inception to date", so the screen she printed it
+ * from says the same, not "Year to date".
+ */
+import { describe, expect, it } from "vitest";
+
+import {
+  ANALYTICS_NO_PERIOD, CASH_FLOW_NO_PERIOD, EQUITY_NO_PERIOD, incomeStatementNoPeriod, TRIAL_BALANCE_NO_PERIOD,
+} from "./report-period-words";
+
+describe("the no-month headings", () => {
+  it("match the words each report's file carries", () => {
+    expect(TRIAL_BALANCE_NO_PERIOD).toBe("All periods");
+    expect(ANALYTICS_NO_PERIOD).toBe("All periods");
+    expect(EQUITY_NO_PERIOD).toBe("Inception to date");
+    expect(CASH_FLOW_NO_PERIOD).toBe("Year to date");
+  });
+
+  it("names the income statement's year the way its file does, with no space", () => {
+    expect(incomeStatementNoPeriod(2026)).toBe("FY2026");
+    expect(incomeStatementNoPeriod(null)).toBe("Year to date");
+  });
+});

@@ -25,6 +25,7 @@ import { ReportPeriodHeading } from "@/components/finance-ui/report-period-headi
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { periodParams } from "./period-params";
+import { TRIAL_BALANCE_NO_PERIOD } from "./report-period-words";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const TYPE_STYLE: Record<string, string> = {
@@ -99,11 +100,11 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
         </InfoHint>
       </div>
 
-      <ReportPeriodHeading label={tb.period_label} fallback="All periods" />
+      <ReportPeriodHeading label={tb.period_label} fallback={TRIAL_BALANCE_NO_PERIOD} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Total debit" value={formatMoney(tb.total_debit.kobo, currency)} foot={periodLabel || "All periods"} />
-        <KpiCard label="Total credit" value={formatMoney(tb.total_credit.kobo, currency)} foot={periodLabel || "All periods"} />
+        <KpiCard label="Total debit" value={formatMoney(tb.total_debit.kobo, currency)} foot={periodLabel || TRIAL_BALANCE_NO_PERIOD} />
+        <KpiCard label="Total credit" value={formatMoney(tb.total_credit.kobo, currency)} foot={periodLabel || TRIAL_BALANCE_NO_PERIOD} />
         <KpiCard label="Status" value={tb.is_balanced ? "Balanced" : "Out of balance"} tone={tb.is_balanced ? "live" : "alert"} foot={tb.is_balanced ? "Debits = Credits" : "Needs investigation"} />
         <KpiCard label="Accounts" value={String(rows.length)} foot={acctType ? `${acctType.toLowerCase()} only` : "with a balance"} />
       </div>

@@ -3,9 +3,9 @@
  *
  * Mrs Bello, who covers the whole school, runs the check: every closed month
  * and year is listed as matching, or the balances that moved are named with
- * what was sealed and what the ledger says now. Mrs Adeyemi, the bursar for
+ * what was stored when it closed and what the ledger says now. Mrs Adeyemi, the bursar for
  * Lekki only, is told the check covers every branch and no request is sent;
- * somebody without the key is told their role cannot verify the seals.
+ * somebody without the key is told their role cannot verify the closed figures.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -86,11 +86,11 @@ const button = (label: string) =>
   Array.from(container.querySelectorAll("button")).find((el) => el.textContent?.trim() === label);
 
 describe("the verdict", () => {
-  it("says every seal matches, or how many differ and how many break the chain", () => {
-    expect(sealVerdict({ ok: true, checked: 14, mismatches: 0, chain_breaks: [] })).toBe("All 14 sealed months and years still match the ledger.");
-    expect(sealVerdict({ ok: false, checked: 14, mismatches: 1, chain_breaks: [] })).toBe("1 of 14 sealed months and years differ from the ledger.");
-    expect(sealVerdict({ ok: false, checked: 14, mismatches: 0, chain_breaks: [9] })).toBe("1 seal does not follow the seal before it.");
-    expect(sealVerdict({ ok: true, checked: 0, mismatches: 0, chain_breaks: [] })).toContain("Nothing is sealed yet");
+  it("says every close matches, or how many differ and how many break the chain", () => {
+    expect(sealVerdict({ ok: true, checked: 14, mismatches: 0, chain_breaks: [] })).toBe("All 14 closed months and years still match the ledger.");
+    expect(sealVerdict({ ok: false, checked: 14, mismatches: 1, chain_breaks: [] })).toBe("1 of 14 closed months and years differ from the ledger.");
+    expect(sealVerdict({ ok: false, checked: 14, mismatches: 0, chain_breaks: [9] })).toBe("1 close does not follow the close before it.");
+    expect(sealVerdict({ ok: true, checked: 0, mismatches: 0, chain_breaks: [] })).toContain("No month or year has been closed yet");
   });
 });
 
@@ -100,7 +100,7 @@ describe("Closed figures", () => {
     expect(mocks.verify).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Not checked yet");
 
-    await act(async () => button("Verify sealed figures")!.click());
+    await act(async () => button("Verify closed figures")!.click());
     expect(mocks.verify).toHaveBeenCalledWith({ entity: "BRIGHTSTAR" });
   });
 
@@ -108,7 +108,7 @@ describe("Closed figures", () => {
     mocks.result = { data: { data: { ok: false, checked: 2, mismatches: 1, chain_breaks: [], checks: [MARCH, APRIL] } }, isFetching: false, isError: false, error: undefined };
     await render();
 
-    expect(container.textContent).toContain("1 of 2 sealed months and years differ from the ledger.");
+    expect(container.textContent).toContain("1 of 2 closed months and years differ from the ledger.");
     expect(container.textContent).toContain("April 2026 (FY2026)");
     expect(container.textContent).toContain("1 ledger line was added after the seal.");
     expect(container.textContent).toContain("5100 Repairs");
@@ -117,18 +117,28 @@ describe("Closed figures", () => {
     expect(container.textContent).toContain("Differs");
   });
 
+  it("names the stored figures as closed, never as sealed", async () => {
+    mocks.result = { data: { data: { ok: false, checked: 2, mismatches: 1, chain_breaks: [12], checks: [MARCH, { ...APRIL, summary: null }] } }, isFetching: false, isError: false, error: undefined };
+    await render();
+
+    expect(container.textContent).toContain("Closed debit");
+    expect(container.textContent).toContain("Closed credit");
+    expect(button("Verify closed figures")).toBeDefined();
+    expect(container.textContent).not.toMatch(/sealed|seal\b|seals\b/i);
+  });
+
   it("tells a branch-only reader the check covers every branch, and sends nothing", async () => {
     mocks.wholeSchool = false;
     await render();
 
-    expect(container.textContent).toContain("Only a school-wide reader can see the sealed figures");
-    expect(button("Verify sealed figures")).toBeUndefined();
+    expect(container.textContent).toContain("Only a school-wide reader can see the closed figures");
+    expect(button("Verify closed figures")).toBeUndefined();
   });
 
-  it("tells a reader without the key that their role cannot verify the seals", async () => {
+  it("tells a reader without the key that their role cannot verify the closed figures", async () => {
     mocks.denied = new Set([P.FIN_VIEW_SEALS]);
     await render();
 
-    expect(container.textContent).toContain("Your role can't verify the sealed figures");
+    expect(container.textContent).toContain("Your role can't verify the closed figures");
   });
 });

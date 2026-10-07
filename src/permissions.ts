@@ -72,7 +72,7 @@ export const P = {
   FIN_CLOSE_PERIOD: "200324",
   FIN_FORCE_CLOSE_PERIOD: "200344",  // close a month or year over failing checks, with a reason
   FIN_ARCHIVE_FISCAL_YEAR: "203645",  // put a closed year away, and bring it back
-  FIN_VIEW_SEALS: "204901",  // verify the sealed figures of closed months and years
+  FIN_VIEW_SEALS: "204901",  // verify the closed figures of closed months and years
   FIN_CREATE_ACCOUNT: "200202",
   FIN_CREATE_BANK_ACCOUNT: "201802",
   FIN_CREATE_BANK_TRANSACTION: "204502",

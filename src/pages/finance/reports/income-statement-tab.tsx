@@ -28,6 +28,7 @@ import type { IncomeStatementLine, IncomeStatementTotals } from "@/redux/service
 import { toArray } from "@/redux/services/finance/api-types";
 import { ReportPeriodHeading } from "@/components/finance-ui/report-period-heading";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
+import { incomeStatementNoPeriod } from "./report-period-words";
 
 function Select({ value, onChange, children, className }: { value: string; onChange: (v: string) => void; children: ReactNode; className?: string }) {
   return (
@@ -97,7 +98,7 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
   const showBudget = d.has_budget && wantBudget;
   const showPrior = d.has_prior_year && wantPrior;
   const colCount = 2 + (showBudget ? 2 : 0) + (showPrior ? 1 : 0);
-  const periodLabel = d.period_label ?? (span.startsWith("fy:") && d.fiscal_year ? `FY ${d.fiscal_year}` : d.fiscal_year ? `${d.fiscal_year} fiscal year` : "Year to date");
+  const periodLabel = d.period_label ?? incomeStatementNoPeriod(d.fiscal_year);
 
   const numCell = "px-3 py-2 text-right tabular-nums";
   const muted = "text-gray-05";

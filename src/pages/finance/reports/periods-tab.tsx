@@ -1138,7 +1138,7 @@ export function PeriodCloseDrawer({
                         {item.detail ? <p className="mt-1 break-words font-mont text-xs leading-5 text-gray-05">{item.detail}</p> : null}
                         {sealsLink(item) && canWholeSchool(P.FIN_VIEW_SEALS) ? (
                           <Link to={`${F.REPORTS}/seals`} className="mt-1 inline-block font-mont text-xs font-semibold text-primary hover:underline">
-                            Verify sealed figures
+                            Verify closed figures
                           </Link>
                         ) : null}
                         {severity === "warning" ? (

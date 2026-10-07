@@ -23,6 +23,7 @@ import { ReportPeriodHeading } from "@/components/finance-ui/report-period-headi
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { periodParams } from "./period-params";
+import { EQUITY_NO_PERIOD } from "./report-period-words";
 
 function Select({ value, onChange, children, className }: { value: string; onChange: (v: string) => void; children: ReactNode; className?: string }) {
   return (
@@ -38,7 +39,7 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 const colLabel = (c: EquityColumn) => (c.key === "retained_earnings" ? "Current year earnings" : c.label);
 
 export function EquityReport({ entity, currency }: { entity: string; currency?: string | null }) {
-  const [period, setPeriod] = useState("");   // "" = year to date, else fiscal period id
+  const [period, setPeriod] = useState("");   // "" = inception to date, else fiscal period id
 
   const [showArchived] = useShowArchived();
 
@@ -78,10 +79,10 @@ export function EquityReport({ entity, currency }: { entity: string; currency?: 
   return (
     <div className="space-y-5">
       {d.narrowed && <BranchReportNote />}
-      <ReportPeriodHeading label={d.period_label} fallback="Year to date" />
+      <ReportPeriodHeading label={d.period_label} fallback={EQUITY_NO_PERIOD} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Select value={period} onChange={setPeriod} className="w-44">
-          <option value="">Year to date</option>
+          <option value="">{EQUITY_NO_PERIOD}</option>
           {periods.map((p) => <option key={p.id} value={String(p.id)}>{p.label}</option>)}
         </Select>
         <div className="flex items-center gap-2">

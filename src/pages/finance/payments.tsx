@@ -3,6 +3,7 @@
 // settlements and the platform's held-money checks.
 // Beneficiary details follow Field Access on payments.payout in each tab.
 import { DEFAULT_PAYMENTS_SECTION, type PaymentsSection } from "./console-sections";
+import { paymentsHeadings } from "./payments-headings";
 import { FinanceShell } from "./finance-shell";
 import { PayoutsTab } from "./payouts-tab";
 import { BatchesTab } from "./batches-tab";
@@ -18,17 +19,7 @@ import { useCan } from "@/components/finance-ui/can";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { P } from "../../permissions";
-
-const HEADINGS: Record<PaymentsSection, { label: string; subtitle: string }> = {
-  payouts: { label: "Payouts", subtitle: "Money out - single disbursements to recipients." },
-  batches: { label: "Payout Batches", subtitle: "Assemble a batch of payouts and submit them in one run." },
-  settlement: { label: "Settlement", subtitle: "Match the provider's payouts to the bank, and book them as settlements." },
-  transactions: { label: "Transactions Log", subtitle: "Lists the money coming in and going out: every collection, payout and transfer." },
-  "provider-activity": { label: "Payment provider activity", subtitle: "Every request XVS made to the payment provider, including refused and failed ones." },
-  webhooks: { label: "Needs Attention", subtitle: "Provider events that did not make it into the books." },
-  "held-settlements": { label: "Held Settlements", subtitle: "Online payments held for each branch, paid into its bank." },
-  "held-reconciliations": { label: "Held Reconciliations", subtitle: "The daily check of held money against the payment provider." },
-};
+import { platformName } from "../../host";
 
 /**
  * `section` comes from the route table; see console-sections.ts.
@@ -45,7 +36,8 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
 }) {
   const { code: entity, currency } = useActiveEntity();
   const { can } = useCan();
-  const { label, subtitle } = HEADINGS[section] ?? HEADINGS.payouts;
+  const headings = paymentsHeadings(platformName);
+  const { label, subtitle } = headings[section] ?? headings.payouts;
   const platformHeld = section === "held-settlements" && can(P.PAY_VIEW_PLATFORM_SETTLEMENTS);
   const needsEntity = section !== "held-reconciliations" && !platformHeld;
 

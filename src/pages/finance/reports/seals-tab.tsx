@@ -3,13 +3,15 @@
  * moved.
  *
  * Every month close, month lock and year close stores each account's balance
- * per branch and a checksum over the period's ledger lines, chained to the seal
- * before it. This screen asks the server to recompute every current seal from
+ * per branch and a checksum over the period's ledger lines, chained to the close
+ * before it. This screen asks the server to recompute every stored close from
  * the ledger and compare: it lists each closed month and year as matching, or
- * names the balances that moved, what was sealed and what the ledger says now.
- * Nothing is written and nothing is repaired; it is the auditor's check.
+ * names the balances that moved, what was stored when it closed and what the
+ * ledger says now. Nothing is written and nothing is repaired; it is the
+ * auditor's check. The word "sealed" is kept only as a search keyword, never on
+ * this screen.
  *
- * A seal covers every branch's figures, so the server keeps the check for a
+ * A close covers every branch's figures, so the server keeps the check for a
  * reader who covers the whole school. A branch's own bursar is told so here
  * rather than sent to a refusal. The check recomputes the whole ledger, so it
  * runs when asked, not on every visit.
@@ -33,7 +35,7 @@ import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-acces
 import { useDates } from "../../../lib/display-prefs";
 import { isForbidden } from "../../../lib/api-errors";
 
-export const SEALS_DESCRIPTION = "Every closed month and year, recomputed from the ledger and compared with the figures sealed when it closed.";
+export const SEALS_DESCRIPTION = "Every closed month and year, recomputed from the ledger and compared with the figures stored when it closed.";
 
 const KIND_LABEL: Record<string, string> = {
   PERIOD_CLOSED: "Month closed",
@@ -43,13 +45,13 @@ const KIND_LABEL: Record<string, string> = {
 
 /** The one-line verdict above the list. */
 export function sealVerdict(result: Pick<SealVerification, "ok" | "checked" | "mismatches" | "chain_breaks">): string {
-  if (result.checked === 0) return "Nothing is sealed yet. A month is sealed when it is closed.";
-  const things = (n: number) => `${n} sealed ${n === 1 ? "month or year" : "months and years"}`;
+  if (result.checked === 0) return "No month or year has been closed yet. Its figures are stored when it closes.";
+  const things = (n: number) => `${n} closed ${n === 1 ? "month or year" : "months and years"}`;
   if (result.ok) return `All ${things(result.checked)} still match the ledger.`;
   const parts = [];
   if (result.mismatches) parts.push(`${result.mismatches} of ${things(result.checked)} differ from the ledger.`);
   if (result.chain_breaks.length) {
-    parts.push(`${result.chain_breaks.length} ${result.chain_breaks.length === 1 ? "seal does" : "seals do"} not follow the seal before it.`);
+    parts.push(`${result.chain_breaks.length} ${result.chain_breaks.length === 1 ? "close does" : "closes do"} not follow the close before it.`);
   }
   return parts.join(" ");
 }
@@ -66,8 +68,8 @@ function Differences({ check, showBranch, currency }: { check: SealCheck; showBr
           <tr>
             {showBranch ? <th className={thCls}>Branch</th> : null}
             <th className={thCls}>Account</th>
-            <th className={cn(thCls, "text-right")}>Sealed debit</th>
-            <th className={cn(thCls, "text-right")}>Sealed credit</th>
+            <th className={cn(thCls, "text-right")}>Closed debit</th>
+            <th className={cn(thCls, "text-right")}>Closed credit</th>
             <th className={cn(thCls, "text-right")}>Debit now</th>
             <th className={cn(thCls, "text-right")}>Credit now</th>
           </tr>
@@ -97,7 +99,7 @@ function CheckRow({ check, showBranch, currency }: { check: SealCheck; showBranc
         <div className="min-w-0">
           <p className="font-mont text-sm font-semibold text-gray-01">{check.label}</p>
           <p className="mt-0.5 font-mont text-[11px] text-gray-05">
-            {KIND_LABEL[check.kind] ?? check.kind} · sealed {dates.dateTime(check.sealed_at)} · {check.line_count} ledger {check.line_count === 1 ? "line" : "lines"}
+            {KIND_LABEL[check.kind] ?? check.kind} · stored {dates.dateTime(check.sealed_at)} · {check.line_count} ledger {check.line_count === 1 ? "line" : "lines"}
             {check.line_count_now !== check.line_count ? `, ${check.line_count_now} now` : ""}
           </p>
         </div>
@@ -129,10 +131,10 @@ export function SealsReport({ entity, currency }: { entity: string; currency?: s
   const [verify, result] = useLazyVerifySealsQuery();
 
   if (!can(P.FIN_VIEW_SEALS)) {
-    return <EmptyState title="No access to sealed figures" message={noAccessMessage("verify the sealed figures")} />;
+    return <EmptyState title="No access to closed figures" message={noAccessMessage("verify the closed figures")} />;
   }
   if (!wholeSchool) {
-    return <ForbiddenState message="Only a school-wide reader can see the sealed figures, because they cover every branch." />;
+    return <ForbiddenState message="Only a school-wide reader can see the closed figures, because they cover every branch." />;
   }
 
   const run = () => { void verify({ entity, ...(year ? { fiscal_year: Number(year) } : {}) }); };
@@ -151,19 +153,19 @@ export function SealsReport({ entity, currency }: { entity: string; currency?: s
           {years.map((row) => <option key={row.id} value={row.year}>FY {row.year}{row.is_archived ? " · Archived" : ""}</option>)}
         </select>
         <Button onClick={run} disabled={result.isFetching} className="w-full gap-1.5 sm:w-auto">
-          <ShieldCheck className="size-4" />{result.isFetching ? "Checking…" : "Verify sealed figures"}
+          <ShieldCheck className="size-4" />{result.isFetching ? "Checking…" : "Verify closed figures"}
         </Button>
       </div>
 
       {result.isFetching ? (
-        <LoadingState rows={4} label="Recomputing the sealed figures…" />
+        <LoadingState rows={4} label="Recomputing the closed figures…" />
       ) : result.isError ? (
         isForbidden(result.error)
-          ? <ForbiddenState message="Only a school-wide reader can see the sealed figures, because they cover every branch." />
+          ? <ForbiddenState message="Only a school-wide reader can see the closed figures, because they cover every branch." />
           : <ErrorState onRetry={run} />
       ) : !data ? (
         <div className="rounded-md border border-white-02 bg-white">
-          <EmptyState title="Not checked yet" message="Run the check to recompute every closed month and year from the ledger and compare it with its seal." />
+          <EmptyState title="Not checked yet" message="Run the check to recompute every closed month and year from the ledger and compare it with the figures stored when it closed." />
         </div>
       ) : (
         <>
