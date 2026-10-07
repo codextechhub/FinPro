@@ -35,7 +35,7 @@ import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
 import { useDates } from "../../../lib/display-prefs";
 import {
-  useGetPayerLinksQuery, useGetPayerPaymentsQuery, useGetReceivablesSettingsQuery,
+  useGetPayerLinksQuery, useGetPayerPaymentsQuery, useGetPayerPaymentSplitChoicesQuery,
   usePreviewPayerPaymentMutation, useRecordPayerPaymentMutation, useVoidPayerPaymentMutation,
 } from "@/redux/services/finance/fees-api";
 import type {
@@ -111,15 +111,14 @@ export function PayerPaymentsTab({ entity, currency }: { entity: string; currenc
   );
 }
 
-function RecordPayerPaymentDrawer({ entity, currency, onClose, onRecorded }: {
+export function RecordPayerPaymentDrawer({ entity, currency, onClose, onRecorded }: {
   entity: string; currency?: string | null; onClose: () => void; onRecorded: (id: number) => void;
 }) {
-  const { can } = useCan();
   const [form, setForm] = useState<PayerPaymentFormState>(emptyPayerPaymentForm);
   const [plan, setPlan] = useState<{ key: string; data: PayerPaymentPlan } | null>(null);
   const [preview, { isLoading: previewing }] = usePreviewPayerPaymentMutation();
   const [record, { isLoading: recording }] = useRecordPayerPaymentMutation();
-  const settings = useGetReceivablesSettingsQuery({ entity }, { skip: !can(P.FIN_VIEW_SETTINGS) }).data?.data.settings;
+  const choices = useGetPayerPaymentSplitChoicesQuery({ entity }).data?.data;
   const links = useGetPayerLinksQuery({ entity, payer: form.payer, is_active: "true" }, { skip: !form.payer });
 
   const people = useMemo(() => {
@@ -135,7 +134,7 @@ function RecordPayerPaymentDrawer({ entity, currency, onClose, onRecorded }: {
   const codes = people.map((p) => p.code);
 
   const set = (patch: Partial<PayerPaymentFormState>) => setForm((f) => ({ ...f, ...patch }));
-  const forcedManual = needsManualAmounts(form.split, settings?.payer_payment_split);
+  const forcedManual = needsManualAmounts(form.split, choices?.split_default);
   const state = forcedManual && !form.manual ? { ...form, manual: true } : form;
   const input = payerPaymentInput(entity, state, codes);
   const key = inputKey(input);
@@ -161,10 +160,10 @@ function RecordPayerPaymentDrawer({ entity, currency, onClose, onRecorded }: {
   };
   const startManual = () => set({ manual: true, amounts: plan ? amountsFromPlan(plan.data.shares) : form.amounts });
 
-  // The words for each split come from the receivables settings, so the picker is
-  // offered to a reader of those settings; a payment and its preview carry their own.
-  const splitOptions = settings?.payer_payment_split_options ?? [];
-  const defaultSplit = splitOptions.find((o) => o.value === settings?.payer_payment_split)?.label ?? null;
+  // The choices and their words come from the server, readable by whoever may
+  // record; a payment and its preview carry their own label.
+  const splitOptions = choices?.split_options ?? [];
+  const defaultSplit = choices?.split_default_label ?? null;
 
   return (
     <DetailDrawer

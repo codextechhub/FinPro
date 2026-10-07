@@ -26,11 +26,33 @@ vi.mock("../../../host", async (importOriginal) => ({
 
 vi.mock("@/redux/services/finance/fees-api", () => ({
   useVoidPayerPaymentMutation: () => [vi.fn(), { isLoading: false }],
+  useGetPayerLinksQuery: () => ({ data: undefined, isSuccess: false }),
+  usePreviewPayerPaymentMutation: () => [vi.fn(), { isLoading: false }],
+  useRecordPayerPaymentMutation: () => [vi.fn(), { isLoading: false }],
+  useGetPayerPaymentSplitChoicesQuery: () => ({
+    data: {
+      data: {
+        split_options: [
+          { value: "OLDEST_FIRST", label: "Oldest bill first, across every customer" },
+          { value: "PROPORTIONAL", label: "In proportion to what each owes" },
+          { value: "AS_ENTERED", label: "As entered" },
+        ],
+        split_default: "OLDEST_FIRST",
+        split_default_label: "Oldest bill first, across every customer",
+      },
+    },
+  }),
+}));
+vi.mock("@/components/finance-ui", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  BankAccountPicker: () => null,
+  CustomerPicker: () => null,
+  PostingDateField: () => null,
 }));
 vi.mock("@/components/finance-ui/can", () => ({ useCan: () => ({ can: () => false }) }));
 vi.mock("../../../lib/display-prefs", () => ({ useDates: () => ({ day: (v: string) => String(v).slice(0, 10) }) }));
 
-import { PayerPaymentDrawer, PlanTable } from "./payer-payments-tab";
+import { PayerPaymentDrawer, PlanTable, RecordPayerPaymentDrawer } from "./payer-payments-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -94,5 +116,19 @@ describe("how a split reads", () => {
       payment={{ ...PAYMENT, split: "OLDEST_FIRST", split_label: "Oldest bill first, across every customer" }}
       entity="HOLYCROSS" currency="NGN" onClose={() => undefined} />));
     expect(document.body.textContent).toContain("Oldest bill first, across every customer");
+  });
+});
+
+describe("the split picker of the record form", () => {
+  it("offers both choices to a recorder who cannot read the receivables settings", () => {
+    mocks.branches = [{ id: 1, name: "Ikeja" }];
+    act(() => root.render(<RecordPayerPaymentDrawer entity="HOLYCROSS" currency="NGN" onClose={() => undefined} onRecorded={() => undefined} />));
+    const picker = document.body.querySelector<HTMLSelectElement>("select[aria-label='How to split it']");
+    expect(picker).not.toBeNull();
+    const options = [...picker!.options].map((o) => o.textContent);
+    expect(options).toContain("School setting: Oldest bill first, across every customer");
+    expect(options).toContain("Oldest bill first, across every customer");
+    expect(options).toContain("In proportion to what each owes");
+    expect(options).toContain("I will enter each customer's amount");
   });
 });

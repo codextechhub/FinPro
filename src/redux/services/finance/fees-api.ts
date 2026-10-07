@@ -31,6 +31,7 @@ import type {
   PayerPayment,
   PayerPaymentInput,
   PayerPaymentPlan,
+  PayerPaymentSplitChoices,
   ReceivablesSettingsPayload,
   ReceivablesSettingsUpdate,
   SubmittedProvision,
@@ -197,6 +198,12 @@ export const feesApi = baseApi.injectEndpoints({
       query: ({ entity, id }) => ({ url: `/finance/payer-payments/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["FinancePayerPayments"],
     }),
+    // The choices the record form offers, readable by whoever may record: the
+    // receivables settings are not, so the form never depends on them.
+    getPayerPaymentSplitChoices: builder.query<ApiEnvelope<PayerPaymentSplitChoices>, { entity: string }>({
+      query: ({ entity }) => ({ url: `/finance/payer-payments/preview/${qs({ entity })}`, method: "GET" }),
+      providesTags: ["FinanceSettings"],
+    }),
     // A POST that writes nothing: a mutation, so a changed amount asks again
     // rather than reading a cached split for the old one.
     previewPayerPayment: builder.mutation<ApiEnvelope<PayerPaymentPlan>, PayerPaymentInput>({
@@ -241,6 +248,7 @@ export const {
   useEndPayerLinkMutation,
   useGetPayerPaymentsQuery,
   useGetPayerPaymentQuery,
+  useGetPayerPaymentSplitChoicesQuery,
   usePreviewPayerPaymentMutation,
   useRecordPayerPaymentMutation,
   useVoidPayerPaymentMutation,

@@ -267,6 +267,13 @@ export interface PayerPlanShare {
   bills?: PayerPlanBill[];
 }
 
+/** What the record form offers before it previews: the split choices and the school's current default. */
+export interface PayerPaymentSplitChoices {
+  split_options: ChoiceOption<PayerPaymentSplit>[];
+  split_default: PayerPaymentSplit;
+  split_default_label: string;
+}
+
 export interface PayerPaymentPlan {
   payer: PartyRef;
   bank_account: { id: number; name: string };
