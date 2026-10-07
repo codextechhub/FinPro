@@ -32,6 +32,7 @@ import type {
   ArAdjustmentBatchKind,
 } from "@/redux/services/finance/ar-types";
 import { formatMoney } from "@/utils/money";
+import { useDates } from "../../../lib/display-prefs";
 import { batchAdjustmentLinesAreValid, refundBatchBranches } from "./batch-adjustment-validation";
 import {
   refundCreditBranchLabel,
@@ -79,6 +80,7 @@ export function BatchAdjustmentDrawer({
   currency?: string | null;
 }) {
   const { can } = useCan();
+  const dates = useDates();
   const canCreateRefund = can(P.FIN_CREATE_REFUND);
   const canCreateWriteOff = can(P.FIN_CREATE_WRITE_OFF);
   const [kind, setKind] = useState<ArAdjustmentBatchKind>(
@@ -434,11 +436,11 @@ export function BatchAdjustmentDrawer({
                         ? "This target already appears in the batch."
                         : ineligible
                           ? writeOff
-                            ? `This invoice is not open as at ${date} - it cannot be written off on that date.`
-                            : `No credit available as at ${date} - pick a later posting date or another customer.`
+                            ? `This invoice is not open as at ${dates.day(date)} - it cannot be written off on that date.`
+                            : `No credit available as at ${dates.day(date)} - pick a later posting date or another customer.`
                           : overLimit
-                            ? `Amount cannot exceed ${formatMoney(line.available, currency)} available as at ${date}.`
-                            : `${formatMoney(line.available, currency)} available as at ${date}.`}
+                            ? `Amount cannot exceed ${formatMoney(line.available, currency)} available as at ${dates.day(date)}.`
+                            : `${formatMoney(line.available, currency)} available as at ${dates.day(date)}.`}
                     </p>
                   ) : null}
                 </div>

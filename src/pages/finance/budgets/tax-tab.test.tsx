@@ -189,3 +189,30 @@ describe("a branch's own bursar", () => {
     expect(button("New filing")).toBeUndefined();
   });
 });
+
+describe("the words a bursar reads on the tax screens", () => {
+  const JARGON = /accru|\bGL\b|netting|journal|\bDr\b|\bCr\b/i;
+
+  it("prepare a return in plain words", async () => {
+    mocks.filing = { ...base, filing_status: "FILED", branch_breakdown: [share(1, "Main", 12_000_000)] };
+    await act(async () => root.render(<TaxTab entity="BRIGHTSTAR" />));
+    await click(button("New filing"));
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Prepare a return: works out what is owed for the period from the books.");
+    expect(text).not.toMatch(JARGON);
+  });
+
+  it("take a return back to draft, and pay one, without accounting shorthand", async () => {
+    mocks.filing = { ...base, filing_status: "FILED", branch_breakdown: [share(1, "Main", 12_000_000)] };
+    await openReturn();
+    await click(button("Un-file"));
+    expect(document.body.textContent).toContain("undoes the entries it made in the books");
+    expect(document.body.textContent).not.toMatch(/netting|journal/i);
+
+    await click(button("Cancel"));
+    await click(buttonStarting("Pay "));
+    const note = Array.from(document.body.querySelectorAll("p")).find((p) => p.textContent?.startsWith("Pays what is owed"));
+    expect(note?.textContent).toContain("Pays what is owed out of the bank account you choose, and clears it from VAT output payable.");
+    expect(note?.textContent).not.toMatch(/\bDr\b|\bCr\b|liability -/);
+  });
+});

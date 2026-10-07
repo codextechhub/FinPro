@@ -31,3 +31,16 @@ export function incomeStatementNoPeriod(fiscalYear: number | string | null | und
 export function cashFlowNoPeriod(fiscalYear: number | string | null | undefined): string {
   return incomeStatementNoPeriod(fiscalYear);
 }
+
+/**
+ * The period picker's first choice, worded as the heading it selects.
+ *
+ * Choosing it sends no period, and the server answers with the fiscal year
+ * today falls in, which the heading names "FY2026". The choice says the same
+ * year through the same helper, so the two cannot drift: "This fiscal year
+ * (FY2026)". With no fiscal year there is nothing to name and it reads "Year
+ * to date", as the heading does.
+ */
+export function currentFiscalYearChoice(fiscalYear: number | string | null | undefined): string {
+  return fiscalYear ? `This fiscal year (${incomeStatementNoPeriod(fiscalYear)})` : YEAR_TO_DATE;
+}

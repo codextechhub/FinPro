@@ -276,7 +276,7 @@ export function TaxRemittances({ filing, entity, currency, showBranch }: {
         open={target != null}
         onOpenChange={(open) => !open && close()}
         title={`Reverse the ${target ? formatMoney(target.amount, currency) : ""} payment${showBranch && target?.branch_name ? ` for ${target.branch_name}` : ""}?`}
-        description="Reverses the payment's journal and takes it off the return, which goes back to Filed with that share unpaid. Use it for a payment recorded in error."
+        description="Undoes the payment's entries in the books and takes it off the return, which goes back to Filed with that share unpaid. Use it for a payment recorded in error."
         confirmText="Reverse payment"
         destructive
         loading={isLoading}

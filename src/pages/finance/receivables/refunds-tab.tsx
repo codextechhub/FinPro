@@ -345,10 +345,11 @@ export function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
   );
 }
 
-function NewActionDrawer({ open, onClose, entity, currency }: {
+export function NewActionDrawer({ open, onClose, entity, currency }: {
   open: boolean; onClose: () => void; entity: string; currency?: string | null;
 }) {
   const { can } = useCan();
+  const dates = useDates();
   const [mode, setMode] = useState<Mode>("REFUND");
   const [date, setDate] = useState("");
   const [customer, setCustomer] = useState("");
@@ -586,13 +587,13 @@ function NewActionDrawer({ open, onClose, entity, currency }: {
         {!wo && !refundAvailabilityQ.isFetching && !refundAvailabilityQ.isError
           && refundAvailabilityQ.data && refundCustomers.length === 0 && !refundSearch ? (
             <p className="font-mont text-xs text-gray-05">
-              No customer had credit available to refund as at {date}. Credit received
+              No customer had credit available to refund as at {dates.day(date)}. Credit received
               later cannot fund a refund dated before it - try a later date.
             </p>
           ) : null}
         {noCreditOnDate && refundCustomers.length > 0 ? (
           <p className="font-mont text-xs text-destructive">
-            {customer} has no credit available as at {date}. Pick a later refund date,
+            {customer} has no credit available as at {dates.day(date)}. Pick a later refund date,
             or a different customer.
           </p>
         ) : null}
@@ -625,8 +626,8 @@ function NewActionDrawer({ open, onClose, entity, currency }: {
                   refundAmountOverLimit ? "text-destructive" : "text-gray-05",
                 )}>
                   {refundAmountOverLimit
-                    ? `Amount cannot exceed ${formatMoney(refundableAmount, currency)} available as at ${date}.`
-                    : `${formatMoney(refundableAmount, currency)} available to refund as at ${date}.`}
+                    ? `Amount cannot exceed ${formatMoney(refundableAmount, currency)} available as at ${dates.day(date)}.`
+                    : `${formatMoney(refundableAmount, currency)} available to refund as at ${dates.day(date)}.`}
                 </p>
               ) : null}
             </div>

@@ -28,7 +28,8 @@ import type { IncomeStatementLine, IncomeStatementTotals } from "@/redux/service
 import { toArray } from "@/redux/services/finance/api-types";
 import { ReportPeriodHeading } from "@/components/finance-ui/report-period-heading";
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
-import { incomeStatementNoPeriod } from "./report-period-words";
+import { currentFiscalYearChoice, incomeStatementNoPeriod } from "./report-period-words";
+import { useDefaultFiscalYear } from "./use-default-fiscal-year";
 
 function Select({ value, onChange, children, className }: { value: string; onChange: (v: string) => void; children: ReactNode; className?: string }) {
   return (
@@ -91,6 +92,7 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
 
   const { data, isLoading, isFetching, isError, refetch } = useGetIncomeStatementQuery({ entity, ...windowParams });
   const d = data?.data;
+  const defaultYear = useDefaultFiscalYear(span === "", d?.fiscal_year, !isFetching);
 
   if (isLoading) return <LoadingState />;
   if (isError || !d) return <ErrorState onRetry={refetch} />;
@@ -139,7 +141,7 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <Select value={span} onChange={setSpan} className="w-full sm:w-52">
-            <option value="">Year to date</option>
+            <option value="">{currentFiscalYearChoice(defaultYear)}</option>
             <optgroup label="Whole fiscal year">
               {years.map((year) => <option key={year} value={`fy:${year}`}>FY {year} (whole year)</option>)}
             </optgroup>

@@ -64,3 +64,33 @@ describe("the income statement heading", () => {
     expect(heading()).toBe("September 2026");
   });
 });
+
+describe("the period picker's first choice", () => {
+  const firstChoice = () => container.querySelector("select option")?.textContent;
+  const pick = (value: string) => {
+    const select = container.querySelector("select") as HTMLSelectElement;
+    const setValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!;
+    act(() => { setValue.call(select, value); select.dispatchEvent(new Event("change", { bubbles: true })); });
+  };
+
+  it("names the fiscal year its heading names", () => {
+    mocks.periodLabel = null; mocks.fiscalYear = 2026;
+    act(() => root.render(<IncomeStatementReport entity="HOLYCROSS" currency="NGN" />));
+    expect(firstChoice()).toBe("This fiscal year (FY2026)");
+    expect(heading()).toBe("FY2026");
+  });
+
+  it("still names the current year after another is picked", () => {
+    mocks.periodLabel = null; mocks.fiscalYear = 2026;
+    act(() => root.render(<IncomeStatementReport entity="HOLYCROSS" currency="NGN" />));
+    mocks.fiscalYear = 2025;
+    pick("fy:2026");
+    expect(firstChoice()).toBe("This fiscal year (FY2026)");
+  });
+
+  it("reads Year to date only when the books hold no fiscal year", () => {
+    mocks.periodLabel = null; mocks.fiscalYear = null;
+    act(() => root.render(<IncomeStatementReport entity="HOLYCROSS" currency="NGN" />));
+    expect(firstChoice()).toBe("Year to date");
+  });
+});

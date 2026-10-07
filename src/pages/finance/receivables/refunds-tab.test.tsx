@@ -12,7 +12,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ArAdjustment } from "@/redux/services/finance/ar-types";
 
-const mocks = vi.hoisted(() => ({ held: new Set<string>(), detail: undefined as unknown, uid: 4, request: undefined as unknown, resume: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  held: new Set<string>(), detail: undefined as unknown, uid: 4, request: undefined as unknown, resume: vi.fn(), availability: undefined as unknown,
+}));
 
 vi.mock("@/redux/services/finance/approval-request-api", () => ({
   useGetDocumentApprovalRequestQuery: (_args: unknown, options: { skip?: boolean }) => ({ data: options?.skip ? undefined : { data: mocks.detail } }),
@@ -36,7 +38,17 @@ vi.mock("@/hooks/use-permissions", () => ({
     fieldAccess: {},
   }),
 }));
-vi.mock("../../../lib/display-prefs", () => ({ useDates: () => ({ day: (v: string) => String(v).slice(0, 10), today: () => "2026-10-06" }) }));
+/** The school writes dates day first: "03/10/2026". */
+const dayFirst = (v: string) => String(v).slice(0, 10).split("-").reverse().join("/");
+vi.mock("../../../lib/display-prefs", () => ({ useDates: () => ({ day: dayFirst, today: () => "2026-10-06" }) }));
+vi.mock("./use-adjustment-gate", () => ({ useAdjustmentGate: () => ({ rule: { mode: "never", threshold: null } }) }));
+vi.mock("@/components/finance-ui", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  PostingDateField: ({ onChange }: { onChange: (v: string) => void }) => <button type="button" onClick={() => onChange("2026-09-05")}>Pick date</button>,
+  CustomerPicker: () => null,
+  BankAccountPicker: () => null,
+  AccountPicker: () => null,
+}));
 vi.mock("../../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverPrompt: () => ({ promptIfParked: vi.fn(), noApproverDialog: null }) }));
 vi.mock("./document-void-action", () => ({ DocumentVoidAction: () => null }));
@@ -45,14 +57,14 @@ vi.mock("@/redux/services/finance/ar-api", () => {
   const mutation = () => [() => ({ unwrap: async () => ({ data: {} }) }), { isLoading: false }];
   const query = () => ({ data: undefined, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() });
   return {
-    useGetArAdjustmentsQuery: query, useGetInvoicesQuery: query, useGetRefundAvailabilityQuery: query,
+    useGetArAdjustmentsQuery: query, useGetInvoicesQuery: query, useGetRefundAvailabilityQuery: () => ({ data: mocks.availability, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
     useCreateRefundMutation: mutation, usePostRefundMutation: mutation, useSubmitRefundMutation: mutation,
     useCreateWriteOffRequestMutation: mutation, usePostWriteOffRequestMutation: mutation, useSubmitWriteOffRequestMutation: mutation,
   };
 });
 
 import { P } from "../../../permissions";
-import { AdjustmentDetailDrawer } from "./refunds-tab";
+import { AdjustmentDetailDrawer, NewActionDrawer } from "./refunds-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -85,7 +97,7 @@ const button = (label: string) => [...document.body.querySelectorAll("button")].
 describe("a refund an approver sent back", () => {
   it("reads Sent back and offers its sender Resume, and no Submit", async () => {
     render();
-    expect(document.body.textContent).toContain("Sent back by Mr Eze on 2026-10-03: Add the bank reference");
+    expect(document.body.textContent).toContain("Sent back by Mr Eze on 03/10/2026: Add the bank reference");
     expect(button("Submit for approval")).toBeUndefined();
     await act(async () => { button("Resume")!.click(); });
     expect(mocks.resume).toHaveBeenCalledWith("wf-12");
@@ -103,5 +115,16 @@ describe("a refund an approver sent back", () => {
     render();
     expect(button("Submit for approval")).toBeDefined();
     expect(document.body.textContent).not.toContain("Sent back");
+  });
+});
+
+describe("the date a new refund is measured on", () => {
+  it("is written in the school's date style when no customer has credit on it", async () => {
+    mocks.availability = { data: [], pagination: { currentPage: 1, totalPages: 1 } };
+    act(() => root.render(<NewActionDrawer open onClose={vi.fn()} entity="BSS" currency="NGN" />));
+    await act(async () => { button("Pick date")!.click(); });
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("No customer had credit available to refund as at 05/09/2026.");
+    expect(text).not.toContain("2026-09-05");
   });
 });

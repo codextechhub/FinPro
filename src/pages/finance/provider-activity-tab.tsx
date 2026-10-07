@@ -29,27 +29,38 @@ import { PROVIDER_CHOICES, providerInfo } from "./payment-providers";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 
-/** The actions the log records, as the server names them, for the filter. */
+/**
+ * Every action the log can hold, with the server's display names, in the
+ * server's order, for the filter. The list is `PaymentAuditAction` in the
+ * backend's `apps/vs_payments/constants.py`: no route serves it, so it is
+ * copied by hand, and `provider-activity-tab.test.tsx` fails when the two
+ * differ. An action missing here leaves its rows visible only under
+ * "Everything".
+ */
 export const PROVIDER_ACTIONS: readonly (readonly [string, string])[] = [
   ["COLLECTION_INITIATED", "Collection initiated"],
   ["COLLECTION_CONFIRMED", "Collection confirmed"],
   ["COLLECTION_FAILED", "Collection failed"],
   ["VIRTUAL_ACCOUNT_CREATED", "Virtual account created"],
   ["VIRTUAL_ACCOUNT_STATUS_CHANGED", "Virtual account status changed"],
-  ["VIRTUAL_ACCOUNT_REISSUED", "Virtual account reissued"],
   ["PAYOUT_INITIATED", "Payout initiated"],
   ["PAYOUT_CONFIRMED", "Payout confirmed"],
   ["PAYOUT_FAILED", "Payout failed"],
   ["PAYOUT_BATCH_CREATED", "Payout batch created"],
   ["PAYOUT_BATCH_SUBMITTED", "Payout batch submitted"],
-  ["HELD_FUNDS_REFUSED", "Payout refused: held funds"],
   ["WEBHOOK_RECEIVED", "Webhook received"],
   ["WEBHOOK_REJECTED", "Webhook rejected"],
   ["COLLECTIONS_SETTLED", "Collections settled to a bank"],
   ["SUBACCOUNT_SAVED", "Collection subaccount saved"],
+  ["CUSTODY_SETTINGS_UPDATED", "Custody settings updated"],
+  ["CUSTODY_SWITCHED", "Custody mode switched"],
+  ["CUSTODY_SWITCH_WAITING", "Custody switch waiting"],
   ["HELD_SETTLEMENT_BUILT", "Held settlement built"],
   ["HELD_SETTLEMENT_PAID", "Held settlement paid"],
   ["HELD_SETTLEMENT_FAILED", "Held settlement failed"],
+  ["HELD_FUNDS_REFUSED", "Payout refused: held funds"],
+  ["HELD_OPENING_BALANCE", "Held opening balance"],
+  ["VIRTUAL_ACCOUNT_REISSUED", "Virtual account reissued"],
   ["PROVIDER_DISPUTE_RECEIVED", "Chargeback or refund received"],
   ["PROVIDER_DISPUTE_RESOLVED", "Chargeback resolved"],
 ];

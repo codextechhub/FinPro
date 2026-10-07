@@ -24,6 +24,7 @@ import { useEffect, useRef } from "react";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { cn } from "@/lib/utils";
 import { clipRangesFrom } from "@/utils/posting-window";
+import { useDates } from "../../lib/display-prefs";
 import { usePostingWindow } from "./use-posting-window";
 
 export function PostingDateField({
@@ -59,6 +60,8 @@ export function PostingDateField({
 }) {
   const { ranges: openRanges, defaultDate: windowDefault, constrained, noOpenPeriod, label: windowLabel, reasonFor, isLoading } =
     usePostingWindow(entity);
+  const dates = useDates();
+  const floor = notBefore ? dates.day(notBefore) : "";
 
   // Intersect the open periods with the causal floor. Both constraints must hold,
   // and a period that ends before the floor drops out entirely.
@@ -121,13 +124,13 @@ export function PostingDateField({
         </p>
       ) : noEligibleDate ? (
         <p className="font-mont text-[11px] text-error">
-          No open period falls on or after {notBefore}
+          No open period falls on or after {floor}
           {notBeforeLabel ? ` (${notBeforeLabel})` : ""}, so this cannot be posted yet.
         </p>
       ) : tooEarly ? (
         <p className="font-mont text-[11px] text-error">
           {notBeforeLabel ? `${notBeforeLabel} only exists from ` : "Not valid before "}
-          {notBefore}. Pick {notBefore} or later.
+          {floor}. Pick {floor} or later.
         </p>
       ) : reason ? (
         <p className="font-mont text-[11px] text-error">
@@ -137,7 +140,7 @@ export function PostingDateField({
         <p className="font-mont text-[11px] text-gray-05">{hint}</p>
       ) : notBefore ? (
         <p className="font-mont text-[11px] text-gray-05">
-          On or after {notBefore}
+          On or after {floor}
           {notBeforeLabel ? ` - ${notBeforeLabel}` : ""}
         </p>
       ) : constrained && windowLabel ? (

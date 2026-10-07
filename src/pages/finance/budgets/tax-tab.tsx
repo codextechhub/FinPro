@@ -114,7 +114,7 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
       <DataTable columns={columns} rows={rows} rowKey={(f) => f.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(f) => setSelectedId(f.id)}
         page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
-        emptyTitle="No tax filings" emptyMessage="Prepare a filing from an obligation to accrue, file and remit." />
+        emptyTitle="No tax filings" emptyMessage="Prepare a return for a tax obligation, then file it and pay it." />
 
       <FilingDrawer filingId={selectedId} filings={rows} entity={entity} currency={currency} onClose={() => setSelectedId(null)} />
       <NewFilingDrawer open={newFiling} onClose={() => setNewFiling(false)} entity={entity} />
@@ -226,7 +226,7 @@ function FilingDrawer({ filingId, filings, entity, currency, onClose }: { filing
         open={unfiling}
         onOpenChange={setUnfiling}
         title={`Un-file ${f.obligation_code} - ${taxPeriodLabel(f.period_start, f.period_end, dates.prefs)}?`}
-        description="Reverts this return to draft and reverses its netting/penalty journal. Use it to correct a return filed in error. Only possible while nothing has been remitted."
+        description="Takes this return back to draft and undoes the entries it made in the books, including any penalty. Use it to correct a return filed in error. Only possible while nothing has been paid."
         confirmText="Un-file return"
         destructive
         loading={unfilingBusy}
@@ -328,7 +328,7 @@ function PayDrawer({ filing, entity, currency, onClose }: { filing: TaxFilingDet
         <Button disabled={isLoading || !bank || amount <= 0 || (askShare && !share)} onClick={submit} className="gap-1.5"><Banknote className="size-4" />{isLoading ? "Paying…" : `Pay ${formatMoney(amount, currency)}`}</Button>
       </>}>
       <div className="space-y-4">
-        <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">Remits the liability - Dr {filing.liability_account || filing.obligation_code + " payable"}, Cr bank. Partial payments are allowed; the filing closes once the balance is cleared.</p>
+        <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">Pays what is owed out of the bank account you choose, and clears it from {filing.liability_account_name || filing.obligation_code + " payable"}. Part payments are allowed; the return closes once nothing is left to pay.</p>
         {askShare ? (
           <FormField label="Share to pay" required>
             <Select value={shareBranch} onChange={chooseShare}>
@@ -372,7 +372,7 @@ function NewFilingDrawer({ open, onClose, entity }: { open: boolean; onClose: ()
   };
   return (
     <DetailDrawer open={open} onOpenChange={(o) => (o ? undefined : close())}
-      title="New filing" description="Prepare a return - accrues the period's liability from the GL." widthClass="sm:max-w-md"
+      title="New filing" description="Prepare a return: works out what is owed for the period from the books." widthClass="sm:max-w-md"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
         <Button disabled={isLoading || !obId || !start || !end} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Preparing…" : "Prepare filing"}</Button>

@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ANALYTICS_NO_PERIOD, cashFlowNoPeriod, EQUITY_NO_PERIOD, incomeStatementNoPeriod, TRIAL_BALANCE_NO_PERIOD,
+  ANALYTICS_NO_PERIOD, cashFlowNoPeriod, EQUITY_NO_PERIOD, currentFiscalYearChoice, incomeStatementNoPeriod, TRIAL_BALANCE_NO_PERIOD,
 } from "./report-period-words";
 
 describe("the no-month headings", () => {
@@ -26,5 +26,11 @@ describe("the no-month headings", () => {
   it("names the cash flow's year as the income statement does", () => {
     expect(cashFlowNoPeriod(2026)).toBe("FY2026");
     expect(cashFlowNoPeriod(null)).toBe("Year to date");
+  });
+
+  it("words the picker's first choice with the year its heading names", () => {
+    expect(currentFiscalYearChoice(2026)).toBe("This fiscal year (FY2026)");
+    expect(currentFiscalYearChoice(2026)).toContain(incomeStatementNoPeriod(2026));
+    expect(currentFiscalYearChoice(null)).toBe("Year to date");
   });
 });

@@ -169,6 +169,8 @@ describe("the return's detail", () => {
     await render(<TaxRemittances filing={OCTOBER} entity="BRIGHTSTAR" showBranch />);
     await act(async () => button("Reverse")!.click());
     expect(button("Reverse payment")?.disabled).toBe(true);
+    expect(document.body.textContent).toContain("Undoes the payment's entries in the books and takes it off the return");
+    expect(document.body.textContent).not.toMatch(/journal/i);
 
     const field = document.body.querySelector("textarea")!;
     const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;

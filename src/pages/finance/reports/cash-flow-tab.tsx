@@ -22,7 +22,8 @@ import { ReportPeriodHeading } from "@/components/finance-ui/report-period-headi
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { periodParams } from "./period-params";
-import { cashFlowNoPeriod, YEAR_TO_DATE } from "./report-period-words";
+import { cashFlowNoPeriod, currentFiscalYearChoice } from "./report-period-words";
+import { useDefaultFiscalYear } from "./use-default-fiscal-year";
 
 const BAND: Record<string, string> = {
   operating: "bg-green-01/10 text-green-01",
@@ -46,7 +47,7 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 }
 
 export function CashFlowReport({ entity, currency }: { entity: string; currency?: string | null }) {
-  const [period, setPeriod] = useState("");   // "" = current fiscal year to date, else fiscal period id
+  const [period, setPeriod] = useState("");   // "" = the current fiscal year, else a fiscal period id
 
   const [showArchived] = useShowArchived();
 
@@ -57,6 +58,7 @@ export function CashFlowReport({ entity, currency }: { entity: string; currency?
   const picked = periodParams(periods, period);
   const { data, isLoading, isFetching, isError, refetch } = useGetCashFlowQuery({ entity, ...picked });
   const d = data?.data;
+  const defaultYear = useDefaultFiscalYear(period === "", d?.fiscal_year, !isFetching);
 
   if (isLoading) return <LoadingState />;
   if (isError || !d) return <ErrorState onRetry={refetch} />;
@@ -73,7 +75,7 @@ export function CashFlowReport({ entity, currency }: { entity: string; currency?
       <ReportPeriodHeading label={d.period_label} fallback={cashFlowNoPeriod(d.fiscal_year)} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Select value={period} onChange={setPeriod} className="w-44">
-          <option value="">{YEAR_TO_DATE}</option>
+          <option value="">{currentFiscalYearChoice(defaultYear)}</option>
           {periods.map((p) => <option key={p.id} value={String(p.id)}>{p.label}</option>)}
         </Select>
         <div className="flex items-center gap-2">

@@ -110,7 +110,7 @@ function TaxCodeModal({ existing, onClose, entity }: { existing: TaxCode | null;
 
   return (
     <FormDrawer open onOpenChange={(o) => !o && onClose()} title={existing ? `Edit ${existing.code}` : "New tax code"}
-      description="Define a rate and the GL accounts it books to." onSubmit={submit}
+      description="Define a rate and the accounts it books to." onSubmit={submit}
       loading={isLoading} canSubmit={canSubmit} widthClass="sm:max-w-lg">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Code" required><Input value={code} onChange={(e) => setCode(e.target.value)} disabled={!!existing} placeholder="e.g. VAT-7.5" className="bg-white font-mont" /></FormField>

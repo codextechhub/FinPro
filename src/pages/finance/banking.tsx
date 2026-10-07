@@ -502,7 +502,7 @@ export function StatementsTab({
                       type="button"
                       onClick={() => setRollingBack(s)}
                       title="Roll back this import"
-                      aria-label={`Roll back statement ${s.period_label || s.statement_date}`}
+                      aria-label={`Roll back statement ${s.period_label || dates.day(s.statement_date)}`}
                       className="rounded p-1.5 text-gray-05 hover:bg-destructive/5 hover:text-destructive"
                     >
                       <Undo2 className="size-3.5" />
@@ -513,7 +513,7 @@ export function StatementsTab({
                     onClick={() => onEdit(s.id)}
                     disabled={!s.can_edit}
                     title={s.edit_block_reason || "Edit statement"}
-                    aria-label={`Edit statement ${s.period_label || s.statement_date}`}
+                    aria-label={`Edit statement ${s.period_label || dates.day(s.statement_date)}`}
                     className="rounded p-1.5 text-gray-05 hover:bg-gray-03 hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     <Pencil className="size-3.5" />
