@@ -22,7 +22,7 @@ import { ReportPeriodHeading } from "@/components/finance-ui/report-period-headi
 import { BranchReportNote } from "@/components/finance-ui/branch-report-note";
 import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { periodParams } from "./period-params";
-import { CASH_FLOW_NO_PERIOD } from "./report-period-words";
+import { cashFlowNoPeriod, YEAR_TO_DATE } from "./report-period-words";
 
 const BAND: Record<string, string> = {
   operating: "bg-green-01/10 text-green-01",
@@ -46,7 +46,7 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 }
 
 export function CashFlowReport({ entity, currency }: { entity: string; currency?: string | null }) {
-  const [period, setPeriod] = useState("");   // "" = year to date, else fiscal period id
+  const [period, setPeriod] = useState("");   // "" = current fiscal year to date, else fiscal period id
 
   const [showArchived] = useShowArchived();
 
@@ -70,10 +70,10 @@ export function CashFlowReport({ entity, currency }: { entity: string; currency?
   return (
     <div className="space-y-5">
       {d.narrowed && <BranchReportNote />}
-      <ReportPeriodHeading label={d.period_label} fallback={CASH_FLOW_NO_PERIOD} />
+      <ReportPeriodHeading label={d.period_label} fallback={cashFlowNoPeriod(d.fiscal_year)} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Select value={period} onChange={setPeriod} className="w-44">
-          <option value="">{CASH_FLOW_NO_PERIOD}</option>
+          <option value="">{YEAR_TO_DATE}</option>
           {periods.map((p) => <option key={p.id} value={String(p.id)}>{p.label}</option>)}
         </Select>
         <div className="flex items-center gap-2">

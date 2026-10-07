@@ -163,6 +163,9 @@ export interface CashFlow {
   period: string | null;
   /** The period in words ("September 2026"), the report's heading; null when it covers every period. */
   period_label: string | null;
+  /** The fiscal year covered when no period is chosen (the current year to date); null for a chosen period or a school with no fiscal year. */
+  fiscal_year: number | null;
+  /** Cash held at the window's start: the real earlier balances, not zero, for a chosen month or a later year. */
   opening_cash: ReportMoney;
   closing_cash: ReportMoney;
   by_activity: Record<string, ReportMoney>;
