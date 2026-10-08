@@ -41,6 +41,8 @@ export interface ConsoleNavChild {
   /** A screen that pays out of money the platform holds for the school,
    *  offered only where custody is HELD (see `ConsoleNavGate.custody`). */
   heldCustody?: boolean;
+  /** A filing or action that exists only for a reader whose reach covers every branch. */
+  wholeSchool?: boolean;
 }
 
 export interface ConsoleNavItem extends ConsoleNavChild {
@@ -81,12 +83,15 @@ export interface ConsoleNavGate {
    * custody, and such screens follow their permissions alone.
    */
   custody?: CustodyReading;
+  /** Whether the reader covers every branch, including the sole branch of a one-branch school. */
+  wholeSchool?: boolean;
 }
 
 /** Whether the school's shape lets a screen appear, before any permission. */
 function entryFitsSchool(entry: ConsoleNavChild, gate: ConsoleNavGate): boolean {
   if (entry.multiBranch && gate.multiBranch !== true) return false;
   if (entry.heldCustody && gate.custody !== undefined && gate.custody !== "HELD") return false;
+  if (entry.wholeSchool && gate.wholeSchool !== true) return false;
   return true;
 }
 

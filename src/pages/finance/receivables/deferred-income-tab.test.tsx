@@ -57,7 +57,7 @@ const ROWS = [
   row({ id: 2, branch_id: 2, branch_name: "Lekki", amount: 500_000, journal_id: 401, journal_number: "JE-0401" }),
   row({
     id: 3, date: "2026-08-31", month: "2026-08", period_id: 8, period_name: "2026-08", period_label: "August 2026", period_status: "CLOSED",
-    branch_period_status: "CLOSED", can_reverse: false, reverse_blocked_reason: "August 2026 is closed; its releases are sealed with it.",
+    branch_period_status: "CLOSED", can_reverse: false, reverse_blocked_reason: "August 2026 is closed; its deferred income releases belong to the closed month. Reopen the month first.",
   }),
   row({ id: 4, date: "2026-07-31", month: "2026-07", period_id: 7, period_name: "2026-07", period_label: "July 2026", reversed: true, can_reverse: false }),
 ];
@@ -69,7 +69,7 @@ const LEKKI_CLOSED_SEPTEMBER = [
   row({
     id: 2, branch_id: 2, branch_name: "Lekki", amount: 500_000, journal_id: 401, journal_number: "JE-0401",
     branch_period_status: "CLOSED", can_reverse: false,
-    reverse_blocked_reason: "Lekki has closed September 2026; its release is sealed with that month.",
+    reverse_blocked_reason: "Lekki has closed September 2026; its release cannot be undone while that month is closed.",
   }),
   ...ROWS.slice(2),
 ];
@@ -99,7 +99,7 @@ describe("the months a release can be undone in", () => {
       { periodId: 9, name: "September 2026", amount: 1_500_000, journals: 2, blockedReason: SHARED_REASON },
     ]);
     const lekkiOnly = LEKKI_CLOSED_SEPTEMBER.filter((r) => r.branch_id === 2);
-    expect(undoableMonths(lekkiOnly)[0].blockedReason).toBe("Lekki has closed September 2026; its release is sealed with that month.");
+    expect(undoableMonths(lekkiOnly)[0].blockedReason).toBe("Lekki has closed September 2026; its release cannot be undone while that month is closed.");
   });
 });
 
@@ -137,7 +137,7 @@ describe("the deferred income tab", () => {
     expect(september?.textContent).toBe("September 2026: cannot be undone");
     expect(september?.disabled).toBe(true);
     expect(document.body.querySelector("[role=dialog]")?.textContent ?? document.body.textContent).toContain(SHARED_REASON);
-    expect(container.textContent).toContain("its release is sealed with that month");
+    expect(container.textContent).toContain("its release cannot be undone while that month is closed");
     expect(container.textContent).not.toContain("August 2026 is closed");
   });
 });

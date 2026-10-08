@@ -365,8 +365,8 @@ export function PeriodsTab({ entity, headerSlot }: {
     : {
       title: `Close fiscal year ${yearAction?.year ?? ""}${yearScope}?`,
       description: calendar.applies
-        ? `Posts the branch's year-end journal, clears its income and expense balances into Retained Earnings, and seals FY ${yearAction?.year ?? ""} for that branch. The school's year closes once every branch has closed its year. Period locks remain unchanged.`
-        : `Posts the formal year-end journal, clears income and expense balances into Retained Earnings, and seals FY ${yearAction?.year ?? ""}. Period locks remain unchanged.`,
+        ? `Posts the branch's year-end journal, clears its income and expense balances into Retained Earnings, and closes FY ${yearAction?.year ?? ""} for that branch. The school's year closes once every branch has closed its year. Period locks remain unchanged.`
+        : `Posts the formal year-end journal, clears income and expense balances into Retained Earnings, and closes FY ${yearAction?.year ?? ""}. Period locks remain unchanged.`,
       text: "Close fiscal year",
     };
 
@@ -563,7 +563,7 @@ function FiscalYearOverview({
         <StatCard label="Open" value={String(summary.open)} sub="Ordinary posting allowed" icon={Circle} tone="primary" />
         <StatCard label="Soft-closed" value={String(summary.softClosed)} sub="Close entries only" icon={Clock3} tone="amber" />
         <StatCard label="Closed" value={String(summary.closed)} sub="Re-openable by permission" icon={ShieldCheck} tone="green" />
-        <StatCard label="Locked" value={String(summary.locked)} sub="Permanent seal" icon={Lock} tone="gray" />
+        <StatCard label="Locked" value={String(summary.locked)} sub="Permanently closed" icon={Lock} tone="gray" />
       </div>
     </section>
   );
@@ -629,7 +629,7 @@ function YearCloseReadiness({
           : <CheckCircle2 className="size-5 shrink-0 text-green-01" />}
         <div className="min-w-0 flex-1">
           <p className="font-mont text-sm font-semibold text-gray-01">
-            Fiscal year {year} is {isArchived ? "archived" : "sealed"}{branchName ? ` for ${branchName}` : ""}
+            Fiscal year {year} is {isArchived ? "archived" : "closed"}{branchName ? ` for ${branchName}` : ""}
           </p>
           <p className="mt-0.5 font-mont text-xs text-gray-05">
             {isArchived

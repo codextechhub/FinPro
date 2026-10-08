@@ -14,6 +14,7 @@ import {
   PiggyBank, Boxes, Scale, TrendingUp, ArrowLeftRight, GitBranch, ScrollText, Activity,
   CircleDollarSign, Send, Settings, AlertTriangle, ArrowRightLeft, HandCoins, Split, Handshake,
   Gavel, ShieldCheck, Hourglass, ShieldAlert, Lock,
+  FileStack,
 } from "lucide-react";
 import type { ConsoleNavGroup } from "@/components/finance-ui/console-nav";
 import { routesPath } from "@/routes/routes-path";
@@ -119,6 +120,7 @@ export const financeNav: ConsoleNavGroup[] = [
       { title: "Balance Sheet", url: `${F.REPORTS}/balance-sheet`, icon: Scale, permissions: [P.FIN_VIEW_REPORTS] },
       { title: "Cash Flow", url: `${F.REPORTS}/cash-flow`, icon: ArrowLeftRight, permissions: [P.FIN_VIEW_REPORTS] },
       { title: "Changes in Equity", url: `${F.REPORTS}/changes-in-equity`, icon: GitBranch, permissions: [P.FIN_VIEW_REPORTS] },
+      { title: "Statutory Pack", url: `${F.REPORTS}/statutory-pack`, icon: FileStack, permissions: [P.FIN_VIEW_REPORTS], wholeSchool: true },
       { title: "Cost & Dimension Analysis", url: `${F.REPORTS}/analytics`, icon: Layers, permissions: [P.FIN_VIEW_REPORTS] },
       { title: "Closed figures", url: `${F.REPORTS}/seals`, icon: ShieldCheck, permissions: [P.FIN_VIEW_SEALS] },
       { title: "Audit Trail", url: F.AUDIT, icon: ScrollText, permissions: [P.FIN_VIEW_AUDIT] },

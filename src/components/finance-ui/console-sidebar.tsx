@@ -30,6 +30,7 @@ import { revealActiveSidebarItem } from "./sidebar-navigation";
 import { useReaderBranchLens } from "./raising-branch";
 import { useCustodyReading } from "./held-custody";
 import { useActiveEntity } from "./use-entity";
+import { useReaderReach } from "../../host";
 
 /**
  * Each console page mounts its own shell, so the sidebar remounts on every
@@ -48,6 +49,7 @@ export function ConsoleSidebar({ title, nav, gateOnCustody = false }: { title: s
   const location = useLocation().pathname;
   const { hasAnyPermission, hasModuleAccess } = usePermissions();
   const { applies: multiBranch } = useReaderBranchLens();
+  const { wholeSchool } = useReaderReach();
   const { code: entity } = useActiveEntity();
   const custodyRead = useCustodyReading(entity, gateOnCustody);
   const custody = gateOnCustody ? custodyRead : undefined;
@@ -64,7 +66,7 @@ export function ConsoleSidebar({ title, nav, gateOnCustody = false }: { title: s
     revealActiveSidebarItem(el, remembered);
   }, [title, location]);
 
-  const visibleNav = visibleConsoleNav(nav, { hasAnyPermission, hasModuleAccess, multiBranch, custody });
+  const visibleNav = visibleConsoleNav(nav, { hasAnyPermission, hasModuleAccess, multiBranch, custody, wholeSchool });
 
   // Find the single best-matching leaf URL (longest URL whose path is a prefix
   // of the current location). This prevents a shorter sibling URL from also

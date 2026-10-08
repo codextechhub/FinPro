@@ -202,6 +202,50 @@ export interface ChangesInEquity {
   is_reconciled: boolean;
 }
 
+export interface StatutoryPackHeading {
+  statement_of_financial_position: string;
+  income_statement: string;
+  cash_flow: string;
+  changes_in_equity: string;
+}
+
+export interface StatutoryPack {
+  entity: string;
+  as_of: string;
+  period: string | null;
+  period_label: string | null;
+  fiscal_year: number | null;
+  headings: StatutoryPackHeading;
+  statement_of_financial_position: {
+    sections: BalanceSheetSection[];
+    total_assets: ReportMoney;
+    total_equity: ReportMoney;
+    total_liabilities: ReportMoney;
+    is_balanced: boolean;
+  };
+  income_statement: {
+    lines: BalanceSheetGroup[];
+    total_income: ReportMoney;
+    total_expense: ReportMoney;
+    net_income: ReportMoney;
+  };
+  cash_flow: {
+    opening_cash: ReportMoney;
+    closing_cash: ReportMoney;
+    by_activity: Record<string, ReportMoney>;
+    net_change: ReportMoney;
+    is_reconciled: boolean;
+  };
+  changes_in_equity: {
+    total_opening: ReportMoney;
+    total_profit: ReportMoney;
+    total_contributions: ReportMoney;
+    total_transfers: ReportMoney;
+    total_closing: ReportMoney;
+    is_reconciled: boolean;
+  };
+}
+
 export interface ReportParams {
   entity: string;
   period?: string | number;

@@ -56,7 +56,7 @@ const MARCH = {
 };
 const APRIL = {
   ...MARCH, seal_id: 12, label: "April 2026 (FY2026)", period_id: 42, line_count: 80, line_count_now: 81,
-  ok: false, lines_match: false, summary: "1 ledger line was added after the seal.",
+  ok: false, lines_match: false, summary: "1 ledger line was added after the month closed.",
   differences: [{
     branch_id: 2, branch_name: "Lekki", account_id: 5, account_code: "5100", account_name: "Repairs",
     sealed: { debit: money(2000000), credit: money(0) }, now: { debit: money(2500000), credit: money(0) },
@@ -110,7 +110,7 @@ describe("Closed figures", () => {
 
     expect(container.textContent).toContain("1 of 2 closed months and years differ from the ledger.");
     expect(container.textContent).toContain("April 2026 (FY2026)");
-    expect(container.textContent).toContain("1 ledger line was added after the seal.");
+    expect(container.textContent).toContain("1 ledger line was added after the month closed.");
     expect(container.textContent).toContain("5100 Repairs");
     expect(container.textContent).toContain("Lekki");
     expect(container.textContent).toContain("Matches");

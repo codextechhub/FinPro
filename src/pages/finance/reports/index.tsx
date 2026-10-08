@@ -9,6 +9,7 @@ import { IncomeStatementReport } from "./income-statement-tab";
 import { BalanceSheetReport } from "./balance-sheet-tab";
 import { CashFlowReport } from "./cash-flow-tab";
 import { EquityReport } from "./equity-tab";
+import { StatutoryPackReport } from "./statutory-pack-tab";
 import { TrialBalanceReport } from "./trial-balance-tab";
 import { AnalyticsSliceReport } from "./analytics-slice-tab";
 import { PeriodsTab, PERIODS_DESCRIPTION } from "./periods-tab";
@@ -21,6 +22,7 @@ const LABELS: Record<string, string> = {
   "trial-balance": "Trial Balance", "income-statement": "Income Statement (P&L)",
   "balance-sheet": "Balance Sheet", "cash-flow": "Cash Flow",
   "changes-in-equity": "Changes in Equity", analytics: "Cost & Dimension Analysis",
+  "statutory-pack": "Statutory Pack",
   periods: "Periods & Close",
   seals: "Closed figures",
 };
@@ -36,6 +38,7 @@ const DESCRIPTIONS: Record<string, string> = {
   "balance-sheet": "Assets, liabilities and equity as they stand on a single date.",
   "cash-flow": "Where cash came from and where it went, split into operating, investing and financing.",
   "changes-in-equity": "How each equity component moved from opening to closing balance.",
+  "statutory-pack": "The IFRS for SMEs statements prepared together for the school's annual filing.",
   analytics: "Net posted activity per account, sliced by one cost centre or dimension axis.",
   periods: PERIODS_DESCRIPTION,
   seals: SEALS_DESCRIPTION,
@@ -94,6 +97,8 @@ export default function ReportsPage({ section = DEFAULT_REPORTS_SECTION }: {
           <CashFlowReport entity={entity} currency={currency} />
         ) : section === "changes-in-equity" ? (
           <EquityReport entity={entity} currency={currency} />
+        ) : section === "statutory-pack" ? (
+          <StatutoryPackReport entity={entity} currency={currency} />
         ) : section === "analytics" ? (
           <AnalyticsSliceReport entity={entity} currency={currency} />
         ) : section === "periods" ? (

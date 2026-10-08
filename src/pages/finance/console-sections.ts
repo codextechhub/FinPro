@@ -102,6 +102,7 @@ export const REPORTS_SECTIONS = [
   "balance-sheet",
   "cash-flow",
   "changes-in-equity",
+  "statutory-pack",
   "analytics",
   "periods",
   "seals",

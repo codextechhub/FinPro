@@ -16,6 +16,7 @@ import type {
   ReportParams,
   ReceivablesDashboard,
   SpendDashboard,
+  StatutoryPack,
   TrialBalance,
 } from "./reports-types";
 
@@ -41,6 +42,10 @@ export const reportsApi = baseApi.injectEndpoints({
     }),
     getChangesInEquity: builder.query<ApiEnvelope<ChangesInEquity>, ReportParams>({
       query: (p) => ({ url: `/finance/reports/changes-in-equity/${qs(p)}`, method: "GET" }),
+      providesTags: ["FinanceReports"],
+    }),
+    getStatutoryPack: builder.query<ApiEnvelope<StatutoryPack>, ReportParams>({
+      query: (p) => ({ url: `/finance/reports/statutory-pack/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceReports"],
     }),
     getArAging: builder.query<ApiEnvelope<ArAging>, ReportParams>({
@@ -74,6 +79,7 @@ export const {
   useGetBalanceSheetQuery,
   useGetCashFlowQuery,
   useGetChangesInEquityQuery,
+  useGetStatutoryPackQuery,
   useGetArAgingQuery,
   useGetAnalyticsSliceQuery,
   useGetFinanceDashboardQuery,

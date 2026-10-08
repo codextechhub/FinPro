@@ -436,7 +436,7 @@ describe("re-opening a fiscal year", () => {
     mocks.lens = { applies: true, pinnedBranch: 2, branch: 2, choices: [LEKKI], isLoading: false };
     await mountWorkbench("BRIGHTSTAR");
 
-    expect(container.textContent).toContain("Fiscal year 2026 is sealed for Lekki");
+    expect(container.textContent).toContain("Fiscal year 2026 is closed for Lekki");
     expect(button("Re-open year")).toBeUndefined();
   });
 

@@ -52,6 +52,7 @@ function reader(...keys: string[]): ConsoleNavGate {
       codes.some((code) => held.has(FINANCE_PERMISSION_REGISTRY[code])),
     hasModuleAccess: (...prefixes: string[]) =>
       keys.some((key) => prefixes.some((prefix) => key.startsWith(prefix))),
+    wholeSchool: true,
   };
 }
 
@@ -177,6 +178,16 @@ describe("what a reader is offered", () => {
     const shown = (...keys: string[]) => titles(visibleConsoleNav(financeNav, reader(...keys)));
     expect(shown("payments.report.view")).toContain("Payment provider activity");
     expect(shown("payments.payout.view", "payments.collection.view")).not.toContain("Payment provider activity");
+  });
+
+  it("offers the statutory pack to a whole-school reader and a reader pinned to the sole branch", () => {
+    const reportReader = reader("finance.report.view");
+    const wholeSchoolReader = { ...reportReader, multiBranch: true, wholeSchool: true };
+    const branchBoundReader = { ...reportReader, multiBranch: true, wholeSchool: false };
+    const soleBranchReader = { ...reportReader, multiBranch: false, wholeSchool: true };
+    expect(titles(visibleConsoleNav(financeNav, wholeSchoolReader))).toContain("Statutory Pack");
+    expect(titles(visibleConsoleNav(financeNav, branchBoundReader))).not.toContain("Statutory Pack");
+    expect(titles(visibleConsoleNav(financeNav, soleBranchReader))).toContain("Statutory Pack");
   });
 
   it("drops a group whose every screen is closed rather than showing an empty heading", () => {
