@@ -29,6 +29,7 @@ import type {
 } from "@/redux/services/procurement/procurement-types";
 import { formatMoney } from "@/utils/money";
 import { CategoryPicker, VendorPicker } from "../pickers";
+import { ProcurementPageTitle } from "../screen-help";
 import { useDates } from "../../../lib/display-prefs";
 import { isForbidden } from "../../../lib/api-errors";
 
@@ -138,7 +139,7 @@ export function CatalogTab({ entity, currency }: { entity: string; currency?: st
   return <>
     <header data-guide="procurement-catalog.heading" className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="font-mont text-lg font-semibold text-gray-01">Catalog</h1>
+        <ProcurementPageTitle screen="catalog">Catalog</ProcurementPageTitle>
         <p className="mt-0.5 font-mont text-xs text-gray-05">Master item list with purchasing defaults, preferred vendors and reference pricing.</p>
       </div>
       {canCreate ? <Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Item</Button> : null}

@@ -70,7 +70,7 @@ const PACK = {
   statement_of_financial_position: {
     sections: [{
       key: "current_assets", label: "Current assets", total: money(15000000),
-      groups: [{ line: "trade_receivables", label: "Accounts receivable (what customers owe)", amount: money(15000000), accounts: [] }],
+      groups: [{ line: "trade_receivables", label: "Accounts receivable", amount: money(15000000), accounts: [] }],
     }],
     total_assets: money(15000000), total_equity: money(9000000), total_liabilities: money(6000000), is_balanced: true,
   },
@@ -129,7 +129,7 @@ describe("Statutory pack", () => {
     expect(section("statutory-income")).toContain(PACK.headings.income_statement);
     expect(section("statutory-cash-flow")).toContain(PACK.headings.cash_flow);
     expect(section("statutory-equity")).toContain(PACK.headings.changes_in_equity);
-    expect(container.textContent).toContain("Accounts receivable (what customers owe)");
+    expect(container.textContent).toContain("Accounts receivable");
     expect(container.textContent).toContain("Revenue (income earned)");
     expect(container.textContent).toContain("₦150,000.00");
   });

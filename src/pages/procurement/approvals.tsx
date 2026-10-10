@@ -8,9 +8,10 @@ import {
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
+import { ProcurementPageTitle } from "./screen-help";
 import {
   ConfirmActionModal, DataTable, DetailDrawer, EmptyState, ErrorState,
-  InfoHint, LoadingState, StatusPill, TabStrip, useActiveEntity, type Column,
+  LoadingState, StatusPill, TabStrip, useActiveEntity, type Column,
   type TabStripItem,
 } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
@@ -112,10 +113,7 @@ export default function ProcurementApprovalsPage() {
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
       <header>
-        <div className="flex items-center gap-1.5">
-          <h1 className="font-mont text-lg font-semibold text-gray-01">Approvals</h1>
-          <InfoHint ariaLabel="About procurement approvals">This queue contains only Procurement documents in the books you are viewing that are waiting on a step you can act on.</InfoHint>
-        </div>
+        <ProcurementPageTitle screen="approvals">Approvals</ProcurementPageTitle>
         <p className="mt-0.5 font-mont text-xs text-gray-05">Documents awaiting your decision, routed through the shared approval workflow.</p>
       </header>
 

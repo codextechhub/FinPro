@@ -38,6 +38,7 @@ import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { useDates } from "../../../lib/display-prefs";
 import { presetRange } from "../../../utils/date-presets";
+import { FINANCE_HELP } from "../screen-help";
 import { SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
@@ -133,9 +134,7 @@ export default function GeneralLedgerPage() {
           <div>
             <div className="flex items-center gap-1.5">
               <h1 className="font-mont text-lg font-semibold text-gray-01">Journal Entries</h1>
-              <InfoHint ariaLabel="About journal entries">
-                Every journal must balance: total debits = total credits. Most come from subsystems automatically (invoices, payroll, bank); the Manual source is for adjustments, accruals and corrections. Posted journals are read-only.
-              </InfoHint>
+              <InfoHint ariaLabel="About journal entries">{FINANCE_HELP.ledger}</InfoHint>
             </div>
             <p className="mt-0.5 font-mont text-xs text-gray-05">The general ledger - every financial mutation lands here as a balanced Dr/Cr posting.</p>
           </div>

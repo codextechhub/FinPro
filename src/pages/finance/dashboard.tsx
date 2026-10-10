@@ -55,6 +55,7 @@ import {
 } from "./dashboard-cards";
 import { useDates } from "../../lib/display-prefs";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
+import { FINANCE_HELP } from "./screen-help";
 
 const F = routesPath.PROTECTED.FINANCE;
 
@@ -188,9 +189,7 @@ export default function FinanceDashboard() {
             )}
             <div className="mt-0.5 flex items-center gap-1.5">
               <h1 className="font-mont text-lg font-semibold text-gray-01">Finance overview</h1>
-              <InfoHint ariaLabel="About Finance overview">
-                A view of these books built from what you may read. Each card appears only when you hold access to the figures behind it. The switch at the top changes the collection figures; everything else is as of the date shown.
-              </InfoHint>
+              <InfoHint ariaLabel="About Finance overview">{FINANCE_HELP.dashboard}</InfoHint>
             </div>
             <p className="mt-0.5 font-mont text-xs text-gray-05">
               {head ? [head.window?.name, head.as_of ? `as of ${dates.day(head.as_of)}` : null, head.narrowed ? "your branches only" : null]

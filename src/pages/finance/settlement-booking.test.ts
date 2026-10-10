@@ -90,6 +90,6 @@ describe("paymentsForLine", () => {
 
 describe("the account the payments wait in", () => {
   it("is named with its plain words beside it, as the chart of accounts names it", () => {
-    expect(GATEWAY_CLEARING_NAME).toBe("Gateway clearing (online payments not yet in the bank)");
+    expect(GATEWAY_CLEARING_NAME).toBe("Gateway clearing");
   });
 });

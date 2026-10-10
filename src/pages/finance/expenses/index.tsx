@@ -10,6 +10,7 @@ import { ExpenseClaimsTab } from "./expense-claims-tab";
 import { PettyCashTab } from "./petty-cash-tab";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { FINANCE_HELP } from "../screen-help";
 import { EmptyState } from "@/components/finance-ui/states";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { useCan } from "@/components/finance-ui/can";
@@ -31,8 +32,8 @@ export default function ExpensesPage({ section = DEFAULT_EXPENSES_SECTION }: {
           <div className="flex items-center gap-1.5">
             <h1 className="font-mont text-lg font-semibold text-gray-01">{isPettyCash ? "Petty Cash" : "Expense Claims"}</h1>
             {isPettyCash
-              ? <InfoHint ariaLabel="About petty-cash floats">A petty-cash float is an imprest tin mapped to its own GL account. Establishing or replenishing moves cash from the bank into it (Dr petty cash, Cr bank); each voucher spends it (Dr expense, Cr petty cash). Replenish restores the float to its ceiling. Reduce float and Close fund count the tin and bank its cash (Dr bank, Cr petty cash), with any difference from the books going to Cash over and short.</InfoHint>
-              : <InfoHint ariaLabel="About expense claims">An expense claim pays a member of staff back for school spending. Approving it books the spending and what the school now owes them; paying it later takes the money from the bank and clears what is owed.</InfoHint>}
+              ? <InfoHint ariaLabel="About petty-cash floats">{FINANCE_HELP["petty-cash"]}</InfoHint>
+              : <InfoHint ariaLabel="About expense claims">{FINANCE_HELP.claims}</InfoHint>}
           </div>
           <p className="mt-0.5 font-mont text-xs text-gray-05">{isPettyCash ? "Petty-cash floats, vouchers and returns to the bank." : "Out-of-pocket spending by staff that needs reimbursement."}</p>
         </div>

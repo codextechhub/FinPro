@@ -14,7 +14,9 @@ import { financeNav } from "../../pages/finance/finance-nav";
 import { procurementNav } from "../../pages/procurement/procurement-nav";
 import {
   activeNavTitle,
+  activeNavLeafUrl,
   consoleOffersScreens,
+  navLeaves,
   visibleConsoleNav,
   type ConsoleNavChild,
   type ConsoleNavGate,
@@ -37,9 +39,7 @@ const NOT_ON_A_CONSOLE_SCREEN: Record<string, string> = {
 const resourceOf = (key: string) => key.split(".").slice(0, 2).join(".");
 
 function entries(nav: ConsoleNavGroup[]): ConsoleNavChild[] {
-  return nav.flatMap((group) =>
-    group.items.flatMap((item) => (item.children?.length ? item.children : [item])),
-  );
+  return nav.flatMap((group) => group.items.flatMap(navLeaves));
 }
 
 const ALL_ENTRIES = [...entries(financeNav), ...entries(procurementNav)];
@@ -146,10 +146,11 @@ describe("what a reader is offered", () => {
   it("offers Between Branches only at a school with more than one branch", () => {
     const bursar = reader("finance.interbranch.view", "finance.payment.view");
     const between = (multiBranch?: boolean) =>
-      visibleConsoleNav(financeNav, { ...bursar, multiBranch }).find((g) => g.label === "Between Branches");
+      visibleConsoleNav(financeNav, { ...bursar, multiBranch })
+        .find((group) => group.label === "Between Branches");
 
-    expect(between(true)?.items.map((i) => i.title)).toEqual([
-      "Inter-branch Transfers", "Inter-branch Balances", "Held Receipts", "Recharges", "Shared Cost Rules",
+    expect(between(true)?.items.flatMap(navLeaves).map((i) => i.title) ?? []).toEqual([
+      "Inter-branch Transfers", "Held Receipts", "Inter-branch Balances", "Recharges", "Shared Cost Rules",
     ]);
     // Sunrise Academy runs one branch: the whole group is absent, not empty.
     expect(between(false)).toBeUndefined();
@@ -161,7 +162,7 @@ describe("what a reader is offered", () => {
     const bursar = reader("payments.payout.view", "payments.report.view");
     const payouts = (custody?: ConsoleNavGate["custody"]) =>
       visibleConsoleNav(financeNav, { ...bursar, custody })
-        .flatMap((g) => g.items.map((i) => i.title))
+        .flatMap((g) => g.items.flatMap(navLeaves).map((i) => i.title))
         .filter((title) => title === "Payouts" || title === "Batches");
 
     // Bright Star runs HELD: both are offered.
@@ -191,8 +192,15 @@ describe("what a reader is offered", () => {
   });
 
   it("drops a group whose every screen is closed rather than showing an empty heading", () => {
-    const labels = visibleConsoleNav(financeNav, reader("finance.invoice.view")).map((g) => g.label);
-    expect(labels).toEqual([undefined, "Receivables"]);
+    const menu = visibleConsoleNav(financeNav, reader("finance.invoice.view"));
+    expect(menu.flatMap((group) => group.items).map((item) => item.title)).toEqual(["Dashboard", "Customers & Billing"]);
+  });
+
+  it("keeps platform payment controls in their own subgroup", () => {
+    const menu = visibleConsoleNav(financeNav, reader("payments.platform_settlement.view"));
+    const payments = menu.find((group) => group.label === "Payments");
+    expect(payments?.items.map((item) => item.title)).toEqual(["Platform Controls"]);
+    expect(payments?.items.flatMap(navLeaves).map((item) => item.title) ?? []).toEqual(["Held Settlements", "Held Reconciliations"]);
   });
 });
 
@@ -203,7 +211,7 @@ describe("what a reader is offered", () => {
  * call that screen "Dashboard" because the dashboard's address is a prefix of it.
  */
 describe("the console header's title", () => {
-  const leaves = financeNav.flatMap((group) => group.items.flatMap((item) => item.children?.length ? item.children : [item]));
+  const leaves = financeNav.flatMap((group) => group.items.flatMap(navLeaves));
   const url = (title: string) => leaves.find((item) => item.title === title)!.url;
   const section = (title: string) => url(title).slice(0, url(title).lastIndexOf("/"));
 
@@ -212,9 +220,15 @@ describe("the console header's title", () => {
     expect(activeNavTitle(financeNav, url("Dashboard"))).toBe("Dashboard");
   });
 
-  it("does not let the console root claim a section's bare address", () => {
-    expect(activeNavTitle(financeNav, section("Invoices"))).toBeNull();
-    expect(activeNavTitle(financeNav, section("Budgets & Forecasts"))).toBeNull();
+  it("selects the default leaf when a tabbed screen opens at its base address", () => {
+    expect(activeNavLeafUrl(financeNav, "/finance/setup")).toBe(url("Entities"));
+    expect(activeNavLeafUrl(financeNav, "/finance/payments")).toBe(url("Payouts"));
+    expect(activeNavTitle(financeNav, "/finance/setup")).toBe("Entities");
+  });
+
+  it("names the default tab at a section's bare address", () => {
+    expect(activeNavTitle(financeNav, section("Invoices"))).toBe("Invoices");
+    expect(activeNavTitle(financeNav, section("Budgets & Forecasts"))).toBe("Budgets & Forecasts");
   });
 });
 

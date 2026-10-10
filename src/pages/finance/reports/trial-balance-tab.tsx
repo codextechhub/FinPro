@@ -11,7 +11,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { Eye } from "lucide-react";
-import { Money, KpiCard, InfoHint } from "@/components/finance-ui";
+import { Money, KpiCard } from "@/components/finance-ui";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
@@ -93,13 +93,6 @@ export function TrialBalanceReport({ entity, currency }: { entity: string; curre
   return (
     <div className="space-y-5">
       {tb.narrowed && <BranchReportNote />}
-      <div className="flex items-center gap-1.5">
-        <span className="font-mont text-sm font-semibold text-gray-01">Trial balance</span>
-        <InfoHint ariaLabel="About the trial balance">
-          The trial balance always totals equal - every debit has a matching credit. It's the input to the <span className="font-semibold">Income Statement</span> (income &amp; expense) and the <span className="font-semibold">Balance Sheet</span> (asset, liability &amp; equity); investigate any imbalance here before producing those.
-        </InfoHint>
-      </div>
-
       <ReportPeriodHeading label={tb.period_label} fallback={TRIAL_BALANCE_NO_PERIOD} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

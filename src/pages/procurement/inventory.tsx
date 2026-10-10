@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { ProcurementShell } from "./procurement-shell";
+import { ProcurementPageTitle } from "./screen-help";
 import {
   AccountPicker, CostCenterPicker, DataTable, DetailDrawer, EmptyState, ErrorState, FormDrawer, FormField,
   LoadingState, Money, MoneyInput, PostingRecap, Segmented, StatCard, StatusPill, TabStrip, toArray,
@@ -159,7 +160,7 @@ function ItemsSection({ entity, currency }: { entity: string; currency?: string 
       <PageShell className="space-y-5 text-black-01">
         <header data-guide="procurement-stock-items.heading" className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="font-mont text-lg font-semibold text-gray-01">Stock Items</h1>
+            <ProcurementPageTitle screen="stockItems">Stock Items</ProcurementPageTitle>
             <p className="mt-0.5 font-mont text-xs text-gray-05">
               {store
                 ? `On-hand inventory at ${locations.find((l) => String(l.id) === store)?.code ?? "this store"}, with its own reorder status and valuation.`
@@ -729,7 +730,7 @@ function MovementsSection({ entity, currency }: { entity: string; currency?: str
     <ProcurementShell>
       <PageShell className="space-y-5 text-black-01">
         <div data-guide="procurement-stock-movements.heading">
-          <h1 className="font-mont text-lg font-semibold text-gray-01">Stock Movements</h1>
+          <ProcurementPageTitle screen="stockMovements">Stock Movements</ProcurementPageTitle>
           <p className="mt-0.5 font-mont text-xs text-gray-05">Receipts, issues and adjustments.{multi ? " Balances shown are the running balance at each store." : ""}</p>
         </div>
         <section data-guide="procurement-stock-movements.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>

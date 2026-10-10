@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 
 import { ProcurementShell } from "../procurement-shell";
+import { ProcurementPageTitle } from "../screen-help";
 import { RequisitionPicker } from "../pickers";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
@@ -126,7 +127,7 @@ export default function RfqsPage() {
     <PageShell className="space-y-5 text-black-01">
       <header data-guide="procurement-rfqs.heading" className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-mont text-lg font-semibold text-gray-01">RFQs</h1>
+          <ProcurementPageTitle screen="rfqs">RFQs</ProcurementPageTitle>
           <p className="mt-0.5 font-mont text-xs text-gray-05">Invite vendors to quote, track responses, and award the winning bid.</p>
         </div>
         <Can permission={P.PROC_CREATE_RFQ}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New RFQ</Button></Can>

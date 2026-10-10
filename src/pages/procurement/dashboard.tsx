@@ -22,7 +22,8 @@ import { Plus } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { ProcurementShell } from "./procurement-shell";
-import { Donut, ErrorState, InfoHint, LoadingState, TabStrip, useActiveEntity, type TabStripItem } from "@/components/finance-ui";
+import { ProcurementPageTitle } from "./screen-help";
+import { Donut, ErrorState, LoadingState, TabStrip, useActiveEntity, type TabStripItem } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { cn } from "@/lib/utils";
 import { P } from "../../permissions";
@@ -430,12 +431,7 @@ export default function ProcurementDashboard() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
             {head?.reader_first_name && <p className="font-mont text-xs text-gray-05">{greeting()}, {head.reader_first_name}</p>}
-            <div className="mt-0.5 flex items-center gap-1.5">
-              <h1 className="font-mont text-lg font-semibold text-gray-01">Procurement overview</h1>
-              <InfoHint ariaLabel="About the procurement overview">
-                Built from what you may read: each card appears only when you hold access to the documents behind it. The switch at the top changes spend, categories, top vendors and what was paid; everything else is where things stand today. Approvals are your own.
-              </InfoHint>
-            </div>
+            <div className="mt-0.5"><ProcurementPageTitle screen="dashboard">Procurement overview</ProcurementPageTitle></div>
             <p className="mt-0.5 font-mont text-xs text-gray-05">
               {head ? [head.window.name, `as of ${dates.day(head.as_of)}`, head.narrowed ? "your branches only" : null].filter(Boolean).join(" · ") : "-"}
             </p>

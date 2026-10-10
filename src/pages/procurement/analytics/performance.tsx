@@ -55,7 +55,7 @@ export default function PerformanceScreen({ entity, currency }: SectionProps) {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <SectionHeader title="Vendor Performance" subtitle="Delivery timeliness and payment behaviour from posted records.">
+      <SectionHeader title="Vendor Performance" subtitle="Delivery timeliness and payment behaviour from posted records." screen="vendorPerformance">
         <DateFilter label="From" value={start} onChange={setStart} />
         <DateFilter label="To" value={end} onChange={setEnd} />
         <Can permission={P.PROC_CREATE_VENDOR_ASSESSMENT}>

@@ -32,6 +32,7 @@ import type {
 } from "@/redux/services/procurement/procurement-types";
 import { formatMoney } from "@/utils/money";
 import { CategoryPicker } from "../pickers";
+import { ProcurementPageTitle } from "../screen-help";
 import { buildVendorUpdatePayload, type VendorFormValues } from "./vendor-update-payload";
 import { VendorGovernanceFields } from "./vendor-governance-fields";
 import { PAYMENT_TERMS, paymentTermsLabel } from "../payment-terms";
@@ -114,7 +115,7 @@ export function VendorsTab({ entity, currency }: { entity: string; currency?: st
   return <>
     <header data-guide="procurement-vendors.heading" className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="font-mont text-lg font-semibold text-gray-01">Vendors</h1>
+        <ProcurementPageTitle screen="vendors">Vendors</ProcurementPageTitle>
         <p className="mt-0.5 font-mont text-xs text-gray-05">Vendors, categories and the item catalog.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">

@@ -77,6 +77,7 @@ import {
 import type { PayrollLine, PayrollRun, PayrollRunBranchShare, EmployeeSalary, SalaryStructure, SalaryComponent, PayslipComponent } from "@/redux/services/finance/ops-types";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { FINANCE_HELP } from "./screen-help";
 import { useDates } from "../../lib/display-prefs";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
@@ -182,7 +183,7 @@ export default function PayrollPage() {
         <div data-guide="finance-payroll.heading">
           <div className="flex items-center gap-1.5">
             <h1 className="font-mont text-lg font-semibold text-gray-01">Payroll</h1>
-            <InfoHint ariaLabel="About payroll runs">A payroll run works out gross, PAYE, pension, NHF, any voluntary deductions and net for every employee, and the school's own pension, NSITF and ITF on top. Posting it records the salary cost and what is owed to staff, to each state's revenue service and to each pension administrator, branch by branch. Paying it clears what is owed to staff against the bank.</InfoHint>
+            <InfoHint ariaLabel="About payroll runs">{FINANCE_HELP.payroll}</InfoHint>
           </div>
           <p className="mt-0.5 font-mont text-xs text-gray-05">Monthly salary runs and payslips, generated from the employee roster.</p>
         </div>

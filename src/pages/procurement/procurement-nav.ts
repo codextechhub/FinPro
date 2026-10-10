@@ -41,7 +41,7 @@ export const procurementNav: ConsoleNavGroup[] = [
   {
     label: "Vendors & Catalog",
     items: [
-      { title: "Vendors", url: `${R.VENDORS}/vendors`, icon: Store, permissions: [P.PROC_VIEW_VENDORS], resources: ["procurement.report"] },
+      { title: "Vendors", url: `${R.VENDORS}/vendors`, aliases: [R.VENDORS], icon: Store, permissions: [P.PROC_VIEW_VENDORS], resources: ["procurement.report"] },
       { title: "Categories", url: `${R.VENDORS}/categories`, icon: Tags, permissions: [P.PROC_VIEW_CATEGORIES] },
       { title: "Catalog", url: `${R.VENDORS}/catalog`, icon: Package, permissions: [P.PROC_VIEW_CATALOG] },
     ],
@@ -50,7 +50,7 @@ export const procurementNav: ConsoleNavGroup[] = [
   {
     label: "Sourcing",
     items: [
-      { title: "RFQs", url: `${R.SOURCING}/rfqs`, icon: Send, permissions: [P.PROC_VIEW_RFQS] },
+      { title: "RFQs", url: `${R.SOURCING}/rfqs`, aliases: [R.SOURCING], icon: Send, permissions: [P.PROC_VIEW_RFQS] },
       { title: "Quotations", url: `${R.SOURCING}/quotations`, icon: FileText, permissions: [P.PROC_VIEW_QUOTATIONS], resources: ["procurement.competition"] },
       { title: "Contracts", url: R.CONTRACTS, icon: FileSignature, permissions: [P.PROC_VIEW_CONTRACTS] },
     ],
@@ -59,7 +59,7 @@ export const procurementNav: ConsoleNavGroup[] = [
   {
     label: "Inventory",
     items: [
-      { title: "Stock Items", url: `${R.INVENTORY}/items`, icon: Boxes, permissions: [P.PROC_VIEW_STOCK] },
+      { title: "Stock Items", url: `${R.INVENTORY}/items`, aliases: [R.INVENTORY], icon: Boxes, permissions: [P.PROC_VIEW_STOCK] },
       { title: "Movements", url: `${R.INVENTORY}/movements`, icon: ArrowLeftRight, permissions: [P.PROC_VIEW_STOCK] },
       { title: "Locations", url: `${R.INVENTORY}/locations`, icon: Warehouse, permissions: [P.PROC_VIEW_STOCK] },
     ],
@@ -68,7 +68,7 @@ export const procurementNav: ConsoleNavGroup[] = [
   {
     label: "Analytics",
     items: [
-      { title: "Unpaid bills by age", url: `${R.ANALYTICS}/ap-aging`, icon: BarChart3, permissions: [P.PROC_VIEW_ANALYTICS] },
+      { title: "Unpaid bills by age", url: `${R.ANALYTICS}/ap-aging`, aliases: [R.ANALYTICS], icon: BarChart3, permissions: [P.PROC_VIEW_ANALYTICS] },
       { title: "Goods not yet billed", url: `${R.ANALYTICS}/grir`, icon: Scale, permissions: [P.PROC_VIEW_ANALYTICS] },
       { title: "Spend", url: `${R.ANALYTICS}/spend`, icon: BarChart3, permissions: [P.PROC_VIEW_ANALYTICS] },
       { title: "Vendor Performance", url: `${R.ANALYTICS}/performance`, icon: TrendingUp, permissions: [P.PROC_VIEW_ANALYTICS], resources: ["procurement.vendor_assessment"] },

@@ -25,6 +25,7 @@ import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { P } from "../../../permissions";
 import { formatMoney } from "@/utils/money";
 import { isForbidden } from "../../../lib/api-errors";
+import { ProcurementPageTitle } from "../screen-help";
 import {
   useCreateCategoryMutation,
   useGetCategoriesQuery,
@@ -151,7 +152,7 @@ export function CategoriesTab({ entity, currency }: { entity: string; currency?:
   return <>
     <header data-guide="procurement-categories.heading" className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="font-mont text-lg font-semibold text-gray-01">Categories</h1>
+        <ProcurementPageTitle screen="categories">Categories</ProcurementPageTitle>
         <p className="mt-0.5 font-mont text-xs text-gray-05">Spend taxonomy and accounting defaults for vendor purchasing.</p>
       </div>
       {canCreate ? <Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Category</Button> : null}

@@ -20,6 +20,7 @@ import { ProvisionsTab } from "./provisions-tab";
 import { DepositsTab } from "./deposits-tab";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { FINANCE_HELP } from "../screen-help";
 
 const LABELS: Record<string, string> = {
   invoices: "Customer Invoices", "credit-notes": "Credit / Debit Notes", refunds: "Refunds & Write-offs",
@@ -42,10 +43,6 @@ const SUBTITLES: Record<string, string> = {
   provisions: "The allowance for debts that may not be paid, worked out from how old they are.",
   deposits: "Refundable deposits held for customers, returned when they leave or forfeited when unclaimed.",
 };
-const HINTS: Record<string, string> = {
-  "fee-structures": "A fee structure is a billing template. When you generate invoices, each line builds an invoice line from its GL account, amount and tax - so revenue posts to the right place automatically. Only customer structures generate invoices.",
-};
-
 /** `section` comes from the route table; see console-sections.ts. */
 export default function ReceivablesPage({ section = DEFAULT_RECEIVABLES_SECTION }: {
   section?: ReceivablesSection;
@@ -59,7 +56,7 @@ export default function ReceivablesPage({ section = DEFAULT_RECEIVABLES_SECTION 
           <div>
             <div className="flex items-center gap-1.5">
               <h1 className="font-mont text-lg font-semibold text-gray-01">{LABELS[section] ?? "Receivables"}</h1>
-              {HINTS[section] && <InfoHint ariaLabel={`About ${LABELS[section] ?? "Receivables"}`}>{HINTS[section]}</InfoHint>}
+              <InfoHint ariaLabel={`About ${LABELS[section] ?? "Receivables"}`}>{FINANCE_HELP[section]}</InfoHint>
             </div>
             <p className="mt-0.5 font-mont text-xs text-gray-05">{SUBTITLES[section] ?? "Accounts receivable for the selected entity."}</p>
           </div>

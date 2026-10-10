@@ -8,11 +8,12 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
+import { ProcurementPageTitle } from "./screen-help";
 import { RequisitionPicker, VendorPicker, ContractPicker } from "./pickers";
 import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import {
   Can, ConfirmActionModal, DataTable, DetailDrawer, EmptyState, ErrorState,
-  FormField, InfoHint, LoadingState, StatCard, StatusPill, TabStrip, toArray, useActiveEntity,
+  FormField, LoadingState, StatCard, StatusPill, TabStrip, toArray, useActiveEntity,
   useCan, type Column, type TabStripItem,
 } from "@/components/finance-ui";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
@@ -140,7 +141,7 @@ export default function PurchaseOrdersPage() {
       <PageShell className="space-y-5 text-black-01">
         <header data-guide="procurement-purchase-orders.heading" className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-1.5"><h1 className="font-mont text-lg font-semibold text-gray-01">Purchase Orders</h1><InfoHint ariaLabel="About purchase orders">Approved orders issued to vendors. Receipt and invoice progress are calculated from the real linked documents.</InfoHint></div>
+            <ProcurementPageTitle screen="purchaseOrders">Purchase Orders</ProcurementPageTitle>
             <p className="mt-0.5 font-mont text-xs text-gray-05">Track supplier commitments, delivery progress, and approval status.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

@@ -4,6 +4,7 @@ import { ClipboardCheck, FilePenLine, FileText, PackageCheck, Plus, Printer, Sen
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
+import { ProcurementPageTitle } from "./screen-help";
 import { PurchaseOrderPicker, VendorPicker } from "./pickers";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LoadingState,
@@ -86,10 +87,7 @@ export default function GoodsReceiptsPage() {
       <PageShell className="space-y-5 text-black-01">
         <header data-guide="procurement-goods-receipts.heading" className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-mont text-lg font-semibold text-gray-01">Goods Receipts</h1>
-              <InfoHint ariaLabel="About goods receipts">Record deliveries against open purchase orders, including accepted quantities, rejections, and inspection findings.</InfoHint>
-            </div>
+            <ProcurementPageTitle screen="goodsReceipts">Goods Receipts</ProcurementPageTitle>
             <p className="mt-0.5 font-mont text-xs text-gray-05">Record deliveries against open purchase orders.</p>
           </div>
           <Can permission={P.PROC_CREATE_GOODS_RECEIPT}>

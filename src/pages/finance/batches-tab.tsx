@@ -211,7 +211,7 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
     } catch { /* central */ }
   };
 
-  const dr: RecapRow[] = [{ code: "", name: "Accounts payable (vendor)", amount: gross }];
+  const dr: RecapRow[] = [{ code: "", name: "Accounts payable", amount: gross }];
   const cr: RecapRow[] = [
     { code: sourceAccount, name: "Bank / cash", amount: net },
     ...(wht > 0 ? [{ code: "", name: WHT_PAYABLE_LABEL, amount: wht }] : []),

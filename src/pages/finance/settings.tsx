@@ -52,7 +52,7 @@ import {
   type ConsoleSettingsGroup,
   type ConsoleSettingsSection,
 } from "@/components/settings/settings-layout";
-import { useActiveEntity } from "@/components/finance-ui";
+import { InfoHint, useActiveEntity } from "@/components/finance-ui";
 import { DEFAULT_FINANCE_SETTINGS_SECTION, type FinanceSettingsSection } from "./console-sections";
 import { FeeDuePolicyPanel, financeSettingsSections, setupSections } from "@xvs/finance/host";
 import { FinanceShell } from "./finance-shell";
@@ -62,6 +62,7 @@ import { ReceivablesSettings } from "./receivables-settings";
 import { PayrollSettingsPanel } from "./payroll-settings";
 import { CalendarRulePanel, RecordKeepingPanel } from "./settings-records";
 import { useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
+import { FINANCE_HELP } from "./screen-help";
 
 const F = routesPath.PROTECTED.FINANCE;
 
@@ -130,6 +131,7 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
     <FinanceShell>
       <ConsoleSettingsLayout
         title="Finance Settings"
+        titleHelp={<InfoHint ariaLabel="About Finance settings">{FINANCE_HELP.settings}</InfoHint>}
         description="Manage the structure, defaults and controls behind each set of books. Operational work stays in the main Finance menu."
         basePath={F.SETTINGS}
         activeSection={activeSection}

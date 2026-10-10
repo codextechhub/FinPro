@@ -29,7 +29,7 @@ export default function SpendScreen({ entity, currency }: SectionProps) {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <SectionHeader title="Spend Analytics" subtitle="Spend by category, vendor and over time.">
+      <SectionHeader title="Spend Analytics" subtitle="Spend by category, vendor and over time." screen="spend">
         <DateFilter label="From" value={start} onChange={setStart} />
         <DateFilter label="To" value={end} onChange={setEnd} />
       </SectionHeader>

@@ -10,7 +10,7 @@
  * screen to do it.
  */
 
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import {
   Sidebar,
@@ -25,7 +25,7 @@ import { AppLogo } from "../../host";
 import { NavMain } from "./nav-main";
 import { usePermissions } from "@/hooks/use-permissions";
 import { routesPath } from "@/routes/routes-path";
-import { visibleConsoleNav, type ConsoleNavGroup, type ConsoleNavItem } from "./console-nav";
+import { activeNavLeafUrl, navLeaves, visibleConsoleNav, type ConsoleNavGroup, type ConsoleNavItem } from "./console-nav";
 import { revealActiveSidebarItem } from "./sidebar-navigation";
 import { useReaderBranchLens } from "./raising-branch";
 import { useCustodyReading } from "./held-custody";
@@ -72,21 +72,9 @@ export function ConsoleSidebar({ title, nav, gateOnCustody = false }: { title: s
   // of the current location). This prevents a shorter sibling URL from also
   // lighting up when a more-specific sibling is the real active item -
   // e.g. /finance/collections must not be active when at /finance/collections/virtual-accounts.
-  const matches = (url: string) => location === url || location.startsWith(url + "/");
-  const activeUrl = (() => {
-    let best: string | null = null;
-    for (const g of visibleNav) {
-      for (const item of g.items) {
-        const leaves = item.children?.length ? item.children : [item];
-        for (const leaf of leaves) {
-          if (matches(leaf.url) && (!best || leaf.url.length > best.length)) best = leaf.url;
-        }
-      }
-    }
-    return best;
-  })();
+  const activeUrl = activeNavLeafUrl(visibleNav, location);
 
-  const mapItems = (navItems: ConsoleNavItem[]) => navItems.map((item) => {
+  const mapItems = (navItems: ConsoleNavItem[]): Parameters<typeof NavMain>[0]["items"] => navItems.map((item) => {
     const kids = item.children ?? [];
     if (kids.length) {
       return {
@@ -94,12 +82,8 @@ export function ConsoleSidebar({ title, nav, gateOnCustody = false }: { title: s
         url: item.url,
         icon: item.icon,
         isActive: false,
-        childActive: kids.some((c) => c.url === activeUrl),
-        items: kids.map((c) => ({
-          title: c.title,
-          url: c.url,
-          isActive: c.url === activeUrl,
-        })),
+        childActive: kids.some((child) => navLeaves(child).some((leaf) => leaf.url === activeUrl)),
+        items: mapItems(kids),
       };
     }
     return {
@@ -112,6 +96,14 @@ export function ConsoleSidebar({ title, nav, gateOnCustody = false }: { title: s
   });
 
   const groups = visibleNav.map((g) => ({ label: g.label, items: mapItems(g.items) }));
+  const activeMenuTitle = groups
+    .flatMap((group) => group.items)
+    .find((item) => item.childActive)?.title ?? null;
+  const [openMenuTitle, setOpenMenuTitle] = useState<string | null>(activeMenuTitle);
+
+  useLayoutEffect(() => {
+    setOpenMenuTitle(activeMenuTitle);
+  }, [activeMenuTitle]);
 
   const groupLabelCls = "px-4 pb-1 pt-3 font-mont text-[10px] font-semibold uppercase tracking-wide text-gray-05 group-data-[collapsible=icon]:hidden";
 
@@ -150,7 +142,12 @@ export function ConsoleSidebar({ title, nav, gateOnCustody = false }: { title: s
         {groups.map((g, i) => (
           <div key={g.label ?? `g${i}`}>
             {g.label && <p className={groupLabelCls}>{g.label}</p>}
-            <NavMain items={g.items} navigationKey={location} />
+            <NavMain
+              items={g.items}
+              navigationKey={location}
+              sharedOpenTitle={openMenuTitle}
+              onSharedOpenTitleChange={setOpenMenuTitle}
+            />
           </div>
         ))}
       </SidebarContent>

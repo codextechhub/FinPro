@@ -7,6 +7,7 @@ import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { formatMoney } from "@/utils/money";
+import { ProcurementPageTitle, type ProcurementHelpKey } from "../screen-help";
 
 export type PillTone = "green" | "amber" | "red" | "gray";
 
@@ -78,15 +79,16 @@ export function GradeBadge({ grade }: { grade: string }) {
 }
 
 /** Page header: title + subtitle on the left, filter controls (children) right. */
-export function SectionHeader({ title, subtitle, children }: {
+export function SectionHeader({ title, subtitle, screen, children }: {
   title: string;
   subtitle: string;
+  screen: ProcurementHelpKey;
   children?: React.ReactNode;
 }) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
-        <h1 className="font-mont text-lg font-semibold text-gray-01">{title}</h1>
+        <ProcurementPageTitle screen={screen}>{title}</ProcurementPageTitle>
         <p className="mt-0.5 font-mont text-xs text-gray-05">{subtitle}</p>
       </div>
       {children && <div className="flex flex-wrap items-end gap-3">{children}</div>}

@@ -35,29 +35,30 @@ import { Link } from "react-router";
 import { useLayoutEffect, useRef, useState } from "react";
 import { revealExpandedNavGroup } from "./sidebar-navigation";
 
-type NavItem = {
+export type NavItem = {
   title: string;
   url: string;
   icon?: React.ElementType;
   isActive: boolean;
-  childActive: boolean;
+  childActive?: boolean;
   // Leaf items that open a separate console show a trailing chevron affordance.
   affordance?: boolean;
-  items?: {
-    title: string;
-    url: string;
-    isActive: boolean;
-    disabled?: boolean;
-  }[];
+  disabled?: boolean;
+  items?: NavItem[];
 };
 
 export function NavMain({
   items,
   navigationKey,
+  sharedOpenTitle,
+  onSharedOpenTitleChange,
 }: {
   items: NavItem[];
   /** Route key used when several NavMain instances share one sidebar. */
   navigationKey?: string;
+  /** Controlled open menu shared by separately labelled navigation groups. */
+  sharedOpenTitle?: string | null;
+  onSharedOpenTitleChange?: (title: string | null) => void;
 }) {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -76,6 +77,8 @@ export function NavMain({
         key={activeNavigationKey}
         items={items}
         isCollapsed={isCollapsed}
+        sharedOpenTitle={sharedOpenTitle}
+        onSharedOpenTitleChange={onSharedOpenTitleChange}
       />
     </SidebarGroup>
   );
@@ -84,13 +87,19 @@ export function NavMain({
 function NavMainItems({
   items,
   isCollapsed,
+  sharedOpenTitle,
+  onSharedOpenTitleChange,
 }: {
   items: NavItem[];
   isCollapsed: boolean;
+  sharedOpenTitle?: string | null;
+  onSharedOpenTitleChange?: (title: string | null) => void;
 }) {
-  const [openTitle, setOpenTitle] = useState<string | null>(
+  const [localOpenTitle, setLocalOpenTitle] = useState<string | null>(
     items.find((item) => item.childActive)?.title ?? null,
   );
+  const openTitle = sharedOpenTitle === undefined ? localOpenTitle : sharedOpenTitle;
+  const setOpenTitle = onSharedOpenTitleChange ?? setLocalOpenTitle;
 
   // Every group's row, keyed by title, so the one just opened can be scrolled
   // into view. Keyed rather than a single conditional ref: with one shared ref
@@ -163,22 +172,7 @@ function NavMainItems({
                       {item.title}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    {item.items?.map((subItem) => (
-                      subItem.disabled ? (
-                        <DropdownMenuItem key={subItem.title} disabled>
-                          {subItem.title}
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem key={subItem.title} asChild>
-                          <Link
-                            to={subItem.url}
-                            className={subItem.isActive ? "font-medium text-primary" : ""}
-                          >
-                            {subItem.title}
-                          </Link>
-                        </DropdownMenuItem>
-                      )
-                    ))}
+                    <CollapsedMenuItems items={item.items ?? []} />
                   </DropdownMenuContent>
                 </DropdownMenu>
               </SidebarMenuItem>
@@ -216,28 +210,7 @@ function NavMainItems({
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <SidebarMenuSub className="ml-6">
-                    {item.items?.map((subItem) => (
-                      <SidebarMenuSubItem key={subItem.title}>
-                        {subItem.disabled ? (
-                          <SidebarMenuSubButton
-                            className="text-xs opacity-40 cursor-not-allowed pointer-events-none"
-                            isActive={false}
-                          >
-                            {subItem.title}
-                          </SidebarMenuSubButton>
-                        ) : (
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={subItem.isActive}
-                            className="text-xs"
-                          >
-                            <Link to={subItem.url}>{subItem.title}</Link>
-                          </SidebarMenuSubButton>
-                        )}
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
+                  <NestedMenuItems items={item.items ?? []} />
                 </CollapsibleContent>
               </SidebarMenuItem>
             </Collapsible>
@@ -245,4 +218,70 @@ function NavMainItems({
         })}
       </SidebarMenu>
   );
+}
+
+/** One accordion level below a console's main sections. */
+function NestedMenuItems({ items }: { items: NavItem[] }) {
+  const [openTitle, setOpenTitle] = useState<string | null>(
+    items.find((item) => item.childActive)?.title ?? null,
+  );
+
+  return (
+    <SidebarMenuSub className="ml-6">
+      {items.map((item) => {
+        const hasChildren = Boolean(item.items?.length);
+        const active = item.isActive || item.childActive;
+        if (!hasChildren) {
+          return (
+            <SidebarMenuSubItem key={item.title}>
+              {item.disabled ? (
+                <SidebarMenuSubButton className="cursor-not-allowed text-xs opacity-40 pointer-events-none" isActive={false}>
+                  {item.title}
+                </SidebarMenuSubButton>
+              ) : (
+                <SidebarMenuSubButton asChild isActive={item.isActive} className="text-xs">
+                  <Link to={item.url}>{item.title}</Link>
+                </SidebarMenuSubButton>
+              )}
+            </SidebarMenuSubItem>
+          );
+        }
+
+        return (
+          <Collapsible key={item.title} asChild open={openTitle === item.title}
+            onOpenChange={(open) => setOpenTitle(open ? item.title : null)}>
+            <SidebarMenuSubItem className="group/nested-collapsible">
+              <CollapsibleTrigger asChild>
+                <SidebarMenuSubButton className="text-xs font-semibold" isActive={active}>
+                  <span>{item.title}</span>
+                  <ChevronRight className="ml-auto size-3.5 transition-transform group-data-[state=open]/nested-collapsible:rotate-90" />
+                </SidebarMenuSubButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <NestedMenuItems items={item.items ?? []} />
+              </CollapsibleContent>
+            </SidebarMenuSubItem>
+          </Collapsible>
+        );
+      })}
+    </SidebarMenuSub>
+  );
+}
+
+/** The icon-only rail flattens the same hierarchy into a labelled popover. */
+function CollapsedMenuItems({ items }: { items: NavItem[] }) {
+  return items.map((item) => item.items?.length ? (
+    <div key={item.title}>
+      <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wide text-gray-05">
+        {item.title}
+      </DropdownMenuLabel>
+      <CollapsedMenuItems items={item.items} />
+    </div>
+  ) : item.disabled ? (
+    <DropdownMenuItem key={item.title} disabled>{item.title}</DropdownMenuItem>
+  ) : (
+    <DropdownMenuItem key={item.title} asChild>
+      <Link to={item.url} className={item.isActive ? "font-medium text-primary" : ""}>{item.title}</Link>
+    </DropdownMenuItem>
+  ));
 }

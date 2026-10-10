@@ -31,6 +31,8 @@ import type { CustodyReading } from "./held-custody";
 export interface ConsoleNavChild {
   title: string;
   url: string;
+  /** Additional routes that render this leaf, such as a tabbed page's base URL. */
+  aliases?: string[];
   /** Any one of these opens the screen. Absent: open to anyone in the console. */
   permissions?: PermissionCode[];
   /** Backend resources ("finance.salary") used on this screen beyond `permissions`. */
@@ -47,7 +49,7 @@ export interface ConsoleNavChild {
 
 export interface ConsoleNavItem extends ConsoleNavChild {
   icon?: ElementType;
-  children?: ConsoleNavChild[];
+  children?: ConsoleNavItem[];
 }
 
 // A labelled section of the console sidebar (the design groups items under
@@ -101,6 +103,39 @@ export function navEntryOpen(entry: ConsoleNavChild, gate: ConsoleNavGate): bool
   return !entry.permissions?.length || gate.hasAnyPermission(...entry.permissions);
 }
 
+/** Every navigable destination below an item, in display order. */
+export function navLeaves(item: ConsoleNavItem): ConsoleNavItem[] {
+  return item.children?.length ? item.children.flatMap(navLeaves) : [item];
+}
+
+/** URL of the leaf that owns the current route, including declared aliases. */
+export function activeNavLeafUrl(nav: ConsoleNavGroup[], pathname: string): string | null {
+  const matches = (url: string) => pathname === url || pathname.startsWith(url + "/");
+  let best: { leafUrl: string; matchLength: number } | null = null;
+  for (const group of nav) {
+    for (const item of group.items) {
+      for (const leaf of navLeaves(item)) {
+        for (const candidate of [leaf.url, ...(leaf.aliases ?? [])]) {
+          if (matches(candidate) && (!best || candidate.length > best.matchLength)) {
+            best = { leafUrl: leaf.url, matchLength: candidate.length };
+          }
+        }
+      }
+    }
+  }
+  return best?.leafUrl ?? null;
+}
+
+/** The visible part of one menu branch, with empty parents removed. */
+function visibleItem(item: ConsoleNavItem, gate: ConsoleNavGate): ConsoleNavItem | null {
+  if (!item.children?.length) return navEntryOpen(item, gate) ? item : null;
+  const children = item.children.flatMap((child) => {
+    const visible = visibleItem(child, gate);
+    return visible ? [visible] : [];
+  });
+  return children.length ? { ...item, children } : null;
+}
+
 /**
  * The menu as this reader sees it: screens that cannot open are removed, a
  * parent survives only with a visible child, and a group with nothing left is
@@ -111,9 +146,8 @@ export function visibleConsoleNav(nav: ConsoleNavGroup[], gate: ConsoleNavGate):
     .map((group) => ({
       ...group,
       items: group.items.flatMap((item) => {
-        if (!item.children?.length) return navEntryOpen(item, gate) ? [item] : [];
-        const children = item.children.filter((child) => navEntryOpen(child, gate));
-        return children.length ? [{ ...item, children }] : [];
+        const visible = visibleItem(item, gate);
+        return visible ? [visible] : [];
       }),
     }))
     .filter((group) => group.items.length > 0);
@@ -137,9 +171,7 @@ export function consoleOffersScreens(nav: ConsoleNavGroup[], gate: ConsoleNavGat
       ? gate.hasAnyPermission(...entry.permissions)
       : !!entry.resources?.some((resource) => gate.hasModuleAccess(`${resource}.`));
   };
-  return nav.some((group) =>
-    group.items.some((item) => (item.children?.length ? item.children.some(offers) : offers(item))),
-  );
+  return nav.some((group) => group.items.some((item) => navLeaves(item).some(offers)));
 }
 
 /**
@@ -154,20 +186,21 @@ export function consoleOffersScreens(nav: ConsoleNavGroup[], gate: ConsoleNavGat
  * and the shell falls back to the console name.
  */
 export function activeNavTitle(nav: ConsoleNavGroup[], pathname: string): string | null {
-  const candidates: { url: string; title: string }[] = [];
+  const candidates: { url: string; title: string; leafUrl: string }[] = [];
   for (const group of nav) {
     for (const item of group.items) {
-      if (item.children?.length) {
-        for (const child of item.children) candidates.push({ url: child.url, title: child.title });
-      } else {
-        candidates.push({ url: item.url, title: item.title });
+      for (const leaf of navLeaves(item)) {
+        for (const url of [leaf.url, ...(leaf.aliases ?? [])]) {
+          candidates.push({ url, title: leaf.title, leafUrl: leaf.url });
+        }
       }
     }
   }
-  const hasItemsBeneath = (url: string) => candidates.some((c) => c.url.startsWith(url + "/"));
+  const hasItemsBeneath = (candidate: { url: string; leafUrl: string }) =>
+    candidate.url === candidate.leafUrl && candidates.some((c) => c.url.startsWith(candidate.url + "/"));
   let best: { url: string; title: string } | null = null;
   for (const c of candidates) {
-    if (pathname === c.url || (pathname.startsWith(c.url + "/") && !hasItemsBeneath(c.url))) {
+    if (pathname === c.url || (pathname.startsWith(c.url + "/") && !hasItemsBeneath(c))) {
       if (!best || c.url.length > best.url.length) best = c;
     }
   }

@@ -186,22 +186,22 @@ describe("a vendor payment with withholding tax", () => {
     mocks.state.doc = { ...withWht, status: "POSTED", approval_state: "APPROVED", posting_lines: [
       { account_code: "2100", account_name: "Accounts payable", debit: 9_000_000, credit: 0 },
       { account_code: "1010", account_name: "Bank", debit: 0, credit: 8_550_000 },
-      { account_code: "2310", account_name: "WHT payable (withholding tax)", debit: 0, credit: 450_000 },
+      { account_code: "2310", account_name: "WHT payable", debit: 0, credit: 450_000 },
     ] };
     mocks.state.workflow = undefined;
     render();
     expect(document.body.textContent).toContain("Withholding tax kept back");
     expect(document.body.textContent).not.toContain("WHT withheld");
     openPosting();
-    expect(document.body.textContent).toContain("WHT payable (withholding tax)");
+    expect(document.body.textContent).toContain("WHT payable");
   });
 
-  it("names the liability WHT payable (withholding tax) in the preview before it posts", () => {
+  it("names the WHT payable account in the preview before it posts", () => {
     mocks.state.doc = { ...withWht, status: "DRAFT", approval_state: "NOT_SUBMITTED" };
     mocks.state.workflow = undefined;
     render();
     openPosting();
-    expect(document.body.textContent).toContain("WHT payable (withholding tax)");
+    expect(document.body.textContent).toContain("WHT payable");
     expect(document.body.textContent).not.toContain("Withholding tax payable");
   });
 });

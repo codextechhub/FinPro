@@ -25,6 +25,7 @@ import { useDates, type DateFormatter } from "../../lib/display-prefs";
 import { sinceDate } from "../../utils/date-presets";
 import { exitedOutline, exitedTitle } from "@/components/finance-ui/exited-person";
 import { proxyLabel } from "../../components/workflow/person-flags";
+import { FINANCE_HELP } from "./screen-help";
 
 const NO_BRANCH = "No branch";
 
@@ -263,12 +264,7 @@ export default function FinanceAuditPage() {
           <div>
             <div className="flex items-center gap-1.5">
               <h1 className="font-mont text-lg font-semibold text-gray-01">Audit Trail</h1>
-              <InfoHint ariaLabel="About the finance audit trail">
-                The audit trail is your accountability layer. Every finance action - posts, reversals,
-                approvals, rejections, period closes and system postings - is captured with a field-level
-                before/after snapshot, and rows can never be edited or deleted. Click a row to see exactly
-                what moved.
-              </InfoHint>
+              <InfoHint ariaLabel="About the finance audit trail">{FINANCE_HELP.audit}</InfoHint>
             </div>
             <p className="mt-0.5 font-mont text-xs text-gray-05">Every finance mutation, recorded immutably for this entity.</p>
           </div>

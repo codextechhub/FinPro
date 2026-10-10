@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -140,5 +140,65 @@ describe("NavMain active state", () => {
     expect(triggers[1]?.getAttribute("data-state")).toBe("open");
     expect(container.textContent).not.toContain("CX Users");
     expect(container.textContent).toContain("Inbox");
+  });
+
+  it("keeps one menu open across separately labelled groups", async () => {
+    function GroupedMenus() {
+      const [open, setOpen] = useState<string | null>(null);
+      const props = { sharedOpenTitle: open, onSharedOpenTitleChange: setOpen };
+      return <>
+        <NavMain items={[{
+          title: "Books", url: "/books", isActive: false,
+          items: [{ title: "Ledger", url: "/ledger", isActive: false }],
+        }]} {...props} />
+        <NavMain items={[{
+          title: "Money Received", url: "/received", isActive: false,
+          items: [{ title: "Receipts", url: "/receipts", isActive: false }],
+        }]} {...props} />
+      </>;
+    }
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <SidebarProvider defaultOpen><Sidebar><GroupedMenus /></Sidebar></SidebarProvider>
+        </MemoryRouter>,
+      );
+    });
+
+    const triggers = container.querySelectorAll<HTMLElement>('[data-slot="collapsible-trigger"]');
+    await act(async () => triggers[0]?.click());
+    expect(container.textContent).toContain("Ledger");
+
+    await act(async () => triggers[1]?.click());
+    expect(container.textContent).not.toContain("Ledger");
+    expect(container.textContent).toContain("Receipts");
+  });
+
+  it("opens the active main section and subgroup in a three-level menu", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <SidebarProvider defaultOpen>
+            <Sidebar>
+              <NavMain items={[{
+                title: "Receivables", url: "/finance/receivables", isActive: false, childActive: true,
+                items: [{
+                  title: "Money Received", url: "/finance/receivables/receipts", isActive: false, childActive: true,
+                  items: [{
+                    title: "Receipts & Allocation", url: "/finance/receivables/receipts", isActive: true, childActive: false,
+                  }],
+                }],
+              }]} />
+            </Sidebar>
+          </SidebarProvider>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.textContent).toContain("Receivables");
+    expect(container.textContent).toContain("Money Received");
+    expect(container.textContent).toContain("Receipts & Allocation");
+    expect(container.querySelectorAll('[data-active="true"]')).toHaveLength(3);
   });
 });

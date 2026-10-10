@@ -52,7 +52,7 @@ export default function GrirScreen({ entity, currency }: SectionProps) {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <SectionHeader title="GR/IR & Control (goods received, not yet billed)" subtitle="Goods received but not yet billed, checked against the clearing account." />
+      <SectionHeader title="Goods not yet billed" subtitle="Goods received but not yet billed, checked against the clearing account." screen="goodsNotBilled" />
 
       {isForbidden(error) ? (
         <div className={cn(INFORMATION_CARD_SURFACE, "rounded-md")}><ForbiddenState /></div>

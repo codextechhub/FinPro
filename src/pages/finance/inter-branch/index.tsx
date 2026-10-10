@@ -24,32 +24,33 @@ import { useInterBranchReader } from "./use-inter-branch";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { useCan } from "@/components/finance-ui/can";
 import { P } from "../../../permissions";
+import { FINANCE_HELP } from "../screen-help";
 
 const HEADINGS: Record<InterBranchSection, { title: string; lead: string; hint: string }> = {
   transfers: {
     title: "Inter-branch Transfers",
     lead: "Money sent and asked for between branches, and everything else that passed between two of them.",
-    hint: "Each side books its own journal through the inter-branch account (1260), naming the other branch. The branch that receives money confirms it arrived; a void reverses both sides and needs somebody who works in both branches.",
+    hint: FINANCE_HELP["inter-branch-transfers"],
   },
   balances: {
     title: "Inter-branch Balances",
     lead: "What each pair of branches owes the other.",
-    hint: "Read from both branches' books. They agree when every transfer is booked on both sides, and a month will not close while a pair disagrees.",
+    hint: FINANCE_HELP["inter-branch-balances"],
   },
   "held-receipts": {
     title: "Held Receipts",
     lead: "Money one branch collected for another branch's bills.",
-    hint: "Booked to Held for other branches (2190) at the branch that received it, until it is forwarded. At the other branch it then settles the customer's bills.",
+    hint: FINANCE_HELP["held-receipts"],
   },
   recharges: {
     title: "Recharges",
     lead: "A cost one branch paid, shared with the branches it served.",
-    hint: "The paying branch's expense falls by every other branch's share, each owing branch books its share as its own expense, and owes the paying branch until it repays.",
+    hint: FINANCE_HELP.recharges,
   },
   "cost-rules": {
     title: "Shared Cost Rules",
     lead: "Whether a branch absorbs a cost it pays for others, or recharges it, and how.",
-    hint: "One rule per kind of cost. They apply to every branch, so only somebody who covers the whole school can change them.",
+    hint: FINANCE_HELP["shared-cost-rules"],
   },
 };
 

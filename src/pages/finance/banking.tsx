@@ -58,6 +58,7 @@ import { baseApi } from "@/redux/services/base-api";
 import { useAppDispatch } from "@/redux/store";
 import { routesPath } from "@/routes/routes-path";
 import { PageShell } from "@/components/layout/page-shell";
+import { FINANCE_HELP } from "./screen-help";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 import { BankDocumentsSection } from "./bank-documents";
@@ -143,7 +144,7 @@ export default function BankingPage() {
           <div>
             <div className="flex items-center gap-1.5">
               <h1 className="font-mont text-lg font-semibold text-gray-01">Bank Accounts</h1>
-              <InfoHint ariaLabel="About bank accounts">Each bank account maps 1:1 to a GL cash account - the ledger's book balance. Import the bank's statement and reconcile to explain every difference (in-flight items, charges); auto-reconcile pairs lines by amount and date.</InfoHint>
+              <InfoHint ariaLabel="About bank accounts">{FINANCE_HELP.banking}</InfoHint>
             </div>
             <p className="mt-0.5 font-mont text-xs text-gray-05">Bank accounts, statement import and reconciliation.</p>
           </div>

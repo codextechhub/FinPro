@@ -14,10 +14,11 @@ import { WebhooksTab } from "./webhooks-tab";
 import { HeldSettlementsTab, PlatformHeldSettlementsTab } from "./held-settlements-tab";
 import { HeldReconciliationsTab } from "./held-reconciliations";
 import { HeldCustodyScreen } from "./online-payments";
-import { useActiveEntity } from "@/components/finance-ui";
+import { InfoHint, useActiveEntity } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { FINANCE_HELP } from "./screen-help";
 import { P } from "../../permissions";
 import { platformName } from "../../host";
 
@@ -45,7 +46,10 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01" data-guide={`finance-payments-${section}.workspace`}>
         <div data-guide={`finance-payments-${section}.heading`}>
-          <h1 className="font-mont text-lg font-semibold text-gray-01">{label}</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="font-mont text-lg font-semibold text-gray-01">{label}</h1>
+            <InfoHint ariaLabel={`About ${label.toLowerCase()}`}>{FINANCE_HELP[section]}</InfoHint>
+          </div>
           <p className="mt-0.5 font-mont text-xs text-gray-05">{subtitle}</p>
         </div>
         {section === "held-reconciliations" ? (

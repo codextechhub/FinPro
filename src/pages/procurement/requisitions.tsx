@@ -9,6 +9,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
+import { ProcurementPageTitle } from "./screen-help";
 import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
 import { useServesPath } from "../../lib/host-routes";
@@ -23,7 +24,7 @@ import {
 } from "./requisition-edit";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
-  DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LoadingState,
+  DataTable, DetailDrawer, EmptyState, ErrorState, FormField, LoadingState,
   MoneyInput, StatCard, StatusPill, TabStrip, toArray, useActiveEntity, type Column,
   type TabStripItem, RaisingBranchChoiceField, useRaisingBranchChoice,
 } from "@/components/finance-ui";
@@ -185,10 +186,7 @@ export default function RequisitionsPage() {
       <PageShell className="space-y-5 text-black-01">
         <header data-guide="procurement-requisitions.heading" className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-mont text-lg font-semibold text-gray-01">Purchase Requisitions</h1>
-              <InfoHint ariaLabel="About requisitions">A requisition is an internal request to buy to goods and services. It becomes a purchase order only after approval.</InfoHint>
-            </div>
+            <ProcurementPageTitle screen="requisitions">Purchase Requisitions</ProcurementPageTitle>
             <p className="mt-0.5 font-mont text-xs text-gray-05">Create, track, and approve internal purchase requests.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

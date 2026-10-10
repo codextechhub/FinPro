@@ -32,6 +32,7 @@ import type { StockBalance, StockLocation } from "@/redux/services/procurement/p
 import { noBranchLabel, useIsSchool } from "../../lib/reader-words";
 import { apiFieldError } from "@/utils/api-errors";
 import { ProcurementShell } from "./procurement-shell";
+import { ProcurementPageTitle } from "./screen-help";
 import { EmptyPanel, Field } from "./sourcing/shared";
 import { isForbidden } from "./sourcing/helpers";
 import { PageShell } from "@/components/layout/page-shell";
@@ -112,7 +113,7 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
       <PageShell className="space-y-5 text-black-01">
         <header data-guide="procurement-stock-locations.heading" className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="font-mont text-lg font-semibold text-gray-01">Stock Locations</h1>
+            <ProcurementPageTitle screen="stockLocations">Stock Locations</ProcurementPageTitle>
             <p className="mt-0.5 font-mont text-xs text-gray-05">The stores stock is held in. Each holds its own quantity, value and average cost.</p>
           </div>
           <Can permission={P.PROC_CREATE_STOCK}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New location</Button></Can>

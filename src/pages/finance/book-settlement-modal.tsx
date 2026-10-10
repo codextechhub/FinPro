@@ -62,7 +62,7 @@ export function BookSettlementModal({ target, payments, bankName, entity, curren
 
   const dr: RecapRow[] = [
     { code: "", name: bankName ? `Bank: ${bankName}` : "Bank", amount: Math.max(figures.net, 0) },
-    ...(figures.fee > 0 ? [{ code: "", name: "Bank charges (provider fees)", amount: figures.fee }] : []),
+    ...(figures.fee > 0 ? [{ code: "", name: "Bank charges", amount: figures.fee }] : []),
   ];
   const cr: RecapRow[] = [{ code: "", name: GATEWAY_CLEARING_NAME, amount: figures.gross }];
 

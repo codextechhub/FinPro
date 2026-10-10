@@ -53,7 +53,7 @@ export default function ApAgingScreen({ entity, currency }: SectionProps) {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <SectionHeader title="Unpaid bills by age (AP aging)" subtitle="What is owed to suppliers, grouped by how late it is.">
+      <SectionHeader title="Unpaid bills by age" subtitle="What is owed to suppliers, grouped by how late it is." screen="unpaidBills">
         <DateFilter label="As of" value={asOf} onChange={setAsOf} />
       </SectionHeader>
 

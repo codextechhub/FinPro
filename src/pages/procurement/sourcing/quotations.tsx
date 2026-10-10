@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 
 import { ProcurementShell } from "../procurement-shell";
+import { ProcurementPageTitle } from "../screen-help";
 import { RfqPicker, VendorPicker } from "../pickers";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
@@ -103,7 +104,7 @@ export default function QuotationsPage() {
     <PageShell className="space-y-5 text-black-01">
       <header data-guide="procurement-quotations.heading" className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-mont text-lg font-semibold text-gray-01">Quotations</h1>
+          <ProcurementPageTitle screen="quotations">Quotations</ProcurementPageTitle>
           <p className="mt-0.5 font-mont text-xs text-gray-05">Vendor bids against your RFQs. Compare them, then award the winner.</p>
         </div>
         <div className="flex flex-wrap gap-2">

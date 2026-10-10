@@ -42,13 +42,14 @@ import {
   type ConsoleSettingsGroup,
   type ConsoleSettingsSection,
 } from "@/components/settings/settings-layout";
-import { useActiveEntity } from "@/components/finance-ui";
+import { InfoHint, useActiveEntity } from "@/components/finance-ui";
 import { useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
 import { useGetFinanceAccountSettingsQuery } from "@/redux/services/finance/setup-api";
 import { useGetProcurementSettingsQuery, useUpdateProcurementSettingsMutation } from "@/redux/services/procurement/procurement-api";
 import type { ProcurementSettingsValues } from "@/redux/services/procurement/procurement-types";
 import type { FinanceAuditLog, SettingConsumer } from "@/redux/services/finance/setup-types";
 import { ProcurementShell } from "./procurement-shell";
+import { PROCUREMENT_HELP } from "./screen-help";
 import { financeSettingsSections, platformName } from "../../host";
 import { useIsSchool, wholeBooksLabel } from "../../lib/reader-words";
 import { PAYMENT_TERMS } from "./payment-terms";
@@ -78,9 +79,9 @@ const GROUPS: ConsoleSettingsGroup[] = [
 ];
 
 const PROCUREMENT_ACCOUNTS = [
-  ["ACCOUNTS_PAYABLE", "Accounts payable (what is owed to suppliers)", "Control account for the vendor sub-ledger (the total owed to every vendor)."],
-  ["GRIR_CLEARING", "GR/IR clearing (goods received, not yet billed)", "Temporary liability between goods receipt and vendor invoice."],
-  ["WHT_PAYABLE", "WHT payable (withholding tax)", "Withholding tax deducted from vendor payments."],
+  ["ACCOUNTS_PAYABLE", "Accounts payable", "Control account for the vendor sub-ledger (the total owed to every vendor)."],
+  ["GRIR_CLEARING", "GR/IR clearing", "Temporary liability between goods receipt and vendor invoice."],
+  ["WHT_PAYABLE", "WHT payable", "Withholding tax deducted from vendor payments."],
   ["INVENTORY_ASSET", "Inventory asset", "Value of stock held for future issue."],
   ["INVENTORY_ADJUSTMENT", "Inventory adjustment", "Stock-count gains, losses and write-downs."],
   ["PURCHASE_PRICE_VARIANCE", "Purchase price variance", "Difference between receipt basis and vendor invoice price."],
@@ -99,6 +100,7 @@ export default function ProcurementSettings({ section = DEFAULT_PROCUREMENT_SETT
     <ProcurementShell>
       <ConsoleSettingsLayout
         title="Procurement Settings"
+        titleHelp={<InfoHint ariaLabel="About Procurement Settings">{PROCUREMENT_HELP.settings}</InfoHint>}
         description="Review the defaults and controls behind purchasing, vendor governance, matching and payables."
         basePath={PR.SETTINGS}
         activeSection={activeSection}

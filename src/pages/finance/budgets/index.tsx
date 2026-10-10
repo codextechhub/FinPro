@@ -2,12 +2,13 @@
 
 import { DEFAULT_BUDGETS_SECTION, type BudgetsSection } from "../console-sections";
 import { FinanceShell } from "../finance-shell";
-import { useActiveEntity } from "@/components/finance-ui";
+import { InfoHint, useActiveEntity } from "@/components/finance-ui";
 import { BudgetsTab } from "./budgets-tab";
 import { AssetsTab } from "./assets-tab";
 import { TaxTab } from "./tax-tab";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { FINANCE_HELP } from "../screen-help";
 
 const META: Record<string, { title: string; sub: string }> = {
   budgets: { title: "Budgets & Forecasts", sub: "Compare planned vs actual spending - find your overruns before close does." },
@@ -26,7 +27,10 @@ export default function BudgetsAssetsTaxPage({ section = DEFAULT_BUDGETS_SECTION
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01" data-guide={`finance-${section}.workspace`}>
         <div data-guide={`finance-${section}.heading`}>
-          <h1 className="font-mont text-lg font-semibold text-gray-01">{meta.title}</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="font-mont text-lg font-semibold text-gray-01">{meta.title}</h1>
+            <InfoHint ariaLabel={`About ${meta.title.toLowerCase()}`}>{FINANCE_HELP[section]}</InfoHint>
+          </div>
           {meta.sub ? <p className="mt-0.5 font-mont text-xs text-gray-05">{meta.sub}</p> : null}
         </div>
         {!entity ? (

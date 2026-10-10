@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
+import { ProcurementPageTitle } from "./screen-help";
 import { VendorPicker } from "./pickers";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormDrawer, FormField, LoadingState,
@@ -111,7 +112,7 @@ export default function ContractsPage() {
     <PageShell className="space-y-5 text-black-01">
       <header data-guide="procurement-contracts.heading" className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-mont text-lg font-semibold text-gray-01">Contracts</h1>
+          <ProcurementPageTitle screen="contracts">Contracts</ProcurementPageTitle>
           <p className="mt-0.5 font-mont text-xs text-gray-05">Vendor agreements with milestones and a renewal radar.</p>
         </div>
         <Can permission={P.PROC_CREATE_CONTRACT}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New contract</Button></Can>

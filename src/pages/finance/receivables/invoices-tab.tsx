@@ -10,6 +10,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Search, ArrowUp, ArrowDown, Layers, Plus } from "lucide-react";
 import { DataTable, Money, ConfirmActionModal, InfoHint, TabStrip, toArray, kpiValueClass, type Column, type TabStripItem } from "@/components/finance-ui";
+import { FINANCE_HELP } from "../screen-help";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
@@ -151,7 +152,7 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
       <div>
         <div className="flex items-center gap-1.5">
           <h1 className="font-mont text-lg font-semibold text-gray-01">Customer Invoices</h1>
-          <InfoHint ariaLabel="About customer invoices">Posting an invoice records what the customer owes and the income it brings in. A payment is recorded against the invoice, and what customers owe always equals the open balances of their invoices.</InfoHint>
+          <InfoHint ariaLabel="About customer invoices">{FINANCE_HELP.invoices}</InfoHint>
         </div>
         <p className="mt-0.5 font-mont text-xs text-gray-05">Accounts receivable for the selected entity.</p>
       </div>

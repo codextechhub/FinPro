@@ -182,7 +182,7 @@ function PayoutDrawer({ payoutId, payouts, currency, onClose }: { payoutId: numb
   const paid = p.status === "PAID";
   const failed = p.status === "FAILED" || p.status === "REVERSED";
   const dispatched = p.status === "PROCESSING" || paid || (failed && !!p.provider_reference);
-  const dr: RecapRow[] = [{ code: "", name: "Accounts payable (vendor)", amount: p.amount }];
+  const dr: RecapRow[] = [{ code: "", name: "Accounts payable", amount: p.amount }];
   const cr: RecapRow[] = [{ code: p.source_account_code || "", name: p.source_account_name || "Cash & bank", amount: p.amount }];
 
   return (
@@ -278,7 +278,7 @@ export function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boo
     } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
-  const dr: RecapRow[] = [{ code: "", name: "Accounts payable (vendor)", amount: amount || 0 }];
+  const dr: RecapRow[] = [{ code: "", name: "Accounts payable", amount: amount || 0 }];
   const cr: RecapRow[] = [{ code: sourceAccount, name: acctName(sourceAccount) || "Cash & bank", amount: amount || 0 }];
 
   return (

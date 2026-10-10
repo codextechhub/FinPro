@@ -9,11 +9,12 @@ import {
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
+import { ProcurementPageTitle } from "./screen-help";
 import { PurchaseOrderPicker, VendorPicker } from "./pickers";
 import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
 import {
-  DataTable, DetailDrawer, ErrorState, FormField, InfoHint, LineEditor,
+  DataTable, DetailDrawer, ErrorState, FormField, LineEditor,
   LoadingState, PostingRecap, StatCard, StatusPill, TabStrip, emptyLine, toApiLines, toArray,
   useActiveEntity, type Column, type DocLine, type TabStripItem,
   PostingDateField, ConfirmActionModal,} from "@/components/finance-ui";
@@ -118,7 +119,7 @@ export default function VendorInvoicesPage() {
   if (view === "credit-notes") {
     return <ProcurementShell>
       <PageShell className="space-y-5 text-black-01">
-        <header className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-1.5"><h1 className="font-mont text-lg font-semibold text-gray-01">Vendor Invoices</h1><InfoHint ariaLabel="About vendor credit notes">A credit note lowers what a posted bill owes. On a bill already paid, the credit stays with the vendor for the same branch&rsquo;s later bills.</InfoHint></div><p className="mt-0.5 font-mont text-xs text-gray-05">Credit notes correcting posted supplier bills.</p></div>{switcher}</header>
+        <header className="flex flex-wrap items-start justify-between gap-3"><div><ProcurementPageTitle screen="vendorInvoices">Vendor Invoices</ProcurementPageTitle><p className="mt-0.5 font-mont text-xs text-gray-05">Credit notes correcting posted supplier bills.</p></div>{switcher}</header>
         <CreditNotesView entity={entity} currency={currency} />
       </PageShell>
     </ProcurementShell>;
@@ -161,7 +162,7 @@ function BillsView({ entity, currency, switcher }: { entity: string; currency?: 
   ];
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
-      <header data-guide="procurement-vendor-invoices.heading" className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-1.5"><h1 className="font-mont text-lg font-semibold text-gray-01">Vendor Invoices</h1><InfoHint ariaLabel="About vendor invoices">Supplier bills remain drafts until matched, approved, and posted to Accounts Payable.</InfoHint></div><p className="mt-0.5 font-mont text-xs text-gray-05">Review three-way matches, approval, settlement, and overdue exposure.</p></div><div className="flex flex-wrap items-center gap-2">{switcher}<Can permission={P.PROC_IMPORT_OPENING_VENDOR_INVOICES}><Button variant="outline" onClick={() => setImporting(true)}><Upload className="size-4" /> Opening bills</Button></Can><QuickExportButton screen="procurement.vendor_invoices" params={{ ...statusFilterArgs(status, "display_status"), search: debouncedSearch }} entity={entity} typeface="geist" defaultName="Vendor invoices" /><Can permission={P.PROC_CREATE_VENDOR_INVOICE}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> Record Invoice</Button></Can></div></header>
+      <header data-guide="procurement-vendor-invoices.heading" className="flex flex-wrap items-start justify-between gap-3"><div><ProcurementPageTitle screen="vendorInvoices">Vendor Invoices</ProcurementPageTitle><p className="mt-0.5 font-mont text-xs text-gray-05">Review three-way matches, approval, settlement, and overdue exposure.</p></div><div className="flex flex-wrap items-center gap-2">{switcher}<Can permission={P.PROC_IMPORT_OPENING_VENDOR_INVOICES}><Button variant="outline" onClick={() => setImporting(true)}><Upload className="size-4" /> Opening bills</Button></Can><QuickExportButton screen="procurement.vendor_invoices" params={{ ...statusFilterArgs(status, "display_status"), search: debouncedSearch }} entity={entity} typeface="geist" defaultName="Vendor invoices" /><Can permission={P.PROC_CREATE_VENDOR_INVOICE}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> Record Invoice</Button></Can></div></header>
       <div data-guide="procurement-vendor-invoices.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {summaryLoading || !summary ? <div className={cn(INFORMATION_CARD_SURFACE, "col-span-full rounded-md")}><LoadingState rows={2} /></div> : <>
           <StatCard label="Under Review" value={summary.under_review.count} icon={Clock3} tone="amber" />
