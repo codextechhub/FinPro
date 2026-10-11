@@ -25,8 +25,9 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { ArrowRight, Ban, Forward, Plus } from "lucide-react";
 
 import {
-  BankAccountPicker, ConfirmActionModal, CustomerPicker, DataTable, DetailDrawer, FormDrawer, FormField, Money,
-  MoneyInput, PostingDateField, RaisingBranchChoiceField, toArray, useRaisingBranchChoice, type Column,
+  AccessField, BankAccountPicker, ConfirmActionModal, CustomerPicker, DataTable, DetailDrawer, FormDrawer, Money,
+  MoneyInput, PostingDateField, RaisingBranchChoiceField, fieldWriteErrors, toArray, useFieldAccess,
+  useRaisingBranchChoice, type Column, type FieldErrors,
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { ErrorState, LoadingState } from "@/components/finance-ui/states";
@@ -132,6 +133,7 @@ function HeldStatus({ h }: { h: HeldReceipt }) {
 }
 
 export function HeldReceiptsTab({ entity, currency, reader }: { entity: string; currency?: string | null; reader: InterBranchReader }) {
+  const access = useFieldAccess("finance.interbranch");
   const dates = useDates();
   const { can } = useCan();
   const [status, setStatus] = useState("");
@@ -143,13 +145,13 @@ export function HeldReceiptsTab({ entity, currency, reader }: { entity: string; 
   const rows = toArray(data?.data);
 
   const columns: Column<HeldReceipt>[] = [
-    { header: "Number", cell: (h) => <span className="font-semibold tabular-nums text-gray-01">{h.document_number}</span> },
-    { header: "Date", cell: (h) => <span className="tabular-nums text-gray-05">{dates.day(h.receipt_date, h.branch_id)}</span> },
-    { header: "Collected at", cell: (h) => h.branch_name },
-    { header: "For", cell: (h) => h.for_branch_name },
-    { header: "Customer", cell: (h) => h.customer_name },
-    { header: "Amount", align: "right", cell: (h) => <Money kobo={h.amount} currency={currency} align="right" /> },
-    { header: "Status", cell: (h) => <HeldStatus h={h} /> },
+    ...(!access.isHidden("document_number") ? [{ header: "Number", cell: (h: HeldReceipt) => <span className="font-semibold tabular-nums text-gray-01">{h.document_number}</span> }] : []),
+    ...(!access.isHidden("receipt_date") ? [{ header: "Date", cell: (h: HeldReceipt) => <span className="tabular-nums text-gray-05">{dates.day(h.receipt_date, h.branch_id)}</span> }] : []),
+    ...(!access.isHidden("branch_name") ? [{ header: "Collected at", cell: (h: HeldReceipt) => h.branch_name }] : []),
+    ...(!access.isHidden("for_branch_name") ? [{ header: "For", cell: (h: HeldReceipt) => h.for_branch_name }] : []),
+    ...(!access.isHidden("customer_name") ? [{ header: "Customer", cell: (h: HeldReceipt) => h.customer_name }] : []),
+    ...(!access.isHidden("amount") ? [{ header: "Amount", align: "right" as const, cell: (h: HeldReceipt) => <Money kobo={h.amount} currency={currency} align="right" /> }] : []),
+    ...(!access.isHidden("status") ? [{ header: "Status", cell: (h: HeldReceipt) => <HeldStatus h={h} /> }] : []),
   ];
 
   return (
@@ -184,9 +186,10 @@ function HeldReceiptDrawer({ id, entity, currency, reader, onClose }: {
   const dates = useDates();
   const { data, isLoading, isError, refetch } = useGetHeldReceiptQuery(id ? { id, entity } : skipToken);
   const held = id ? data?.data ?? null : null;
+  const access = useFieldAccess("finance.interbranch", held);
   const { can } = useCan();
   const [action, setAction] = useState<null | "forward" | "void">(null);
-  const allowed = held
+  const allowed = held && !access.isHidden("status") && !access.isHidden("forwarded_by")
     ? heldActions(held, { canForward: reader.keys.transfer, canVoid: can(P.FIN_REVERSE_PAYMENT), covers: reader.reach.covers })
     : { forward: false, void: false };
 
@@ -195,7 +198,7 @@ function HeldReceiptDrawer({ id, entity, currency, reader, onClose }: {
       <DetailDrawer
         open={id != null} onOpenChange={(o) => (o ? undefined : onClose())}
         title={held?.document_number ?? "Held receipt"}
-        description={held ? `Collected at ${held.branch_name} for ${held.for_branch_name}` : undefined}
+        description={held && access.anyVisible("branch_name", "for_branch_name") ? `Collected at ${held.branch_name ?? "hidden branch"} for ${held.for_branch_name ?? "hidden branch"}` : undefined}
         widthClass="sm:max-w-lg"
         footer={held && (allowed.forward || allowed.void) ? (
           <>
@@ -207,25 +210,25 @@ function HeldReceiptDrawer({ id, entity, currency, reader, onClose }: {
         {isLoading ? <LoadingState rows={5} /> : isError || !held ? <ErrorState onRetry={refetch} /> : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <HeldStatus h={held} />
-              <Money kobo={held.amount} currency={currency} className="text-lg font-semibold" />
+              {!access.isHidden("status") ? <HeldStatus h={held} /> : null}
+              {!access.isHidden("amount") ? <Money kobo={held.amount} currency={currency} className="text-lg font-semibold" /> : null}
             </div>
             <dl className="grid grid-cols-1 gap-3 rounded-md border border-white-02 p-4 sm:grid-cols-2">
-              <Fact label="Customer">{held.customer_name}</Fact>
-              <Fact label="Received">{dates.day(held.receipt_date, held.branch_id)}</Fact>
-              <Fact label="Into">{held.bank_account_name}</Fact>
-              <Fact label="Method">{METHODS.find(([v]) => v === held.method)?.[1] ?? held.method}</Fact>
-              {held.reference ? <Fact label="Reference">{held.reference}</Fact> : null}
-              {held.narration ? <Fact label="Note">{held.narration}</Fact> : null}
+              {!access.isHidden("customer_name") ? <Fact label="Customer">{held.customer_name}</Fact> : null}
+              {!access.isHidden("receipt_date") ? <Fact label="Received">{dates.day(held.receipt_date, held.branch_id)}</Fact> : null}
+              {!access.isHidden("bank_account_name") ? <Fact label="Into">{held.bank_account_name}</Fact> : null}
+              {!access.isHidden("method") ? <Fact label="Method">{METHODS.find(([v]) => v === held.method)?.[1] ?? held.method}</Fact> : null}
+              {!access.isHidden("reference") && held.reference ? <Fact label="Reference">{held.reference}</Fact> : null}
+              {!access.isHidden("narration") && held.narration ? <Fact label="Note">{held.narration}</Fact> : null}
             </dl>
-            {held.forwarded_by ? (
+            {!access.isHidden("forwarded_by") && held.forwarded_by ? (
               <div className="space-y-2">
                 <Note>{forwardNote(held)}</Note>
                 <Link to={transferLink(held.forwarded_by.id)} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline">
                   Open the transfer <ArrowRight className="size-3.5" />
                 </Link>
               </div>
-            ) : held.status === "POSTED" ? (
+            ) : held.status === "POSTED" && !access.isHidden("branch_name") && !access.isHidden("for_branch_name") ? (
               <Note>{`${held.branch_name} holds this for ${held.for_branch_name} (Held for other branches). ${held.for_branch_name}'s bill is settled once it is forwarded.`}</Note>
             ) : null}
           </div>
@@ -240,6 +243,8 @@ function HeldReceiptDrawer({ id, entity, currency, reader, onClose }: {
 function ForwardDrawer({ held, entity, currency, reader, onClose }: {
   held: HeldReceipt; entity: string; currency?: string | null; reader: InterBranchReader; onClose: () => void;
 }) {
+  const access = useFieldAccess("finance.interbranch");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [toAccount, setToAccount] = useState("");
   const [fromAccount, setFromAccount] = useState("");
   const [date, setDate] = useState("");
@@ -249,37 +254,44 @@ function ForwardDrawer({ held, entity, currency, reader, onClose }: {
   const submit = async () => {
     try {
       const res = await forward({
-        id: held.id, entity, to_bank_account: toAccount ? Number(toAccount) : undefined,
-        from_bank_account: fromAccount ? Number(fromAccount) : undefined, transfer_date: date || undefined,
-        purpose: purpose.trim() || undefined,
+        id: held.id, entity,
+        ...access.writableOnly({
+          to_bank_account: toAccount ? Number(toAccount) : undefined,
+          from_bank_account: fromAccount ? Number(fromAccount) : undefined,
+          transfer_date: date || undefined, purpose: purpose.trim() || undefined,
+        }, { creating: false }),
       }).unwrap();
       toast.success(res.message || "Receipt forwarded.");
       promptIfParked(res.data?.approval);
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
   return (
     <>
       <FormDrawer
         open onOpenChange={(o) => !o && onClose()}
-        title={`Forward ${formatMoney(held.amount, currency)} to ${held.for_branch_name}`}
+        title={[
+          "Forward",
+          !access.isHidden("amount") ? formatMoney(held.amount, currency) : null,
+          !access.isHidden("for_branch_name") ? `to ${held.for_branch_name}` : null,
+        ].filter(Boolean).join(" ")}
         description="It follows the approval route for money sent between branches. Once sent, it settles the customer's bills there."
         onSubmit={submit} submitText="Forward" loading={isLoading}
       >
-        <FormField label="Paid from">
+        <AccessField access={access} name="from_bank_account" label="Paid from" creating={false} errors={denied}>
           <BankAccountPicker entity={entity} value={fromAccount} onChange={setFromAccount} documentBranchId={held.branch_id} placeholder={held.bank_account_name} />
-        </FormField>
+        </AccessField>
         {reader.reach.covers([held.for_branch_id]) ? (
-          <FormField label="Paid into">
+          <AccessField access={access} name="to_bank_account" label="Paid into" creating={false} errors={denied}>
             <BankAccountPicker entity={entity} value={toAccount} onChange={setToAccount} documentBranchId={held.for_branch_id} placeholder="Its collection account" />
-          </FormField>
-        ) : (
+          </AccessField>
+        ) : !access.isHidden("for_branch_name") ? (
           <Note>{`The money lands in ${held.for_branch_name}'s collection account.`}</Note>
-        )}
-        <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
-        <FormField label="Note">
-          <Input value={purpose} maxLength={255} onChange={(e) => setPurpose(e.target.value)} placeholder={`Forwarding ${held.customer_name}'s payment`} className="h-9 bg-white" />
-        </FormField>
+        ) : null}
+        <AccessField access={access} name="transfer_date" creating={false} errors={denied}><PostingDateField label="Date" entity={entity} value={date} onChange={setDate} /></AccessField>
+        <AccessField access={access} name="purpose" label="Note" creating={false} errors={denied}>
+          <Input value={purpose} maxLength={255} onChange={(e) => setPurpose(e.target.value)} placeholder={!access.isHidden("customer_name") ? `Forwarding ${held.customer_name}'s payment` : "Forwarding held payment"} className="h-9 bg-white" />
+        </AccessField>
       </FormDrawer>
       {noApproverDialog}
     </>
@@ -289,25 +301,31 @@ function ForwardDrawer({ held, entity, currency, reader, onClose }: {
 function VoidHeldDialog({ held, entity, currency, onClose }: {
   held: HeldReceipt; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const access = useFieldAccess("finance.interbranch");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [date, setDate] = useState("");
   const [voidHeld, { isLoading }] = useVoidHeldReceiptMutation();
   const submit = async () => {
     try {
-      const res = await voidHeld({ id: held.id, entity, date: date || undefined }).unwrap();
+      const res = await voidHeld({ id: held.id, entity, ...access.writableOnly({ date: date || undefined }, { creating: false }) }).unwrap();
       toast.success(res.message || "Held receipt voided.");
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
   return (
     <ConfirmActionModal
       open onOpenChange={(o) => !o && onClose()} loading={isLoading} onConfirm={submit} destructive
-      title={`Void ${held.document_number}?`}
-      description={`Reverses the ${formatMoney(held.amount, currency)} ${held.branch_name} recorded for ${held.for_branch_name}. Refused while it is matched to a bank statement line.`}
+      title={!access.isHidden("document_number") ? `Void ${held.document_number}?` : "Void this held receipt?"}
+      description={[
+        !access.isHidden("amount") ? `Reverses the ${formatMoney(held.amount, currency)}` : "Reverses this receipt",
+        !access.isHidden("branch_name") && !access.isHidden("for_branch_name") ? `${held.branch_name} recorded for ${held.for_branch_name}.` : ".",
+        "Refused while it is matched to a bank statement line.",
+      ].join(" ")}
       confirmText="Void receipt"
     >
-      <FormField label="Date the reversal">
+      <AccessField access={access} name="date" label="Date the reversal" creating={false} errors={denied}>
         <DatePickerInput value={date} onChange={(e) => setDate(e.target.value)} className="bg-white" />
-      </FormField>
+      </AccessField>
     </ConfirmActionModal>
   );
 }
@@ -315,6 +333,8 @@ function VoidHeldDialog({ held, entity, currency, onClose }: {
 function RecordHeldDrawer({ entity, currency, reader, onClose }: {
   entity: string; currency?: string | null; reader: InterBranchReader; onClose: () => void;
 }) {
+  const access = useFieldAccess("finance.interbranch");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const collecting = useRaisingBranchChoice();
   const [bank, setBank] = useState("");
   const [forBranch, setForBranch] = useState("");
@@ -333,14 +353,14 @@ function RecordHeldDrawer({ entity, currency, reader, onClose }: {
 
   const submit = async () => {
     try {
-      const res = await record({
+      const res = await record(access.writableOnly({
         entity, bank_account: Number(bank), for_branch: Number(forBranch), customer: customer.trim(),
         amount, receipt_date: date, method, reference: reference.trim() || undefined,
         narration: narration.trim() || undefined,
-      }).unwrap();
+      }, { creating: true })).unwrap();
       toast.success(res.message || "Held for the other branch.");
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
@@ -349,14 +369,14 @@ function RecordHeldDrawer({ entity, currency, reader, onClose }: {
       description="Money paid into this branch's bank for another branch's bill. It is held until forwarded."
       onSubmit={submit} submitText={amount > 0 ? `Hold ${formatMoney(amount, currency)}` : "Hold"} loading={isLoading} canSubmit={canSubmit}
     >
-      <RaisingBranchChoiceField choice={{ ...collecting, setValue: (v) => { collecting.setValue(v); setBank(""); if (v === forBranch) setForBranch(""); } }} label="Collected at" />
-      <FormField label="Paid into" required>
+      <AccessField access={access} name="branch" creating errors={denied}><RaisingBranchChoiceField choice={{ ...collecting, setValue: (v) => { collecting.setValue(v); setBank(""); if (v === forBranch) setForBranch(""); } }} label="Collected at" /></AccessField>
+      <AccessField access={access} name="bank_account" label="Paid into" required creating errors={denied}>
         <BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={collecting.branchId} />
-      </FormField>
-      <FormField label="For branch" required>
+      </AccessField>
+      <AccessField access={access} name="for_branch" label="For branch" required creating errors={denied}>
         <BranchSelect label="For branch" branches={others} value={forBranch} onChange={(v) => { setForBranch(v); setCustomer(""); }} />
-      </FormField>
-      <FormField label="Customer who paid" required>
+      </AccessField>
+      <AccessField access={access} name="customer" label="Customer who paid" required creating errors={denied}>
         {canListCustomers
           ? <CustomerPicker entity={entity} value={customer} onChange={setCustomer} />
           : (
@@ -365,20 +385,20 @@ function RecordHeldDrawer({ entity, currency, reader, onClose }: {
               value={customer} onChange={setCustomer} onFound={setFound}
             />
           )}
-      </FormField>
+      </AccessField>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></FormField>
-        <PostingDateField label="Received on" entity={entity} value={date} onChange={setDate} />
+        <AccessField access={access} name="amount" label="Amount" required creating errors={denied}><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></AccessField>
+        <AccessField access={access} name="receipt_date" creating errors={denied}><PostingDateField label="Received on" entity={entity} value={date} onChange={setDate} /></AccessField>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField label="Method">
+        <AccessField access={access} name="method" label="Method" creating errors={denied}>
           <NativeSelect value={method} onChange={(e) => setMethod(e.target.value)} aria-label="Method">
             {METHODS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </NativeSelect>
-        </FormField>
-        <FormField label="Reference"><Input value={reference} maxLength={64} onChange={(e) => setReference(e.target.value)} className="h-9 bg-white" /></FormField>
+        </AccessField>
+        <AccessField access={access} name="reference" label="Reference" creating errors={denied}><Input value={reference} maxLength={64} onChange={(e) => setReference(e.target.value)} className="h-9 bg-white" /></AccessField>
       </div>
-      <FormField label="Note"><Input value={narration} maxLength={255} onChange={(e) => setNarration(e.target.value)} className="h-9 bg-white" /></FormField>
+      <AccessField access={access} name="narration" label="Note" creating errors={denied}><Input value={narration} maxLength={255} onChange={(e) => setNarration(e.target.value)} className="h-9 bg-white" /></AccessField>
     </FormDrawer>
   );
 }

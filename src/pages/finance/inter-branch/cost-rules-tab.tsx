@@ -17,7 +17,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Pencil, Plus } from "lucide-react";
 
-import { AccountPicker, DataTable, FormDrawer, FormField, Segmented, toArray, type Column } from "@/components/finance-ui";
+import {
+  AccessField, AccountPicker, DataTable, FormDrawer, Segmented, fieldWriteErrors,
+  toArray, useFieldAccess, type Column, type FieldErrors,
+} from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,20 +35,23 @@ const TREATMENTS = [["RECHARGE", "Recharge it"], ["ABSORB", "Paying branch absor
 const BASES = [["COUNTS", "By counts"], ["PERCENTAGES", "By fixed percentages"]] as const;
 
 export function CostRulesTab({ entity, reader }: { entity: string; reader: InterBranchReader }) {
+  const access = useFieldAccess("finance.interbranch");
   const { data, isLoading, isFetching, isError, refetch } = useGetSharedCostRulesQuery({ entity, page_size: 100 });
   const rows = toArray(data?.data);
   const [editing, setEditing] = useState<SharedCostRule | "new" | null>(null);
   const canChange = reader.keys.recharge && reader.reach.wholeSchool;
+  const canEdit = canChange && !["name", "treatment", "basis"].some((name) => access.isReadOnly(name, { creating: false }));
+  const canCreate = canChange && !["name", "treatment", "basis"].some((name) => access.isReadOnly(name, { creating: true }));
 
   const columns: Column<SharedCostRule>[] = [
-    { header: "Cost", cell: (r) => <span className="font-semibold text-gray-01">{r.name}</span> },
-    { header: "Treatment", cell: (r) => (r.treatment === "ABSORB" ? "Paying branch absorbs it" : "Recharged") },
-    { header: "Split", cell: (r) => r.treatment === "ABSORB" ? "-" : r.basis === "COUNTS"
+    ...(!access.isHidden("name") ? [{ header: "Cost", cell: (r: SharedCostRule) => <span className="font-semibold text-gray-01">{r.name}</span> }] : []),
+    ...(!access.isHidden("treatment") ? [{ header: "Treatment", cell: (r: SharedCostRule) => (r.treatment === "ABSORB" ? "Paying branch absorbs it" : "Recharged") }] : []),
+    ...(!access.isHidden("basis") && !access.isHidden("shares") ? [{ header: "Split", cell: (r: SharedCostRule) => r.treatment === "ABSORB" ? "-" : r.basis === "COUNTS"
       ? "Counts given each time"
-      : r.shares.map((share) => `${share.branch_name} ${share.percent}%`).join(", ") || "Fixed percentages" },
-    { header: "Expense account", cell: (r) => r.expense_account_code || "-" },
-    { header: "Status", cell: (r) => <TonePill tone={r.is_active ? "good" : "closed"}>{r.is_active ? "In use" : "Not in use"}</TonePill> },
-    ...(canChange ? [{
+      : r.shares.map((share) => `${share.branch_name} ${share.percent}%`).join(", ") || "Fixed percentages" }] : []),
+    ...(!access.isHidden("expense_account_code") ? [{ header: "Expense account", cell: (r: SharedCostRule) => r.expense_account_code || "-" }] : []),
+    ...(!access.isHidden("is_active") ? [{ header: "Status", cell: (r: SharedCostRule) => <TonePill tone={r.is_active ? "good" : "closed"}>{r.is_active ? "In use" : "Not in use"}</TonePill> }] : []),
+    ...(canEdit ? [{
       header: "", align: "right" as const,
       cell: (r: SharedCostRule) => (
         <Button type="button" size="xs" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditing(r); }} className="gap-1"><Pencil className="size-3" /> Edit</Button>
@@ -59,7 +65,7 @@ export function CostRulesTab({ entity, reader }: { entity: string; reader: Inter
         {canChange ? <span /> : reader.keys.recharge ? (
           <Note>These rules apply to every branch, so only somebody who covers the whole school can change them.</Note>
         ) : <span />}
-        {canChange ? <Button onClick={() => setEditing("new")} className="gap-1.5"><Plus className="size-4" /> New rule</Button> : null}
+        {canCreate ? <Button onClick={() => setEditing("new")} className="gap-1.5"><Plus className="size-4" /> New rule</Button> : null}
       </div>
       <DataTable
         columns={columns} rows={rows} rowKey={(r) => r.id}
@@ -74,6 +80,8 @@ export function CostRulesTab({ entity, reader }: { entity: string; reader: Inter
 function RuleDrawer({ entity, reader, rule, onClose }: {
   entity: string; reader: InterBranchReader; rule: SharedCostRule | null; onClose: () => void;
 }) {
+  const access = useFieldAccess("finance.interbranch", rule);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [name, setName] = useState(rule?.name ?? "");
   const [treatment, setTreatment] = useState<SharedCostTreatment>(rule?.treatment ?? "RECHARGE");
   const [basis, setBasis] = useState<RechargeBasis>(rule?.basis ?? "COUNTS");
@@ -89,15 +97,15 @@ function RuleDrawer({ entity, reader, rule, onClose }: {
   const canSubmit = !!name.trim() && !problem;
 
   const submit = async () => {
-    const body = {
+    const body = access.writableOnly({
       entity, name: name.trim(), treatment, basis, expense_account: account || null, is_active: active,
       shares: fixed ? Object.entries(weights).map(([id, bps]) => ({ branch: Number(id), percent: bps / 100 })) : [],
-    };
+    }, { creating: !rule });
     try {
       const res = rule ? await update({ id: rule.id, ...body }).unwrap() : await create(body).unwrap();
       toast.success(res.message || "Rule saved.");
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
@@ -106,10 +114,11 @@ function RuleDrawer({ entity, reader, rule, onClose }: {
       description="Applies to every branch." onSubmit={submit} submitText="Save rule"
       loading={creating || updating} canSubmit={canSubmit}
     >
-      <FormField label="Cost" required><Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="e.g. Internet" className="h-9 bg-white" /></FormField>
-      <Segmented label="When one branch pays it" value={treatment} onChange={setTreatment} options={TREATMENTS} />
-      {treatment === "RECHARGE" ? <Segmented label="Split" value={basis} onChange={setBasis} options={BASES} /> : null}
-      {fixed ? (
+      <AccessField access={access} name="name" label="Cost" required creating={!rule} errors={denied}><Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="e.g. Internet" className="h-9 bg-white" /></AccessField>
+      <AccessField access={access} name="treatment" creating={!rule} errors={denied}><Segmented label="When one branch pays it" value={treatment} onChange={setTreatment} options={TREATMENTS} /></AccessField>
+      {treatment === "RECHARGE" ? <AccessField access={access} name="basis" creating={!rule} errors={denied}><Segmented label="Split" value={basis} onChange={setBasis} options={BASES} /></AccessField> : null}
+      {fixed && !access.isHidden("shares", { creating: !rule }) ? (
+        <AccessField access={access} name="shares" creating={!rule} errors={denied}>
         <div className="space-y-1.5">
           <div className="divide-y divide-white-02 rounded-md border border-white-02">
             {reader.branches.map((b) => (
@@ -125,16 +134,19 @@ function RuleDrawer({ entity, reader, rule, onClose }: {
           </div>
           {problem ? <p className="font-mont text-[11px] text-error">{problem}</p> : null}
         </div>
+        </AccessField>
       ) : treatment === "RECHARGE" ? (
         <Note>Each recharge under this rule asks for the counts (pupils, staff, rooms) at the time.</Note>
       ) : null}
-      <FormField label="Expense account">
+      <AccessField access={access} name="expense_account" label="Expense account" creating={!rule} errors={denied}>
         <AccountPicker entity={entity} value={account} onChange={setAccount} accountType="EXPENSE" postableOnly activeOnly placeholder="Offered on each recharge" />
-      </FormField>
+      </AccessField>
       {rule ? (
+        <AccessField access={access} name="is_active" errors={denied}>
         <label className="flex items-center gap-2 font-mont text-sm text-black-01">
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> In use
         </label>
+        </AccessField>
       ) : null}
     </FormDrawer>
   );

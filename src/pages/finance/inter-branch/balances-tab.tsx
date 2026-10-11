@@ -17,7 +17,7 @@
 import { Link } from "react-router";
 import { ArrowRight } from "lucide-react";
 
-import { DataTable, Money, type Column } from "@/components/finance-ui";
+import { DataTable, Money, useFieldAccess, type Column } from "@/components/finance-ui";
 import { formatMoney } from "@/utils/money";
 import { useGetInterBranchBalancesQuery } from "@/redux/services/finance/interbranch-api";
 import type { InterBranchHeld, InterBranchPair } from "@/redux/services/finance/interbranch-types";
@@ -25,6 +25,7 @@ import { pairLink } from "./links";
 import { Note, TonePill } from "./parts";
 
 export function BalancesTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const access = useFieldAccess("finance.interbranch");
   const { data, isLoading, isFetching, isError, refetch } = useGetInterBranchBalancesQuery({ entity });
   const balances = data?.data;
   const pairs = Array.isArray(balances?.pairs) ? balances.pairs : [];
@@ -32,28 +33,28 @@ export function BalancesTab({ entity, currency }: { entity: string; currency?: s
   const netTotal = balances?.net_total ?? null;
 
   const pairColumns: Column<InterBranchPair>[] = [
-    { header: "Owes", cell: (p) => <span className="font-semibold text-gray-01">{p.owed_by.name}</span> },
-    { header: "To", cell: (p) => p.owed_to.name },
-    { header: "Amount", align: "right", cell: (p) => <Money kobo={p.amount} currency={currency} align="right" /> },
+    ...(!access.isHidden("branch_name") ? [{ header: "Owes", cell: (p: InterBranchPair) => <span className="font-semibold text-gray-01">{p.owed_by.name}</span> }] : []),
+    ...(!access.isHidden("to_branch_name") ? [{ header: "To", cell: (p: InterBranchPair) => p.owed_to.name }] : []),
+    ...(!access.isHidden("amount") ? [{ header: "Amount", align: "right" as const, cell: (p: InterBranchPair) => <Money kobo={p.amount} currency={currency} align="right" /> }] : []),
     { header: "Both books", cell: (p) => p.balanced
       ? <TonePill tone="good">Agree</TonePill>
       : <TonePill tone="waiting">Disagree</TonePill> },
-    { header: "Open", align: "right", cell: (p) => (
+    ...(!access.isHidden("branch_name") && !access.isHidden("to_branch_name") ? [{ header: "Open", align: "right" as const, cell: (p: InterBranchPair) => (
       <Link to={pairLink(p.owed_by.id, p.owed_to.id)} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
         Transfers <ArrowRight className="size-3.5" />
       </Link>
-    ) },
+    ) }] : []),
   ];
 
   const heldColumns: Column<InterBranchHeld>[] = [
-    { header: "Held by", cell: (h) => <span className="font-semibold text-gray-01">{h.held_by.name}</span> },
-    { header: "For", cell: (h) => h.held_for.name },
-    { header: "Amount", align: "right", cell: (h) => <Money kobo={h.amount} currency={currency} align="right" /> },
+    ...(!access.isHidden("branch_name") ? [{ header: "Held by", cell: (h: InterBranchHeld) => <span className="font-semibold text-gray-01">{h.held_by.name}</span> }] : []),
+    ...(!access.isHidden("for_branch_name") ? [{ header: "For", cell: (h: InterBranchHeld) => h.held_for.name }] : []),
+    ...(!access.isHidden("amount") ? [{ header: "Amount", align: "right" as const, cell: (h: InterBranchHeld) => <Money kobo={h.amount} currency={currency} align="right" /> }] : []),
   ];
 
   return (
     <div className="space-y-5">
-      {netTotal !== null && !isLoading ? (
+      {!access.isHidden("amount") && netTotal !== null && !isLoading ? (
         netTotal === 0
           ? <Note>Across every branch the inter-branch account nets to zero, as it should.</Note>
           : <Note tone="warn">{`Across every branch the inter-branch account nets to ${formatMoney(netTotal, currency)}, not zero. A transfer is booked on one side only; the month will not close until it is found.`}</Note>

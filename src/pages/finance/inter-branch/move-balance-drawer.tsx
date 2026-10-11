@@ -18,7 +18,8 @@ import { toast } from "sonner";
 import { ArrowRight, Users } from "lucide-react";
 
 import {
-  CustomerPicker, DetailDrawer, FormField, Money, PostingDateField, useCustomerBranch,
+  AccessField, CustomerPicker, DetailDrawer, Money, PostingDateField, fieldWriteErrors,
+  useCustomerBranch, useFieldAccess, type FieldErrors,
 } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,8 @@ export function MoveBalanceDrawer({ entity, currency, reader, onClose, onOpenTra
   /** A customer already chosen, when opened from their account. */
   customerCode?: string;
 }) {
+  const access = useFieldAccess("finance.interbranch");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [customer, setCustomer] = useState(customerCode);
   const customerBranch = useCustomerBranch(entity, customer);
   const [fromPick, setFromPick] = useState("");
@@ -55,16 +58,18 @@ export function MoveBalanceDrawer({ entity, currency, reader, onClose, onOpenTra
 
   const submit = async () => {
     try {
-      const res = await move({
+      const res = await move(access.writableOnly({
         entity, customer, from_branch: Number(fromBranch), to_branch: Number(toBranch),
         move_date: date || undefined, purpose: purpose.trim() || undefined,
-      }).unwrap();
+      }, { creating: true })).unwrap();
       toast.success(res.message || "Balance moved.");
       setResult({ moved: res.data, from: reader.nameOf(Number(fromBranch)), to: reader.nameOf(Number(toBranch)) });
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
-  const summary = result ? moveSummary(result.moved) : null;
+  const summary = result && !access.isHidden("moved_items") && !access.isHidden("amount")
+    ? moveSummary(result.moved)
+    : null;
 
   return (
     <DetailDrawer
@@ -75,11 +80,11 @@ export function MoveBalanceDrawer({ entity, currency, reader, onClose, onOpenTra
       footer={result ? (
         <>
           <Button variant="outline" onClick={onClose}>Close</Button>
-          {result.moved.transfer_id && onOpenTransfer ? (
+          {!access.isHidden("related_documents") && result.moved.transfer_id && onOpenTransfer ? (
             <Button onClick={() => { onOpenTransfer(result.moved.transfer_id!); onClose(); }} className="gap-1.5">
               Open the move <ArrowRight className="size-4" />
             </Button>
-          ) : result.moved.transfer_id ? (
+          ) : !access.isHidden("related_documents") && result.moved.transfer_id ? (
             <Button asChild className="gap-1.5">
               <Link to={transferLink(result.moved.transfer_id)}>Open the move <ArrowRight className="size-4" /></Link>
             </Button>
@@ -94,10 +99,10 @@ export function MoveBalanceDrawer({ entity, currency, reader, onClose, onOpenTra
         </>
       )}
     >
-      {result && summary ? (
+      {result ? (
         result.moved.transfer_id === null ? (
           <Note>{`Nothing was open at ${result.from}, so nothing moved.`}</Note>
-        ) : (
+        ) : summary ? (
           <div className="space-y-4">
             <p className="font-mont text-sm text-black-01">{`Moved from ${result.from} to ${result.to}:`}</p>
             <dl className="divide-y divide-white-02 rounded-md border border-white-02">
@@ -110,24 +115,24 @@ export function MoveBalanceDrawer({ entity, currency, reader, onClose, onOpenTra
               The moved bills cannot be voided on their own while the move stands. Void the move from the register instead, which works only while nothing moved has been paid, credited or released at {result.to}.
             </p>
           </div>
-        )
+        ) : <Note>The balance moved. The result fields are hidden for this role.</Note>
       ) : (
         <div className="space-y-4">
-          <FormField label="Customer" required>
+          <AccessField access={access} name="customer" label="Customer" required creating errors={denied}>
             <CustomerPicker entity={entity} value={customer} onChange={(v) => { setCustomer(v); setFromPick(""); }} />
-          </FormField>
+          </AccessField>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FormField label="From branch" required>
+            <AccessField access={access} name="from_branch" label="From branch" required creating errors={denied}>
               <BranchSelect label="From branch" branches={reader.branches} value={fromBranch} onChange={setFromPick} />
-            </FormField>
-            <FormField label="To branch" required>
+            </AccessField>
+            <AccessField access={access} name="to_branch" label="To branch" required creating errors={denied}>
               <BranchSelect label="To branch" branches={reader.branches.filter((b) => String(b.id) !== fromBranch)} value={toBranch} onChange={setToBranch} />
-            </FormField>
+            </AccessField>
           </div>
-          <PostingDateField label="Move date" entity={entity} value={date} onChange={setDate} hint="Income earned up to this day stays with the old branch." />
-          <FormField label="Why">
+          <AccessField access={access} name="move_date" creating errors={denied}><PostingDateField label="Move date" entity={entity} value={date} onChange={setDate} hint="Income earned up to this day stays with the old branch." /></AccessField>
+          <AccessField access={access} name="purpose" label="Why" creating errors={denied}>
             <Input value={purpose} maxLength={255} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Changed branch for second term" className="h-9 bg-white" />
-          </FormField>
+          </AccessField>
           <Note>
             Moves the open invoices and debit notes, any unspent credit, and the fees not yet earned. Income already earned stays with the old branch, which the new branch then owes for it.
           </Note>

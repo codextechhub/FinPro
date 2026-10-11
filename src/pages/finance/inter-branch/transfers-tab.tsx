@@ -35,8 +35,9 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { ArrowRight, Ban, CheckCheck, HandCoins, Send, Users, XCircle } from "lucide-react";
 
 import {
-  BankAccountPicker, ConfirmActionModal, DataTable, DetailDrawer, FormDrawer, FormField, Money, MoneyInput,
-  PostingDateField, RaisingBranchChoiceField, toArray, useRaisingBranchChoice, type Column,
+  AccessField, BankAccountPicker, ConfirmActionModal, DataTable, DetailDrawer, FormDrawer, Money, MoneyInput,
+  PostingDateField, RaisingBranchChoiceField, fieldWriteErrors, toArray, useFieldAccess,
+  useRaisingBranchChoice, type Column, type FieldErrors,
 } from "@/components/finance-ui";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { ErrorState, LoadingState } from "@/components/finance-ui/states";
@@ -82,6 +83,7 @@ function useRegisterFilters() {
 }
 
 export function TransfersTab({ entity, currency, reader }: { entity: string; currency?: string | null; reader: InterBranchReader }) {
+  const access = useFieldAccess("finance.interbranch");
   const dates = useDates();
   const filters = useRegisterFilters();
   const [page, setPage] = useState(1);
@@ -104,13 +106,13 @@ export function TransfersTab({ entity, currency, reader }: { entity: string; cur
   const setFilter = (key: (typeof FILTER_KEYS)[number], next: string) => { setPage(1); filters.set(key, next); };
 
   const columns: Column<InterBranchTransfer>[] = [
-    { header: "Number", cell: (t) => <span className="font-semibold tabular-nums text-gray-01">{t.document_number || `#${t.id}`}</span> },
-    { header: "Date", cell: (t) => <span className="tabular-nums text-gray-05">{dates.day(t.transfer_date, t.branch_id)}</span> },
-    { header: "What", cell: (t) => KIND_LABELS[t.kind] ?? t.kind_label },
-    { header: "From", cell: (t) => t.branch_name },
-    { header: "To", cell: (t) => t.to_branch_name },
-    { header: "Amount", align: "right", cell: (t) => <Money kobo={t.amount} currency={currency} align="right" /> },
-    { header: "Stage", cell: (t) => <StagePill transfer={t} /> },
+    ...(!access.isHidden("document_number") ? [{ header: "Number", cell: (t: InterBranchTransfer) => <span className="font-semibold tabular-nums text-gray-01">{t.document_number || `#${t.id}`}</span> }] : []),
+    ...(!access.isHidden("transfer_date") ? [{ header: "Date", cell: (t: InterBranchTransfer) => <span className="tabular-nums text-gray-05">{dates.day(t.transfer_date, t.branch_id)}</span> }] : []),
+    ...(!access.isHidden("kind") ? [{ header: "What", cell: (t: InterBranchTransfer) => KIND_LABELS[t.kind] ?? t.kind_label }] : []),
+    ...(!access.isHidden("branch_name") ? [{ header: "From", cell: (t: InterBranchTransfer) => t.branch_name }] : []),
+    ...(!access.isHidden("to_branch_name") ? [{ header: "To", cell: (t: InterBranchTransfer) => t.to_branch_name }] : []),
+    ...(!access.isHidden("amount") ? [{ header: "Amount", align: "right" as const, cell: (t: InterBranchTransfer) => <Money kobo={t.amount} currency={currency} align="right" /> }] : []),
+    ...(!access.isHidden("status") ? [{ header: "Stage", cell: (t: InterBranchTransfer) => <StagePill transfer={t} /> }] : []),
   ];
 
   return (
@@ -183,11 +185,14 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
   const dates = useDates();
   const { data, isLoading, isError, refetch } = useGetInterBranchTransferQuery(id ? { id, entity } : skipToken);
   const t = id ? data?.data : undefined;
+  const access = useFieldAccess("finance.interbranch", t);
   // No edit route: a send sent back is resumed as it is, or withdrawn to change it.
   const { standing, request, workflowId, requestNamed } = useFinanceReturned(t);
   const [action, setAction] = useState<TransferAction | null>(null);
   const money = (kobo: number) => formatMoney(kobo, currency);
-  const actions = t ? transferActions(t, reader.keys, reader.reach) : [];
+  const actions = t && !["status", "kind", "branch_id", "to_branch_id"].some((name) => access.isHidden(name))
+    ? transferActions(t, reader.keys, reader.reach)
+    : [];
   const blocked = t && t.status === "POSTED" ? voidBlockedByKind(t) : null;
   const reachNote = t ? voidReachNote(t, reader.keys, reader.reach) : null;
   const debt = t ? movedDebt(t) : null;
@@ -197,7 +202,10 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
       <DetailDrawer
         open={id != null} onOpenChange={(o) => (o ? undefined : onClose())}
         title={t ? (t.document_number || `Transfer #${t.id}`) : "Transfer"}
-        description={t ? `${KIND_LABELS[t.kind] ?? t.kind_label} · ${t.branch_name} to ${t.to_branch_name}` : undefined}
+        description={t && access.anyVisible("kind", "branch_name", "to_branch_name") ? [
+          !access.isHidden("kind") ? KIND_LABELS[t.kind] ?? t.kind_label : null,
+          !access.isHidden("branch_name") && !access.isHidden("to_branch_name") ? `${t.branch_name} to ${t.to_branch_name}` : null,
+        ].filter(Boolean).join(" · ") : undefined}
         widthClass="sm:max-w-xl"
         footer={t && (actions.length || standing === "sender") ? (
           <div className="flex w-full flex-wrap justify-end gap-2">
@@ -220,26 +228,26 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
         {isLoading ? <LoadingState rows={6} /> : isError || !t ? <ErrorState onRetry={refetch} /> : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <StagePill transfer={t} />
-              <Money kobo={t.amount} currency={currency} className="text-lg font-semibold" />
+              {!access.isHidden("status") ? <StagePill transfer={t} /> : null}
+              {!access.isHidden("amount") ? <Money kobo={t.amount} currency={currency} className="text-lg font-semibold" /> : null}
             </div>
-            <Note>{transferMeaning(t, money)}</Note>
+            {!["kind", "amount", "branch_name", "to_branch_name"].some((name) => access.isHidden(name)) ? <Note>{transferMeaning(t, money)}</Note> : null}
             <dl className="grid grid-cols-1 gap-3 rounded-md border border-white-02 p-4 sm:grid-cols-2">
-              <Fact label="From">{t.branch_name}</Fact>
-              <Fact label="To">{t.to_branch_name}</Fact>
-              <Fact label="Date">{dates.day(t.transfer_date, t.branch_id)}</Fact>
-              <Fact label="Purpose">{t.purpose || "-"}</Fact>
-              {t.from_bank_account_name ? <Fact label="Paid from">{t.from_bank_account_name}</Fact> : null}
-              {t.to_bank_account_name ? <Fact label="Paid into">{t.to_bank_account_name}</Fact> : null}
-              {t.customer_name ? <Fact label="Customer">{t.customer_name}</Fact> : null}
-              {t.reference ? <Fact label="Reference">{t.reference}</Fact> : null}
-              {t.repay_by ? <Fact label="Repay by">{dates.day(t.repay_by)}</Fact> : null}
-              {t.requested_at ? <Fact label="Asked for">{dates.dateTime(t.requested_at, t.to_branch_id)}</Fact> : null}
-              {t.sent_at ? <Fact label="Sent">{dates.dateTime(t.sent_at, t.branch_id)}</Fact> : null}
-              {t.arrival_date ? <Fact label="Arrived">{dates.day(t.arrival_date, t.to_branch_id)}</Fact> : null}
-              {t.declined_at ? <Fact label="Declined">{`${dates.dateTime(t.declined_at, t.branch_id)}${t.decline_reason ? `: ${t.decline_reason}` : ""}`}</Fact> : null}
+              {!access.isHidden("branch_name") ? <Fact label="From">{t.branch_name}</Fact> : null}
+              {!access.isHidden("to_branch_name") ? <Fact label="To">{t.to_branch_name}</Fact> : null}
+              {!access.isHidden("transfer_date") ? <Fact label="Date">{dates.day(t.transfer_date, t.branch_id)}</Fact> : null}
+              {!access.isHidden("purpose") ? <Fact label="Purpose">{t.purpose || "-"}</Fact> : null}
+              {!access.isHidden("from_bank_account_name") && t.from_bank_account_name ? <Fact label="Paid from">{t.from_bank_account_name}</Fact> : null}
+              {!access.isHidden("to_bank_account_name") && t.to_bank_account_name ? <Fact label="Paid into">{t.to_bank_account_name}</Fact> : null}
+              {!access.isHidden("customer_name") && t.customer_name ? <Fact label="Customer">{t.customer_name}</Fact> : null}
+              {!access.isHidden("reference") && t.reference ? <Fact label="Reference">{t.reference}</Fact> : null}
+              {!access.isHidden("repay_by") && t.repay_by ? <Fact label="Repay by">{dates.day(t.repay_by)}</Fact> : null}
+              {!access.isHidden("requested_at") && t.requested_at ? <Fact label="Asked for">{dates.dateTime(t.requested_at, t.to_branch_id)}</Fact> : null}
+              {!access.isHidden("sent_at") && t.sent_at ? <Fact label="Sent">{dates.dateTime(t.sent_at, t.branch_id)}</Fact> : null}
+              {!access.isHidden("arrival_date") && t.arrival_date ? <Fact label="Arrived">{dates.day(t.arrival_date, t.to_branch_id)}</Fact> : null}
+              {!access.isHidden("declined_at") && t.declined_at ? <Fact label="Declined">{`${dates.dateTime(t.declined_at, t.branch_id)}${!access.isHidden("decline_reason") && t.decline_reason ? `: ${t.decline_reason}` : ""}`}</Fact> : null}
             </dl>
-            {t.moved_items?.length ? (
+            {!access.isHidden("moved_items") && t.moved_items?.length ? (
               <section className="space-y-1.5">
                 <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">What it carried</p>
                 <ul className="divide-y divide-white-02 rounded-md border border-white-02">
@@ -252,10 +260,10 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
                 </ul>
               </section>
             ) : null}
-            {debt != null ? (
+            {!access.isHidden("net_owed") && debt != null ? (
               <Note tone={debt === 0 ? "plain" : "warn"}>{moveDebtSentence(debt, t.branch_name, t.to_branch_name, money)}</Note>
             ) : null}
-            {t.journals.length ? (
+            {!access.isHidden("journals") && t.journals?.length ? (
               <section className="space-y-1.5">
                 <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Journals</p>
                 <ul className="space-y-1">
@@ -273,17 +281,17 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
                 </ul>
               </section>
             ) : null}
-            {t.held_receipt_id ? (
+            {!access.isHidden("held_receipt_id") && t.held_receipt_id ? (
               <Link to={heldReceiptLink(t.held_receipt_id)} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline">
                 Open the held receipt <ArrowRight className="size-3.5" />
               </Link>
             ) : null}
-            {t.kind === "INCOME_GIVEN_BACK" && t.adjustment_entry_id ? (
+            {!access.isHidden("adjustment_entry_id") && t.kind === "INCOME_GIVEN_BACK" && t.adjustment_entry_id ? (
               <Link to={adjustmentLink(t.adjustment_entry_id)} onClick={onClose} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline">
                 Everything the same document gave back <ArrowRight className="size-3.5" />
               </Link>
             ) : null}
-            {t.recharge_id ? (
+            {!access.isHidden("recharge_id") && t.recharge_id ? (
               <Link to={rechargeLink(t.recharge_id)} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline">
                 Open the recharge <ArrowRight className="size-3.5" />
               </Link>
@@ -311,20 +319,24 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
 function ReceivingAccountField({ entity, reader, branchId, value, onChange }: {
   entity: string; reader: InterBranchReader; branchId: number | undefined; value: string; onChange: (v: string) => void;
 }) {
+  const access = useFieldAccess("finance.interbranch");
   if (!branchId) return null;
+  if (access.isHidden("to_bank_account", { creating: true })) return null;
   if (!reader.reach.covers([branchId])) {
     return <Note>{`The money lands in ${reader.nameOf(branchId)}'s collection account.`}</Note>;
   }
   return (
-    <FormField label="Paid into">
+    <AccessField access={access} name="to_bank_account" label="Paid into" creating>
       <BankAccountPicker entity={entity} value={value} onChange={onChange} documentBranchId={branchId} placeholder="Its collection account" />
-    </FormField>
+    </AccessField>
   );
 }
 
 function SendMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
   entity: string; currency?: string | null; reader: InterBranchReader; onClose: () => void; onSent: (id: number) => void;
 }) {
+  const access = useFieldAccess("finance.interbranch");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const sending = useRaisingBranchChoice();
   const [fromAccount, setFromAccount] = useState("");
   const [toBranch, setToBranch] = useState("");
@@ -342,17 +354,17 @@ function SendMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
   const pickSending = (next: string) => { sending.setValue(next); setFromAccount(""); if (next === toBranch) setToBranch(""); };
   const submit = async () => {
     try {
-      const res = await send({
+      const res = await send(access.writableOnly({
         entity, from_bank_account: Number(fromAccount), to_branch: Number(toBranch),
         to_bank_account: toAccount ? Number(toAccount) : undefined, amount,
         transfer_date: date || undefined, purpose: purpose.trim(), repay_by: repayBy || undefined,
         reference: reference.trim() || undefined,
-      }).unwrap();
+      }, { creating: true })).unwrap();
       toast.success(res.message || "Transfer sent.");
       promptIfParked(res.data?.approval);
       if (res.data?.id) onSent(res.data.id);
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
@@ -362,22 +374,22 @@ function SendMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
         description="It follows the sending branch's approval route, and the receiving branch confirms it arrived."
         onSubmit={submit} submitText={amount > 0 ? `Send ${formatMoney(amount, currency)}` : "Send"} loading={isLoading} canSubmit={canSubmit}
       >
-        <RaisingBranchChoiceField choice={{ ...sending, setValue: pickSending }} label="Sending branch" />
-        <FormField label="Paid from" required>
+        <AccessField access={access} name="branch" creating errors={denied}><RaisingBranchChoiceField choice={{ ...sending, setValue: pickSending }} label="Sending branch" /></AccessField>
+        <AccessField access={access} name="from_bank_account" label="Paid from" required creating errors={denied}>
           <BankAccountPicker entity={entity} value={fromAccount} onChange={setFromAccount} documentBranchId={sending.branchId} />
-        </FormField>
-        <FormField label="To branch" required>
+        </AccessField>
+        <AccessField access={access} name="to_branch" label="To branch" required creating errors={denied}>
           <BranchSelect label="To branch" branches={others} value={toBranch} onChange={(v) => { setToBranch(v); setToAccount(""); }} />
-        </FormField>
+        </AccessField>
         <ReceivingAccountField entity={entity} reader={reader} branchId={toBranch ? Number(toBranch) : undefined} value={toAccount} onChange={setToAccount} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></FormField>
-          <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
+          <AccessField access={access} name="amount" label="Amount" required creating errors={denied}><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></AccessField>
+          <AccessField access={access} name="transfer_date" creating errors={denied}><PostingDateField label="Date" entity={entity} value={date} onChange={setDate} /></AccessField>
         </div>
-        <FormField label="What it is for" required><Input value={purpose} maxLength={255} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Salaries shortfall" className="h-9 bg-white" /></FormField>
+        <AccessField access={access} name="purpose" label="What it is for" required creating errors={denied}><Input value={purpose} maxLength={255} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Salaries shortfall" className="h-9 bg-white" /></AccessField>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Repay by"><DatePickerInput value={repayBy} onChange={(e) => setRepayBy(e.target.value)} className="bg-white" /></FormField>
-          <FormField label="Reference"><Input value={reference} maxLength={64} onChange={(e) => setReference(e.target.value)} className="h-9 bg-white" /></FormField>
+          <AccessField access={access} name="repay_by" label="Repay by" creating errors={denied}><DatePickerInput value={repayBy} onChange={(e) => setRepayBy(e.target.value)} className="bg-white" /></AccessField>
+          <AccessField access={access} name="reference" label="Reference" creating errors={denied}><Input value={reference} maxLength={64} onChange={(e) => setReference(e.target.value)} className="h-9 bg-white" /></AccessField>
         </div>
       </FormDrawer>
       {noApproverDialog}
@@ -388,6 +400,8 @@ function SendMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
 function RequestMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
   entity: string; currency?: string | null; reader: InterBranchReader; onClose: () => void; onSent: (id: number) => void;
 }) {
+  const access = useFieldAccess("finance.interbranch");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const asking = useRaisingBranchChoice();
   const [fromBranch, setFromBranch] = useState("");
   const [amount, setAmount] = useState(0);
@@ -400,15 +414,15 @@ function RequestMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
 
   const submit = async () => {
     try {
-      const res = await request({
+      const res = await request(access.writableOnly({
         entity, from_branch: Number(fromBranch), amount, purpose: purpose.trim(),
         repay_by: repayBy || undefined, to_bank_account: account ? Number(account) : undefined,
         ...asking.body("to_branch"),
-      }).unwrap();
+      }, { creating: true })).unwrap();
       toast.success(res.message || "Request sent.");
       if (res.data?.id) onSent(res.data.id);
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
@@ -417,17 +431,17 @@ function RequestMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
       description="Nothing is booked until the branch you ask sends it."
       onSubmit={submit} submitText="Ask" loading={isLoading} canSubmit={canSubmit}
     >
-      <RaisingBranchChoiceField choice={{ ...asking, setValue: (v) => { asking.setValue(v); setAccount(""); if (v === fromBranch) setFromBranch(""); } }} label="Your branch" />
-      <FormField label="Ask branch" required>
+      <AccessField access={access} name="to_branch" creating errors={denied}><RaisingBranchChoiceField choice={{ ...asking, setValue: (v) => { asking.setValue(v); setAccount(""); if (v === fromBranch) setFromBranch(""); } }} label="Your branch" /></AccessField>
+      <AccessField access={access} name="from_branch" label="Ask branch" required creating errors={denied}>
         <BranchSelect label="Ask branch" branches={others} value={fromBranch} onChange={setFromBranch} />
-      </FormField>
-      <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></FormField>
-      <FormField label="What it is for" required><Input value={purpose} maxLength={255} onChange={(e) => setPurpose(e.target.value)} className="h-9 bg-white" /></FormField>
+      </AccessField>
+      <AccessField access={access} name="amount" label="Amount" required creating errors={denied}><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></AccessField>
+      <AccessField access={access} name="purpose" label="What it is for" required creating errors={denied}><Input value={purpose} maxLength={255} onChange={(e) => setPurpose(e.target.value)} className="h-9 bg-white" /></AccessField>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField label="Paid into">
+        <AccessField access={access} name="to_bank_account" label="Paid into" creating errors={denied}>
           <BankAccountPicker entity={entity} value={account} onChange={setAccount} documentBranchId={asking.branchId} placeholder="Your collection account" />
-        </FormField>
-        <FormField label="Repay by"><DatePickerInput value={repayBy} onChange={(e) => setRepayBy(e.target.value)} className="bg-white" /></FormField>
+        </AccessField>
+        <AccessField access={access} name="repay_by" label="Repay by" creating errors={denied}><DatePickerInput value={repayBy} onChange={(e) => setRepayBy(e.target.value)} className="bg-white" /></AccessField>
       </div>
     </FormDrawer>
   );
@@ -436,6 +450,8 @@ function RequestMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
 function SendRequestedDrawer({ transfer, entity, currency, reader, onClose }: {
   transfer: InterBranchTransfer; entity: string; currency?: string | null; reader: InterBranchReader; onClose: () => void;
 }) {
+  const access = useFieldAccess("finance.interbranch");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [fromAccount, setFromAccount] = useState("");
   const [toAccount, setToAccount] = useState(transfer.to_bank_account_id ? String(transfer.to_bank_account_id) : "");
   const [date, setDate] = useState("");
@@ -445,32 +461,39 @@ function SendRequestedDrawer({ transfer, entity, currency, reader, onClose }: {
   const submit = async () => {
     try {
       const res = await send({
-        id: transfer.id, entity, from_bank_account: Number(fromAccount),
-        to_bank_account: toAccount ? Number(toAccount) : undefined, transfer_date: date || undefined,
+        id: transfer.id, entity, ...access.writableOnly({
+          from_bank_account: Number(fromAccount),
+          to_bank_account: toAccount ? Number(toAccount) : undefined,
+          transfer_date: date || undefined,
+        }, { creating: false }),
       }).unwrap();
       toast.success(res.message || "Transfer sent.");
       promptIfParked(res.data?.approval);
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
     <>
       <FormDrawer
         open onOpenChange={(o) => !o && onClose()}
-        title={`Send ${formatMoney(transfer.amount, currency)} to ${transfer.to_branch_name}`}
-        description={transfer.purpose}
+        title={[
+          "Send",
+          !access.isHidden("amount") ? formatMoney(transfer.amount, currency) : null,
+          !access.isHidden("to_branch_name") ? `to ${transfer.to_branch_name}` : null,
+        ].filter(Boolean).join(" ")}
+        description={!access.isHidden("purpose") ? transfer.purpose : undefined}
         onSubmit={submit} submitText="Send" loading={isLoading} canSubmit={!!fromAccount}
       >
-        <FormField label="Paid from" required>
+        <AccessField access={access} name="from_bank_account" label="Paid from" required creating={false} errors={denied}>
           <BankAccountPicker entity={entity} value={fromAccount} onChange={setFromAccount} documentBranchId={transfer.branch_id} />
-        </FormField>
-        {transfer.to_bank_account_name && !reader.reach.covers([transfer.to_branch_id]) ? (
+        </AccessField>
+        {!access.isHidden("to_bank_account_name") && transfer.to_bank_account_name && !reader.reach.covers([transfer.to_branch_id]) ? (
           <Note>{`The money lands in ${transfer.to_bank_account_name}, the account ${transfer.to_branch_name} asked for.`}</Note>
         ) : (
           <ReceivingAccountField entity={entity} reader={reader} branchId={transfer.to_branch_id} value={toAccount} onChange={setToAccount} />
         )}
-        <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
+        <AccessField access={access} name="transfer_date" creating={false} errors={denied}><PostingDateField label="Date" entity={entity} value={date} onChange={setDate} /></AccessField>
       </FormDrawer>
       {noApproverDialog}
     </>
@@ -480,25 +503,32 @@ function SendRequestedDrawer({ transfer, entity, currency, reader, onClose }: {
 function DeclineDialog({ transfer, entity, currency, onClose }: {
   transfer: InterBranchTransfer; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const access = useFieldAccess("finance.interbranch");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [reason, setReason] = useState("");
   const [decline, { isLoading }] = useDeclineInterBranchRequestMutation();
   const submit = async () => {
     try {
-      const res = await decline({ id: transfer.id, entity, reason: reason.trim() || undefined }).unwrap();
+      const res = await decline({ id: transfer.id, entity, ...access.writableOnly({ reason: reason.trim() || undefined }, { creating: false }) }).unwrap();
       toast.success(res.message || "Request declined.");
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
   return (
     <ConfirmActionModal
       open onOpenChange={(o) => !o && onClose()} loading={isLoading} onConfirm={submit}
-      title={`Decline ${transfer.to_branch_name}'s request?`}
-      description={`${transfer.to_branch_name} asked for ${formatMoney(transfer.amount, currency)}. Nothing was booked, so nothing is reversed.`}
+      title={!access.isHidden("to_branch_name") ? `Decline ${transfer.to_branch_name}'s request?` : "Decline this request?"}
+      description={[
+        !access.isHidden("to_branch_name") ? transfer.to_branch_name : "The other branch",
+        "asked for",
+        !access.isHidden("amount") ? `${formatMoney(transfer.amount, currency)}.` : "money.",
+        "Nothing was booked, so nothing is reversed.",
+      ].join(" ")}
       confirmText="Decline request" destructive
     >
-      <FormField label="Reason">
-        <Input value={reason} maxLength={255} onChange={(e) => setReason(e.target.value)} placeholder={`Tell ${transfer.to_branch_name} why`} className="h-9 bg-white" />
-      </FormField>
+      <AccessField access={access} name="reason" label="Reason" creating={false} errors={denied}>
+        <Input value={reason} maxLength={255} onChange={(e) => setReason(e.target.value)} placeholder={!access.isHidden("to_branch_name") ? `Tell ${transfer.to_branch_name} why` : "Explain why"} className="h-9 bg-white" />
+      </AccessField>
     </ConfirmActionModal>
   );
 }
@@ -506,25 +536,31 @@ function DeclineDialog({ transfer, entity, currency, onClose }: {
 function ConfirmArrivalDialog({ transfer, entity, currency, onClose }: {
   transfer: InterBranchTransfer; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const access = useFieldAccess("finance.interbranch");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [date, setDate] = useState("");
   const [confirm, { isLoading }] = useConfirmInterBranchArrivalMutation();
   const submit = async () => {
     try {
-      const res = await confirm({ id: transfer.id, entity, arrival_date: date || undefined }).unwrap();
+      const res = await confirm({ id: transfer.id, entity, ...access.writableOnly({ arrival_date: date || undefined }, { creating: false }) }).unwrap();
       toast.success(res.message || "Arrival confirmed.");
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
   return (
     <ConfirmActionModal
       open onOpenChange={(o) => !o && onClose()} loading={isLoading} onConfirm={submit}
-      title={`Confirm ${formatMoney(transfer.amount, currency)} arrived?`}
-      description={`${transfer.branch_name} sent it${transfer.to_bank_account_name ? ` to ${transfer.to_bank_account_name}` : ""}. Both books already hold it; this is ${transfer.to_branch_name}'s word that the bank received it.`}
+      title={!access.isHidden("amount") ? `Confirm ${formatMoney(transfer.amount, currency)} arrived?` : "Confirm the money arrived?"}
+      description={[
+        !access.isHidden("branch_name") ? `${transfer.branch_name} sent it` : "The sending branch sent it",
+        !access.isHidden("to_bank_account_name") && transfer.to_bank_account_name ? `to ${transfer.to_bank_account_name}.` : ".",
+        "Both books already hold it; this confirms that the bank received it.",
+      ].join(" ")}
       confirmText="Confirm it arrived"
     >
-      <FormField label="Arrived on">
+      <AccessField access={access} name="arrival_date" label="Arrived on" creating={false} errors={denied}>
         <DatePickerInput value={date} min={transfer.transfer_date} onChange={(e) => setDate(e.target.value)} className="bg-white" />
-      </FormField>
+      </AccessField>
       <p className="mt-1 font-mont text-[11px] text-gray-05">Leave it empty for today.</p>
     </ConfirmActionModal>
   );
@@ -533,25 +569,31 @@ function ConfirmArrivalDialog({ transfer, entity, currency, onClose }: {
 function VoidTransferDialog({ transfer, entity, currency, onClose }: {
   transfer: InterBranchTransfer; entity: string; currency?: string | null; onClose: () => void;
 }) {
+  const access = useFieldAccess("finance.interbranch");
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [date, setDate] = useState("");
   const [voidTransfer, { isLoading }] = useVoidInterBranchTransferMutation();
   const submit = async () => {
     try {
-      const res = await voidTransfer({ id: transfer.id, entity, date: date || undefined }).unwrap();
+      const res = await voidTransfer({ id: transfer.id, entity, ...access.writableOnly({ date: date || undefined }, { creating: false }) }).unwrap();
       toast.success(res.message || "Transfer voided.");
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
   return (
     <ConfirmActionModal
       open onOpenChange={(o) => !o && onClose()} loading={isLoading} onConfirm={submit} destructive
-      title={`Void ${transfer.document_number}?`}
-      description={`${formatMoney(transfer.amount, currency)} between ${transfer.branch_name} and ${transfer.to_branch_name}. ${voidConditions(transfer)}`}
+      title={!access.isHidden("document_number") ? `Void ${transfer.document_number}?` : "Void this transfer?"}
+      description={[
+        !access.isHidden("amount") ? formatMoney(transfer.amount, currency) : "This transfer",
+        !access.isHidden("branch_name") && !access.isHidden("to_branch_name") ? `between ${transfer.branch_name} and ${transfer.to_branch_name}.` : ".",
+        voidConditions(transfer),
+      ].join(" ")}
       confirmText="Void transfer"
     >
-      <FormField label="Date the reversal">
+      <AccessField access={access} name="date" label="Date the reversal" creating={false} errors={denied}>
         <DatePickerInput value={date} onChange={(e) => setDate(e.target.value)} className="bg-white" />
-      </FormField>
+      </AccessField>
       <p className="mt-1 font-mont text-[11px] text-gray-05">Leave it empty to reverse on each journal's own date.</p>
     </ConfirmActionModal>
   );
