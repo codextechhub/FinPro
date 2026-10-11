@@ -138,7 +138,6 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
         sections={sections}
         groups={GROUPS}
         fitScreen
-        scopeLabel={active.entity ? `${active.entity.code} · ${active.entity.name}` : "Select an entity"}
       >
         {activeSection === "overview" ? <Overview entity={active.entity} sections={sections} /> : null}
         {activeSection === "entities" ? <Entities /> : null}

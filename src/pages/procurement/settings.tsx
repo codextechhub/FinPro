@@ -107,7 +107,6 @@ export default function ProcurementSettings({ section = DEFAULT_PROCUREMENT_SETT
         sections={SECTIONS}
         groups={GROUPS}
         fitScreen
-        scopeLabel={active.entity ? `${active.entity.code} · ${active.entity.name}` : "Select an entity"}
       >
         {activeSection === "overview" ? <Overview entity={active.entity} /> : null}
         {activeSection === "general" ? <General entity={active.entity} entityCode={active.code} /> : null}

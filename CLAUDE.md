@@ -81,6 +81,49 @@ applications, and restores the console's npm link that the install overwrites.
 It moves versions; it does not verify them. Committing the two lockfiles and
 running both suites afterwards is still yours.
 
+## Field Access is part of every feature contract
+
+Every new or changed user-visible business field must receive an explicit
+Field Access decision in the same change. This includes fields in forms,
+drawers, detail panels, tables, cards, exports, imports, documents, emails and
+derived summaries. A screen permission answers whether somebody may open the
+resource; it does not answer which fields inside that resource they may read or
+change.
+
+Default to including the field. Give a stored or submitted field separate Read
+and Write control. Give a computed, generated, status, audit or other
+server-owned field Read control and mark it non-writable. Do not create switches
+for transport-only values such as internal IDs, pagination data or protocol
+metadata, but make sure a display label, nested object or derived value cannot
+leak a hidden field under another response name.
+
+When the correct boundary is genuinely unclear, ask the user directly before
+building it. Show one concrete case and ask whether the fields should have
+separate switches or one deliberately grouped switch. For example: "Bright
+Star School records an inter-branch transfer from Ikeja Branch to Lekki Branch.
+Should Amount, Purpose and the two bank accounts each have their own switches,
+or should the bank accounts share one Banking details switch?" Do not silently
+exclude a field because it seems harmless.
+
+Field Access work is end-to-end:
+
+- Match each control, value, column, card, export and derived display to the
+  backend registry field that owns its meaning.
+- Use the shared Field Access hook and wrapper everywhere: remove a hidden field
+  completely, grey a read-only field, omit it from the submitted body and remove
+  paired table headers and empty sections.
+- Pass an existing record to the hook so record-specific rules win over the
+  create-form map. Handle field refusal errors beside the affected controls.
+- Add frontend coverage for hidden, read-only and writable states, including
+  nested values, aliases and table header-to-cell alignment as applicable.
+- Coordinate backend registration and enforcement in the same product change.
+  A frontend-only hidden control is not access control.
+
+Before finishing any product change, report `Field Access impact:` followed by
+the fields added, changed or reviewed. If there is no impact, say
+`Field Access impact: none` and give the reason. Documentation-only and Git-only
+requests do not require this statement.
+
 ### Cut the version in the same change, and cut it with `release.sh`
 
 A change to `src/` is not finished when it typechecks. It is finished when both
