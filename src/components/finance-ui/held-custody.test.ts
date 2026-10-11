@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { custodyReading, mayReadCustody } from "./held-custody";
-import { visibleConsoleNav, type ConsoleNavGate } from "./console-nav";
+import { navLeaves, visibleConsoleNav, type ConsoleNavGate } from "./console-nav";
 import { FINANCE_PERMISSION_REGISTRY, type PermissionCode } from "../../permissions";
 import { financeNav } from "../../pages/finance/finance-nav";
 import type { CustodyMode } from "@/redux/services/payments/payments-types";
@@ -27,7 +27,7 @@ function payoutScreens(keys: string[], mode: CustodyMode) {
   // The server answers only a reader who may read; anyone else never gets a mode.
   const custody = custodyReading(may, may ? mode : undefined);
   return visibleConsoleNav(financeNav, { ...gate, custody })
-    .flatMap((g) => g.items.map((i) => i.title))
+    .flatMap((group) => group.items.flatMap(navLeaves).map((item) => item.title))
     .filter((title) => title === "Payouts" || title === "Batches");
 }
 
