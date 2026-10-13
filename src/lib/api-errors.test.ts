@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { errorCode, isForbidden, refusalMessage } from "./api-errors";
+import { errorCode, isForbidden, refusalMessage, refusalSentence } from "./api-errors";
 
 /**
  * A refusal is the one failure a screen answers differently: it names what the
@@ -60,5 +60,26 @@ describe("refusalMessage", () => {
     expect(refusalMessage({ status: 409, data: { error: { code: "PERIOD_CLOSE_ERROR" } } })).toBeNull();
     expect(refusalMessage({ status: "FETCH_ERROR" })).toBeNull();
     expect(refusalMessage(undefined)).toBeNull();
+  });
+});
+
+describe("refusalSentence", () => {
+  it("reads the sentence a field error carries", () => {
+    expect(refusalSentence({
+      status: 400,
+      data: { message: "Validation error", error: { code: "VALIDATION_ERROR", detail: { customer: ["No such customer for this payment's branch."] } } },
+    })).toBe("No such customer for this payment's branch.");
+    expect(refusalSentence({ status: 400, data: { error: { detail: { customer: "Name the customer." } } } })).toBe("Name the customer.");
+  });
+
+  it("falls back to the envelope's message", () => {
+    expect(refusalSentence({ status: 409, data: { message: "A terminal keeps at least one number.", error: { code: "CONFLICT" } } }))
+      .toBe("A terminal keeps at least one number.");
+  });
+
+  it("is null when the failure says nothing", () => {
+    expect(refusalSentence({ status: "FETCH_ERROR" })).toBeNull();
+    expect(refusalSentence(undefined)).toBeNull();
+    expect(refusalSentence({ status: 500, data: {} })).toBeNull();
   });
 });

@@ -89,6 +89,9 @@ export const PAYMENTS_SECTIONS = [
   "provider-activity",
   "webhooks",
   "held-settlements",
+  // Each branch's payment terminal, and the payments made on them.
+  "terminals",
+  "terminal-payments",
   // Platform only: the daily held-ledger check and the provider account settings.
   // A school app leaves it unmounted.
   "held-reconciliations",

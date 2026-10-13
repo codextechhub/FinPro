@@ -14,6 +14,7 @@ import type { ArAdjustment } from "@/redux/services/finance/ar-types";
 
 const mocks = vi.hoisted(() => ({
   held: new Set<string>(), detail: undefined as unknown, uid: 4, request: undefined as unknown, resume: vi.fn(), availability: undefined as unknown, fieldAccess: {} as Record<string, unknown>, availabilityAsked: [] as unknown[],
+  createRefund: vi.fn(), postRefund: vi.fn(), tie: vi.fn(),
 }));
 
 vi.mock("@/redux/services/finance/approval-request-api", () => ({
@@ -52,13 +53,31 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 vi.mock("../../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverPrompt: () => ({ promptIfParked: vi.fn(), noApproverDialog: null }) }));
 vi.mock("./document-void-action", () => ({ DocumentVoidAction: () => null }));
+// The online side of a refund has its own test (provider-refund-panel.test.tsx); here a button stands in for choosing it.
+vi.mock("./provider-refund-panel", () => ({
+  OnlineRefundFields: ({ onChange }: { onChange: (v: { online: boolean; collection: string; payment: null }) => void }) => (
+    <button type="button" onClick={() => onChange({ online: true, collection: "5", payment: null })}>Choose online</button>
+  ),
+  ProviderRefundChip: () => null,
+  ProviderRefundPanel: () => null,
+  useProviderRefundMap: () => new Map(),
+  useTieRefund: () => mocks.tie,
+}));
+vi.mock("@/components/custom/search-select", () => ({
+  SearchSelect: ({ options, value, onChange }: { options: { value: string; label: string }[]; value?: string; onChange?: React.ChangeEventHandler<HTMLSelectElement> }) => (
+    <select aria-label="customer" value={value ?? ""} onChange={onChange}>
+      <option value="">-</option>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  ),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/redux/services/finance/ar-api", () => {
   const mutation = () => [() => ({ unwrap: async () => ({ data: {} }) }), { isLoading: false }];
   const query = () => ({ data: undefined, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() });
   return {
     useGetArAdjustmentsQuery: query, useGetInvoicesQuery: query, useGetRefundAvailabilityQuery: (_args: unknown, options?: { skip?: boolean }) => (mocks.availabilityAsked.push(options?.skip === true), { data: options?.skip ? undefined : mocks.availability, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
-    useCreateRefundMutation: mutation, usePostRefundMutation: mutation, useSubmitRefundMutation: mutation,
+    useCreateRefundMutation: () => [mocks.createRefund, { isLoading: false }], usePostRefundMutation: () => [mocks.postRefund, { isLoading: false }], useSubmitRefundMutation: mutation,
     useCreateWriteOffRequestMutation: mutation, usePostWriteOffRequestMutation: mutation, useSubmitWriteOffRequestMutation: mutation,
   };
 });
@@ -87,6 +106,12 @@ beforeEach(() => {
   mocks.resume.mockReset();
   mocks.fieldAccess = {};
   mocks.availabilityAsked = [];
+  mocks.createRefund.mockReset();
+  mocks.createRefund.mockReturnValue({ unwrap: async () => ({ data: { id: 21, approval_required: false } }) });
+  mocks.postRefund.mockReset();
+  mocks.postRefund.mockReturnValue({ unwrap: async () => ({ message: "Refund processed." }) });
+  mocks.tie.mockReset();
+  mocks.tie.mockResolvedValue(true);
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -149,6 +174,46 @@ describe("the refund picker for a role that may not read customer balances", () 
     await act(async () => { button("Pick date")!.click(); });
     expect(document.body.querySelector("[data-testid=refund-credit-hidden]")).toBeNull();
     expect(mocks.availabilityAsked.at(-1)).toBe(false);
+  });
+});
+
+describe("a refund returned through the payment provider", () => {
+  const CREDIT = { customer_id: 1, customer_code: "C-001", customer_name: "Adeyemi", branch_id: 2, branch_name: "Lekki", refundable_credit: 10_000_000, refundable_credit_naira: "100,000.00" };
+
+  /** Fills the form as Mrs Bello would: a date, Mrs Adeyemi's credit at Lekki, and the online way of paying. */
+  const fillForm = async () => {
+    mocks.availability = { data: [CREDIT], pagination: { currentPage: 1, totalPages: 1 } };
+    act(() => root.render(<NewActionDrawer open onClose={vi.fn()} entity="BSS" currency="NGN" />));
+    await act(async () => { button("Pick date")!.click(); });
+    const select = document.body.querySelector("select[aria-label=customer]") as HTMLSelectElement;
+    await act(async () => { select.value = "C-001::2"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  };
+
+  it("is raised as an online refund with no bank account, tied to its payment, then posted", async () => {
+    await fillForm();
+    await act(async () => { button("Choose online")!.click(); });
+    await act(async () => { button("Process refund")!.click(); });
+    expect(mocks.createRefund).toHaveBeenCalledTimes(1);
+    const body = mocks.createRefund.mock.calls[0][0];
+    expect(body).toMatchObject({ entity: "BSS", customer: "C-001", branch: 2, method: "ONLINE", amount: 10_000_000 });
+    expect(body.bank_account).toBeUndefined();
+    expect(mocks.tie).toHaveBeenCalledWith(21, "5");
+    expect(mocks.postRefund).toHaveBeenCalledTimes(1);
+    expect(mocks.tie.mock.invocationCallOrder[0]).toBeLessThan(mocks.postRefund.mock.invocationCallOrder[0]);
+  });
+
+  it("stays a draft when the payment cannot be tied, and says so", async () => {
+    mocks.tie.mockResolvedValue(false);
+    await fillForm();
+    await act(async () => { button("Choose online")!.click(); });
+    await act(async () => { button("Process refund")!.click(); });
+    expect(mocks.createRefund).toHaveBeenCalledTimes(1);
+    expect(mocks.postRefund).not.toHaveBeenCalled();
+  });
+
+  it("is a bank refund while the online choice is not made", async () => {
+    await fillForm();
+    expect(button("Process refund")!.disabled).toBe(true);
   });
 });
 

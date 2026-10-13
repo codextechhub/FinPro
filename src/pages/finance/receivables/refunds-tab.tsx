@@ -11,7 +11,12 @@
  *   • a write-off is per-invoice in our ledger, so the write-off form picks one of
  *     the customer's open invoices (amount defaults to / caps at its balance);
  *   • refunds and write-offs can either post directly or be submitted into the
- *     shared approval workflow, depending on the school's published templates.
+ *     shared approval workflow, depending on the school's published templates;
+ *   • at a school that holds its online money, a refund can instead be returned
+ *     to the payer through the payment provider (see provider-refund-panel.tsx).
+ *     It is raised as an online refund, tied to the payment it returns before it
+ *     is posted, and a refund whose tie is refused stays a draft to be finished
+ *     from its drawer.
  */
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
@@ -56,6 +61,9 @@ import type { ArAdjustment, RefundAvailabilityCustomer } from "@/redux/services/
 import { DocumentVoidAction } from "./document-void-action";
 import { DOCUMENT_STATUS_WORDS, statusWord } from "@/components/finance-ui/status-words";
 import { WriteOffRecoverModal } from "./write-off-recover-modal";
+import { GATEWAY_CLEARING_NAME } from "../settlement-booking";
+import { OnlineRefundFields, ProviderRefundChip, ProviderRefundPanel, useProviderRefundMap, useTieRefund } from "./provider-refund-panel";
+import { NO_ONLINE_REFUND, ONLINE_REFUND_METHOD, BANK_REFUND_METHOD, paymentAmountError, paymentChoiceReady, type OnlineRefundChoice } from "./provider-refund-model";
 import { useDates } from "../../../lib/display-prefs";
 
 type Mode = "REFUND" | "WRITEOFF";
@@ -158,6 +166,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
   const kinds = data?.kinds ?? ["REFUND", "WRITEOFF"];
   const bothKinds = kinds.length > 1;
   const { showCredit, showWrittenOff, count: kpiCount } = adjustmentKpiTiles(data?.kpis);
+  const providerRefunds = useProviderRefundMap(entity);
   const resetPage = () => setPage(1);
   const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
 
@@ -168,7 +177,12 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
     { header: "Customer", cell: (r) => <span className="text-gray-01">{r.customer_name}</span> },
     { header: "Reason", cell: (r) => <span className="block max-w-[260px] truncate text-gray-01" title={r.reason}>{r.reason || "-"}</span> },
     { header: "Amount", align: "right", cell: (r) => <Money kobo={r.amount} currency={currency} align="right" /> },
-    { header: "Status", cell: (r) => <StatusPill status={isSentBack(r, true) ? SENT_BACK_STATUS : r.status || "DRAFT"} /> },
+    { header: "Status", cell: (r) => (
+      <span className="inline-flex flex-col items-start">
+        <StatusPill status={isSentBack(r, true) ? SENT_BACK_STATUS : r.status || "DRAFT"} />
+        {r.kind === "REFUND" && r.refund_id ? <ProviderRefundChip link={providerRefunds.get(r.refund_id)} /> : null}
+      </span>
+    ) },
   ];
 
   return (
@@ -298,6 +312,13 @@ export function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
     } catch { /* central */ }
   };
 
+  /** Puts a draft refund on its way by the route its approval rule sets, as the footer does. */
+  const sendDraft = async () => {
+    if (gated && can(P.FIN_SUBMIT_REFUND)) await doSubmit();
+    else if (!gated && can(P.FIN_POST_REFUND)) await doPost();
+    else toast.info("The refund is tied again. Ask somebody who may submit or post it to send it.");
+  };
+
   return (
     <DetailDrawer
       open={!!row} onOpenChange={(o) => (o ? undefined : onClose())}
@@ -349,6 +370,13 @@ export function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
           <Field label="Date">{dates.day(row.date)}</Field>
         </div>
         <Field label="Reason"><span className="font-normal">{row.reason || "-"}</span></Field>
+        {!wo && row.refund_id ? (
+          <ProviderRefundPanel
+            refundId={row.refund_id} refundStatus={row.status} customerCode={row.customer_code}
+            entity={entity} currency={currency} amount={row.amount}
+            onSend={sendDraft} sending={posting || submittingRefund}
+          />
+        ) : null}
         <div>
           <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">GL posting</p>
           <PostingRecap title={wo ? "Write-off posting" : "Refund posting"} dr={recap.dr} cr={recap.cr} currency={currency} helper={helper} stackOnMobile />
@@ -383,7 +411,9 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
   // The picked row: one customer's credit at one branch (see refundCreditKey).
   const [refundKey, setRefundKey] = useState("");
   const [selectedRefundCustomer, setSelectedRefundCustomer] = useState<RefundAvailabilityCustomer | null>(null);
+  const [onlineChoice, setOnlineChoice] = useState<OnlineRefundChoice>(NO_ONLINE_REFUND);
 
+  const tieRefund = useTieRefund(entity);
   const [createRefund, { isLoading: creatingR }] = useCreateRefundMutation();
   const [postRefund, { isLoading: postingR }] = usePostRefundMutation();
   const [submitRefund, { isLoading: submittingR }] = useSubmitRefundMutation();
@@ -476,23 +506,26 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
     }
     return {
       dr: [{ code: "2140", name: "Customer credit", amount }],
-      cr: [{ code: "Bank", name: "cash out", amount }],
+      cr: onlineChoice.online
+        ? [{ code: "", name: GATEWAY_CLEARING_NAME, amount }]
+        : [{ code: "Bank", name: "cash out", amount }],
     };
-  }, [wo, expenseAccount, amount]);
+  }, [wo, expenseAccount, amount, onlineChoice.online]);
 
   const canSubmit = wo
     ? !!customer && !!invoice && amount > 0 && !!date
-    : !!customer && !!bankAccount && refundAmountIsValid && !!date;
+    : !!customer && paymentChoiceReady(onlineChoice, bankAccount) && refundAmountIsValid && !!date
+      && !paymentAmountError(amount, onlineChoice.payment);
 
   const reset = () => {
     setMode("REFUND"); setDate(""); setCustomer(""); setAmount(0); setReason("");
     setBankAccount(""); setInvoice(""); setExpenseAccount(""); setNextAction("post");
-    setRefundCustomerSearch(""); setRefundKey(""); setSelectedRefundCustomer(null);
+    setRefundCustomerSearch(""); setRefundKey(""); setSelectedRefundCustomer(null); setOnlineChoice(NO_ONLINE_REFUND);
   };
   const close = () => { reset(); onClose(); };
   const changeMode = (m: Mode) => {
     setMode(m); setCustomer(""); setInvoice(""); setAmount(0); setNextAction("post");
-    setRefundCustomerSearch(""); setRefundKey(""); setSelectedRefundCustomer(null);
+    setRefundCustomerSearch(""); setRefundKey(""); setSelectedRefundCustomer(null); setOnlineChoice(NO_ONLINE_REFUND);
   };
   const pickRefundCustomer = (key: string) => {
     const selected = refundCustomers.find((item) => refundCreditKey(item) === key)
@@ -504,6 +537,7 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
     setSelectedRefundCustomer(selected);
     setAmount(selected?.refundable_credit ?? 0);
     setRefundCustomerSearch("");
+    setOnlineChoice((current) => (current.online ? { ...NO_ONLINE_REFUND, online: true } : current));
   };
   const pickInvoice = (id: string) => {
     setInvoice(id);
@@ -535,9 +569,15 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
         const res = await createRefund({
           entity, customer: customer.trim().toUpperCase(),
           branch: refundRequestBranch(activeRefundCustomer),
-          refund_date: date, method: "BANK_TRANSFER",
-          amount, bank_account: bankAccount ? Number(bankAccount) : undefined, narration: reason.trim() || undefined,
+          refund_date: date, method: onlineChoice.online ? ONLINE_REFUND_METHOD : BANK_REFUND_METHOD,
+          amount, bank_account: !onlineChoice.online && bankAccount ? Number(bankAccount) : undefined, narration: reason.trim() || undefined,
         }).unwrap();
+        // Tie an online refund to its payment before posting.
+        if (onlineChoice.online && !(await tieRefund(res.data.id, onlineChoice.collection))) {
+          toast.warning("The refund is saved as a draft but is not tied to a payment yet. Open it to choose the payment.");
+          close();
+          return;
+        }
         if (nextAction === "submit" || (nextAction === "post" && res.data.approval_required)) {
           const submitted = await submitRefund({ id: res.data.id, entity }).unwrap();
           toast.success(submitted.message || "Refund submitted for approval.");
@@ -629,10 +669,19 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
               placeholder={customer ? "Select an open invoice" : "Select a customer first"} />
           </FormField>
         ) : (
-          <FormField label="Refund to bank account" required>
-            <BankAccountPicker entity={entity} value={bankAccount} onChange={setBankAccount}
-              documentBranchId={(liveRefundCustomer ?? selectedRefundCustomer)?.branch_id} />
-          </FormField>
+          <div className="space-y-4">
+            <OnlineRefundFields
+              entity={entity} currency={currency} customerCode={customer}
+              branch={(liveRefundCustomer ?? selectedRefundCustomer)?.branch_id}
+              amount={amount} value={onlineChoice} onChange={setOnlineChoice}
+            />
+            {onlineChoice.online ? null : (
+              <FormField label="Refund to bank account" required>
+                <BankAccountPicker entity={entity} value={bankAccount} onChange={setBankAccount}
+                  documentBranchId={(liveRefundCustomer ?? selectedRefundCustomer)?.branch_id} />
+              </FormField>
+            )}
+          </div>
         )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -672,7 +721,9 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
             stackOnMobile
             helper={wo
               ? "A write-off recognises the loss as expense and clears the receivable."
-              : "A refund pays out a credit balance - cash leaves the bank."}
+              : onlineChoice.online
+                ? "The refund goes back through the payment provider and is booked when the provider confirms it."
+                : "A refund pays out a credit balance - cash leaves the bank."}
           />
         </div>
 

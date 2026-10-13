@@ -36,7 +36,10 @@
  *
  *   Payments (80): 01 collection, 02 virtual_account, 03 payout, 04 report,
  *   05 payout_batch, 06 webhook, 07 unattributed_webhook, 08 settings
- *   (custody), 09 settlement, 10 platform_settlement, 11 platform_provider.
+ *   (custody), 09 settlement, 10 platform_settlement, 11 platform_provider,
+ *   12 refund (returned through the provider), 13 terminal (a branch's payment
+ *   terminal), 14 terminal_payment (money paid at a terminal); a terminal
+ *   payment's `match` is action 31, as a vendor bill's match is.
  *
  *   Workflow (60): 01 template, 02 instance, 03 action, 04 group, 05 approvers.
  *   Most workflow codes are declared by each host, which gates its own menus on
@@ -237,6 +240,13 @@ export const P = {
   PAY_SUBMIT_PLATFORM_SETTLEMENT: "801030",  // put a held settlement forward for approval (platform)
   PAY_VIEW_PLATFORM_PROVIDER: "801101",  // the platform's own provider account settings
   PAY_UPDATE_PLATFORM_PROVIDER: "801103",  // change them, with a reason (platform)
+  PAY_VIEW_REFUNDS: "801201",  // read refunds returned through the payment provider
+  PAY_CREATE_REFUND: "801202",  // tie a draft online refund to the payment it returns, or pay it from the bank
+  PAY_VIEW_TERMINALS: "801301",  // each branch's payment terminal and its WhatsApp numbers
+  PAY_UPDATE_TERMINAL: "801303",  // retry a failed terminal, add or remove a number
+  PAY_VIEW_TERMINAL_PAYMENTS: "801401",  // payments made at a terminal, matched or not
+  PAY_MATCH_TERMINAL_PAYMENT: "801431",  // apply a terminal payment to a customer
+  PAY_REVERSE_TERMINAL_PAYMENT: "801414",  // undo a match
   PROC_ACTIVATE_CONTRACT: "700427",
   PROC_ADJUST_STOCK: "701337",
   PROC_ALLOCATE_VENDOR_ADVANCE: "701120",  // apply a prepayment to a later bill
@@ -583,6 +593,13 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "801030": "payments.platform_settlement.submit",
   "801101": "payments.platform_provider.view",
   "801103": "payments.platform_provider.update",
+  "801201": "payments.refund.view",
+  "801202": "payments.refund.create",
+  "801301": "payments.terminal.view",
+  "801303": "payments.terminal.update",
+  "801401": "payments.terminal_payment.view",
+  "801431": "payments.terminal_payment.match",
+  "801414": "payments.terminal_payment.reverse",
   "203702": "finance.statutory.create",
   "203703": "finance.statutory.update",
 };

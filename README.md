@@ -49,6 +49,13 @@ which is how this list was written.
    format, in both applications. The interceptor must toast 409s at all: a
    conflict it drops is a click that does nothing.
 
+7. **Depend on `qrcode.react`.** The desk collection dialog and the branch
+   terminal cards draw QR codes with it (`dependencies` in this package's
+   `package.json`, version `^4.2.0`). It makes no network calls. A host that
+   installs this package from a git tag gets it with the tag; a host that links
+   the package from a sibling checkout (the console) must list it in its own
+   `dependencies`, because an npm link installs nothing.
+
 ## Host contract
 
 This package is consumed **as TypeScript source**, and resolves `@/*` against

@@ -54,6 +54,27 @@ export function refusalMessage(error: unknown, display?: TenantDisplay | null): 
   return null;
 }
 
+/**
+ * The sentence a refusal carries, for a screen that shows it beside the action
+ * that was refused rather than leaving it to the host's toast alone.
+ *
+ * A field error (`{ customer: "No such customer for this payment's branch." }`)
+ * puts its sentence in `error.detail`, keyed by the field; any other refusal
+ * has only the envelope's `message`. Null when the failure carries neither
+ * (a network error, say).
+ */
+export function refusalSentence(error: unknown): string | null {
+  const envelope = envelopeOf(error);
+  const detail = envelope?.error?.detail;
+  if (detail && typeof detail === "object") {
+    for (const value of Object.values(detail)) {
+      const sentence = Array.isArray(value) ? value.find((v) => typeof v === "string" && v) : value;
+      if (typeof sentence === "string" && sentence) return sentence;
+    }
+  }
+  return typeof envelope?.message === "string" && envelope.message ? envelope.message : null;
+}
+
 type ErrorEnvelope = { message?: unknown; error?: { code?: unknown; detail?: unknown } };
 
 /** The `{ success, message, error }` body, from an RTK Query error or as given. */

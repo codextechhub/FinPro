@@ -151,6 +151,11 @@ export const arApi = baseApi.injectEndpoints({
       query: (params) => ({ url: `/finance/refunds/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceRefunds"],
     }),
+    // One refund by id: its method says whether it is an online refund.
+    getRefund: builder.query<ApiEnvelope<Refund>, { id: number; entity: string }>({
+      query: ({ id, entity }) => ({ url: `/finance/refunds/${id}/${qs({ entity })}`, method: "GET" }),
+      providesTags: ["FinanceRefunds"],
+    }),
     getRefundAvailability: builder.query<
       PaginatedEnvelope<RefundAvailabilityCustomer>,
       // `as_of` is the refund's accounting date. Credit that only arrives later
@@ -467,6 +472,7 @@ export const {
   useSubmitCreditNoteMutation,
   useAllocateCreditNoteMutation,
   useGetRefundsQuery,
+  useGetRefundQuery,
   useGetRefundAvailabilityQuery,
   useCreateRefundMutation,
   usePostRefundMutation,

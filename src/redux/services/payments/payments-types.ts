@@ -4,6 +4,9 @@
 // detail response lists the present ones they cannot change in
 // `_read_only_fields`. Read them through `useFieldAccess`.
 
+/** DESK: a member of staff at a branch desk started it for the payer to pay on their own phone. */
+export type CollectionOrigin = "STANDARD" | "DESK";
+
 export type CollectionStatus = "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "ABANDONED" | "REFUNDED";
 
 export interface Collection {
@@ -13,6 +16,8 @@ export interface Collection {
   branch?: number | null;
   provider: string;
   channel: string;
+  /** Where the collection was started; absent when Field Access hides it. */
+  origin?: CollectionOrigin;
   reference: string;
   provider_reference: string | null;
   amount: number;
@@ -165,6 +170,7 @@ export interface InitiateCollectionPayload {
   deposit_account?: string;
   channel?: string;
   provider?: string;
+  origin?: CollectionOrigin;
   payer_email?: string;
   payer_name?: string;
   narration?: string;
@@ -571,4 +577,137 @@ export interface ProviderSweep {
   amount: number;
   settled_at: string | null;
   recorded_on: string;
+}
+
+// ---------------------------------------------------------------------------
+// Refunds returned to the payer through the payment provider
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a refund returned through the provider stands. LINKED: tied to its
+ * payment and not yet posted. PROCESSING: sent, the provider has not returned
+ * it yet. PROCESSED: returned. FAILED: not returned; the refund is a draft
+ * again. CANCELLED: dropped before it was sent.
+ */
+export type ProviderRefundStatus = "LINKED" | "PROCESSING" | "PROCESSED" | "FAILED" | "CANCELLED";
+
+/** One refund through the provider. Fields follow Field Access on `payments.refund`. */
+export interface ProviderRefund {
+  id: number;
+  /** The finance refund this is the provider half of. */
+  refund_id: number;
+  refund_number: string;
+  refund_status: string;
+  branch: number | null;
+  provider: string;
+  status?: ProviderRefundStatus;
+  /** The provider's own word for the stage, kept as it was sent. */
+  provider_status?: string;
+  amount: number;
+  amount_naira: string;
+  collection_id?: number;
+  collection_reference?: string;
+  provider_reference?: string;
+  failure_reason?: string;
+  sent_at: string | null;
+  processed_at: string | null;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Branch payment terminals and the payments made on them
+// ---------------------------------------------------------------------------
+
+/** PENDING: being set up. NEEDS_NUMBER: waiting for a WhatsApp number. ACTIVE: open. FAILED: set-up refused. DEACTIVATED: switched off. */
+export type TerminalStatus = "PENDING" | "NEEDS_NUMBER" | "ACTIVE" | "FAILED" | "DEACTIVATED";
+
+/**
+ * What the provider said about how to pay at a terminal, under the names it
+ * used. Which of the link, code and method fields come back is the provider's
+ * to decide, so every one is optional and read through terminal-model.ts.
+ */
+export interface TerminalPaymentDetails {
+  paymentMethods?: unknown[];
+  payment_methods?: unknown[];
+  payment_url?: string;
+  payment_link?: string;
+  link?: string;
+  qr_code?: string;
+  qr_code_url?: string;
+  poster_url?: string;
+  currency?: string;
+}
+
+/** One branch's payment terminal. Fields follow Field Access on `payments.terminal`. */
+export interface VirtualTerminal {
+  id: number;
+  branch: number;
+  branch_name: string;
+  provider: string;
+  code?: string;
+  name?: string;
+  status?: TerminalStatus;
+  attempts?: number;
+  last_error?: string;
+  payment_details?: TerminalPaymentDetails;
+  routed_to_branch_bank?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A WhatsApp number a terminal notifies. Both fields follow Field Access on `payments.terminal_destination`. */
+export interface TerminalDestination {
+  name?: string;
+  number?: string;
+}
+
+export type TerminalPaymentFilter = "UNMATCHED" | "MATCHED" | "ALL";
+export type TerminalMatchMethod = "AUTO" | "MANUAL";
+
+/** A customer the server suggests for an unmatched payment. */
+export interface TerminalSuggestion {
+  customer: number;
+  code: string;
+  name: string;
+  /** What the customer owes at the payment's branch, in kobo. */
+  open_balance: number;
+  email_match: boolean;
+  /** Why it was suggested: `email`, `name` or `amount`. */
+  reasons: ("email" | "name" | "amount")[];
+}
+
+/** One payment made at a branch terminal. Fields follow Field Access on `payments.terminal_payment`. */
+export interface TerminalPayment {
+  id: number;
+  collection_id: number;
+  branch: number | null;
+  branch_name?: string;
+  terminal?: number;
+  terminal_name?: string;
+  reference?: string;
+  provider_reference?: string;
+  amount?: number;
+  amount_naira?: string;
+  fee?: number;
+  status?: "UNMATCHED" | "MATCHED";
+  match_method?: TerminalMatchMethod | "";
+  /** Why an unmatched payment did not match by itself. */
+  match_note?: string;
+  payer_email?: string;
+  sender_name?: string;
+  sender_bank?: string;
+  matched_customer?: number | null;
+  matched_customer_code?: string | null;
+  matched_customer_name?: string | null;
+  matched_by?: number | null;
+  matched_by_name?: string | null;
+  matched_at?: string | null;
+  unmatched_by_name?: string | null;
+  unmatched_at?: string | null;
+  receipt_id?: number | null;
+  paid_at?: string | null;
+  booked_on?: string | null;
+  created_at?: string;
+  /** Up to five; absent when Field Access hides them. */
+  suggestions?: TerminalSuggestion[];
 }

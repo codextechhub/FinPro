@@ -1,6 +1,7 @@
 // Payments (§6.Payments) - single payouts, payout batches, settlement
 // reconciliation (gateway vs bank), the gateway transactions log, held
-// settlements and the platform's held-money checks.
+// settlements, each branch's payment terminal with the payments made on it, and
+// the platform's held-money checks.
 // Beneficiary details follow Field Access on payments.payout in each tab.
 import { DEFAULT_PAYMENTS_SECTION, type PaymentsSection } from "./console-sections";
 import { paymentsHeadings } from "./payments-headings";
@@ -14,10 +15,14 @@ import { WebhooksTab } from "./webhooks-tab";
 import { HeldSettlementsTab, PlatformHeldSettlementsTab } from "./held-settlements-tab";
 import { HeldReconciliationsTab } from "./held-reconciliations";
 import { HeldCustodyScreen } from "./online-payments";
+import { TerminalsTab } from "./terminals-tab";
+import { TerminalPaymentsTab } from "./terminal-payments-tab";
 import { InfoHint, useActiveEntity } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { EmptyState } from "@/components/finance-ui/states";
+import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { FINANCE_HELP } from "./screen-help";
 import { P } from "../../permissions";
 import { platformName } from "../../host";
@@ -60,6 +65,14 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
           <NoEntityState />
         ) : section === "held-settlements" ? (
           <HeldSettlementsTab entity={entity!} currency={currency} />
+        ) : section === "terminals" ? (
+          can(P.PAY_VIEW_TERMINALS)
+            ? <TerminalsTab entity={entity!} />
+            : <EmptyState title="No terminals access" message={noAccessMessage("view branch terminals")} />
+        ) : section === "terminal-payments" ? (
+          can(P.PAY_VIEW_TERMINAL_PAYMENTS)
+            ? <TerminalPaymentsTab entity={entity!} currency={currency} />
+            : <EmptyState title="No terminal payments access" message={noAccessMessage("view terminal payments")} />
         ) : section === "batches" ? (
           <HeldCustodyScreen entity={entity!}><BatchesTab entity={entity!} currency={currency} /></HeldCustodyScreen>
         ) : section === "settlement" ? (

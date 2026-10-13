@@ -16,6 +16,8 @@ export function paymentsHeadings(product: string): Record<PaymentsSection, { lab
     "provider-activity": { label: "Payment provider activity", subtitle: `Every request ${product} made to the payment provider, including refused and failed ones.` },
     webhooks: { label: "Needs Attention", subtitle: "Provider events that did not make it into the books." },
     "held-settlements": { label: "Held Settlements", subtitle: "Online payments held for each branch, paid into its bank." },
+    terminals: { label: "Branch Terminals", subtitle: "Each branch's payment terminal, and the WhatsApp numbers it notifies." },
+    "terminal-payments": { label: "Terminal Payments", subtitle: "Payments made at a branch terminal, and the pupil or family each belongs to." },
     "held-reconciliations": { label: "Held Reconciliations", subtitle: "The daily check of held money against the payment provider." },
   };
 }

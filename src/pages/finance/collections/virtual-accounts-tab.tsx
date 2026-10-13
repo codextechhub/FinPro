@@ -235,21 +235,21 @@ function VirtualAccountDetailDrawer({ va, entity, currency, onClose, onUpdated }
   );
 }
 
-function ProvisionDrawer({ open, onClose, entity }: { open: boolean; onClose: () => void; entity: string }) {
+export function ProvisionDrawer({ open, onClose, entity }: { open: boolean; onClose: () => void; entity: string }) {
   const [customer, setCustomer] = useState("");
   const [provider, setProvider] = useState("PAYSTACK");
   const [depositAccount, setDepositAccount] = useState("");
-  const [bankCode, setBankCode] = useState("");
+  const [preferredBank, setPreferredBank] = useState("");
   const [create, { isLoading }] = useCreateVirtualAccountMutation();
 
-  const reset = () => { setCustomer(""); setProvider("PAYSTACK"); setDepositAccount(""); setBankCode(""); };
+  const reset = () => { setCustomer(""); setProvider("PAYSTACK"); setDepositAccount(""); setPreferredBank(""); };
   const close = () => { reset(); onClose(); };
 
   const submit = async () => {
     try {
       const res = await create({
         entity, customer, provider,
-        deposit_account: depositAccount || undefined, bank_code: bankCode.trim() || undefined,
+        deposit_account: depositAccount || undefined, preferred_bank: preferredBank.trim().toLowerCase() || undefined,
       }).unwrap();
       toast.success(res.message || "Virtual account created.");
       close();
@@ -281,8 +281,9 @@ function ProvisionDrawer({ open, onClose, entity }: { open: boolean; onClose: ()
         <FormField label="Deposit (GL) account - optional">
           <AccountPicker entity={entity} value={depositAccount} onChange={setDepositAccount} accountType="ASSET" postableOnly placeholder="Bank / cash account where funds land" />
         </FormField>
-        <FormField label="Bank code - optional">
-          <Input value={bankCode} onChange={(e) => setBankCode(e.target.value)} placeholder="Provider-specific preferred bank" className="bg-white font-mont" />
+        <FormField label="Preferred bank - optional">
+          <Input value={preferredBank} onChange={(e) => setPreferredBank(e.target.value)} placeholder="The bank's slug, for example wema-bank" className="bg-white font-mont" />
+          <p className="mt-1 font-mont text-[11px] text-gray-05">Name the bank by its slug, not its bank code. Leave blank to let the provider choose.</p>
         </FormField>
       </div>
     </DetailDrawer>

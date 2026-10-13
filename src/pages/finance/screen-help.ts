@@ -46,6 +46,8 @@ export const FINANCE_HELP = {
   "held-reconciliations": "Compare held-money records with the payment provider's records each day.",
   transactions: "Review every collection, payout and transfer that moved money.",
   "provider-activity": "Review every request sent to the payment provider, including refused and failed requests.",
+  terminals: "See each branch's payment terminal, whether it is open, and the WhatsApp numbers it notifies.",
+  "terminal-payments": "Match payments made at a branch terminal to the customer they are for.",
   webhooks: "Investigate provider events that could not be processed into the system or books.",
   "trial-balance": "Show every account's closing debit or credit and confirm that the ledger balances.",
   "income-statement": "Show income, expenses and the resulting profit or loss for a period.",

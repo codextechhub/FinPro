@@ -58,7 +58,7 @@ export const financeNav: ConsoleNavGroup[] = [
     ]), icon: HandCoins },
     { ...branch("Adjustments", [
       { title: "Credit / Debit Notes", url: `${F.RECEIVABLES}/credit-notes`, permissions: [P.FIN_VIEW_CREDIT_NOTES] },
-      { title: "Refunds & Write-offs", url: `${F.RECEIVABLES}/refunds`, permissions: [P.FIN_VIEW_REFUNDS, P.FIN_VIEW_WRITE_OFFS] },
+      { title: "Refunds & Write-offs", url: `${F.RECEIVABLES}/refunds`, permissions: [P.FIN_VIEW_REFUNDS, P.FIN_VIEW_WRITE_OFFS], resources: ["payments.refund"] },
       { title: "Concessions", url: `${F.RECEIVABLES}/concessions`, permissions: [P.FIN_VIEW_CONCESSIONS] },
     ]), icon: FileMinus },
     { ...branch("Collection Follow-up", [
@@ -101,6 +101,8 @@ export const financeNav: ConsoleNavGroup[] = [
     { ...branch("Money In", [
       { title: "Collections", url: F.COLLECTIONS, permissions: [P.PAY_VIEW_COLLECTIONS] },
       { title: "Virtual Accounts", url: `${F.COLLECTIONS}/virtual-accounts`, permissions: [P.PAY_VIEW_VIRTUAL_ACCOUNTS] },
+      { title: "Branch Terminals", url: `${F.PAYMENTS}/terminals`, permissions: [P.PAY_VIEW_TERMINALS] },
+      { title: "Terminal Payments", url: `${F.PAYMENTS}/terminal-payments`, permissions: [P.PAY_VIEW_TERMINAL_PAYMENTS] },
     ]), icon: CircleDollarSign },
     { ...branch("Money Out", [
       { title: "Payouts", url: `${F.PAYMENTS}/payouts`, aliases: [F.PAYMENTS], permissions: [P.PAY_VIEW_PAYOUTS], heldCustody: true },

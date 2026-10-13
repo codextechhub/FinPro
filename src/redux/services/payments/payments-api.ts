@@ -36,14 +36,19 @@ import type {
   PayoutInstruction,
   PayoutSummary,
   PlatformHeldSettlement,
+  ProviderRefund,
   ProviderSettings,
   ProviderSweep,
   SaveSubaccountPayload,
   SavedSubaccount,
   SettlementReconciliation,
+  TerminalDestination,
+  TerminalPayment,
+  TerminalPaymentFilter,
   TransactionLogEntry,
   UpdateCustodyPayload,
   VirtualAccount,
+  VirtualTerminal,
   VirtualAccountKpis,
   WebhookEvent,
   WebhookSummary,
@@ -52,9 +57,13 @@ import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-type
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
 
+/** A collection read with `?verify=1`: the server asks the provider and books what it confirms. */
+const verifiedCollectionUrl = (id: number, entity: string) =>
+  `/payments/collections/${id}/${qs({ entity, verify: 1 })}`;
+
 export const paymentsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getCollections: builder.query<PaginatedEnvelope<Collection>, { entity: string; page?: number; group?: string; status?: string; provider?: string; virtual_account?: number }>({
+    getCollections: builder.query<PaginatedEnvelope<Collection>, { entity: string; page?: number; page_size?: number; group?: string; status?: string; provider?: string; origin?: string; virtual_account?: number }>({
       query: (p) => ({ url: `/payments/collections/${qs(p)}`, method: "GET" }),
       providesTags: ["PaymentsCollections"],
     }),
@@ -79,11 +88,79 @@ export const paymentsApi = baseApi.injectEndpoints({
       invalidatesTags: ["PaymentsCollections", "FinanceInvoices", "FinanceReports"],
     }),
 
+    // One collection read with ?verify=1 (a desk screen polls it until it is paid).
+    // A query, not a mutation: the poll is a read the cache can dedupe, and the
+    // booked receipt invalidates the tags a mutation would.
+    pollCollection: builder.query<ApiEnvelope<Collection>, { id: number; entity: string }>({
+      query: ({ id, entity }) => ({ url: verifiedCollectionUrl(id, entity), method: "GET" }),
+    }),
+
+    // Refunds returned through the provider (payments.refund.view / .create).
+    getProviderRefunds: builder.query<PaginatedEnvelope<ProviderRefund>, { entity: string; page?: number; page_size?: number; refund?: number; collection?: number; status?: string }>({
+      query: (p) => ({ url: `/payments/refunds/${qs(p)}`, method: "GET" }),
+      providesTags: ["PaymentsRefunds"],
+    }),
+    // ?verify=1 asks the provider and books the refund if it confirms the money went back.
+    verifyProviderRefund: builder.mutation<ApiEnvelope<ProviderRefund>, { id: number; entity: string }>({
+      query: ({ id, entity }) => ({ url: `/payments/refunds/${id}/${qs({ entity, verify: 1 })}`, method: "GET" }),
+      invalidatesTags: ["PaymentsRefunds", "FinanceRefunds", "FinanceJournals", "FinanceReports", "FinanceCustomers"],
+    }),
+    // Ties a draft online refund to the payment it returns. `collection` is the payment's id or reference.
+    linkProviderRefund: builder.mutation<ApiEnvelope<ProviderRefund>, { entity: string; refund: number; collection: number | string }>({
+      query: ({ entity, ...body }) => ({ url: `/payments/refunds/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["PaymentsRefunds", "FinanceRefunds"],
+    }),
+    payProviderRefundFromBank: builder.mutation<ApiEnvelope<ProviderRefund>, { id: number; entity: string; bank_account?: number; method?: string }>({
+      query: ({ id, entity, ...body }) => ({ url: `/payments/refunds/${id}/pay-from-bank/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["PaymentsRefunds", "FinanceRefunds"],
+    }),
+
+    // Branch terminals (payments.terminal.view / .update).
+    getTerminals: builder.query<PaginatedEnvelope<VirtualTerminal>, { entity: string; page?: number; status?: string; branch?: number }>({
+      query: (p) => ({ url: `/payments/terminals/${qs(p)}`, method: "GET" }),
+      providesTags: ["PaymentsTerminals"],
+    }),
+    retryTerminal: builder.mutation<ApiEnvelope<VirtualTerminal>, { id: number; entity: string }>({
+      query: ({ id, entity }) => ({ url: `/payments/terminals/${id}/retry/${qs({ entity })}`, method: "POST" }),
+      invalidatesTags: ["PaymentsTerminals"],
+    }),
+    getTerminalDestinations: builder.query<ApiEnvelope<TerminalDestination[]>, { id: number; entity: string }>({
+      query: ({ id, entity }) => ({ url: `/payments/terminals/${id}/destinations/${qs({ entity })}`, method: "GET" }),
+      providesTags: (_r, _e, { id }) => [{ type: "PaymentsTerminals", id: `destinations-${id}` }],
+    }),
+    addTerminalDestination: builder.mutation<ApiEnvelope<TerminalDestination[]>, { id: number; entity: string; name: string; number: string }>({
+      query: ({ id, entity, ...body }) => ({ url: `/payments/terminals/${id}/destinations/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: "PaymentsTerminals", id: `destinations-${id}` }, "PaymentsTerminals"],
+    }),
+    removeTerminalDestination: builder.mutation<ApiEnvelope<TerminalDestination[]>, { id: number; entity: string; number: string }>({
+      query: ({ id, entity, ...body }) => ({ url: `/payments/terminals/${id}/destinations/remove/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: "PaymentsTerminals", id: `destinations-${id}` }, "PaymentsTerminals"],
+    }),
+
+    // Payments made at terminals (payments.terminal_payment.*). Unmatched by default.
+    getTerminalPayments: builder.query<PaginatedEnvelope<TerminalPayment>, { entity: string; page?: number; status?: TerminalPaymentFilter; branch?: number; search?: string }>({
+      query: (p) => ({ url: `/payments/terminal-payments/${qs(p)}`, method: "GET" }),
+      providesTags: ["PaymentsTerminalPayments"],
+    }),
+    getTerminalPayment: builder.query<ApiEnvelope<TerminalPayment>, { id: number; entity: string }>({
+      query: ({ id, entity }) => ({ url: `/payments/terminal-payments/${id}/${qs({ entity })}`, method: "GET" }),
+      providesTags: ["PaymentsTerminalPayments"],
+    }),
+    // Matching books a receipt that settles the customer's bills; unmatching voids it.
+    matchTerminalPayment: builder.mutation<ApiEnvelope<TerminalPayment>, { id: number; entity: string; customer: string | number }>({
+      query: ({ id, entity, ...body }) => ({ url: `/payments/terminal-payments/${id}/match/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["PaymentsTerminalPayments", "PaymentsCollections", "FinanceInvoices", "FinancePayments", "FinanceCustomers", "FinanceReports"],
+    }),
+    unmatchTerminalPayment: builder.mutation<ApiEnvelope<TerminalPayment>, { id: number; entity: string }>({
+      query: ({ id, entity }) => ({ url: `/payments/terminal-payments/${id}/unmatch/${qs({ entity })}`, method: "POST" }),
+      invalidatesTags: ["PaymentsTerminalPayments", "PaymentsCollections", "FinanceInvoices", "FinancePayments", "FinanceCustomers", "FinanceReports"],
+    }),
+
     getVirtualAccounts: builder.query<PaginatedEnvelope<VirtualAccount> & { kpis: VirtualAccountKpis }, { entity: string; page?: number; status?: string; provider?: string; search?: string }>({
       query: (p) => ({ url: `/payments/virtual-accounts/${qs(p)}`, method: "GET" }),
       providesTags: ["PaymentsVirtualAccounts"],
     }),
-    createVirtualAccount: builder.mutation<ApiEnvelope<VirtualAccount>, { entity: string; customer: string | number; provider?: string; deposit_account?: string; bank_code?: string }>({
+    createVirtualAccount: builder.mutation<ApiEnvelope<VirtualAccount>, { entity: string; customer: string | number; provider?: string; deposit_account?: string; preferred_bank?: string }>({
       query: ({ entity, ...body }) => ({
         url: `/payments/virtual-accounts/${qs({ entity })}`,
         method: "POST",
@@ -273,6 +350,20 @@ export const {
   useGetCollectionsSummaryQuery,
   useInitiateCollectionMutation,
   useVerifyCollectionMutation,
+  usePollCollectionQuery,
+  useGetProviderRefundsQuery,
+  useVerifyProviderRefundMutation,
+  useLinkProviderRefundMutation,
+  usePayProviderRefundFromBankMutation,
+  useGetTerminalsQuery,
+  useRetryTerminalMutation,
+  useGetTerminalDestinationsQuery,
+  useAddTerminalDestinationMutation,
+  useRemoveTerminalDestinationMutation,
+  useGetTerminalPaymentsQuery,
+  useGetTerminalPaymentQuery,
+  useMatchTerminalPaymentMutation,
+  useUnmatchTerminalPaymentMutation,
   useGetVirtualAccountsQuery,
   useCreateVirtualAccountMutation,
   useUpdateVirtualAccountMutation,

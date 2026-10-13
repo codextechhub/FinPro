@@ -29,7 +29,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus, RefreshCw, Link2, Receipt } from "lucide-react";
-import { DataTable, Money, MoneyInput, DetailDrawer, FormField, CustomerPicker, PostingRecap, KpiCard, toArray, type Column, type RecapRow } from "@/components/finance-ui";
+import { DataTable, Money, MoneyInput, DetailDrawer, FormField, CustomerPicker, PostingRecap, KpiCard, toArray, useFieldAccess, type Column, type RecapRow } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,7 @@ import type { Invoice } from "@/redux/services/finance/ar-types";
 import { useDates } from "../../../lib/display-prefs";
 import { usePaymentBranchColumn } from "../payment-branches";
 import { canReverify } from "./collection-reverify";
+import { originWord } from "./desk-collection-model";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 
@@ -91,8 +92,15 @@ export function CollectionsTab({ entity, currency }: { entity: string; currency?
   useActionParam("new", can(P.PAY_CREATE_COLLECTION), () => setCreating(true));
   const [group, setGroup] = useState("");
   const [provider, setProvider] = useState("");
+  const [origin, setOrigin] = useState("");
   const [page, setPage] = useState(1);
-  const listParams = useMemo(() => ({ entity, page, ...(group ? { group } : {}), ...(provider ? { provider } : {}) }), [entity, page, group, provider]);
+  const access = useFieldAccess("payments.collection");
+  const showOrigin = !access.isHidden("origin");
+  const originArg = showOrigin ? origin : "";
+  const listParams = useMemo(
+    () => ({ entity, page, ...(group ? { group } : {}), ...(provider ? { provider } : {}), ...(originArg ? { origin: originArg } : {}) }),
+    [entity, page, group, provider, originArg],
+  );
   const { data, isLoading, isFetching, isError, refetch } = useGetCollectionsQuery(listParams);
   const { data: summaryRes } = useGetCollectionsSummaryQuery({ entity, ...(provider ? { provider } : {}) });
   const rows = useMemo(() => toArray<Collection>(data?.data), [data]);
@@ -111,6 +119,7 @@ export function CollectionsTab({ entity, currency }: { entity: string; currency?
     { header: "Customer", cell: (c) => <span><span className="font-medium text-gray-01">{customerLabel(c)}</span>{c.narration ? <span className="block font-mont text-[11px] text-gray-05">{c.narration}</span> : null}</span> },
     ...(branchColumn.show ? [{ header: "Branch", cell: (c: Collection) => <span className="text-gray-05">{branchColumn.name(c.branch)}</span> }] : []),
     { header: "Provider", cell: (c) => <ProviderTag provider={c.provider} /> },
+    ...(showOrigin ? [{ header: "Source", cell: (c: Collection) => <span className="text-gray-05">{originWord(c.origin)}</span> }] : []),
     { header: "Amount", align: "right", cell: (c) => <Money kobo={c.amount} currency={currency} align="right" /> },
     { header: "Status", cell: (c) => <StatusPill status={c.status} /> },
   ];
@@ -134,12 +143,19 @@ export function CollectionsTab({ entity, currency }: { entity: string; currency?
             <option value="">All providers</option>
             {PROVIDER_CHOICES.map(([v, p]) => <option key={v} value={v}>{p.label}</option>)}
           </Select>
+          {showOrigin ? (
+            <Select value={origin} onChange={(value) => { setOrigin(value); setPage(1); }} className="w-40">
+              <option value="">All sources</option>
+              <option value="DESK">Desk</option>
+              <option value="STANDARD">Online</option>
+            </Select>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Replaces a client-side CSV of `rows` - the current page only. */}
           <QuickExportButton
             screen="payments.collections"
-            params={{ group, provider }}
+            params={{ group, provider, ...(originArg ? { origin: originArg } : {}) }}
             entity={entity}
             typeface="geist"
             defaultName="Gateway collections"
@@ -208,7 +224,7 @@ function CollectionDrawer({ collectionId, collections, entity, currency, onClose
 
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title={c.reference} description={`${customerLabel(c)} · ${formatMoney(c.amount, currency)}${deposit ? " · Virtual account transfer" : ""}`} widthClass="sm:max-w-2xl"
+      title={c.reference} description={`${customerLabel(c)} · ${formatMoney(c.amount, currency)}${deposit ? " · Virtual account transfer" : ""}${c.origin === "DESK" ? " · Taken at the desk" : ""}`} widthClass="sm:max-w-2xl"
       footer={<>
         <StatusPill status={c.status} />
         <div className="flex-1" />

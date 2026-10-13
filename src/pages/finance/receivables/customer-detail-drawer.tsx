@@ -20,7 +20,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { ArrowLeftRight, ScrollText, User, BellRing, CreditCard, Printer, Receipt, Users, Link2 } from "lucide-react";
+import { ArrowLeftRight, ScrollText, User, BellRing, CreditCard, Printer, Receipt, Users, Link2, QrCode } from "lucide-react";
 import { AccessField, DetailDrawer, DocumentEmailAction, Money, ConfirmActionModal, FormField, TabStrip, fieldWriteErrors, useActiveEntity, useFieldAccess, type FieldErrors, type TabStripItem } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState, EmptyState } from "@/components/finance-ui/states";
@@ -38,6 +38,7 @@ import { CustomerReceiptModal } from "./customer-receipt-modal";
 import { MoveBalanceDrawer } from "../inter-branch/move-balance-drawer";
 import { useInterBranchReader } from "../inter-branch/use-inter-branch";
 import { PayerLinksPanel, payerLinksReadable } from "./payer-links-panel";
+import { DeskCollectionDialog } from "../collections/desk-collection-dialog";
 import { useDates } from "../../../lib/display-prefs";
 
 const CUSTOMER = "finance.customer";
@@ -117,6 +118,7 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("statement");
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
+  const [deskOpen, setDeskOpen] = useState(false);
   const [remind, { isLoading: reminding }] = useRemindCustomerMutation();
   const d = data?.data;
   const c = d?.customer;
@@ -129,6 +131,8 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
   const [moving, setMoving] = useState(false);
   // Moving binds two branches' books, so the server keeps it for a whole-school reader.
   const offerMove = reader.applies && reader.reach.wholeSchool && reader.keys.transfer;
+  // A parent can pay into the account at the desk whatever it owes: it may be a prepayment.
+  const offerDesk = can(P.PAY_CREATE_COLLECTION);
 
   const sendReminder = async () => {
     if (!c) return;
@@ -167,10 +171,13 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
       title={c ? c.name : "Customer"}
       description={c ? `${c.code}${c.billing_email ? ` · ${c.billing_email}` : ""}` : undefined}
       widthClass="sm:max-w-3xl"
-      footer={c && (owes || offerMove) ? (
+      footer={c && (owes || offerMove || offerDesk) ? (
         <div className="flex w-full flex-wrap items-center justify-end gap-2">
           {offerMove ? (
             <Button variant="outline" onClick={() => setMoving(true)} className="gap-1.5"><Users className="size-4" /> Move to another branch</Button>
+          ) : null}
+          {offerDesk ? (
+            <Button variant="outline" onClick={() => setDeskOpen(true)} className="gap-1.5"><QrCode className="size-4" /> Collect at the desk</Button>
           ) : null}
           {owes ? <>
           <Can permission={P.FIN_SEND_DUNNING}>
@@ -260,6 +267,20 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
             loading={reminding}
             onConfirm={sendReminder}
           />
+          {deskOpen ? (
+            <DeskCollectionDialog
+              open
+              onOpenChange={setDeskOpen}
+              entity={entity}
+              currency={currency}
+              target={{
+                customerCode: c.code,
+                customerName: c.name,
+                customerEmail: c.billing_email || undefined,
+                customerBranchId: c.branch_id,
+              }}
+            />
+          ) : null}
           {moving ? (
             <MoveBalanceDrawer entity={entity} currency={currency} reader={reader} customerCode={c.code} onClose={() => setMoving(false)} />
           ) : null}

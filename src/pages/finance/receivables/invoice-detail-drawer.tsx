@@ -13,7 +13,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { List, CreditCard, BookOpen, BellRing, Activity, Printer, Check, Globe } from "lucide-react";
+import { List, CreditCard, BookOpen, BellRing, Activity, Printer, Check, Globe, QrCode } from "lucide-react";
 import { DetailDrawer, DocumentEmailAction, Money, StatusPill, ConfirmActionModal, TabStrip, useFieldAccess, type TabStripItem } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState, EmptyState } from "@/components/finance-ui/states";
@@ -28,6 +28,7 @@ import { lineTreatment } from "../../../utils/tax-treatment";
 import { openInvoiceDocument } from "@/utils/finance-documents";
 import { RecordPaymentModal } from "./record-payment-modal";
 import { RequestPaymentModal } from "./request-payment-modal";
+import { DeskCollectionDialog } from "../collections/desk-collection-dialog";
 import { DocumentVoidAction } from "./document-void-action";
 import { PAYMENT_PROGRESS_WORDS, statusWord } from "@/components/finance-ui/status-words";
 import { useDates } from "../../../lib/display-prefs";
@@ -98,6 +99,7 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("lines");
   const [payOpen, setPayOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [deskOpen, setDeskOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
   const [remind, { isLoading: reminding }] = useRemindInvoiceMutation();
   const { data: taxData } = useGetTaxCodesQuery({ entity }, { skip: id == null });
@@ -183,6 +185,11 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
               {tab === "settlements" && (
                 <Can permission={P.PAY_CREATE_COLLECTION}>
                   <Button variant="outline" onClick={() => setRequestOpen(true)} className="gap-1.5"><Globe className="size-4" /> Request payment</Button>
+                </Can>
+              )}
+              {tab === "settlements" && (
+                <Can permission={P.PAY_CREATE_COLLECTION}>
+                  <Button variant="outline" onClick={() => setDeskOpen(true)} className="gap-1.5"><QrCode className="size-4" /> Collect at the desk</Button>
                 </Can>
               )}
               {tab === "settlements" && (
@@ -365,6 +372,19 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
             balanceKobo={s?.balance.kobo ?? inv.balance_due}
             currency={currency}
           />
+          {deskOpen ? (
+            <DeskCollectionDialog
+              open
+              onOpenChange={setDeskOpen}
+              entity={entity}
+              currency={currency}
+              target={{
+                customerCode: inv.customer_code,
+                customerName: inv.customer_name,
+                invoice: { id: inv.id, documentNumber: inv.document_number, balanceKobo: s?.balance.kobo ?? inv.balance_due },
+              }}
+            />
+          ) : null}
           <ConfirmActionModal
             open={remindOpen}
             onOpenChange={setRemindOpen}
