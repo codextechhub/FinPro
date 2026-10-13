@@ -185,12 +185,18 @@ export function buildPayrollSchedulePrintDocument(
   };
 }
 
+/**
+ * The bank reconciliation report. A figure the reader's role may not see
+ * (`finance.bankaccount` book balance, statement balance, or their
+ * difference) is passed as undefined and left off the page, and so is the bank
+ * or ledger account a hidden field would have named.
+ */
 export function buildBankReconciliationPrintDocument(input: {
   account: BankAccount;
   currency?: string | null;
-  book: number;
-  statement: number;
-  difference: number;
+  book?: number;
+  statement?: number;
+  difference?: number;
   matched: BankStatementLine[];
   unmatched: BankStatementLine[];
   prefs: DisplayPrefs;
@@ -208,12 +214,17 @@ export function buildBankReconciliationPrintDocument(input: {
     windowFeatures: "width=820,height=900",
     blocks: [
       { kind: "heading", level: 1, text: "Bank reconciliation" },
-      { kind: "text", className: "sub", text: `${account.name} · ${account.bank_name || ""} · GL ${account.gl_account} · ${formatDay(todayIn(prefs.timeZone, input.now), prefs)}` },
-      { kind: "cards", cards: [
-        { label: "Statement balance", value: money(statement) },
-        { label: "Book balance", value: money(book) },
-        { label: "Difference", value: money(difference), className: difference !== 0 ? "danger" : undefined },
-      ] },
+      { kind: "text", className: "sub", text: [
+        account.name,
+        ...(account.bank_name !== undefined ? [account.bank_name || ""] : []),
+        ...(account.gl_account !== undefined ? [`GL ${account.gl_account}`] : []),
+        formatDay(todayIn(prefs.timeZone, input.now), prefs),
+      ].join(" · ") },
+      ...(statement === undefined && book === undefined && difference === undefined ? [] : [{ kind: "cards" as const, cards: [
+        ...(statement !== undefined ? [{ label: "Statement balance", value: money(statement) }] : []),
+        ...(book !== undefined ? [{ label: "Book balance", value: money(book) }] : []),
+        ...(difference !== undefined ? [{ label: "Difference", value: money(difference), className: difference !== 0 ? "danger" : undefined }] : []),
+      ] }]),
       { kind: "heading", level: 3, text: `Matched lines (${matched.length})` },
       { kind: "table", headings: [cell("Date"), cell("Description"), cell("Amount", "r")], rows: lineRows(matched) },
       { kind: "heading", level: 3, text: `Unmatched lines (${unmatched.length})` },

@@ -6,13 +6,23 @@
  * Print and Send-to-customer actions. Footer: Run reminders · Record payment,
  * and Move to another branch for a whole-school reader at a school with several
  * branches (the customer's whole open balance; see move-balance-drawer.tsx).
+ *
+ * Field Access (`finance.customer`): the code and name carry no switch. Every
+ * other value is shown only when the response carries it, because the server
+ * leaves a field out for a role that may not read it: a stat card, a tab or a
+ * statement column whose data is absent is left out with its heading, and the
+ * Contact tab offers each editable field only while the role may read and write
+ * it. When the balance is hidden the account's running figures leave the open
+ * items and the statement together, the footer actions stay (they do not depend
+ * on the figure), and the Record payment form starts empty rather than prefilled.
+ * The Statement's closing balance and the opening row go with the balance.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { ArrowLeftRight, ScrollText, User, BellRing, CreditCard, Printer, Receipt, Users, Link2 } from "lucide-react";
-import { DetailDrawer, DocumentEmailAction, Money, ConfirmActionModal, FormField, TabStrip, useActiveEntity, type TabStripItem } from "@/components/finance-ui";
-import { Can } from "@/components/finance-ui/can";
+import { AccessField, DetailDrawer, DocumentEmailAction, Money, ConfirmActionModal, FormField, TabStrip, fieldWriteErrors, useActiveEntity, useFieldAccess, type FieldErrors, type TabStripItem } from "@/components/finance-ui";
+import { Can, useCan } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState, EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,8 +37,10 @@ import type { Customer, CustomerDetail } from "@/redux/services/finance/ar-types
 import { CustomerReceiptModal } from "./customer-receipt-modal";
 import { MoveBalanceDrawer } from "../inter-branch/move-balance-drawer";
 import { useInterBranchReader } from "../inter-branch/use-inter-branch";
-import { PayerLinksPanel } from "./payer-links-panel";
+import { PayerLinksPanel, payerLinksReadable } from "./payer-links-panel";
 import { useDates } from "../../../lib/display-prefs";
+
+const CUSTOMER = "finance.customer";
 
 const TABS = [
   { key: "open", label: "Open items", icon: Receipt },
@@ -73,11 +85,34 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
+const STAT_COLUMNS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3" };
+
+/**
+ * The sections of the record a response carries, in tab order. Open items need
+ * either list of open bills; Contact is offered to anyone who can change the
+ * customer or read one of its contact values; Payers follows its own switches.
+ */
+export function customerSections(
+  d: Pick<CustomerDetail, "open_invoices" | "open_debit_notes" | "transactions" | "statement">,
+  { showPayers, showContact }: { showPayers: boolean; showContact: boolean },
+): (typeof TABS)[number]["key"][] {
+  const present: Record<(typeof TABS)[number]["key"], boolean> = {
+    open: d.open_invoices !== undefined || d.open_debit_notes !== undefined,
+    transactions: d.transactions !== undefined,
+    statement: d.statement !== undefined,
+    contact: showContact,
+    payers: showPayers,
+  };
+  return TABS.filter((t) => present[t.key]).map((t) => t.key);
+}
+
 export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
   id: number | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
+  const { can } = useCan();
   const { entity: activeEntity } = useActiveEntity();
+  const showPayers = payerLinksReadable(useFieldAccess("finance.payer_link"));
   const { data, isLoading, isError, refetch } = useGetCustomerDetailQuery(id ? { entity, id } : skipToken);
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("statement");
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -86,7 +121,10 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
   const d = data?.data;
   const c = d?.customer;
   const s = d?.summary;
-  const owes = (s?.current_balance.kobo ?? 0) > 0;   // footer actions only when owed
+  const access = useFieldAccess(CUSTOMER, c);
+  const balance = s?.current_balance;
+  // With the balance hidden, whether the customer owes is unknown, so the actions stay.
+  const owes = balance === undefined || balance.kobo > 0;
   const reader = useInterBranchReader();
   const [moving, setMoving] = useState(false);
   // Moving binds two branches' books, so the server keeps it for a whole-school reader.
@@ -101,16 +139,26 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
     } catch { /* central */ }
   };
 
+  const showContact = can(P.FIN_UPDATE_CUSTOMER) || access.anyVisible("billing_email", "billing_phone", "billing_address", "receivable_account_code");
+  const sections = useMemo(() => d ? customerSections(d, { showPayers, showContact }) : [], [d, showPayers, showContact]);
+  const activeTab = sections.includes(tab) ? tab : sections[0];
+
   // Tabs that stand for a list carry its size; Contact has nothing to count.
   const tabItems = useMemo<TabStripItem<(typeof TABS)[number]["key"]>[]>(() => {
     const count = (k: string) =>
-      k === "open" ? (d ? d.open_invoices.length + d.open_debit_notes.length : undefined)
-        : k === "transactions" ? d?.transactions.length : k === "statement" ? d?.statement.length : undefined;
-    return TABS.map((t) => ({
+      k === "open" ? (d ? (d.open_invoices?.length ?? 0) + (d.open_debit_notes?.length ?? 0) : undefined)
+        : k === "transactions" ? d?.transactions?.length : k === "statement" ? d?.statement?.length : undefined;
+    return TABS.filter((t) => sections.includes(t.key)).map((t) => ({
       value: t.key,
       label: <><t.icon className="size-3.5" />{t.label}{count(t.key) ? ` (${count(t.key)})` : ""}</>,
     }));
-  }, [d]);
+  }, [d, sections]);
+
+  const stats = ([
+    s?.current_balance ? { label: "Current balance", value: signed(s.current_balance.kobo, currency) } : null,
+    s?.lifetime_paid ? { label: "Lifetime paid", value: <Money kobo={s.lifetime_paid.kobo} currency={currency} /> } : null,
+    s?.open_invoice_count !== undefined ? { label: "Open invoices", value: s.open_invoice_count } : null,
+  ] as ({ label: string; value: React.ReactNode } | null)[]).filter((stat) => stat !== null);
 
   return (
     <DetailDrawer
@@ -135,29 +183,31 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
         </div>
       ) : undefined}
     >
-      {isLoading ? <LoadingState rows={6} /> : isError || !d || !c || !s ? <ErrorState onRetry={refetch} /> : (
+      {isLoading ? <LoadingState rows={6} /> : isError || !d || !c ? <ErrorState onRetry={refetch} /> : (
         <div className="space-y-4">
-          <div><Pill status={s.account_status} /></div>
+          {s?.account_status ? <div><Pill status={s.account_status} /></div> : null}
 
-          <div className="grid grid-cols-3 gap-3">
-            <Stat label="Current balance">{signed(s.current_balance.kobo, currency)}</Stat>
-            <Stat label="Lifetime paid"><Money kobo={s.lifetime_paid.kobo} currency={currency} /></Stat>
-            <Stat label="Open invoices">{s.open_invoice_count}</Stat>
-          </div>
+          {stats.length > 0 ? (
+            <div className={cn("grid gap-3", STAT_COLUMNS[stats.length])}>
+              {stats.map((stat) => <Stat key={stat.label} label={stat.label}>{stat.value}</Stat>)}
+            </div>
+          ) : null}
 
-          <TabStrip
-            items={tabItems}
-            value={tab}
-            onChange={setTab}
-            variant="underline"
-            ariaLabel="Customer sections"
-            className="w-full gap-1"
-            buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
-          />
+          {tabItems.length > 1 ? (
+            <TabStrip
+              items={tabItems}
+              value={activeTab}
+              onChange={setTab}
+              variant="underline"
+              ariaLabel="Customer sections"
+              className="w-full gap-1"
+              buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
+            />
+          ) : null}
 
-          {tab === "open" && <OpenItemsTab d={d} currency={currency} />}
+          {activeTab === "open" && <OpenItemsTab d={d} currency={currency} />}
 
-          {tab === "transactions" && (
+          {activeTab === "transactions" && d.transactions && (
             d.transactions.length === 0 ? <EmptyState title="No transactions" /> : (
               <div className="overflow-x-auto rounded-md border border-white-02">
                 <table className="w-full border-collapse">
@@ -179,13 +229,13 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
             )
           )}
 
-          {tab === "statement" && (
-            <StatementTab d={d} entity={entity} entityName={activeEntity?.name ?? entity} currency={currency} />
+          {activeTab === "statement" && d.statement && (
+            <StatementTab d={d} lines={d.statement} showBalance={balance !== undefined} entity={entity} entityName={activeEntity?.name ?? entity} currency={currency} />
           )}
 
-          {tab === "contact" && <ContactPanel key={c.id} entity={entity} customer={c} currency={currency} />}
+          {activeTab === "contact" && <ContactPanel key={c.id} entity={entity} customer={c} currency={currency} />}
 
-          {tab === "payers" && <PayerLinksPanel key={c.id} entity={entity} customer={c} />}
+          {activeTab === "payers" && <PayerLinksPanel key={c.id} entity={entity} customer={c} />}
         </div>
       )}
 
@@ -199,7 +249,7 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
             customerId={c.id}
             customerName={c.name}
             customerBranchId={c.branch_id}
-            owedKobo={s?.current_balance.kobo ?? 0}
+            owedKobo={balance?.kobo ?? 0}
           />
           <ConfirmActionModal
             open={remindOpen}
@@ -219,20 +269,25 @@ export function CustomerDetailDrawer({ id, entity, currency, onClose }: {
   );
 }
 
-/** Outstanding AR items - open invoices and open DEBIT notes (both settleable). */
+/**
+ * Outstanding AR items - open invoices and open DEBIT notes (both settleable).
+ * The Balance column goes with each bill's `balance` when the customer's balance
+ * is hidden.
+ */
 function OpenItemsTab({ d, currency }: { d: CustomerDetail; currency?: string | null }) {
   const dates = useDates();
   const rows = [
-    ...d.open_invoices.map((i) => ({ kind: "INVOICE" as const, reference: i.document_number, date: i.due_date, total: i.total.kobo, balance: i.balance.kobo, status: i.status })),
-    ...d.open_debit_notes.map((n) => ({ kind: "DEBIT_NOTE" as const, reference: n.document_number, date: n.note_date, total: n.total.kobo, balance: n.balance.kobo, status: n.status })),
+    ...(d.open_invoices ?? []).map((i) => ({ kind: "INVOICE" as const, reference: i.document_number, date: i.due_date, total: i.total.kobo, balance: i.balance?.kobo, status: i.status })),
+    ...(d.open_debit_notes ?? []).map((n) => ({ kind: "DEBIT_NOTE" as const, reference: n.document_number, date: n.note_date, total: n.total.kobo, balance: n.balance?.kobo, status: n.status })),
   ];
   if (rows.length === 0) return <EmptyState title="No open items" message="Outstanding invoices and debit notes will appear here." />;
+  const showBalance = rows.some((r) => r.balance !== undefined);
   return (
     <div className="overflow-x-auto rounded-md border border-white-02">
       <table className="w-full border-collapse">
         <thead><tr>
           <th className={th}>Type</th><th className={th}>Reference</th><th className={th}>Due</th>
-          <th className={cn(th, "text-right")}>Total</th><th className={cn(th, "text-right")}>Balance</th>
+          <th className={cn(th, "text-right")}>Total</th>{showBalance ? <th className={cn(th, "text-right")}>Balance</th> : null}
         </tr></thead>
         <tbody>
           {rows.map((r, i) => (
@@ -241,7 +296,7 @@ function OpenItemsTab({ d, currency }: { d: CustomerDetail; currency?: string | 
               <td className={cn(td, "font-semibold")}>{r.reference}</td>
               <td className={cn(td, "tabular-nums text-gray-05")}>{dates.day(r.date)}</td>
               <td className={cn(td, "text-right tabular-nums")}><Money kobo={r.total} currency={currency} align="right" /></td>
-              <td className={cn(td, "text-right font-medium tabular-nums")}><Money kobo={r.balance} currency={currency} align="right" /></td>
+              {showBalance ? <td className={cn(td, "text-right font-medium tabular-nums")}><Money kobo={r.balance ?? 0} currency={currency} align="right" /></td> : null}
             </tr>
           ))}
         </tbody>
@@ -259,24 +314,32 @@ export function statementPeriodLabel(from: string, to: string, day: (iso: string
   return from ? `${day(from)} - ${day(to)}` : `Up to ${day(to)}`;
 }
 
-/** A printable statement-of-account document for the active date range. */
-function StatementTab({ d, entity, entityName, currency }: { d: CustomerDetail; entity: string; entityName: string; currency?: string | null }) {
+type StatementLine = NonNullable<CustomerDetail["statement"]>[number];
+
+/**
+ * A printable statement-of-account document for the active date range. With the
+ * balance hidden, no line carries a running balance, so the opening row, the
+ * Balance column and the closing balance are all left out.
+ */
+function StatementTab({ d, lines, showBalance, entity, entityName, currency }: {
+  d: CustomerDetail; lines: StatementLine[]; showBalance: boolean; entity: string; entityName: string; currency?: string | null;
+}) {
   const dates = useDates();
   const c = d.customer;
   const [from, setFrom] = useState("");
   const [to, setTo] = useState(() => dates.today());
 
   const { opening, rows, closing } = useMemo(() => {
-    const inRange = (e: CustomerDetail["statement"][number]) =>
+    const inRange = (e: StatementLine) =>
       e.date !== null && (!from || e.date >= from) && (!to || e.date <= to);
     let open = 0;
-    for (const e of d.statement) {
+    for (const e of lines) {
       if (inRange(e)) break;
-      open = e.balance.kobo;                 // null-date opening + anything before `from`
+      open = e.balance?.kobo ?? 0;           // null-date opening + anything before `from`
     }
-    const rng = d.statement.filter(inRange);
-    return { opening: open, rows: rng, closing: rng.length ? rng[rng.length - 1].balance.kobo : open };
-  }, [d.statement, from, to]);
+    const rng = lines.filter(inRange);
+    return { opening: open, rows: rng, closing: rng.length ? (rng[rng.length - 1].balance?.kobo ?? 0) : open };
+  }, [lines, from, to]);
 
   const period = statementPeriodLabel(from, to, dates.day);
 
@@ -325,75 +388,106 @@ function StatementTab({ d, entity, entityName, currency }: { d: CustomerDetail; 
           <table className="w-full border-collapse">
             <thead><tr>
               <th className={th}>Date</th><th className={th}>Description</th>
-              <th className={cn(th, "text-right")}>Debit</th><th className={cn(th, "text-right")}>Credit</th><th className={cn(th, "text-right")}>Balance</th>
+              <th className={cn(th, "text-right")}>Debit</th><th className={cn(th, "text-right")}>Credit</th>
+              {showBalance ? <th className={cn(th, "text-right")}>Balance</th> : null}
             </tr></thead>
             <tbody>
-              <tr>
-                <td className={cn(td, "tabular-nums text-gray-05")}>{from || "-"}</td>
-                <td className={td}>Opening balance</td>
-                <td className={cn(td, "text-right text-gray-05")}>-</td>
-                <td className={cn(td, "text-right text-gray-05")}>-</td>
-                <td className={cn(td, "text-right tabular-nums")}>{signed(opening, currency)}</td>
-              </tr>
+              {showBalance ? (
+                <tr>
+                  <td className={cn(td, "tabular-nums text-gray-05")}>{from || "-"}</td>
+                  <td className={td}>Opening balance</td>
+                  <td className={cn(td, "text-right text-gray-05")}>-</td>
+                  <td className={cn(td, "text-right text-gray-05")}>-</td>
+                  <td className={cn(td, "text-right tabular-nums")}>{signed(opening, currency)}</td>
+                </tr>
+              ) : null}
               {rows.map((r, i) => (
                 <tr key={i}>
                   <td className={cn(td, "tabular-nums text-gray-05")}>{dates.day(r.date)}</td>
                   <td className={td}>{r.description}</td>
                   <td className={cn(td, "text-right tabular-nums")}>{r.debit.kobo ? <Money kobo={r.debit.kobo} currency={currency} align="right" /> : "-"}</td>
                   <td className={cn(td, "text-right tabular-nums")}>{r.credit.kobo ? <Money kobo={r.credit.kobo} currency={currency} align="right" /> : "-"}</td>
-                  <td className={cn(td, "text-right font-medium tabular-nums")}>{signed(r.balance.kobo, currency)}</td>
+                  {showBalance ? <td className={cn(td, "text-right font-medium tabular-nums")}>{signed(r.balance?.kobo ?? 0, currency)}</td> : null}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        <div className="mt-4 flex items-end justify-between border-t border-white-02 pt-3">
-          <div>
-            <p className="font-mont text-[11px] text-gray-05">Closing balance due</p>
-            <p className="font-mont text-lg font-semibold tabular-nums text-black-01">{signed(closing, currency)}</p>
+        {showBalance ? (
+          <div className="mt-4 flex items-end justify-between gap-3 border-t border-white-02 pt-3">
+            <div>
+              <p className="font-mont text-[11px] text-gray-05">Closing balance due</p>
+              <p className="font-mont text-lg font-semibold tabular-nums text-black-01">{signed(closing, currency)}</p>
+            </div>
+            <p className="max-w-xs text-right font-mont text-[11px] text-gray-05">Please settle the closing balance at your earliest convenience. Thank you.</p>
           </div>
-          <p className="max-w-xs text-right font-mont text-[11px] text-gray-05">Please settle the closing balance at your earliest convenience. Thank you.</p>
-        </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
+/**
+ * The Contact tab. Each value is its own `finance.customer` field: one the role
+ * may not read is not rendered, one it may read but not change is greyed and
+ * left out of the saved body, and a save the server refuses on a field shows
+ * its reason beside that field. The name carries no switch.
+ */
 function ContactPanel({ entity, customer, currency }: { entity: string; customer: Customer; currency?: string | null }) {
   const [update, { isLoading }] = useUpdateCustomerMutation();
+  const access = useFieldAccess(CUSTOMER, customer);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [name, setName] = useState(customer.name);
-  const [email, setEmail] = useState(customer.billing_email);
-  const [phone, setPhone] = useState(customer.billing_phone);
-  const [address, setAddress] = useState(customer.billing_address);
-  const [active, setActive] = useState(customer.is_active);
-  const dirty = name !== customer.name || email !== customer.billing_email || phone !== customer.billing_phone || address !== customer.billing_address || active !== customer.is_active;
+  const [email, setEmail] = useState(customer.billing_email ?? "");
+  const [phone, setPhone] = useState(customer.billing_phone ?? "");
+  const [address, setAddress] = useState(customer.billing_address ?? "");
+  const [active, setActive] = useState(customer.is_active ?? true);
+  const draft = { billing_email: email, billing_phone: phone, billing_address: address, is_active: active };
+  const stored = { billing_email: customer.billing_email ?? "", billing_phone: customer.billing_phone ?? "", billing_address: customer.billing_address ?? "", is_active: customer.is_active ?? true };
+  const writable = access.writableOnly(draft);
+  const dirty = name !== customer.name
+    || (Object.keys(writable) as (keyof typeof draft)[]).some((key) => draft[key] !== stored[key]);
+  const showReceivable = !access.isHidden("receivable_account_code");
+  const showOpening = !access.isHidden("opening_balance");
+  const showContact = access.anyVisible("billing_email", "billing_phone");
 
   const save = async () => {
+    setDenied(null);
     try {
-      const res = await update({ entity, id: customer.id, name: name.trim(), billing_email: email, billing_phone: phone, billing_address: address, is_active: active }).unwrap();
+      const res = await update({ entity, id: customer.id, name: name.trim(), ...writable }).unwrap();
       toast.success(res.message || "Customer updated.");
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
     <Can permission={P.FIN_UPDATE_CUSTOMER} fallback={
       <div className="space-y-2 font-mont text-sm">
-        <p><span className="text-gray-05">Email:</span> {customer.billing_email || "-"}</p>
-        <p><span className="text-gray-05">Phone:</span> {customer.billing_phone || "-"}</p>
-        <p><span className="text-gray-05">Address:</span> {customer.billing_address || "-"}</p>
-        <p><span className="text-gray-05">Receivable a/c:</span> {customer.receivable_account_code ?? "-"} {customer.receivable_account_name}</p>
+        {!access.isHidden("billing_email") ? <p><span className="text-gray-05">Email:</span> {customer.billing_email || "-"}</p> : null}
+        {!access.isHidden("billing_phone") ? <p><span className="text-gray-05">Phone:</span> {customer.billing_phone || "-"}</p> : null}
+        {!access.isHidden("billing_address") ? <p><span className="text-gray-05">Address:</span> {customer.billing_address || "-"}</p> : null}
+        {showReceivable ? <p><span className="text-gray-05">Receivable a/c:</span> {customer.receivable_account_code ?? "-"} {customer.receivable_account_name}</p> : null}
       </div>
     }>
       <div className="space-y-3">
         <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} className="bg-white" /></FormField>
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Billing email"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-white" /></FormField>
-          <FormField label="Billing phone"><Input value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-white" /></FormField>
-        </div>
-        <FormField label="Billing address"><Input value={address} onChange={(e) => setAddress(e.target.value)} className="bg-white" /></FormField>
-        <p className="font-mont text-xs text-gray-05">Receivable a/c: <span className="font-medium text-gray-01">{customer.receivable_account_code ?? "-"} {customer.receivable_account_name}</span> · Opening balance {formatMoney(customer.opening_balance, currency)}</p>
-        <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active</label>
+        {showContact ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <AccessField access={access} name="billing_email" label="Billing email" errors={denied}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-white" /></AccessField>
+            <AccessField access={access} name="billing_phone" label="Billing phone" errors={denied}><Input value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-white" /></AccessField>
+          </div>
+        ) : null}
+        <AccessField access={access} name="billing_address" label="Billing address" errors={denied}><Input value={address} onChange={(e) => setAddress(e.target.value)} className="bg-white" /></AccessField>
+        {showReceivable || showOpening ? (
+          <p className="font-mont text-xs text-gray-05">
+            {showReceivable ? <>Receivable a/c: <span className="font-medium text-gray-01">{customer.receivable_account_code ?? "-"} {customer.receivable_account_name}</span></> : null}
+            {showReceivable && showOpening ? " · " : null}
+            {showOpening ? <>Opening balance {formatMoney(customer.opening_balance ?? 0, currency)}</> : null}
+          </p>
+        ) : null}
+        <AccessField access={access} name="is_active" errors={denied}>
+          <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active</label>
+        </AccessField>
         <Button onClick={save} disabled={!dirty || isLoading} className="font-mont text-xs font-semibold">{isLoading ? "Saving…" : "Save changes"}</Button>
       </div>
     </Can>

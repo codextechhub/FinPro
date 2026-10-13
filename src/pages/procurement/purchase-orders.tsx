@@ -48,6 +48,7 @@ import { useCancelPurchaseOrderMutation } from "@/redux/services/procurement/pay
 import { SOURCE_DOCUMENT_ID_PARAM } from "@/lib/source-document-route";
 import { PURCHASE_ORDER_TABS, purchaseOrderPill } from "./document-status";
 import { purchaseOrderChanges, purchaseOrderForm } from "./purchase-order-edit";
+import { emailRecipientsText, hasNoEmailRecipient } from "./purchase-order-email";
 import { SENT_BACK_WORD, WITH_APPROVERS_NOTE, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
 
@@ -325,14 +326,14 @@ export function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: num
       {tab === "email" && (po.email_deliveries?.length ? <div className="space-y-3">{po.email_deliveries.map((delivery) => <section key={delivery.id} className="rounded-md border border-white-02 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-mont text-sm font-semibold">{delivery.source === "AUTOMATIC" ? "Automatic after approval" : delivery.source === "RETRY" ? "Retry" : "Manual send"}</p><p className="mt-1 font-mont text-[11px] text-gray-05">Requested by {delivery.requested_by_name} · {dates.dateTime(delivery.created_at)}</p></div><StatusPill status={delivery.status} /></div><div className="mt-3 grid grid-cols-2 gap-2 rounded bg-gray-50 p-2 font-mont text-xs"><span className="text-gray-05">Recipients</span><span className="text-right font-semibold">{delivery.recipient_count}</span><span className="text-gray-05">BCC recipients</span><span className="text-right font-semibold">{delivery.bcc_count}</span></div>{delivery.buyer_message && <p className="mt-3 whitespace-pre-wrap font-mont text-xs leading-5 text-gray-05">{delivery.buyer_message}</p>}{delivery.failure_reason && <div className="mt-3 rounded border border-red-200 bg-red-50 p-2 font-mont text-xs text-red-700">{delivery.failure_reason}</div>}{delivery.status === "FAILED" && canVendorEmail && <div className="mt-3 flex justify-end"><Button size="sm" variant="outline" onClick={() => openEmail(delivery)}>Retry Email</Button></div>}</section>)}</div> : <EmptyBlock text={po.can_email_vendor ? "This approved purchase order has not been emailed yet." : "Email Vendor becomes available after the purchase order is fully approved."} />)}
     </div>}
     {po && editing && <EditPurchaseOrderDrawer po={po} entity={entity} currency={currency} returned={standing === "sender"} onClose={() => setEditing(false)} />}
-    {po && <ConfirmActionModal open={confirmApproval} onOpenChange={setConfirmApproval} title="Raise this purchase order for approval?" description="Submitting locks the purchase order while approvers review it. You can email the vendor only after full approval." confirmText="Raise for Approval" onConfirm={submitForApproval} loading={submitting} confirmDisabled={autoEmailVendor && (previewLoading || previewError || !emailPreview?.recipients.length)}>
+    {po && <ConfirmActionModal open={confirmApproval} onOpenChange={setConfirmApproval} title="Raise this purchase order for approval?" description="Submitting locks the purchase order while approvers review it. You can email the vendor only after full approval." confirmText="Raise for Approval" onConfirm={submitForApproval} loading={submitting} confirmDisabled={autoEmailVendor && (previewLoading || previewError || hasNoEmailRecipient(emailPreview))}>
       <div className="space-y-4">
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 font-mont text-xs leading-5 text-amber-900">The vendor will not receive this draft. Approval must finish first.</div>
         {canVendorEmail && <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-white-02 p-3"><Checkbox className="mt-0.5" checked={autoEmailVendor} onCheckedChange={(checked) => setAutoEmailVendor(checked === true)} /><span className="min-w-0"><span className="block font-mont text-sm font-semibold">Automatically email this PO to the vendor when fully approved</span><span className="mt-1 block font-mont text-xs leading-5 text-gray-05">A PDF copy will be attached, and the send remains pending until approval completes.</span></span></label>}
         {autoEmailVendor && <EmailDetails preview={emailPreview} loading={previewLoading} error={previewError} message={emailMessage} onMessageChange={setEmailMessage} />}
       </div>
     </ConfirmActionModal>}
-    {po && <ConfirmActionModal open={emailOpen} onOpenChange={(open) => { setEmailOpen(open); if (!open) setRetryDelivery(null); }} title={retryDelivery ? "Retry vendor email?" : "Email this purchase order to the vendor?"} description="A new audited delivery will be queued with the current approved PO attached as a PDF." confirmText={retryDelivery ? "Retry Email" : "Send Email"} onConfirm={deliverEmail} loading={sendingEmail || retryingEmail} confirmDisabled={previewLoading || previewError || !emailPreview?.recipients.length}>
+    {po && <ConfirmActionModal open={emailOpen} onOpenChange={(open) => { setEmailOpen(open); if (!open) setRetryDelivery(null); }} title={retryDelivery ? "Retry vendor email?" : "Email this purchase order to the vendor?"} description="A new audited delivery will be queued with the current approved PO attached as a PDF." confirmText={retryDelivery ? "Retry Email" : "Send Email"} onConfirm={deliverEmail} loading={sendingEmail || retryingEmail} confirmDisabled={previewLoading || previewError || hasNoEmailRecipient(emailPreview)}>
       <EmailDetails preview={emailPreview} loading={previewLoading} error={previewError} message={emailMessage} onMessageChange={setEmailMessage} />
     </ConfirmActionModal>}
     {po && <ConfirmActionModal open={cancelOpen} onOpenChange={setCancelOpen} title={`Cancel ${po.document_number}?`} description="Withdraws a commitment nobody will fulfil. The vendor is not emailed: tell them yourself if the order already reached them." confirmText="Cancel order" destructive loading={cancelling} confirmDisabled={!cancelReason.trim()} onConfirm={doCancel}>
@@ -345,10 +346,16 @@ export function PurchaseOrderDrawer({ id, entity, currency, onClose }: { id: num
   </DetailDrawer>;
 }
 
-function EmailDetails({ preview, loading, error, message, onMessageChange }: { preview?: { recipients: string[]; bcc: string[]; subject: string }; loading: boolean; error: boolean; message: string; onMessageChange: (value: string) => void }) {
+/**
+ * The email preview shown before an order is sent. The "To" line follows what
+ * the role may know of the recipients: the addresses, a bare count, or nothing
+ * (see `purchase-order-email.ts`), and a role that may know nothing is not told
+ * that there are none.
+ */
+export function EmailDetails({ preview, loading, error, message, onMessageChange }: { preview?: { recipients: string[]; recipient_count?: number; bcc: string[]; subject: string }; loading: boolean; error: boolean; message: string; onMessageChange: (value: string) => void }) {
   return <div className="space-y-3">
     <div className="rounded-md border border-white-02 bg-gray-50 p-3 font-mont text-xs">
-      {loading ? <p className="text-gray-05">Loading recipients…</p> : error || !preview ? <p className="text-red-600">Recipient details could not be loaded.</p> : <div className="space-y-2"><p><span className="text-gray-05">Subject:</span> <span className="font-semibold">{preview.subject}</span></p><p><span className="text-gray-05">To:</span> <span className="font-semibold break-all">{preview.recipients.join(", ") || "No recipient"}</span></p><p><span className="text-gray-05">BCC:</span> <span className="font-semibold break-all">{preview.bcc.join(", ") || "None"}</span></p></div>}
+      {loading ? <p className="text-gray-05">Loading recipients…</p> : error || !preview ? <p className="text-red-600">Recipient details could not be loaded.</p> : <div className="space-y-2"><p><span className="text-gray-05">Subject:</span> <span className="font-semibold">{preview.subject}</span></p>{emailRecipientsText(preview) == null ? null : <p><span className="text-gray-05">To:</span> <span className="font-semibold break-all">{emailRecipientsText(preview)}</span></p>}<p><span className="text-gray-05">BCC:</span> <span className="font-semibold break-all">{preview.bcc.join(", ") || "None"}</span></p></div>}
     </div>
     <FormField label="Optional note to vendor"><Textarea value={message} maxLength={1000} onChange={(event) => onMessageChange(event.target.value)} placeholder="Add delivery instructions or a short note." className="min-h-24" /></FormField>
     <p className="text-right font-mont text-[11px] text-gray-05">{message.length}/1,000</p>

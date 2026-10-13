@@ -9,28 +9,35 @@ import type { PayeSource, PayeWorking, PayrollLineItem } from "./payroll-types";
 import type { BranchCloseState } from "./setup-types";
 
 // ── Banking ──────────────────────────────────────────────────────────────────
+/**
+ * A bank account. Its name and id carry no Field Access switch; every other
+ * value is a `finance.bankaccount` field and is absent for a role that may not
+ * read it (`account_number` is also sensitive). A detail response lists the
+ * present fields the caller may not change in `_read_only_fields`.
+ */
 export interface BankAccount {
   id: number;
   // The branch it belongs to; null for a row not yet given one.
   branch_id?: number | null;
   name: string;
-  bank_name: string;
-  account_number?: string; // Field Access: finance.bankaccount
-  gl_account: string;
+  bank_name?: string;
+  account_number?: string;
+  gl_account?: string;
   gl_account_name?: string;
-  gl_account_id: number;
-  currency: string | null;
-  is_active: boolean;
-  is_primary: boolean;
-  is_primary_collection: boolean;
-  book_balance: number;
-  book_balance_naira: string;
-  unreconciled_count: number;
-  last_reconciled_at: string | null;
+  gl_account_id?: number;
+  currency?: string | null;
+  is_active?: boolean;
+  is_primary?: boolean;
+  is_primary_collection?: boolean;
+  book_balance?: number;
+  book_balance_naira?: string;
+  unreconciled_count?: number;
+  last_reconciled_at?: string | null;
   /**
    * How the payment provider settles the branch's online payments into this
    * account: read only, and present only for a whole-school reader or a holder
-   * of payments.settings.view (absent, not blank, for anyone else).
+   * of payments.settings.view (absent, not blank, for anyone else), and for a
+   * role that may read the provider subaccount and bank code fields.
    */
   gateway_subaccount_code?: string;
   gateway_subaccount_provider?: string;
@@ -45,7 +52,8 @@ export interface BankTransaction {
   reference: string;
   debit: number;
   credit: number;
-  running_balance: number;
+  /** A `finance.bankaccount` book-balance figure: absent when the balance is hidden. */
+  running_balance?: number;
   matched: boolean;
 }
 
@@ -61,10 +69,15 @@ export interface BankStatement {
   id: number;
   statement_date: string;
   period_label: string;
-  opening_balance: number;
-  opening_balance_naira: string;
-  closing_balance: number;
-  closing_balance_naira: string;
+  /**
+   * The bank's own opening and closing figures. All four are absent when the
+   * role may not read `finance.bankaccount.statement_balance`; the date,
+   * period, line count and status always show.
+   */
+  opening_balance?: number;
+  opening_balance_naira?: string;
+  closing_balance?: number;
+  closing_balance_naira?: string;
   line_count: number;
   status: string;
   status_display: string;
@@ -81,12 +94,13 @@ export interface BankStatement {
 export interface BankReconciliationRun {
   id: number;
   as_of_date: string;
-  book_balance: number;
-  book_balance_naira: string;
-  statement_balance: number;
-  statement_balance_naira: string;
-  difference: number;
-  difference_naira: string;
+  /** The two balances and their difference follow the book and statement balance switches. */
+  book_balance?: number;
+  book_balance_naira?: string;
+  statement_balance?: number;
+  statement_balance_naira?: string;
+  difference?: number;
+  difference_naira?: string;
   matched_count: number;
   status: string;
   status_display: string;
@@ -95,8 +109,10 @@ export interface BankReconciliationRun {
 }
 
 export interface BankAccountDetail extends BankAccount {
-  metrics: { book_balance: number; statement_balance: number; unreconciled_diff: number; unreconciled_count: number };
-  transactions: BankTransaction[];
+  /** Dropped when the role may read none of its figures; each figure follows its own switch. */
+  metrics?: { book_balance?: number; statement_balance?: number; unreconciled_diff?: number; unreconciled_count?: number };
+  /** The recent ledger activity; absent when the role may not read it. */
+  transactions?: BankTransaction[];
   statements: BankStatement[];
   reconciliations: BankReconciliationRun[];
 }
@@ -530,7 +546,8 @@ export interface FiscalYear {
   year: number;
   start_date: string;
   end_date: string;
-  status: string;
+  /** Missing, with `branch_states`, when the reader's Field Access closes the year's close state. */
+  status?: string;
   /** Put away: left out of pickers and lists unless asked for. Absent from an older server. */
   is_archived?: boolean;
   archived_at?: string | null;

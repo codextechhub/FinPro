@@ -41,6 +41,16 @@ const STATUS_META: Record<DocumentDelivery["status"], { label: string; cls: stri
   FAILED: { label: "Failed", cls: "bg-destructive/10 text-destructive" },
 };
 
+/**
+ * The "To" line of the send panel. The customer's billing email is a Field
+ * Access field, so a role that may not read it receives no addresses at all and
+ * is told where the document goes in words instead.
+ */
+function recipientsText(recipients: readonly string[] | undefined): string {
+  if (recipients === undefined) return "The customer's billing email";
+  return recipients.join(", ") || "No recipient";
+}
+
 export interface DocumentEmailActionProps {
   /** Which endpoint family to talk to. `customers` sends a statement of account. */
   kind: "invoices" | "payments" | "customers";
@@ -128,7 +138,7 @@ export function DocumentEmailAction({
             ) : (
               <div className="space-y-2">
                 <p><span className="text-gray-05">Subject:</span> <span className="font-semibold">{preview.subject}</span></p>
-                <p><span className="text-gray-05">To:</span> <span className="font-semibold break-all">{preview.recipients.join(", ") || "No recipient"}</span></p>
+                <p><span className="text-gray-05">To:</span> <span className="font-semibold break-all">{recipientsText(preview.recipients)}</span></p>
                 <p><span className="text-gray-05">BCC:</span> <span className="font-semibold break-all">{preview.bcc.join(", ") || "None"}</span></p>
               </div>
             )}
@@ -171,7 +181,9 @@ export function DocumentEmailAction({
                         <span className={cn(PILL, meta.cls)}>{meta.label}</span>
                       </div>
                       <p className="mt-1.5 font-mont text-[11px] break-all text-gray-05">
-                        {delivery.recipients.join(", ")}
+                        {delivery.recipients
+                          ? delivery.recipients.join(", ")
+                          : `${delivery.recipient_count} ${delivery.recipient_count === 1 ? "address" : "addresses"}`}
                       </p>
                       {delivery.failure_reason ? (
                         <p className="mt-1.5 rounded border border-destructive/20 bg-destructive/5 p-1.5 font-mont text-[11px] text-destructive">

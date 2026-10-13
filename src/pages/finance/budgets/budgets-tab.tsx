@@ -30,6 +30,7 @@ import {
   RaisingBranchChoiceField, toArray, useRaisingBranchChoice, type Column,
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
+import { useCalendarFieldAccess, yearStatusArg } from "@/components/finance-ui/calendar-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -324,7 +325,8 @@ function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; o
   const [year, setYear] = useState("");
   const branch = useRaisingBranchChoice();
   const [rows, setRows] = useState<EditLine[]>([newLine()]);
-  const { data: fyData } = useGetFiscalYearsQuery({ entity, status: "OPEN" }, { skip: !open });
+  const { yearStateReadable } = useCalendarFieldAccess();
+  const { data: fyData } = useGetFiscalYearsQuery({ entity, ...yearStatusArg(yearStateReadable, "OPEN") }, { skip: !open });
   const fys = useMemo(() => toArray(fyData?.data), [fyData]);
   const [create, { isLoading }] = useCreateBudgetMutation();
 
@@ -360,7 +362,7 @@ function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; o
             <p className="mb-1 font-mont text-xs text-gray-05">Fiscal year *</p>
             <Select value={year} onChange={setYear} className="w-full">
               <option value="" disabled>Select fiscal year</option>
-              {fys.map((y) => <option key={y.id} value={y.year}>{y.year}{y.status !== "OPEN" ? ` (${y.status.toLowerCase()})` : ""}</option>)}
+              {fys.map((y) => <option key={y.id} value={y.year}>{y.year}{y.status && y.status !== "OPEN" ? ` (${y.status.toLowerCase()})` : ""}</option>)}
             </Select>
           </div>
           <RaisingBranchChoiceField choice={branch} />

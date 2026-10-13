@@ -59,9 +59,13 @@ const addChanged = <K extends keyof VendorUpdatePayload>(
 /**
  * Build the smallest authorized PATCH body for an existing vendor.
  *
- * Only changed values are sent. A contact or banking field goes in only when
+ * Only changed values are sent. Every field that carries a Field Access switch
+ * (contact, tax, banking, category, terms, KYC, risk, hold) goes in only when
  * the user may write it, so a field shown greyed is never sent even if its
- * local state somehow differs; the governance fields need `canManage`.
+ * local state somehow differs; the three compliance values also need
+ * `canManage`, because the switch says who may see and change the value and the
+ * key says who may take the decision. The vendor's contact people travel
+ * separately, through `vendor-contacts.ts`.
  */
 export function buildVendorUpdatePayload(
   initial: Vendor,
@@ -71,14 +75,14 @@ export function buildVendorUpdatePayload(
   const payload: VendorUpdatePayload = {};
 
   addChanged(payload, "name", values.name.trim(), initial.name);
-  addChanged(payload, "category", values.category, initial.category_code ?? "");
   addChanged(payload, "payable_account", values.payable, initial.payable_code ?? "");
   addChanged(payload, "default_expense_account", values.expense, initial.default_expense_code ?? "");
   addChanged(payload, "default_wht_tax_code", values.wht, initial.default_wht_tax_code_value ?? "");
-  addChanged(payload, "payment_terms", values.terms, initial.payment_terms);
   addChanged(payload, "is_active", values.active, initial.is_active);
 
   const guarded: VendorUpdatePayload = {};
+  addChanged(guarded, "category", values.category, initial.category_code ?? "");
+  addChanged(guarded, "payment_terms", values.terms, initial.payment_terms ?? "");
   addChanged(guarded, "email", values.email, initial.email ?? "");
   addChanged(guarded, "phone", values.phone, initial.phone ?? "");
   addChanged(guarded, "address", values.address, initial.address ?? "");
@@ -89,9 +93,11 @@ export function buildVendorUpdatePayload(
   Object.assign(payload, access.fields.writableOnly(guarded, { creating: false }));
 
   if (access.canManage) {
-    addChanged(payload, "kyc_status", values.kyc, initial.kyc_status);
-    addChanged(payload, "risk", values.risk, initial.risk);
-    addChanged(payload, "on_hold", values.onHold, initial.on_hold);
+    const governance: VendorUpdatePayload = {};
+    addChanged(governance, "kyc_status", values.kyc, initial.kyc_status ?? "");
+    addChanged(governance, "risk", values.risk, initial.risk ?? "");
+    addChanged(governance, "on_hold", values.onHold, initial.on_hold ?? false);
+    Object.assign(payload, access.fields.writableOnly(governance, { creating: false }));
   }
 
   return payload;

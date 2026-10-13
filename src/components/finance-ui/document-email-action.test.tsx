@@ -13,6 +13,9 @@
  *      document again would work but would lose the link to what failed
  *   5. the statement send must carry the period the reader is looking at, or the
  *      customer receives a statement nobody on this side has seen
+ *   6. a role that may not read the customer's billing email receives no address
+ *      at all, in the preview or the history, and the panel must say where the
+ *      document goes in words instead of failing on the missing list
  */
 
 import { act } from "react";
@@ -186,6 +189,18 @@ describe("DocumentEmailAction", () => {
     expect(labels).toContain("BCC:");
     expect(labels).not.toContain("CC:");
     expect(mocks.send).not.toHaveBeenCalled();
+  });
+
+  it("names the destination in words, and shows the count of addresses, when the billing email is hidden", () => {
+    const { recipients: _hidden, ...bareDelivery } = SENT_DELIVERY;
+    mocks.preview.mockReturnValue(previewData({ recipients: undefined, deliveries: [{ ...bareDelivery, recipient_count: 2 }] }));
+    open();
+
+    expect(text()).toContain("To:");
+    expect(text()).toContain("The customer's billing email");
+    expect(text()).not.toContain("payer@example.com");
+    expect(text()).toContain("2 addresses");
+    expect(text()).toContain("finance-monitor@codexng.com");
   });
 
   it("lists the automatic copy sent when the document posted", () => {

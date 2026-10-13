@@ -12,12 +12,22 @@ export interface Account {
   parent_id: number | null;
   parent_code: string | null;
   subtype: string;
-  // Present only on the chart-of-accounts (?with_balance=true) response.
+  /**
+   * Present only on the chart-of-accounts (`?with_balance=true`) response.
+   * For a ledger account behind a bank account the key is absent when the role
+   * may not read `finance.bankaccount.book_balance`; `null` means the server
+   * did not annotate balances.
+   */
   balance?: { kobo: number; naira: string } | null;
   tag?: "CONTROL" | "CASH" | null;
-  // The bank account behind this ledger account, and that account's branch;
-  // null for a ledger account no bank account backs. Absent from older servers.
+  /**
+   * The bank account behind this ledger account; null for a ledger account no
+   * bank account backs. Absent from older servers, and from a role that may not
+   * read `finance.bankaccount.ledger_account` (the account's branch below still
+   * says that a bank backs it).
+   */
   bank_account_id?: number | null;
+  /** That bank account's branch; null for an account no bank backs or a bank without one. */
   bank_branch_id?: number | null;
 }
 
@@ -29,15 +39,18 @@ export interface AccountActivityLine {
   cost_center: string;
   debit: { kobo: number; naira: string };
   credit: { kobo: number; naira: string };
-  running_balance: { kobo: number; naira: string };
+  /** Absent on a bank account's ledger account when `finance.bankaccount.book_balance` is hidden. */
+  running_balance?: { kobo: number; naira: string };
 }
 
 export interface AccountDetail {
   account: Account;
   type_label: string;
   summary: {
-    current_balance: { kobo: number; naira: string };
-    opening_balance: { kobo: number; naira: string };
+    /** Absent on a bank account's ledger account when `finance.bankaccount.book_balance` is hidden. */
+    current_balance?: { kobo: number; naira: string };
+    /** Absent together with `current_balance`. */
+    opening_balance?: { kobo: number; naira: string };
     line_count: number;
     journal_count: number;
     fiscal_year_start: string | null;
@@ -60,6 +73,7 @@ export interface ConsolidatedAccountActivityLine {
   credit: { kobo: number; naira: string };
 }
 
+/** Absent from the activity response of a bank account's ledger account when `finance.bankaccount.book_balance` is hidden. */
 export interface ConsolidatedAccountActivityTotals {
   debit: { kobo: number; naira: string };
   credit: { kobo: number; naira: string };
@@ -88,8 +102,12 @@ export interface FiscalPeriod {
   fiscal_year: number;
   start_date: string;
   end_date: string;
-  status: "OPEN" | "SOFT_CLOSED" | "CLOSED" | "LOCKED";
-  closed_at: string | null;
+  /**
+   * Where the month stands in its close. Missing, with `closed_at` and
+   * `branch_states`, when the reader's Field Access closes the month's close state.
+   */
+  status?: "OPEN" | "SOFT_CLOSED" | "CLOSED" | "LOCKED";
+  closed_at?: string | null;
   /** Present only when asked for with `include_branches`. */
   branch_states?: BranchCloseState[];
 }
@@ -113,7 +131,7 @@ export interface PeriodBrief {
   /** The month as a person reads it ("September 2026"). */
   label: string;
   period_no: number;
-  status: FiscalPeriod["status"];
+  status: NonNullable<FiscalPeriod["status"]>;
   start_date: string;
   end_date: string;
 }
@@ -158,9 +176,11 @@ export interface ChecklistItem {
  */
 export interface PeriodChecklist {
   period: FiscalPeriod;
-  passed: boolean;
-  done: number;
-  total: number;
+  /** `passed`, `done` and `total` are missing when the checklist progress is closed to the reader. */
+  passed?: boolean;
+  done?: number;
+  total?: number;
+  /** Only the checks the reader may read; a closed check is not a row. */
   items: ChecklistItem[];
   branch?: number | null;
 }
@@ -169,7 +189,7 @@ export interface PeriodChecklist {
 export interface BranchPeriodState {
   id: number;
   branch: number;
-  status: FiscalPeriod["status"];
+  status: NonNullable<FiscalPeriod["status"]>;
   closed_at: string | null;
 }
 
@@ -237,8 +257,15 @@ export interface FinanceAuditLog {
   /** The branch of the document the entry is about; null for an entry about the whole books. */
   branch_id: number | null;
   branch_name: string | null;
+  /** What happened to which document, in words; it carries no amount, balance or free text. */
   message: string;
-  // Field-level snapshot of the audited change; the UI summarises the diff.
+  /** The free-text reason a person gave for the act; empty when there is none or the reader may not see it. */
+  reason?: string;
+  /**
+   * The figures and registered free text of the change, under the registered field
+   * names and already narrowed to what the reader may see. A hidden value is
+   * absent, never blanked.
+   */
   before: Record<string, unknown>;
   after: Record<string, unknown>;
   created_at: string;
@@ -290,8 +317,9 @@ export interface FinanceAccountSettings {
 export interface FinanceDocumentBankOption {
   id: number;
   name: string;
-  bank_name: string;
-  currency: string;
+  /** The bank and currency are `finance.bankaccount` fields and are absent for a role that may not read them. */
+  bank_name?: string;
+  currency?: string;
 }
 
 export interface FinanceDocumentSettingsValues {
@@ -362,6 +390,6 @@ export interface CloseChecklistItem {
 }
 
 export interface PeriodCloseResult {
-  period: FiscalPeriod;
-  checklist: { passed: boolean; items: CloseChecklistItem[] };
+  period?: FiscalPeriod;
+  checklist?: { passed?: boolean; items?: CloseChecklistItem[] };
 }

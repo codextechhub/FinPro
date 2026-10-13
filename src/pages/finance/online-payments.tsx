@@ -310,12 +310,14 @@ export function SubaccountSetupModal({ entity, account, branchName, onClose }: {
  * the provider, under which subaccount code, and the action that sets it up.
  * Absent on an account that is not a branch's collection account, and for a
  * reader who may read neither the payment settings nor the account's route.
+ * A role that may not read the collection flag sees the line only where the
+ * provider setup or the account's route says it is the collection account.
  */
 export function CollectionSubaccountBlock({ entity, account }: { entity: string; account: BankAccount }) {
   const { can } = useCan();
   const readsSettings = can(P.PAY_VIEW_PAYMENT_SETTINGS);
   const readsRoute = "gateway_subaccount_code" in account;
-  if (!account.is_primary_collection || !(readsSettings || readsRoute)) return null;
+  if (account.is_primary_collection === false || !(readsSettings || readsRoute)) return null;
   return <CollectionSubaccountLine entity={entity} account={account} readsSettings={readsSettings} />;
 }
 
@@ -328,6 +330,8 @@ function CollectionSubaccountLine({ entity, account, readsSettings }: { entity: 
   const ready = known ? known.subaccount_ready : !!account.gateway_subaccount_code;
   const provider = known?.subaccount_provider || account.gateway_subaccount_provider || "PAYSTACK";
   const detail = subaccountDetail(account.gateway_subaccount_code || known?.subaccount_code, account.settlement_bank_code);
+  // With the collection flag hidden, only a route the provider reports marks this as the collection account.
+  if (account.is_primary_collection === undefined && !known && !("gateway_subaccount_code" in account)) return null;
   return (
     <div className="rounded-md border border-white-02 bg-white p-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

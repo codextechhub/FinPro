@@ -103,7 +103,7 @@ export const setupApi = baseApi.injectEndpoints({
       providesTags: ["FinanceAccounts"],
     }),
     getAccountActivity: b.query<
-      PaginatedEnvelope<ConsolidatedAccountActivityLine> & { totals: ConsolidatedAccountActivityTotals },
+      PaginatedEnvelope<ConsolidatedAccountActivityLine> & { totals?: ConsolidatedAccountActivityTotals },
       { entity: string; id: number; page?: number; page_size?: number; account?: number; date_from?: string; date_to?: string }
     >({
       query: ({ entity, id, ...params }) => ({
@@ -169,9 +169,11 @@ export const setupApi = baseApi.injectEndpoints({
      * formal entry may use the final OPEN, SOFT_CLOSED or CLOSED period, but never
      * a permanently LOCKED one. Forcing it over OPEN months needs a reason.
      * Closing one branch's year closes the school's year once every branch's
-     * year is closed.
+     * year is closed. `net_income`, and each closing journal's `lines`,
+     * `total_debit` and `total_credit`, are the year's net result seen two ways
+     * and are absent for a role that may not read `finance.fiscalyear.net_income`.
      */
-    closeFiscalYear: b.mutation<ApiEnvelope<{ fiscal_year: { id: number; year: number; status: string }; closing_journal: { id: number } | null; net_income: { kobo: number; naira: string } }>, { id: number; entity: string; closing_date?: string } & CalendarBranchArg & CloseOverride>({
+    closeFiscalYear: b.mutation<ApiEnvelope<{ fiscal_year: { id: number; year: number; status?: string }; closing_journal: { id: number } | null; net_income?: { kobo: number; naira: string } }>, { id: number; entity: string; closing_date?: string } & CalendarBranchArg & CloseOverride>({
       query: ({ id, entity, ...body }) => ({ url: `/finance/fiscal-years/${id}/close/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePeriods", "FinanceReports", "FinanceJournals"],
     }),
@@ -180,7 +182,9 @@ export const setupApi = baseApi.injectEndpoints({
      * year-end closing journal inside the year and set its year back to OPEN,
      * so a month can be corrected and the year closed again. The school's year
      * re-opens with it. The reason is required and lands on the audit row. A
-     * LOCKED or archived year is refused.
+     * LOCKED or archived year is refused. Each reversal's `lines`, `total_debit`
+     * and `total_credit` are absent for a role that may not read
+     * `finance.fiscalyear.net_income`.
      */
     reopenFiscalYear: b.mutation<ApiEnvelope<{ fiscal_year: { id: number; year: number; status: string }; reversals: { id: number }[] }>, { id: number; entity: string; reason: string } & CalendarBranchArg>({
       query: ({ id, entity, branch, reason }) => ({ url: `/finance/fiscal-years/${id}/reopen/${qs({ entity })}`, method: "POST", body: { ...branchBody(branch), reason } }),

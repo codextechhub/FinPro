@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FiscalPeriod } from "@/redux/services/finance/setup-types";
-import { periodActionLabel, summarizePeriods, yearCloseState, archiveReadiness, earliestArchiveDate } from "./periods-model";
+import { periodActionLabel, periodStatesReadable, summarizePeriods, yearCloseState, archiveReadiness, earliestArchiveDate } from "./periods-model";
 
 function period(period_no: number, status: FiscalPeriod["status"]): FiscalPeriod {
   return {
@@ -81,5 +81,29 @@ describe("when a closed year may be archived", () => {
 
   it("leaves the age to the server when the reader cannot read the setting", () => {
     expect(archiveReadiness({ status: "CLOSED", end_date: "2029-12-31" }, null, "2030-01-15")).toEqual({ kind: "ready" });
+  });
+});
+
+describe("months whose close state a role may not read", () => {
+  const hidden = (n: number): FiscalPeriod => {
+    const { status: _status, closed_at: _closedAt, ...rest } = period(n, "OPEN");
+    return rest;
+  };
+
+  it("are recognised, and a calendar with none is not claimed readable", () => {
+    expect(periodStatesReadable([period(1, "OPEN"), period(2, "CLOSED")])).toBe(true);
+    expect(periodStatesReadable([hidden(1), hidden(2)])).toBe(false);
+    expect(periodStatesReadable([period(1, "OPEN"), hidden(2)])).toBe(false);
+    expect(periodStatesReadable([])).toBe(false);
+  });
+
+  it("count in no bucket and offer the neutral review", () => {
+    expect(summarizePeriods([hidden(1), hidden(2)])).toMatchObject({ total: 2, open: 0, closed: 0, locked: 0 });
+    expect(periodActionLabel(undefined)).toBe("Review close");
+  });
+
+  it("leave an open year unchecked rather than ready or blocked", () => {
+    expect(yearCloseState("OPEN", [hidden(1), hidden(2)])).toBe("UNCHECKED");
+    expect(yearCloseState("CLOSED", [hidden(1), hidden(2)])).toBe("SEALED");
   });
 });

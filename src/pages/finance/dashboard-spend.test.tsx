@@ -140,6 +140,16 @@ describe("Cash, spend & compliance for the proprietor", () => {
   });
 });
 
+describe("Cash, spend & compliance when the bank is hidden", () => {
+  it("shows the account by name, and no bank, on a card with nothing imported", () => {
+    const { bank_name: _bank, ...account } = FULL.reconciliation![0];
+    const text = render({ ...FULL, reconciliation: [{ ...account, lines: 0, matched: 0, unmatched: 0 }] });
+    expect(text).toContain("GTBank collections");
+    expect(text).not.toContain("Guaranty Trust Bank");
+    expect(text).toContain("No statement imported");
+  });
+});
+
 describe("Cash, spend & compliance for a branch bursar", () => {
   it("leaves out the school's cash, bank, payroll and tax cards", () => {
     const text = render({ ...FULL, narrowed: true, runway: null, cash_movement: null, reconciliation: null,

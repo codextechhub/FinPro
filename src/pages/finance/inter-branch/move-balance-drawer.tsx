@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { ArrowRight, Users } from "lucide-react";
 
 import {
-  AccessField, CustomerPicker, DetailDrawer, Money, PostingDateField, fieldWriteErrors,
+  AccessField, CustomerPicker, DetailDrawer, FormField, Money, PostingDateField, fieldWriteErrors,
   useCustomerBranch, useFieldAccess, type FieldErrors,
 } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
@@ -58,10 +58,12 @@ export function MoveBalanceDrawer({ entity, currency, reader, onClose, onOpenTra
 
   const submit = async () => {
     try {
-      const res = await move(access.writableOnly({
-        entity, customer, from_branch: Number(fromBranch), to_branch: Number(toBranch),
-        move_date: date || undefined, purpose: purpose.trim() || undefined,
-      }, { creating: true })).unwrap();
+      const res = await move({
+        entity, from_branch: Number(fromBranch), to_branch: Number(toBranch),
+        ...access.writableOnly({
+          customer, move_date: date || undefined, purpose: purpose.trim() || undefined,
+        }, { creating: true }),
+      }).unwrap();
       toast.success(res.message || "Balance moved.");
       setResult({ moved: res.data, from: reader.nameOf(Number(fromBranch)), to: reader.nameOf(Number(toBranch)) });
     } catch (error) { setDenied(fieldWriteErrors(error)); }
@@ -122,12 +124,12 @@ export function MoveBalanceDrawer({ entity, currency, reader, onClose, onOpenTra
             <CustomerPicker entity={entity} value={customer} onChange={(v) => { setCustomer(v); setFromPick(""); }} />
           </AccessField>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <AccessField access={access} name="from_branch" label="From branch" required creating errors={denied}>
+            <FormField label="From branch" required>
               <BranchSelect label="From branch" branches={reader.branches} value={fromBranch} onChange={setFromPick} />
-            </AccessField>
-            <AccessField access={access} name="to_branch" label="To branch" required creating errors={denied}>
+            </FormField>
+            <FormField label="To branch" required>
               <BranchSelect label="To branch" branches={reader.branches.filter((b) => String(b.id) !== fromBranch)} value={toBranch} onChange={setToBranch} />
-            </AccessField>
+            </FormField>
           </div>
           <AccessField access={access} name="move_date" creating errors={denied}><PostingDateField label="Move date" entity={entity} value={date} onChange={setDate} hint="Income earned up to this day stays with the old branch." /></AccessField>
           <AccessField access={access} name="purpose" label="Why" creating errors={denied}>

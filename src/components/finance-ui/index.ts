@@ -18,7 +18,8 @@ export { EntitySelect } from "./entity-select";
 export { NoEntityState } from "./no-entity-state";
 export { FormModal, FormDrawer, FormField } from "./form-modal";
 export {
-  useFieldAccess, resolveFieldAccess, fieldWriteErrors,
+  useFieldAccess, resolveFieldAccess, fieldWriteErrors, isReadOnlyFollowing, writableOnlyFollowing, allWritable, errorsBesideFollowed,
+  type WriteFollows,
   type FieldAccess, type FieldAccessMap, type FieldAccessRecord, type FieldErrors,
   type ResourceFieldAccess, type ReadOnlyOptions,
 } from "./field-access";

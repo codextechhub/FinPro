@@ -29,32 +29,20 @@ import {
   useGetStockMovementsQuery, useCreateStockItemMutation, useUpdateStockItemMutation,
   useIssueStockMutation, useAdjustStockMutation, useGetStockBalancesQuery, useTransferStockMutation,
 } from "@/redux/services/procurement/procurement-ext-api";
-import type { StockItem, StockItemDetail, StockMovement } from "@/redux/services/procurement/procurement-types";
+import type { StockItem, StockItemDetail } from "@/redux/services/procurement/procurement-types";
 import { formatMoney } from "@/utils/money";
 import { ActivityFeed, EmptyPanel, Field } from "./sourcing/shared";
 import { isForbidden } from "./sourcing/helpers";
 import { BalancesTable, LocationsSection } from "./stock-locations";
 import { StockLocationPicker, StockTransferDestinationPicker } from "./pickers";
 import { useStockLocations } from "./use-stock-locations";
+import { MovementsSubTable, fmtQty, movementColumns, num, transferToast } from "./stock-movements";
 import { DEFAULT_INVENTORY_SECTION, type InventorySection } from "./console-sections";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 
 // ── Shared small helpers ─────────────────────────────────────────────────────
-// Quantities arrive as 14,4 decimal strings ("10.0000"); show them trimmed.
-const num = (value?: string | null) => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-};
-const fmtQty = (value?: string | null) => {
-  const n = num(value);
-  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
-};
-// Signed quantity/value cell - green for a gain, red for a relief.
-function signClass(n: number) {
-  return n > 0 ? "text-emerald-700" : n < 0 ? "text-destructive" : "text-gray-05";
-}
 // Derived, display-only stock status (never a persisted field).
 function itemStatus(item: StockItem): "OUT_OF_STOCK" | "LOW_STOCK" | "IN_STOCK" {
   if (num(item.on_hand_qty) <= 0) return "OUT_OF_STOCK";
@@ -314,31 +302,6 @@ function ItemLocationBreakdown({ itemId, entity, currency }: { itemId: number; e
           </>
         : <EmptyPanel>This item is not held at any location yet.</EmptyPanel>}
     </section>
-  );
-}
-
-function MovementsSubTable({ movements, currency, multi }: { movements: StockMovement[]; currency?: string | null; multi?: boolean }) {
-  const dates = useDates();
-  if (!movements.length) return <EmptyPanel>No movements recorded for this item yet.</EmptyPanel>;
-  const heads = ["Date", "Type", ...(multi ? ["Store"] : []), "Qty", "Value", multi ? "Bal. at store" : "Bal. qty", "Bal. value"];
-  return (
-    <div className="overflow-x-auto rounded-md border border-white-02"><table className="w-full min-w-[560px]">
-      <thead><tr>{heads.map((h) => <th key={h} className="bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01">{h}</th>)}</tr></thead>
-      <tbody>{movements.map((m) => {
-        const q = num(m.quantity);
-        return (
-          <tr key={m.id}>
-            <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{dates.day(m.movement_date)}</td>
-            <td className="border-t border-white-02 px-3 py-2"><StatusPill status={m.movement_type} /></td>
-            {multi && <td className="border-t border-white-02 px-3 py-2 font-mont text-xs">{m.location_code || "-"}</td>}
-            <td className={cn("border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums", signClass(q))}>{q > 0 ? "+" : ""}{fmtQty(m.quantity)}</td>
-            <td className="border-t border-white-02 px-3 py-2 text-right"><Money kobo={m.value_amount} currency={currency} align="right" /></td>
-            <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{fmtQty(m.balance_qty)}</td>
-            <td className="border-t border-white-02 px-3 py-2 text-right"><Money kobo={m.balance_value} currency={currency} align="right" /></td>
-          </tr>
-        );
-      })}</tbody>
-    </table></div>
   );
 }
 
@@ -655,9 +618,7 @@ function TransferStockDrawer({ entity, currency, item, onClose }: { entity: stri
         movement_date: movementDate || undefined,
         reference: reference.trim() || undefined, narration: narration.trim() || undefined,
       }).unwrap();
-      toast.success(r.data?.inter_branch_transfer_id
-        ? "Stock transferred. The receiving branch owes the cost between branches."
-        : r.message || "Stock transferred.");
+      toast.success(transferToast(r.data, r.message));
       onClose();
     } catch { /* central */ }
   };
@@ -711,20 +672,7 @@ function MovementsSection({ entity, currency }: { entity: string; currency?: str
   const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetStockMovementsQuery(params);
   const rows = toArray(data?.data);
 
-  const columns: Column<StockMovement>[] = [
-    { header: "Date", cell: (m) => dates.day(m.movement_date) },
-    { header: "Move #", cell: (m) => <span className="font-mont font-semibold text-primary">#{m.id}</span> },
-    { header: "Type", cell: (m) => <StatusPill status={m.movement_type} /> },
-    { header: "Item", cell: (m) => m.stock_item_code || "-" },
-    ...(multi ? [{ header: "Store", cell: (m: StockMovement) => m.location_code || "-" }] : []),
-    { header: "Qty", align: "right", cell: (m) => { const q = num(m.quantity); return <span className={cn("tabular-nums", signClass(q))}>{q > 0 ? "+" : ""}{fmtQty(m.quantity)}</span>; } },
-    { header: "Value", align: "right", cell: (m) => <Money kobo={m.value_amount} currency={currency} align="right" /> },
-    // The running balance is the store's, not the entity's, once stock is held per
-    // location - so the column has to say so or it reads as an entity total.
-    { header: multi ? "Bal. at store" : "Bal. qty", align: "right", cell: (m) => <span className="tabular-nums">{fmtQty(m.balance_qty)}</span> },
-    { header: "By", cell: (m) => m.created_by_name || "-" },
-    { header: "Reference", cell: (m) => m.reference || "-" },
-  ];
+  const columns = movementColumns({ rows, currency, multi, dates, ledger: true });
 
   return (
     <ProcurementShell>

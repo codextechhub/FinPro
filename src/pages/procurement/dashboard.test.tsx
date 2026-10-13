@@ -169,6 +169,29 @@ describe("Procurement overview for a requisition raiser", () => {
   });
 });
 
+/**
+ * A clerk with no switch on a vendor's hold or category is sent the overview
+ * without them: the active-vendors tile has no hold figure, the category
+ * spend block is null (the donut goes, the other two cards stay) and the
+ * vendor-on-hold exception is not among the exceptions.
+ */
+describe("Procurement overview for a role without the vendor hold and category", () => {
+  it("leaves out the hold badge, the category card and the hold exception", () => {
+    const text = render({
+      ...FULL,
+      kpis: { ...FULL.kpis, active_vendors: { count: 7, first_time_count: 2 } },
+      spend_by_category: null,
+      exceptions: FULL.exceptions!.filter((row) => row.key !== "vendor_on_hold"),
+    });
+    expect(text).toContain("Active vendors");
+    expect(text).not.toContain("on hold");
+    expect(text).not.toContain("Spend by category");
+    expect(text).not.toContain("from a vendor on hold");
+    expect(text).toContain("Top vendors");
+    expect(text).toContain("Control exceptions");
+  });
+});
+
 describe("Procurement dashboard views", () => {
   it("offers Spend & suppliers to a reader of any card on it, and opens it from the address", () => {
     expect(render(FULL, "procurement.requisition.view")).not.toContain("Spend & suppliers");

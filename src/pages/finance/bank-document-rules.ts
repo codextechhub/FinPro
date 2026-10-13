@@ -1,4 +1,26 @@
+import type { WriteFollows } from "@/components/finance-ui/field-access";
 import type { BankDocumentApprovalState } from "@/redux/services/finance/bank-documents-types";
+
+/**
+ * The response name whose switch governs each body key that is not itself a
+ * response name: the bank account and the other side of an entry are sent as
+ * ids and codes, but read back as `bank_account_name` and the like.
+ */
+export const BODY_FOLLOWS: WriteFollows = {
+  bank_account: "bank_account_name",
+  counter_account: "counter_account_name",
+  from_account: "from_account_name",
+  to_account: "to_account_name",
+};
+
+/** What a bank transaction cannot be raised without. */
+export const TRANSACTION_REQUIRED = ["bank_account", "direction", "amount", "counter_account", "transaction_date", "narration"] as const;
+/** What a draft bank transaction back from approval can have corrected. */
+export const TRANSACTION_CORRECTABLE = [...TRANSACTION_REQUIRED, "reference"] as const;
+/** What a transfer between a branch's own accounts cannot be raised without. */
+export const TRANSFER_REQUIRED = ["from_account", "to_account", "amount", "transfer_date", "narration"] as const;
+/** What a draft transfer back from approval can have corrected. */
+export const TRANSFER_CORRECTABLE = [...TRANSFER_REQUIRED, "reference"] as const;
 
 /**
  * Whether a bank account can move money on a bank document, as plain data.

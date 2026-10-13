@@ -14,7 +14,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Link2, RefreshCw, CheckCircle2, Printer, FilePlus2, Unlink, Check, EyeOff, RotateCcw } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
-import { DetailDrawer, FormField, AccountPicker, InfoHint, PostingDateField, usePostingWindow, useActiveEntity, toArray } from "@/components/finance-ui";
+import { DetailDrawer, FormField, AccountPicker, InfoHint, PostingDateField, usePostingWindow, useActiveEntity, useFieldAccess, toArray } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { FINANCE_HELP } from "./screen-help";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
+import { BANK_ACCOUNT, bankBalances, cardColumns } from "./bank-account-access";
 
 const signedCls = (kobo: number) => (kobo < 0 ? "text-destructive" : "text-green-01");
 
@@ -138,9 +139,11 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
     } catch { /* central */ }
   };
 
-  const book = detail?.metrics.book_balance ?? account.book_balance;
-  const statement = detail?.metrics.statement_balance ?? 0;
-  const difference = book - statement;
+  const shown = bankBalances(useFieldAccess(BANK_ACCOUNT, detail ?? account));
+  const book = shown.book ? (detail?.metrics?.book_balance ?? account.book_balance ?? 0) : undefined;
+  const statement = shown.statement ? (detail?.metrics?.statement_balance ?? 0) : undefined;
+  const difference = shown.difference && book !== undefined && statement !== undefined ? book - statement : undefined;
+  const balanceCards = [shown.statement, shown.book, shown.difference].filter(Boolean).length + 1;
   const totalLines = matched.length + unmatched.length;
   const progress = totalLines ? Math.round((matched.length / totalLines) * 100) : 0;
 
@@ -191,7 +194,11 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
   return (
     <div className="space-y-4" data-guide="finance-bank-reconciliation.workbench">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-mont text-xs text-gray-05">{account.bank_name || "-"} · {account.gl_account}{detail?.statements?.[0]?.period_label ? ` · ${detail.statements[0].period_label}` : ""}</p>
+        <p className="font-mont text-xs text-gray-05">{[
+          ...(account.bank_name !== undefined ? [account.bank_name || "-"] : []),
+          ...(account.gl_account !== undefined ? [account.gl_account] : []),
+          ...(detail?.statements?.[0]?.period_label ? [detail.statements[0].period_label] : []),
+        ].join(" · ")}</p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => printBankReconciliation({ account, currency, book, statement, difference, matched, unmatched, prefs: dates.prefs })} className="gap-1.5"><Printer className="size-4" /> Reconciliation report</Button>
           <Can permission={P.FIN_RECONCILE_BANK}>
@@ -200,10 +207,10 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-guide="finance-bank-reconciliation.balances">
-        <Kpi label="Statement balance" value={formatMoney(statement, currency)} />
-        <Kpi label="Book balance" value={formatMoney(book, currency)} />
-        <Kpi label="Difference" value={formatMoney(difference, currency)} danger={difference !== 0} />
+      <div className={cn("grid gap-3", cardColumns(balanceCards))} data-guide="finance-bank-reconciliation.balances">
+        {statement !== undefined ? <Kpi label="Statement balance" value={formatMoney(statement, currency)} /> : null}
+        {book !== undefined ? <Kpi label="Book balance" value={formatMoney(book, currency)} /> : null}
+        {difference !== undefined ? <Kpi label="Difference" value={formatMoney(difference, currency)} danger={difference !== 0} /> : null}
         <Kpi label="Match progress" value={`${matched.length} / ${totalLines}`}>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-03">
             <div className="h-full rounded-full bg-green-01" style={{ width: `${progress}%` }} />
@@ -211,7 +218,7 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
         </Kpi>
       </div>
 
-      {difference !== 0 ? (
+      {difference !== undefined && difference !== 0 ? (
         <div className="rounded-md bg-amber-50 px-4 py-3 ring-1 ring-amber-100">
           <p className="font-mont text-xs font-semibold text-amber-900">Unreconciled difference: {formatMoney(difference, currency)}</p>
           <p className="mt-0.5 font-mont text-[11px] text-amber-900/80">Match the remaining lines, or raise adjusting entries for bank charges / interest the books don't yet know about.</p>

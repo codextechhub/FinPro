@@ -21,20 +21,27 @@ export type RevenueRecognition = "SPREAD_MONTHLY" | "AT_PERIOD_START";
 export type PayerPaymentSplit = "OLDEST_FIRST" | "PROPORTIONAL" | "AS_ENTERED";
 export type PayerPaymentSurplus = "MOST_RECENT_BILL" | "PAYER";
 
-/** GET /finance/settings/receivables/ -> data.settings. */
+/**
+ * GET /finance/settings/receivables/ -> data.settings.
+ *
+ * Every key is a `finance.settings` Field Access field and is absent for a role
+ * that may not read it. `_read_only_fields` names the settings the role may read
+ * and not change.
+ */
 export interface ReceivablesSettingsValues {
-  revenue_recognition: RevenueRecognition;
-  revenue_recognition_label: string;
-  revenue_recognition_options: ChoiceOption<RevenueRecognition>[];
-  provision_bands: ProvisionBand[];
-  deposits_offset_unpaid_bills: boolean;
-  unclaimed_deposit_years: number;
-  payer_payment_split: PayerPaymentSplit;
-  payer_payment_split_options: ChoiceOption<PayerPaymentSplit>[];
-  payer_payment_surplus: PayerPaymentSurplus;
-  payer_payment_surplus_options: ChoiceOption<PayerPaymentSurplus>[];
-  updated_at: string | null;
-  updated_by: string | null;
+  revenue_recognition?: RevenueRecognition;
+  revenue_recognition_label?: string;
+  revenue_recognition_options?: ChoiceOption<RevenueRecognition>[];
+  provision_bands?: ProvisionBand[];
+  deposits_offset_unpaid_bills?: boolean;
+  unclaimed_deposit_years?: number;
+  payer_payment_split?: PayerPaymentSplit;
+  payer_payment_split_options?: ChoiceOption<PayerPaymentSplit>[];
+  payer_payment_surplus?: PayerPaymentSurplus;
+  payer_payment_surplus_options?: ChoiceOption<PayerPaymentSurplus>[];
+  updated_at?: string | null;
+  updated_by?: string | null;
+  _read_only_fields?: string[];
 }
 
 export interface ReceivablesSettingsPayload {
@@ -47,21 +54,25 @@ export type ReceivablesSettingsUpdate = Partial<Pick<ReceivablesSettingsValues,
   "revenue_recognition" | "provision_bands" | "deposits_offset_unpaid_bills"
   | "unclaimed_deposit_years" | "payer_payment_split" | "payer_payment_surplus">>;
 
-/** GET /finance/deferred-income/: waiting, released, and what falls due by month. */
+/**
+ * GET /finance/deferred-income/: waiting, released, and what falls due by month.
+ * Each key is a `finance.deferredincome` Field Access field and is absent for a
+ * role that may not read it.
+ */
 export interface DeferredIncomeSummary {
-  pending: number;
-  released: number;
+  pending?: number;
+  released?: number;
   /** Up to twelve months, earliest first; `month` is `YYYY-MM`. */
-  by_month: { month: string; amount: number }[];
+  by_month?: { month: string; amount: number }[];
 }
 
-/** One journal a release run posted: one per branch. */
+/** One journal a release run posted: one per branch. Keys the role may not read are absent. */
 export interface DeferredIncomeRelease {
   id: number;
-  branch_id: number | null;
-  date: string;
-  amount: number;
-  journal_id: number;
+  branch_id?: number | null;
+  date?: string;
+  amount?: number;
+  journal_id?: number;
 }
 
 /**
@@ -73,43 +84,51 @@ export interface DeferredIncomeRelease {
  * undone, and is null otherwise. `branch_period_status` is where the release's
  * own branch stands with the month, the month's status until the branch has
  * one of its own.
+ *
+ * Every key but `id` is a `finance.deferredincome` Field Access field and is
+ * absent for a role that may not read it.
  */
 export interface DeferredIncomeReleaseRow {
   id: number;
-  branch_id: number | null;
-  branch_name: string | null;
-  date: string;
+  branch_id?: number | null;
+  branch_name?: string | null;
+  date?: string;
   /** `YYYY-MM`. */
-  month: string;
-  period_id: number | null;
-  period_name: string | null;
+  month?: string;
+  period_id?: number | null;
+  period_name?: string | null;
   /** The release's month as a person reads it ("September 2026"); null when no period holds it. */
-  period_label: string | null;
-  period_status: string | null;
-  branch_period_status: string | null;
-  amount: number;
-  journal_id: number;
-  journal_number: string | null;
-  reversed: boolean;
-  reversed_at: string | null;
-  can_reverse: boolean;
-  reverse_blocked_reason: string | null;
+  period_label?: string | null;
+  period_status?: string | null;
+  branch_period_status?: string | null;
+  amount?: number;
+  journal_id?: number;
+  journal_number?: string | null;
+  reversed?: boolean;
+  reversed_at?: string | null;
+  can_reverse?: boolean;
+  reverse_blocked_reason?: string | null;
 }
 
 export interface DeferredIncomeReleaseResult {
-  up_to: string;
+  up_to?: string;
   releases: DeferredIncomeRelease[];
 }
 
-/** One branch's figures in a provision run; `bands` is keyed by the band's `over_days`. */
+/**
+ * One branch's figures in a provision run; `bands` is keyed by the band's
+ * `over_days`. Every key is a `finance.provision` Field Access field and is
+ * absent for a role that may not read it. `bands` is also absent for a role that
+ * may not read the receivables policy's provision bands (`finance.settings`).
+ */
 export interface ProvisionLine {
-  branch_id: number | null;
-  branch_name: string | null;
-  required: number;
-  current: number;
-  movement: number;
-  bands: Record<string, { owed: number; required: number }>;
-  journal_id: number | null;
+  branch_id?: number | null;
+  branch_name?: string | null;
+  required?: number;
+  current?: number;
+  movement?: number;
+  bands?: Record<string, { owed: number; required: number }>;
+  journal_id?: number | null;
 }
 
 /**
@@ -118,21 +137,26 @@ export interface ProvisionLine {
  * A run covers every branch at once. A reader bound to some branches is sent
  * only those branches' `lines`, with `required_total` and `movement_total`
  * summed from them, and `partial_view` true.
+ *
+ * Every key but `id`, `lines` and `partial_view` is a `finance.provision` Field
+ * Access field and is absent for a role that may not read it; `lines` may be
+ * empty when none of a line's fields is readable. `policy_snapshot` is also
+ * absent for a role that may not read the receivables policy's provision bands
+ * (`finance.settings`). A detail response lists `_read_only_fields`.
  */
 export interface DoubtfulDebtProvision {
   id: number;
-  document_number: string;
-  status: string;
-  as_of: string;
-  narration: string;
-  required_total: number;
-  movement_total: number;
-  policy_snapshot: ProvisionBand[];
-  lines: ProvisionLine[];
+  document_number?: string;
+  status?: string;
+  as_of?: string;
+  narration?: string;
+  required_total?: number;
+  movement_total?: number;
+  policy_snapshot?: ProvisionBand[];
+  lines?: ProvisionLine[];
   /** Null in a partial view: whether the run needs approval turns on its whole
    *  total, which the reader of a part is not shown. */
   approval_required?: boolean | null;
-  created_at: string;
   /** True when the response is the reader's branches' part of the run. Absent
    *  from older servers, which never send such a part. */
   partial_view?: boolean;
@@ -142,30 +166,55 @@ export interface DoubtfulDebtProvision {
   approval_returned?: boolean;
   /** The latest approval request, null before it is first sent; absent where the read does not name it. */
   workflow_instance_id?: string | number | null;
+  created_at?: string;
+  _read_only_fields?: string[];
 }
 
 export type DepositStatus = "HELD" | "RELEASED" | "FORFEITED" | "CANCELLED";
 
+/**
+ * A refundable deposit. Every key but `id` is a `finance.deposit` Field Access
+ * field and is absent for a role that may not read it; all of them are read-only.
+ */
 export interface CustomerDeposit {
   id: number;
-  customer_id: number;
-  customer_code: string;
-  customer_name: string;
-  branch_id: number | null;
-  branch_name: string | null;
-  invoice_id: number;
-  invoice_number: string;
-  amount: number;
-  amount_naira: string;
-  status: DepositStatus;
+  customer_id?: number;
+  customer_code?: string;
+  customer_name?: string;
+  branch_id?: number | null;
+  branch_name?: string | null;
+  invoice_id?: number;
+  invoice_number?: string;
+  amount?: number;
+  amount_naira?: string;
+  status?: DepositStatus;
   /** The day the customer left and the deposit became theirs to claim. */
-  claim_opened_on: string | null;
-  release_note_number: string | null;
-  forfeiture_id: number | null;
+  claim_opened_on?: string | null;
+  release_note_number?: string | null;
+  forfeiture_id?: number | null;
+}
+
+/**
+ * A credit note a deposit release raised, shown as the deposits it returned: its
+ * customer, branch and amount are `finance.deposit` fields and are absent for a
+ * role that may not read them.
+ */
+export interface DepositReleaseNote {
+  id: number;
+  document_number: string;
+  note_date: string;
+  customer_id?: number;
+  customer_code?: string;
+  customer_name?: string;
+  branch_id?: number | null;
+  branch_name?: string | null;
+  amount?: number;
+  amount_naira?: string;
+  reason: string;
 }
 
 export interface DepositForfeitResult {
-  forfeitures: { id: number; branch_id: number | null; amount: number; journal_id: number }[];
+  forfeitures: { id?: number; branch_id?: number | null; amount?: number; journal_id?: number }[];
   skipped: unknown;
 }
 
@@ -267,11 +316,16 @@ export interface PayerPlanShare {
   bills?: PayerPlanBill[];
 }
 
-/** What the record form offers before it previews: the split choices and the school's current default. */
+/**
+ * What the record form offers before it previews: the split choices and the
+ * school's current default. The default and its label are the receivables
+ * policy's payer payment split and are absent for a role that may not read that
+ * setting; the options remain.
+ */
 export interface PayerPaymentSplitChoices {
   split_options: ChoiceOption<PayerPaymentSplit>[];
-  split_default: PayerPaymentSplit;
-  split_default_label: string;
+  split_default?: PayerPaymentSplit;
+  split_default_label?: string;
 }
 
 export interface PayerPaymentPlan {

@@ -3,6 +3,7 @@
  * uses. Column-driven over the app's existing <Table>, with server pagination
  * and all four explicit states (loading / empty / error / forbidden). Filters
  * and toolbars live above it on the page; this owns the table + its footer.
+ * A list with no columns, because Field Access hides every one, renders nothing.
  */
 
 import {
@@ -160,6 +161,8 @@ export function DataTable<T>({
   cardBreakpoint = "md",
   selection,
 }: DataTableProps<T>) {
+  // A list whose every column is hidden by Field Access has nothing to show.
+  if (columns.length === 0 && !selection) return null;
   const colCount = columns.length + (selection ? 1 : 0);
   // Defensive: the backend returns `{}` (not `[]`) for an empty list endpoint,
   // so a caller may hand us a non-array. Never let `.map` throw.

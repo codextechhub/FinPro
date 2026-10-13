@@ -4,6 +4,7 @@ type DocumentActivity = {
   id: string | number;
   action: string;
   message: string;
+  reason?: string;
   actor_name: string;
   created_at: string;
 };
@@ -18,6 +19,7 @@ export type ActivityFeedSeed = {
 export type ActivityFeedItem = {
   key: string;
   message: string;
+  reason?: string;
   actorId?: string | number | null;
   actorName?: string;
   occurredAt: string;
@@ -46,6 +48,7 @@ export function mergeActivityItems({ workflowLogs = [], activity = [], created }
     ...activity.map((log, index) => ({
       key: `document-${log.id}`,
       message: log.message || log.action.replaceAll("_", " ").toLowerCase(),
+      reason: log.reason?.trim() || undefined,
       actorName: log.actor_name || undefined,
       occurredAt: log.created_at,
       sourceOrder: workflowLogs.length + index,
@@ -58,6 +61,7 @@ export function mergeActivityItems({ workflowLogs = [], activity = [], created }
     .map((item) => ({
       key: item.key,
       message: item.message,
+      reason: item.reason,
       actorId: item.actorId,
       actorName: item.actorName,
       occurredAt: item.occurredAt,

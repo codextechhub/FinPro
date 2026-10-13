@@ -14,7 +14,31 @@
  * show on the pair balances) or a permanent move through retained earnings.
  */
 
+import type { FieldAccess } from "@/components/finance-ui/field-access";
 import type { BankSplitDifferenceTreatment, BankSplitPreview } from "@/redux/services/finance/interbranch-types";
+
+/** Field Access resource of a bank account; the split's fields are registered under it. */
+export const BANK_ACCOUNT = "finance.bankaccount";
+
+/**
+ * What a split cannot be sent without: the date, the agreement reference and,
+ * for every branch's share, the agreed balance and the new ledger account's
+ * code and name. The way differences are treated is not among them,
+ * because the server applies a debt between branches when it is left out.
+ */
+export const SPLIT_REQUIRED = [
+  "split_date", "agreement_reference", "opening_balance", "ledger_account_code", "ledger_account_name",
+] as const;
+
+/**
+ * Whether this reader may write everything a split needs. A split whose date,
+ * reference or shares the reader may not set is refused by the server, so it is
+ * not offered. Judged from the `/me` map alone: the split's names are not part
+ * of a bank account record, so a record cannot speak for them.
+ */
+export function splitIsWritable(access: Pick<FieldAccess, "isReadOnly">): boolean {
+  return SPLIT_REQUIRED.every((name) => !access.isReadOnly(name));
+}
 
 export interface SplitRow {
   branch: string;
@@ -62,7 +86,7 @@ export interface BranchDifference {
  * so its whole book balance is its difference.
  */
 export function branchDifferences(
-  preview: Pick<BankSplitPreview, "branches">,
+  preview: Required<Pick<BankSplitPreview, "branches">>,
   rows: Pick<SplitRow, "branch" | "opening_balance">[],
 ): BranchDifference[] {
   return preview.branches.map((b) => {

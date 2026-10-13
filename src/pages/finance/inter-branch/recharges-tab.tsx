@@ -62,9 +62,9 @@ export function RechargesTab({ entity, currency, reader }: { entity: string; cur
   const rows = toArray(data?.data);
 
   const columns: Column<Recharge>[] = [
-    ...(!access.isHidden("document_number") ? [{ header: "Number", cell: (r: Recharge) => <span className="font-semibold tabular-nums text-gray-01">{r.document_number}</span> }] : []),
+    { header: "Number", cell: (r: Recharge) => <span className="font-semibold tabular-nums text-gray-01">{r.document_number}</span> },
     ...(!access.isHidden("recharge_date") ? [{ header: "Date", cell: (r: Recharge) => <span className="tabular-nums text-gray-05">{dates.day(r.recharge_date, r.branch_id)}</span> }] : []),
-    ...(!access.isHidden("branch_name") ? [{ header: "Paid by", cell: (r: Recharge) => r.branch_name }] : []),
+    { header: "Paid by", cell: (r: Recharge) => r.branch_name },
     ...(!access.isHidden("narration") ? [{ header: "Cost", cell: (r: Recharge) => r.narration }] : []),
     ...(!access.isHidden("amount") ? [{ header: "Whole cost", align: "right" as const, cell: (r: Recharge) => <Money kobo={r.amount} currency={currency} align="right" /> }] : []),
     ...(!access.isHidden("status") ? [{ header: "Status", cell: (r: Recharge) => <TonePill tone={r.status === "REVERSED" ? "closed" : "good"}>{r.status === "REVERSED" ? "Voided" : "Booked"}</TonePill> }] : []),
@@ -98,7 +98,7 @@ function RechargeDrawer({ id, entity, currency, reader, onClose }: {
   const r = id ? data?.data : undefined;
   const access = useFieldAccess("finance.interbranch", r);
   const [voiding, setVoiding] = useState(false);
-  const mayVoid = !!r && !access.isHidden("status") && !access.isHidden("branch_id")
+  const mayVoid = !!r && !access.isHidden("status")
     && !access.isHidden("lines") && r.status === "POSTED" && reader.keys.reverse
     && reader.reach.covers(rechargeBranches(r));
 
@@ -108,7 +108,7 @@ function RechargeDrawer({ id, entity, currency, reader, onClose }: {
         open={id != null} onOpenChange={(o) => (o ? undefined : onClose())}
         title={r?.document_number ?? "Recharge"} description={r ? [
           !access.isHidden("narration") ? r.narration : null,
-          !access.isHidden("branch_name") ? `paid by ${r.branch_name}` : null,
+          `paid by ${r.branch_name}`,
         ].filter(Boolean).join(" · ") || undefined : undefined}
         widthClass="sm:max-w-lg"
         footer={mayVoid ? (
@@ -130,10 +130,9 @@ function RechargeDrawer({ id, entity, currency, reader, onClose }: {
                 {r.lines.map((line) => (
                   <div key={line.branch_id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                     <div className="min-w-0">
-                      {!access.isHidden("for_branch_name") ? <p className="font-mont text-sm text-black-01">{line.branch_name}</p> : null}
+                      <p className="font-mont text-sm text-black-01">{line.branch_name}</p>
                       <p className="font-mont text-[11px] text-gray-05">
-                        {weightText(r, line.weight)}
-                        {!access.isHidden("branch_name") ? ` · ${line.transfer_id ? `owes ${r.branch_name}` : "kept by the paying branch"}` : null}
+                        {weightText(r, line.weight)} · {line.transfer_id ? `owes ${r.branch_name}` : "kept by the paying branch"}
                       </p>
                     </div>
                     {!access.isHidden("amount") ? <Money kobo={line.amount} currency={currency} /> : null}
@@ -169,12 +168,12 @@ function VoidRechargeDialog({ recharge, entity, currency, onClose }: {
   return (
     <ConfirmActionModal
       open onOpenChange={(o) => !o && onClose()} loading={isLoading} onConfirm={submit} destructive
-      title={!access.isHidden("document_number") ? `Void ${recharge.document_number}?` : "Void this recharge?"}
+      title={`Void ${recharge.document_number}?`}
       description={[
         "Reverses every branch's share",
         !access.isHidden("amount") ? `of the ${formatMoney(recharge.amount, currency)}` : null,
         !access.isHidden("narration") ? recharge.narration : null,
-        !access.isHidden("branch_name") ? `and what each owes ${recharge.branch_name} for it.` : ".",
+        `and what each owes ${recharge.branch_name} for it.`,
       ].filter(Boolean).join(" ")}
       confirmText="Void recharge"
     >
@@ -225,12 +224,14 @@ function RaiseRechargeDrawer({ entity, currency, reader, onClose }: {
 
   const submit = async () => {
     try {
-      const res = await create(access.writableOnly({
-        entity, amount, narration: narration.trim(), recharge_date: date || undefined,
-        expense_account: account || undefined, rule: rule ? rule.id : undefined, basis,
-        weights: weightsBody(basis, weights), reference: reference.trim() || undefined,
-        ...payer.body("branch"),
-      }, { creating: true })).unwrap();
+      const res = await create({
+        entity, ...payer.body("branch"),
+        ...access.writableOnly({
+          amount, narration: narration.trim(), recharge_date: date || undefined,
+          expense_account: account || undefined, rule: rule ? rule.id : undefined, basis,
+          weights: weightsBody(basis, weights), reference: reference.trim() || undefined,
+        }, { creating: true }),
+      }).unwrap();
       toast.success(res.message || "Recharge booked.");
       onClose();
     } catch (error) { setDenied(fieldWriteErrors(error)); }
@@ -242,7 +243,7 @@ function RaiseRechargeDrawer({ entity, currency, reader, onClose }: {
       description="The paying branch keeps its own share and is owed the others'."
       widthClass="sm:max-w-xl" onSubmit={submit} submitText="Book recharge" loading={isLoading} canSubmit={canSubmit}
     >
-      <AccessField access={access} name="branch" creating errors={denied}><RaisingBranchChoiceField choice={payer} label="Paid by" /></AccessField>
+      <RaisingBranchChoiceField choice={payer} label="Paid by" />
       {rules.length ? (
         <AccessField access={access} name="rule" label="Shared cost rule" creating errors={denied}>
           <NativeSelect value={ruleId} onChange={(e) => pickRule(e.target.value)} aria-label="Shared cost rule">

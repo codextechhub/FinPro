@@ -63,8 +63,10 @@ export interface IncomeGivenBackRow {
   document_number: string;
   to_branch_id: number;
   to_branch_name: string;
-  amount: number;
-  status: string;
+  /** The `finance.interbranch` amount; absent for a role that may not read it. */
+  amount?: number;
+  /** The `finance.interbranch` status; absent for a role that may not read it. */
+  status?: string;
 }
 
 export interface CreditNote {
@@ -84,6 +86,8 @@ export interface CreditNote {
   total_naira: string;
   allocated_amount: number;
   unallocated_amount: number;
+  /** The customer's credit still owed back; absent for a role that may not read the customer balance. */
+  credit_remaining?: number;
   reason: string;
   reference: string;
   /**
@@ -325,12 +329,18 @@ export interface DunningPolicy {
   is_default: boolean;
   stages: DunningStage[];
 }
-export type AgingBucket = { amount: number; count: number };
+/** `amount` is absent when the role may not read the customer balance. */
+export type AgingBucket = { amount?: number; count: number };
+/**
+ * Open-receivable ageing buckets. The server sends none of them (an empty
+ * object) to a role that may not read the customer account status, and sends
+ * each bucket's count without its amount to one that may not read the balance.
+ */
 export interface DunningSummary {
-  due_soon: AgingBucket;
-  overdue_1_30: AgingBucket;
-  overdue_31_60: AgingBucket;
-  overdue_60_plus: AgingBucket;
+  due_soon?: AgingBucket;
+  overdue_1_30?: AgingBucket;
+  overdue_31_60?: AgingBucket;
+  overdue_60_plus?: AgingBucket;
 }
 
 export interface DunningNotice {
@@ -363,7 +373,7 @@ export interface InvoiceListParams {
   include_archived?: "true";
 }
 
-type ArMoney = { kobo: number; naira: string };
+export type ArMoney = { kobo: number; naira: string };
 
 // How an invoice was settled down - cash, credit notes, concessions or write-offs.
 export type SettlementType = "PAYMENT" | "CREDIT_NOTE" | "CONCESSION" | "WRITE_OFF";
@@ -398,8 +408,12 @@ export interface InvoiceDetail {
     service_start?: string | null;
     service_end?: string | null;
   }[];
-  /** This invoice's deferred income: still waiting, and released to revenue. */
-  deferred_income?: { pending: ArMoney; released: ArMoney };
+  /**
+   * This invoice's deferred income: still waiting, and released to revenue. Each
+   * figure is a `finance.deferredincome` Field Access field and is absent for a
+   * role that may not read it.
+   */
+  deferred_income?: { pending?: ArMoney; released?: ArMoney };
   // Cash receipts only - kept for back-compat; use `settlements` for the full picture.
   payments: { date: string; reference: string; method: string; amount: ArMoney }[];
   settlements: InvoiceSettlement[];
@@ -425,20 +439,28 @@ export interface InvoiceSummary {
 // Customers / payers - the AR sub-ledger party (mirrors CustomerSerializer).
 export type CustomerAccountStatus = "ACTIVE" | "OVERDUE" | "CREDIT";
 
+/**
+ * A customer or payer. `code` and `name` carry no Field Access switch; every
+ * other field is a `finance.customer` field and is absent for a role that may
+ * not read it. A detail response lists the present fields the caller may not
+ * change in `_read_only_fields`.
+ */
 export interface Customer {
   id: number;
   code: string;
   name: string;
-  billing_email: string;
-  billing_phone: string;
-  billing_address: string;
-  receivable_account_code: string | null;
-  receivable_account_name: string | null;
-  opening_balance: number;
-  opening_balance_naira: string;
-  source_type: string;
-  source_id: string;
-  is_active: boolean;
+  billing_email?: string;
+  billing_phone?: string;
+  billing_address?: string;
+  receivable_account_id?: number | null;
+  receivable_account_code?: string | null;
+  receivable_account_name?: string | null;
+  opening_balance?: number;
+  opening_balance_naira?: string;
+  source_type?: string;
+  source_id?: string;
+  is_active?: boolean;
+  created_at?: string;
   // The branch the customer is filed under; null for one every branch shares.
   // Absent from servers that do not report it.
   branch_id?: number | null;
@@ -449,16 +471,18 @@ export interface Customer {
   account_status?: CustomerAccountStatus;
   /** On the list: how many customers it pays for as a payer, counting only those the reader can see. */
   pays_for_count?: number;
+  _read_only_fields?: string[];
 }
 
 // Header KPI totals computed over ALL rows (so they stay accurate while the list
 // paginates). { kobo, naira } mirrors the report money shape.
 export interface CustomerSummary {
   total: number;
-  receivable: { kobo: number; naira: string };
-  on_credit: number;
-  overdue: number;
-  status_counts: Record<string, number>; // ACTIVE / CREDIT / OVERDUE / INACTIVE
+  /** The figures below are absent when the role may not read the balance, the account status or the active flag. */
+  receivable?: { kobo: number; naira: string };
+  on_credit?: number;
+  overdue?: number;
+  status_counts?: Record<string, number>; // ACTIVE / CREDIT / OVERDUE / INACTIVE
 }
 
 /**
@@ -519,28 +543,36 @@ export interface PaymentAllocationRow {
 export interface PaymentDetail {
   payment: Payment;
   allocations: PaymentAllocationRow[];
-  open_invoices: { id: number; document_number: string; due_date: string | null; balance: ArMoney }[];
-  open_debit_notes: { id: number; document_number: string; note_date: string | null; balance: ArMoney }[];
+  /**
+   * The customer's open bills and debit notes, each a `finance.customer` field
+   * of the same name: a list is absent for a role that may not read it, and an
+   * item's `balance` is absent for one that may not read the customer balance.
+   */
+  open_invoices?: { id: number; document_number: string; due_date: string | null; balance?: ArMoney }[];
+  open_debit_notes?: { id: number; document_number: string; note_date: string | null; balance?: ArMoney }[];
   gl_postings: { account_code: string; account_name: string; debit: ArMoney; credit: ArMoney }[];
 }
 
 export interface CustomerDetail {
   customer: Customer;
-  summary: {
-    current_balance: ArMoney; lifetime_paid: ArMoney;
-    open_invoice_count: number; account_status: CustomerAccountStatus;
+  /** Dropped when the role may read none of its four figures. */
+  summary?: {
+    current_balance?: ArMoney; lifetime_paid?: ArMoney;
+    open_invoice_count?: number; account_status?: CustomerAccountStatus;
   };
-  open_invoices: { document_number: string; invoice_date: string; due_date: string | null; total: ArMoney; balance: ArMoney; status: string }[];
+  /** Each open bill's `balance` is absent when the customer's balance is hidden. */
+  open_invoices?: { document_number: string; invoice_date: string; due_date: string | null; total: ArMoney; balance?: ArMoney; status: string }[];
   // Open DEBIT notes are supplementary AR charges, outstanding like an invoice.
-  open_debit_notes: { document_number: string; note_date: string | null; total: ArMoney; balance: ArMoney; status: string }[];
-  transactions: {
+  open_debit_notes?: { document_number: string; note_date: string | null; total: ArMoney; balance?: ArMoney; status: string }[];
+  transactions?: {
     date: string;
     type: "INVOICE" | "DEBIT_NOTE" | "CREDIT_NOTE" | "PAYMENT" | "REFUND" | "ADJUSTMENT";
     reference: string;
     amount: ArMoney;
     status: string;
   }[];
-  statement: { date: string | null; description: string; debit: ArMoney; credit: ArMoney; balance: ArMoney }[];
+  /** Each line's running `balance` is absent when the customer's balance is hidden. */
+  statement?: { date: string | null; description: string; debit: ArMoney; credit: ArMoney; balance?: ArMoney }[];
 }
 
 // Fee structures - billing catalogue rolled up into invoices.
@@ -617,7 +649,8 @@ export interface DocumentDelivery {
   source_display: string;
   status: "PENDING" | "SENT" | "FAILED";
   requested_by_name: string;
-  recipients: string[];
+  /** The customer's billing email as used; absent when the role may not read it (`recipient_count` remains). */
+  recipients?: string[];
   recipient_count: number;
   bcc: string[];
   note: string;
@@ -630,7 +663,8 @@ export interface DocumentDelivery {
 
 /** What a send would do, read before anything leaves the building. */
 export interface DocumentEmailPreview {
-  recipients: string[];
+  /** The customer's billing email; absent when the role may not read it. */
+  recipients?: string[];
   bcc: string[];
   subject: string;
   can_send: boolean;

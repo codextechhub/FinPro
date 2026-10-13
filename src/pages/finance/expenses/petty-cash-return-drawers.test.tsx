@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   reopen: vi.fn(),
   update: vi.fn(),
   denied: new Set<string>(),
+  fieldAccess: {} as Record<string, { hidden?: string[]; read_only?: string[] }>,
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
@@ -52,6 +53,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasAnyPermission: () => true,
     hasAllPermissions: () => true,
     hasModuleAccess: () => true,
+    fieldAccess: mocks.fieldAccess,
   }),
 }));
 
@@ -60,6 +62,7 @@ vi.mock("sonner", () => ({ toast: mocks.toast }));
 import type { PettyCashFund } from "@/redux/services/finance/ops-types";
 import { P } from "../../../permissions";
 import { CloseFundDrawer, EditFundDrawer, ReduceFloatDrawer, ReopenFundDialog } from "./petty-cash-return-drawers";
+import { PETTY_CASH_RETURN } from "./petty-cash-returns";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -80,6 +83,7 @@ beforeEach(() => {
   }
   mocks.toast.success.mockReset();
   mocks.denied = new Set();
+  mocks.fieldAccess = {};
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -251,5 +255,123 @@ describe("Reopen and Edit fund", () => {
     act(() => type(inField<HTMLInputElement>("Fund name", "input")!, "Front office"));
     await act(async () => button("Save changes")!.click());
     expect(mocks.update).toHaveBeenCalledWith({ id: 1, entity: "BSS", name: "Front office" });
+  });
+});
+
+/**
+ * Field Access on the raise forms, told as Bright Star's Ikeja bursar whose
+ * role sees some of a return and not the rest.
+ */
+describe("Field Access on a return form", () => {
+  const restrict = (entry: { hidden?: string[]; read_only?: string[] }) => { mocks.fieldAccess = { [PETTY_CASH_RETURN]: entry }; };
+  const fill = (counted = 98_500) => {
+    if (counted !== 100_000) act(() => type(inField<HTMLInputElement>("Cash counted", "input")!, String(counted * NAIRA)));
+    act(() => type(inField<HTMLInputElement>("New float", "input")!, String(60_000 * NAIRA)));
+    act(() => button("Pick bank")!.click());
+    act(() => button("Pick date")!.click());
+  };
+  const reduceDrawer = () => act(() => root.render(<ReduceFloatDrawer fund={FUND} entity="BSS" onClose={() => undefined} onRaised={vi.fn()} />));
+
+  it("restates no hidden figure in the preview, the note or the button", () => {
+    restrict({ hidden: ["book_balance", "difference", "shortage", "overage", "amount", "amount_naira", "previous_float_amount", "cash_left"] });
+    reduceDrawer();
+    fill();
+    const summary = body().querySelector("[data-testid=return-summary]")?.textContent ?? "";
+    expect(summary).toContain("Counted");
+    for (const gone of ["Books say", "To the bank", "Tin keeps", "Float before", "Float to"]) expect(summary).not.toContain(gone);
+    expect(summary).toContain("Float after");
+    expect(body().querySelector("[data-testid=return-difference]")).toBeNull();
+    expect(body().textContent).not.toContain("The books say");
+    expect(body().textContent).not.toContain("₦1,500.00");
+    expect(button("Bank the cash")).toBeDefined();
+    expect(body().textContent).not.toContain("₦38,500.00");
+  });
+
+  it("asks for a reason without saying the count differs when the difference is hidden", async () => {
+    restrict({ hidden: ["difference", "shortage", "overage"] });
+    reduceDrawer();
+    fill();
+    expect(body().textContent).toContain("Reason for any difference");
+    expect(body().textContent).not.toContain("Why the count differs");
+    expect(body().querySelector("[role=alert]")).toBeNull();
+    await act(async () => button("Bank ₦38,500.00")!.click());
+    expect(mocks.reduce).toHaveBeenCalled();
+  });
+
+  it("words the float refusal without the hidden float", () => {
+    restrict({ hidden: ["previous_float_amount"] });
+    reduceDrawer();
+    act(() => type(inField<HTMLInputElement>("New float", "input")!, String(120_000 * NAIRA)));
+    expect(body().querySelector("[role=alert]")?.textContent).toBe("The new float must be lower than the fund's current float.");
+  });
+
+  it("greys a read-only field and never sends it", async () => {
+    restrict({ read_only: ["reference"] });
+    reduceDrawer();
+    expect(body().querySelector("[data-field=reference]")?.hasAttribute("disabled")).toBe(true);
+    fill(100_000);
+    await act(async () => button("Bank ₦40,000.00")!.click());
+    expect(mocks.reduce.mock.calls[0][0]).not.toHaveProperty("reference");
+    expect(mocks.reduce.mock.calls[0][0]).toHaveProperty("counted_amount");
+  });
+
+  it("removes a hidden reference and leaves the rest writable", async () => {
+    restrict({ hidden: ["reference"] });
+    reduceDrawer();
+    expect(body().querySelector("[data-field=reference]")).toBeNull();
+    expect(body().textContent).not.toContain("Deposit slip");
+    fill(100_000);
+    await act(async () => button("Bank ₦40,000.00")!.click());
+    expect(mocks.reduce.mock.calls[0][0]).not.toHaveProperty("reference");
+  });
+
+  it.each([
+    ["counted_amount", { read_only: ["counted_amount"] }],
+    ["counted_amount hidden", { hidden: ["counted_amount"] }],
+    ["new_float_amount", { read_only: ["new_float_amount"] }],
+    ["return_date", { read_only: ["return_date"] }],
+    ["the bank account alias", { read_only: ["bank_account"] }],
+    ["the bank account name", { hidden: ["bank_account_name"] }],
+  ])("cannot be raised when %s may not be set", async (_name, entry) => {
+    restrict(entry);
+    reduceDrawer();
+    expect(body().querySelector("[data-testid=raise-blocked]")).not.toBeNull();
+    const send = [...body().querySelectorAll("button")].find((b) => b.textContent?.includes("Bank"))!;
+    await act(async () => send.click());
+    expect(send.disabled).toBe(true);
+    expect(mocks.reduce).not.toHaveBeenCalled();
+  });
+
+  it("closes a fund whose new float is hidden, sending no float", async () => {
+    restrict({ hidden: ["new_float_amount", "previous_float_amount"] });
+    act(() => root.render(<CloseFundDrawer fund={{ ...FUND, current_balance: 20_000 * NAIRA }} entity="BSS" blockers={[]} onClose={() => undefined} onRaised={vi.fn()} />));
+    expect(body().querySelector("[data-testid=raise-blocked]")).toBeNull();
+    expect(body().querySelector("[data-testid=return-summary]")?.textContent).not.toContain("Float");
+    act(() => button("Pick bank")!.click());
+    act(() => button("Pick date")!.click());
+    const send = [...body().querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Close fund").at(-1)!;
+    await act(async () => send.click());
+    expect(mocks.close.mock.calls[0][0]).not.toHaveProperty("new_float_amount");
+  });
+
+  it("does not offer a closure to a reader who cannot set the date", () => {
+    restrict({ read_only: ["return_date"] });
+    act(() => root.render(<CloseFundDrawer fund={FUND} entity="BSS" blockers={[]} onClose={() => undefined} onRaised={vi.fn()} />));
+    expect(body().querySelector("[data-testid=raise-blocked]")).not.toBeNull();
+    expect(body().querySelector("[data-field=return_date]")?.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("shows a field refusal beside the control it names", async () => {
+    mocks.reduce.mockReturnValue({
+      unwrap: () => Promise.reject({
+        status: 403,
+        data: { error: { code: "field_write_denied", detail: { reference: ["You may not change Reference."], bank_account: ["You may not change Bank account."] } } },
+      }),
+    });
+    reduceDrawer();
+    fill(100_000);
+    await act(async () => button("Bank ₦40,000.00")!.click());
+    expect(body().querySelector("[data-field=reference] [role=alert]")?.textContent).toBe("You may not change Reference.");
+    expect(body().querySelector("[data-field=bank_account_name] [role=alert]")?.textContent).toBe("You may not change Bank account.");
   });
 });

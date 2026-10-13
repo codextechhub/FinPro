@@ -47,6 +47,14 @@ describe("DataTable phone states", () => {
     expect(phoneState).toBeTruthy();
     expect(tableContainer?.classList.contains("max-md:hidden")).toBe(true);
   });
+
+  it("renders nothing for a list whose every column Field Access hides", () => {
+    act(() => {
+      root.render(<DataTable columns={[]} rows={[{ id: "1", name: "Tunde" }]} rowKey={(row) => row.id} emptyTitle="Empty" />);
+    });
+
+    expect(container.innerHTML).toBe("");
+  });
 });
 
 describe("DataTable row selection", () => {

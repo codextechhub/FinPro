@@ -35,7 +35,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { ArrowRight, Ban, CheckCheck, HandCoins, Send, Users, XCircle } from "lucide-react";
 
 import {
-  AccessField, BankAccountPicker, ConfirmActionModal, DataTable, DetailDrawer, FormDrawer, Money, MoneyInput,
+  AccessField, BankAccountPicker, ConfirmActionModal, DataTable, DetailDrawer, FormDrawer, FormField, Money, MoneyInput,
   PostingDateField, RaisingBranchChoiceField, fieldWriteErrors, toArray, useFieldAccess,
   useRaisingBranchChoice, type Column, type FieldErrors,
 } from "@/components/finance-ui";
@@ -106,11 +106,11 @@ export function TransfersTab({ entity, currency, reader }: { entity: string; cur
   const setFilter = (key: (typeof FILTER_KEYS)[number], next: string) => { setPage(1); filters.set(key, next); };
 
   const columns: Column<InterBranchTransfer>[] = [
-    ...(!access.isHidden("document_number") ? [{ header: "Number", cell: (t: InterBranchTransfer) => <span className="font-semibold tabular-nums text-gray-01">{t.document_number || `#${t.id}`}</span> }] : []),
+    { header: "Number", cell: (t: InterBranchTransfer) => <span className="font-semibold tabular-nums text-gray-01">{t.document_number || `#${t.id}`}</span> },
     ...(!access.isHidden("transfer_date") ? [{ header: "Date", cell: (t: InterBranchTransfer) => <span className="tabular-nums text-gray-05">{dates.day(t.transfer_date, t.branch_id)}</span> }] : []),
     ...(!access.isHidden("kind") ? [{ header: "What", cell: (t: InterBranchTransfer) => KIND_LABELS[t.kind] ?? t.kind_label }] : []),
-    ...(!access.isHidden("branch_name") ? [{ header: "From", cell: (t: InterBranchTransfer) => t.branch_name }] : []),
-    ...(!access.isHidden("to_branch_name") ? [{ header: "To", cell: (t: InterBranchTransfer) => t.to_branch_name }] : []),
+    { header: "From", cell: (t: InterBranchTransfer) => t.branch_name },
+    { header: "To", cell: (t: InterBranchTransfer) => t.to_branch_name },
     ...(!access.isHidden("amount") ? [{ header: "Amount", align: "right" as const, cell: (t: InterBranchTransfer) => <Money kobo={t.amount} currency={currency} align="right" /> }] : []),
     ...(!access.isHidden("status") ? [{ header: "Stage", cell: (t: InterBranchTransfer) => <StagePill transfer={t} /> }] : []),
   ];
@@ -190,7 +190,7 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
   const { standing, request, workflowId, requestNamed } = useFinanceReturned(t);
   const [action, setAction] = useState<TransferAction | null>(null);
   const money = (kobo: number) => formatMoney(kobo, currency);
-  const actions = t && !["status", "kind", "branch_id", "to_branch_id"].some((name) => access.isHidden(name))
+  const actions = t && !["status", "kind"].some((name) => access.isHidden(name))
     ? transferActions(t, reader.keys, reader.reach)
     : [];
   const blocked = t && t.status === "POSTED" ? voidBlockedByKind(t) : null;
@@ -202,9 +202,9 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
       <DetailDrawer
         open={id != null} onOpenChange={(o) => (o ? undefined : onClose())}
         title={t ? (t.document_number || `Transfer #${t.id}`) : "Transfer"}
-        description={t && access.anyVisible("kind", "branch_name", "to_branch_name") ? [
+        description={t ? [
           !access.isHidden("kind") ? KIND_LABELS[t.kind] ?? t.kind_label : null,
-          !access.isHidden("branch_name") && !access.isHidden("to_branch_name") ? `${t.branch_name} to ${t.to_branch_name}` : null,
+          `${t.branch_name} to ${t.to_branch_name}`,
         ].filter(Boolean).join(" · ") : undefined}
         widthClass="sm:max-w-xl"
         footer={t && (actions.length || standing === "sender") ? (
@@ -231,10 +231,10 @@ function TransferDrawer({ id, entity, currency, reader, onClose }: {
               {!access.isHidden("status") ? <StagePill transfer={t} /> : null}
               {!access.isHidden("amount") ? <Money kobo={t.amount} currency={currency} className="text-lg font-semibold" /> : null}
             </div>
-            {!["kind", "amount", "branch_name", "to_branch_name"].some((name) => access.isHidden(name)) ? <Note>{transferMeaning(t, money)}</Note> : null}
+            {!["kind", "amount"].some((name) => access.isHidden(name)) ? <Note>{transferMeaning(t, money)}</Note> : null}
             <dl className="grid grid-cols-1 gap-3 rounded-md border border-white-02 p-4 sm:grid-cols-2">
-              {!access.isHidden("branch_name") ? <Fact label="From">{t.branch_name}</Fact> : null}
-              {!access.isHidden("to_branch_name") ? <Fact label="To">{t.to_branch_name}</Fact> : null}
+              <Fact label="From">{t.branch_name}</Fact>
+              <Fact label="To">{t.to_branch_name}</Fact>
               {!access.isHidden("transfer_date") ? <Fact label="Date">{dates.day(t.transfer_date, t.branch_id)}</Fact> : null}
               {!access.isHidden("purpose") ? <Fact label="Purpose">{t.purpose || "-"}</Fact> : null}
               {!access.isHidden("from_bank_account_name") && t.from_bank_account_name ? <Fact label="Paid from">{t.from_bank_account_name}</Fact> : null}
@@ -354,12 +354,15 @@ function SendMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
   const pickSending = (next: string) => { sending.setValue(next); setFromAccount(""); if (next === toBranch) setToBranch(""); };
   const submit = async () => {
     try {
-      const res = await send(access.writableOnly({
-        entity, from_bank_account: Number(fromAccount), to_branch: Number(toBranch),
-        to_bank_account: toAccount ? Number(toAccount) : undefined, amount,
-        transfer_date: date || undefined, purpose: purpose.trim(), repay_by: repayBy || undefined,
-        reference: reference.trim() || undefined,
-      }, { creating: true })).unwrap();
+      const res = await send({
+        entity, to_branch: Number(toBranch),
+        ...access.writableOnly({
+          from_bank_account: Number(fromAccount),
+          to_bank_account: toAccount ? Number(toAccount) : undefined, amount,
+          transfer_date: date || undefined, purpose: purpose.trim(), repay_by: repayBy || undefined,
+          reference: reference.trim() || undefined,
+        }, { creating: true }),
+      }).unwrap();
       toast.success(res.message || "Transfer sent.");
       promptIfParked(res.data?.approval);
       if (res.data?.id) onSent(res.data.id);
@@ -374,13 +377,13 @@ function SendMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
         description="It follows the sending branch's approval route, and the receiving branch confirms it arrived."
         onSubmit={submit} submitText={amount > 0 ? `Send ${formatMoney(amount, currency)}` : "Send"} loading={isLoading} canSubmit={canSubmit}
       >
-        <AccessField access={access} name="branch" creating errors={denied}><RaisingBranchChoiceField choice={{ ...sending, setValue: pickSending }} label="Sending branch" /></AccessField>
+        <RaisingBranchChoiceField choice={{ ...sending, setValue: pickSending }} label="Sending branch" />
         <AccessField access={access} name="from_bank_account" label="Paid from" required creating errors={denied}>
           <BankAccountPicker entity={entity} value={fromAccount} onChange={setFromAccount} documentBranchId={sending.branchId} />
         </AccessField>
-        <AccessField access={access} name="to_branch" label="To branch" required creating errors={denied}>
+        <FormField label="To branch" required>
           <BranchSelect label="To branch" branches={others} value={toBranch} onChange={(v) => { setToBranch(v); setToAccount(""); }} />
-        </AccessField>
+        </FormField>
         <ReceivingAccountField entity={entity} reader={reader} branchId={toBranch ? Number(toBranch) : undefined} value={toAccount} onChange={setToAccount} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <AccessField access={access} name="amount" label="Amount" required creating errors={denied}><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></AccessField>
@@ -414,11 +417,13 @@ function RequestMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
 
   const submit = async () => {
     try {
-      const res = await request(access.writableOnly({
-        entity, from_branch: Number(fromBranch), amount, purpose: purpose.trim(),
-        repay_by: repayBy || undefined, to_bank_account: account ? Number(account) : undefined,
-        ...asking.body("to_branch"),
-      }, { creating: true })).unwrap();
+      const res = await request({
+        entity, from_branch: Number(fromBranch), ...asking.body("to_branch"),
+        ...access.writableOnly({
+          amount, purpose: purpose.trim(),
+          repay_by: repayBy || undefined, to_bank_account: account ? Number(account) : undefined,
+        }, { creating: true }),
+      }).unwrap();
       toast.success(res.message || "Request sent.");
       if (res.data?.id) onSent(res.data.id);
       onClose();
@@ -431,10 +436,10 @@ function RequestMoneyDrawer({ entity, currency, reader, onClose, onSent }: {
       description="Nothing is booked until the branch you ask sends it."
       onSubmit={submit} submitText="Ask" loading={isLoading} canSubmit={canSubmit}
     >
-      <AccessField access={access} name="to_branch" creating errors={denied}><RaisingBranchChoiceField choice={{ ...asking, setValue: (v) => { asking.setValue(v); setAccount(""); if (v === fromBranch) setFromBranch(""); } }} label="Your branch" /></AccessField>
-      <AccessField access={access} name="from_branch" label="Ask branch" required creating errors={denied}>
+      <RaisingBranchChoiceField choice={{ ...asking, setValue: (v) => { asking.setValue(v); setAccount(""); if (v === fromBranch) setFromBranch(""); } }} label="Your branch" />
+      <FormField label="Ask branch" required>
         <BranchSelect label="Ask branch" branches={others} value={fromBranch} onChange={setFromBranch} />
-      </AccessField>
+      </FormField>
       <AccessField access={access} name="amount" label="Amount" required creating errors={denied}><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} className="[&_input]:h-9" /></AccessField>
       <AccessField access={access} name="purpose" label="What it is for" required creating errors={denied}><Input value={purpose} maxLength={255} onChange={(e) => setPurpose(e.target.value)} className="h-9 bg-white" /></AccessField>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -480,7 +485,7 @@ function SendRequestedDrawer({ transfer, entity, currency, reader, onClose }: {
         title={[
           "Send",
           !access.isHidden("amount") ? formatMoney(transfer.amount, currency) : null,
-          !access.isHidden("to_branch_name") ? `to ${transfer.to_branch_name}` : null,
+          `to ${transfer.to_branch_name}`,
         ].filter(Boolean).join(" ")}
         description={!access.isHidden("purpose") ? transfer.purpose : undefined}
         onSubmit={submit} submitText="Send" loading={isLoading} canSubmit={!!fromAccount}
@@ -517,9 +522,9 @@ function DeclineDialog({ transfer, entity, currency, onClose }: {
   return (
     <ConfirmActionModal
       open onOpenChange={(o) => !o && onClose()} loading={isLoading} onConfirm={submit}
-      title={!access.isHidden("to_branch_name") ? `Decline ${transfer.to_branch_name}'s request?` : "Decline this request?"}
+      title={`Decline ${transfer.to_branch_name}'s request?`}
       description={[
-        !access.isHidden("to_branch_name") ? transfer.to_branch_name : "The other branch",
+        transfer.to_branch_name,
         "asked for",
         !access.isHidden("amount") ? `${formatMoney(transfer.amount, currency)}.` : "money.",
         "Nothing was booked, so nothing is reversed.",
@@ -527,7 +532,7 @@ function DeclineDialog({ transfer, entity, currency, onClose }: {
       confirmText="Decline request" destructive
     >
       <AccessField access={access} name="reason" label="Reason" creating={false} errors={denied}>
-        <Input value={reason} maxLength={255} onChange={(e) => setReason(e.target.value)} placeholder={!access.isHidden("to_branch_name") ? `Tell ${transfer.to_branch_name} why` : "Explain why"} className="h-9 bg-white" />
+        <Input value={reason} maxLength={255} onChange={(e) => setReason(e.target.value)} placeholder={`Tell ${transfer.to_branch_name} why`} className="h-9 bg-white" />
       </AccessField>
     </ConfirmActionModal>
   );
@@ -551,11 +556,7 @@ function ConfirmArrivalDialog({ transfer, entity, currency, onClose }: {
     <ConfirmActionModal
       open onOpenChange={(o) => !o && onClose()} loading={isLoading} onConfirm={submit}
       title={!access.isHidden("amount") ? `Confirm ${formatMoney(transfer.amount, currency)} arrived?` : "Confirm the money arrived?"}
-      description={[
-        !access.isHidden("branch_name") ? `${transfer.branch_name} sent it` : "The sending branch sent it",
-        !access.isHidden("to_bank_account_name") && transfer.to_bank_account_name ? `to ${transfer.to_bank_account_name}.` : ".",
-        "Both books already hold it; this confirms that the bank received it.",
-      ].join(" ")}
+      description={`${transfer.branch_name} sent it${!access.isHidden("to_bank_account_name") && transfer.to_bank_account_name ? ` to ${transfer.to_bank_account_name}` : ""}. Both books already hold it; this is ${transfer.to_branch_name}'s word that the bank received it.`}
       confirmText="Confirm it arrived"
     >
       <AccessField access={access} name="arrival_date" label="Arrived on" creating={false} errors={denied}>
@@ -583,10 +584,10 @@ function VoidTransferDialog({ transfer, entity, currency, onClose }: {
   return (
     <ConfirmActionModal
       open onOpenChange={(o) => !o && onClose()} loading={isLoading} onConfirm={submit} destructive
-      title={!access.isHidden("document_number") ? `Void ${transfer.document_number}?` : "Void this transfer?"}
+      title={`Void ${transfer.document_number}?`}
       description={[
         !access.isHidden("amount") ? formatMoney(transfer.amount, currency) : "This transfer",
-        !access.isHidden("branch_name") && !access.isHidden("to_branch_name") ? `between ${transfer.branch_name} and ${transfer.to_branch_name}.` : ".",
+        `between ${transfer.branch_name} and ${transfer.to_branch_name}.`,
         voidConditions(transfer),
       ].join(" ")}
       confirmText="Void transfer"

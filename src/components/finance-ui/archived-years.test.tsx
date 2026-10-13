@@ -9,10 +9,21 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ years: [] as unknown[] }));
+const mocks = vi.hoisted(() => ({
+  years: [] as unknown[],
+  access: {} as Record<string, { hidden?: string[] }>,
+  skipped: [] as boolean[],
+}));
+
+vi.mock("@/hooks/use-permissions", () => ({
+  usePermissions: () => ({ fieldAccess: mocks.access }),
+}));
 
 vi.mock("@/redux/services/finance/ops-api", () => ({
-  useGetFiscalYearsQuery: () => ({ data: { data: mocks.years }, isLoading: false }),
+  useGetFiscalYearsQuery: (_args: unknown, options?: { skip?: boolean }) => {
+    mocks.skipped.push(!!options?.skip);
+    return { data: options?.skip ? undefined : { data: mocks.years }, isLoading: false };
+  },
 }));
 
 import { ShowArchivedToggle, archivedYearsLabel, includeArchivedArg } from "./archived-years";
@@ -27,6 +38,8 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   mocks.years = [];
+  mocks.access = {};
+  mocks.skipped = [];
 });
 
 afterEach(async () => {
@@ -63,5 +76,22 @@ describe("Show archived years", () => {
     const box = container.querySelector<HTMLInputElement>("input[type='checkbox']");
     expect(container.textContent).toContain("Show archived years");
     expect(box?.checked).toBe(true);
+  });
+
+  it("is absent, and asks for nothing, for a role that may not read the archive state", async () => {
+    mocks.years = [{ id: 1, year: 2027, start_date: "2027-01-01", end_date: "2027-12-31", is_archived: true }];
+    mocks.access = { "finance.fiscalyear": { hidden: ["archived_at", "is_archived"] } };
+    await mount("?archived=1");
+
+    expect(container.textContent).toBe("");
+    expect(mocks.skipped.every(Boolean)).toBe(true);
+  });
+
+  it("is unaffected by a role that may not read a year's close state", async () => {
+    mocks.years = [{ id: 1, year: 2027, start_date: "2027-01-01", end_date: "2027-12-31", is_archived: true }];
+    mocks.access = { "finance.fiscalyear": { hidden: ["branch_states", "status"] } };
+    await mount();
+
+    expect(container.textContent).toContain("Show archived years");
   });
 });

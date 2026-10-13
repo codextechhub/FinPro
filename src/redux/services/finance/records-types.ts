@@ -67,28 +67,28 @@ export interface SealDifference {
 
 /** One closed month or year, recomputed from the ledger and compared. */
 export interface SealCheck {
-  seal_id: number;
-  label: string;
-  kind: string;
-  fiscal_year: number;
-  period_id: number | null;
-  sealed_at: string;
-  seal_checksum: string;
-  line_count: number;
-  line_count_now: number;
-  ok: boolean;
-  seal_intact: boolean;
-  lines_match: boolean;
+  seal_id?: number;
+  label?: string;
+  kind?: string;
+  fiscal_year?: number;
+  period_id?: number | null;
+  sealed_at?: string;
+  seal_checksum?: string;
+  line_count?: number;
+  line_count_now?: number;
+  ok?: boolean;
+  seal_intact?: boolean;
+  lines_match?: boolean;
   /** One sentence about what failed; null when the check passed. */
-  summary: string | null;
-  differences: SealDifference[];
+  summary?: string | null;
+  differences?: SealDifference[];
 }
 
 export interface SealVerification {
-  ok: boolean;
-  checked: number;
-  mismatches: number;
+  ok?: boolean;
+  checked?: number;
+  mismatches?: number;
   /** Seals that do not follow the seal written before them, by id. */
-  chain_breaks: number[];
-  checks: SealCheck[];
+  chain_breaks?: number[];
+  checks?: SealCheck[];
 }

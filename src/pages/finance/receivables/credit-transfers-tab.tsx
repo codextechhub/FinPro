@@ -17,7 +17,7 @@ import { Ban, Plus, Send } from "lucide-react";
 import {
   ConfirmActionModal, CustomerPicker, DataTable, DetailDrawer, FormField, Money, MoneyInput,
   PostingDateField, RaisingBranchChoiceField, StatusPill, customerBranchHint, toArray,
-  useCustomerBranch, useRaisingBranchChoice, type Column,
+  useCustomerBranch, useFieldAccess, useRaisingBranchChoice, type Column,
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
@@ -34,6 +34,7 @@ import {
   useVoidCreditTransferMutation,
 } from "@/redux/services/finance/fees-api";
 import type { CustomerCreditTransfer } from "@/redux/services/finance/fees-types";
+import { CUSTOMER_RESOURCE, customerCreditReadable } from "./customer-credit-access";
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
 import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
 import { DOCUMENT_STATUS_WORDS } from "@/components/finance-ui/status-words";
@@ -102,13 +103,19 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
   );
 }
 
-/** The credit a customer holds that a transfer may move, summed across the branches the reader sees. */
+/**
+ * The credit a customer holds that a transfer may move, summed across the
+ * branches the reader sees. Not asked for, and so never `known`, when the role
+ * may not read a customer's balance: the server would answer with an empty list
+ * that reads as "no credit".
+ */
 function useAvailableCredit(entity: string, customer: string) {
+  const readable = customerCreditReadable(useFieldAccess(CUSTOMER_RESOURCE));
   const { data, isFetching } = useGetRefundAvailabilityQuery(
-    { entity, search: customer, page_size: 50 }, { skip: !customer },
+    { entity, search: customer, page_size: 50 }, { skip: !customer || !readable },
   );
   const rows = toArray(data?.data).filter((r) => r.customer_code === customer);
-  return { amount: rows.reduce((sum, r) => sum + r.refundable_credit, 0), known: !!customer && !isFetching };
+  return { amount: rows.reduce((sum, r) => sum + r.refundable_credit, 0), known: readable && !!customer && !isFetching };
 }
 
 function NewTransferDrawer({ open, onClose, entity, currency }: {

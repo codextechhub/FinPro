@@ -4,6 +4,13 @@
  *
  * The calendar is kept per branch; `calendar-branch.ts` says whose calendar the
  * workbench reads and which branch each action sends.
+ *
+ * Every state the workbench draws can be closed to a role by Field Access (a
+ * year's close state and archive state, a month's close state, the checklist
+ * and each check). A state that arrives missing is left out with whatever is
+ * derived from it: the status pills, the counts and progress, the year-end
+ * readiness (an open year whose months carry no state reads as unchecked, and
+ * the server judges the close), the archive action, and the branch rows.
  */
 
 import { useMemo, useState } from "react";
@@ -69,6 +76,7 @@ import { routesPath } from "@/routes/routes-path";
 import {
   archiveReadiness,
   periodActionLabel,
+  periodStatesReadable,
   summarizePeriods,
   yearCloseState,
   type ArchiveReadiness,
@@ -205,7 +213,9 @@ export function PeriodsTab({ entity, headerSlot }: {
     [periodData],
   );
   const summary = useMemo(() => summarizePeriods(periods), [periods]);
-  const closeState = yearCloseState(activeFiscalYear?.status ?? "OPEN", periods);
+  const yearStatus = activeFiscalYear?.status;
+  const statesKnown = periodStatesReadable(periods);
+  const closeState = yearStatus === undefined ? null : yearCloseState(yearStatus, periods);
   const finalPeriod = periods.at(-1);
   const [selected, setSelected] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
@@ -245,8 +255,8 @@ export function PeriodsTab({ entity, headerSlot }: {
   const finalPeriodOfOpenYear = !!selectedPeriod
     && selectedPeriod.id === finalPeriod?.id
     && activeFiscalYear?.status === "OPEN";
-  const yearShut = activeFiscalYear?.status === "CLOSED" || activeFiscalYear?.status === "LOCKED"
-    ? { year: activeFiscalYear.year, status: activeFiscalYear.status }
+  const yearShut = activeFiscalYear && (yearStatus === "CLOSED" || yearStatus === "LOCKED")
+    ? { year: activeFiscalYear.year, status: yearStatus }
     : null;
 
   const chooseYear = (year: number) => {
@@ -328,7 +338,7 @@ export function PeriodsTab({ entity, headerSlot }: {
             className={selectCls}
           >
             {fiscalYears.map((year) => (
-              <option key={year.id} value={year.year}>FY {year.year} · {humanize(year.status)}{year.is_archived ? " · Archived" : ""}</option>
+              <option key={year.id} value={year.year}>FY {year.year}{year.status ? ` · ${humanize(year.status)}` : ""}{year.is_archived ? " · Archived" : ""}</option>
             ))}
           </select>
         </label>
@@ -371,8 +381,8 @@ export function PeriodsTab({ entity, headerSlot }: {
     };
 
   const yearActionWhole = yearAction?.kind === "archive" || yearAction?.kind === "unarchive";
-  const archive: ArchiveReadiness | null = activeFiscalYear && mayArchive
-    ? archiveReadiness(activeFiscalYear, minAgeYears, dates.today())
+  const archive: ArchiveReadiness | null = activeFiscalYear && activeFiscalYear.status !== undefined && mayArchive
+    ? archiveReadiness({ ...activeFiscalYear, status: activeFiscalYear.status }, minAgeYears, dates.today())
     : null;
 
   return (
@@ -399,6 +409,7 @@ export function PeriodsTab({ entity, headerSlot }: {
             fiscalYear={activeFiscalYear}
             periods={periods}
             summary={summary}
+            statesKnown={statesKnown}
             branchName={calendar.applies && calendar.readBranch != null ? calendarBranchName(calendar, calendar.readBranch) : null}
           />
 
@@ -413,9 +424,9 @@ export function PeriodsTab({ entity, headerSlot }: {
             </div>
           ) : null}
 
-          <YearCloseReadiness
+          {closeState != null && yearStatus !== undefined ? <YearCloseReadiness
             state={closeState}
-            status={activeFiscalYear.status}
+            status={yearStatus}
             year={activeFiscalYear.year}
             fiscalYearId={activeFiscalYear.id}
             openCount={summary.open}
@@ -427,7 +438,7 @@ export function PeriodsTab({ entity, headerSlot }: {
             onReopenYear={() => openYearAction({ kind: "reopen", id: activeFiscalYear.id, year: activeFiscalYear.year })}
             onArchiveYear={() => openYearAction({ kind: "archive", id: activeFiscalYear.id, year: activeFiscalYear.year })}
             onUnarchiveYear={() => openYearAction({ kind: "unarchive", id: activeFiscalYear.id, year: activeFiscalYear.year })}
-          />
+          /> : null}
 
           {eachBranch ? <BranchYearStates states={activeFiscalYear.branch_states} /> : null}
 
@@ -526,11 +537,14 @@ function FiscalYearOverview({
   fiscalYear,
   periods,
   summary,
+  statesKnown,
   branchName,
 }: {
-  fiscalYear: { year: number; start_date: string; end_date: string; status: string };
+  fiscalYear: { year: number; start_date: string; end_date: string; status?: string };
   periods: FiscalPeriod[];
   summary: ReturnType<typeof summarizePeriods>;
+  /** Every month carries its close state; false when the reader's Field Access closes it. */
+  statesKnown: boolean;
   /** The branch whose calendar this is, at a school with several; null for the school's own. */
   branchName: string | null;
 }) {
@@ -542,29 +556,33 @@ function FiscalYearOverview({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-mont text-lg font-semibold text-black-01">Fiscal year {fiscalYear.year}{branchName ? ` · ${branchName}` : ""}</h2>
-            <StatusPill status={fiscalYear.status} />
+            {fiscalYear.status ? <StatusPill status={fiscalYear.status} /> : null}
           </div>
           <p className="mt-1 font-mont text-xs text-gray-05">
             {dates.day(fiscalYear.start_date)} - {dates.day(fiscalYear.end_date)} · {periods.length === 4 ? "Quarterly" : periods.length === 12 ? "Monthly" : "Custom"}
           </p>
         </div>
-        <div className="w-full sm:w-52">
-          <div className="flex items-center justify-between font-mont text-[11px] text-gray-05">
-            <span>Close progress</span>
-            <span className="font-semibold tabular-nums text-gray-01">{summary.progressed} / {summary.total}</span>
+        {statesKnown ? (
+          <div className="w-full sm:w-52">
+            <div className="flex items-center justify-between font-mont text-[11px] text-gray-05">
+              <span>Close progress</span>
+              <span className="font-semibold tabular-nums text-gray-01">{summary.progressed} / {summary.total}</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-03/60">
+              <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progress}%` }} />
+            </div>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-03/60">
-            <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
+        ) : null}
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Open" value={String(summary.open)} sub="Ordinary posting allowed" icon={Circle} tone="primary" />
-        <StatCard label="Soft-closed" value={String(summary.softClosed)} sub="Close entries only" icon={Clock3} tone="amber" />
-        <StatCard label="Closed" value={String(summary.closed)} sub="Re-openable by permission" icon={ShieldCheck} tone="green" />
-        <StatCard label="Locked" value={String(summary.locked)} sub="Permanently closed" icon={Lock} tone="gray" />
-      </div>
+      {statesKnown ? (
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label="Open" value={String(summary.open)} sub="Ordinary posting allowed" icon={Circle} tone="primary" />
+          <StatCard label="Soft-closed" value={String(summary.softClosed)} sub="Close entries only" icon={Clock3} tone="amber" />
+          <StatCard label="Closed" value={String(summary.closed)} sub="Re-openable by permission" icon={ShieldCheck} tone="green" />
+          <StatCard label="Locked" value={String(summary.locked)} sub="Permanently closed" icon={Lock} tone="gray" />
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -677,23 +695,30 @@ function YearCloseReadiness({
       ? "The final period is already locked"
       : state === "EMPTY"
         ? "This fiscal calendar is incomplete"
-        : "Ready for year-end close";
+        : state === "UNCHECKED"
+          ? "Year-end close"
+          : "Ready for year-end close";
   const description = state === "OPEN_PERIODS"
     ? "Soft-close or close every open period before posting the formal year-end journal."
     : state === "FINAL_LOCKED"
       ? "A locked final period cannot accept the year-end journal. An administrator must repair this historical state."
       : state === "EMPTY"
         ? "A fiscal year without posting periods cannot be closed."
-        : "All posting windows are restricted. Closing the year will move the net result into Retained Earnings.";
+        : state === "UNCHECKED"
+          ? "Closing the year posts the formal year-end journal and moves the net result into Retained Earnings. The close checks that every month is ready."
+          : "All posting windows are restricted. Closing the year will move the net result into Retained Earnings.";
 
   return (
     <div className={cn(
       "flex flex-wrap items-center gap-3 rounded-lg border p-4",
-      blocked ? "border-amber-200 bg-amber-50" : "border-green-01/25 bg-green-01/5",
+      blocked ? "border-amber-200 bg-amber-50"
+        : state === "UNCHECKED" ? "border-white-02 bg-[#F7F8FA]" : "border-green-01/25 bg-green-01/5",
     )}>
       {blocked
         ? <TriangleAlert className="size-5 shrink-0 text-amber-700" />
-        : <CheckCircle2 className="size-5 shrink-0 text-green-01" />}
+        : state === "UNCHECKED"
+          ? <CalendarDays className="size-5 shrink-0 text-gray-05" />
+          : <CheckCircle2 className="size-5 shrink-0 text-green-01" />}
       <div className="min-w-0 flex-1">
         <p className="font-mont text-sm font-semibold text-gray-01">{title}</p>
         <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">{description}</p>
@@ -740,7 +765,7 @@ function PeriodCard({ period, selected, onClick }: { period: FiscalPeriod; selec
           <p className="font-mont text-[10px] font-semibold uppercase tracking-wide text-gray-05">Period {String(period.period_no).padStart(2, "0")}</p>
           <p className="mt-1 truncate font-mont text-sm font-semibold text-gray-01">{period.label}</p>
         </div>
-        <StatusPill status={period.status} />
+        {period.status ? <StatusPill status={period.status} /> : null}
       </div>
       <p className="mt-4 pl-1 font-mont text-xs text-gray-05 tabular-nums">
         {dates.day(period.start_date)} - {dates.day(period.end_date)}
@@ -847,6 +872,13 @@ const F = routesPath.PROTECTED.FINANCE;
  * status arrives as `status`, read from the branch's period list. Under All
  * branches at a school with several, the drawer also lists each branch's own
  * state for the month, so a month held open by one branch says which.
+ *
+ * Field Access can close a month's close state, the checklist progress and each
+ * check's result for a role. The drawer then leaves out the status, the count,
+ * the progress bar and every check that role may not read, and offers no close
+ * action: which actions are valid depends on the state, so a role that cannot
+ * read it is not offered any. A checklist with no readable check draws no
+ * checklist section.
  *
  * Forcing a close: when a check that blocks the close fails, a holder of
  * `finance.period.force_close` may close the month anyway. It is its own act,
@@ -1044,15 +1076,21 @@ export function PeriodCloseDrawer({
             : <ErrorState onRetry={refetch} />
         ) : (
           <div data-guide="finance-periods.checklist" className="space-y-5">
-            <div className="rounded-lg border border-white-02 bg-[#F7F8FA] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 font-mont text-sm">
-                <span className="flex items-center gap-2 text-gray-05">Current status <StatusPill status={status ?? period.status} /></span>
-                <span className="text-gray-05">Checklist <span className="font-semibold tabular-nums text-black-01">{detail.done} / {detail.total}</span></span>
+            {status || detail.total !== undefined ? (
+              <div className="rounded-lg border border-white-02 bg-[#F7F8FA] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 font-mont text-sm">
+                  {status ? <span className="flex items-center gap-2 text-gray-05">Current status <StatusPill status={status} /></span> : null}
+                  {detail.total !== undefined ? (
+                    <span className="text-gray-05">Checklist <span className="font-semibold tabular-nums text-black-01">{detail.done ?? 0} / {detail.total}</span></span>
+                  ) : null}
+                </div>
+                {detail.total !== undefined ? (
+                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-03/60">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${detail.total ? ((detail.done ?? 0) / detail.total) * 100 : 0}%` }} />
+                  </div>
+                ) : null}
               </div>
-              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-03/60">
-                <div className="h-full rounded-full bg-primary" style={{ width: `${detail.total ? (detail.done / detail.total) * 100 : 0}%` }} />
-              </div>
-            </div>
+            ) : null}
 
             {yearShut && canReopen ? (
               <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
@@ -1092,7 +1130,7 @@ export function PeriodCloseDrawer({
 
             {several && calendar.selected === "all" && period ? <BranchMonthStates states={branchStates} /> : null}
 
-            <div>
+            {items.length > 0 ? <div>
               <div className="mb-3 flex items-center gap-1.5">
                 <h4 className="font-mont text-sm font-semibold text-gray-01">Close checklist</h4>
                 <InfoHint ariaLabel="About the close checklist">Closing posts due depreciation and releases deferred income falling due, then runs month-end controls. Soft close is reversible; permanent locks are not.</InfoHint>
@@ -1150,7 +1188,7 @@ export function PeriodCloseDrawer({
                   );
                 })}
               </div>
-            </div>
+            </div> : null}
           </div>
         )}
       </DetailDrawer>

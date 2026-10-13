@@ -33,22 +33,22 @@ export function BalancesTab({ entity, currency }: { entity: string; currency?: s
   const netTotal = balances?.net_total ?? null;
 
   const pairColumns: Column<InterBranchPair>[] = [
-    ...(!access.isHidden("branch_name") ? [{ header: "Owes", cell: (p: InterBranchPair) => <span className="font-semibold text-gray-01">{p.owed_by.name}</span> }] : []),
-    ...(!access.isHidden("to_branch_name") ? [{ header: "To", cell: (p: InterBranchPair) => p.owed_to.name }] : []),
+    { header: "Owes", cell: (p: InterBranchPair) => <span className="font-semibold text-gray-01">{p.owed_by.name}</span> },
+    { header: "To", cell: (p: InterBranchPair) => p.owed_to.name },
     ...(!access.isHidden("amount") ? [{ header: "Amount", align: "right" as const, cell: (p: InterBranchPair) => <Money kobo={p.amount} currency={currency} align="right" /> }] : []),
     { header: "Both books", cell: (p) => p.balanced
       ? <TonePill tone="good">Agree</TonePill>
       : <TonePill tone="waiting">Disagree</TonePill> },
-    ...(!access.isHidden("branch_name") && !access.isHidden("to_branch_name") ? [{ header: "Open", align: "right" as const, cell: (p: InterBranchPair) => (
+    { header: "Open", align: "right", cell: (p) => (
       <Link to={pairLink(p.owed_by.id, p.owed_to.id)} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
         Transfers <ArrowRight className="size-3.5" />
       </Link>
-    ) }] : []),
+    ) },
   ];
 
   const heldColumns: Column<InterBranchHeld>[] = [
-    ...(!access.isHidden("branch_name") ? [{ header: "Held by", cell: (h: InterBranchHeld) => <span className="font-semibold text-gray-01">{h.held_by.name}</span> }] : []),
-    ...(!access.isHidden("for_branch_name") ? [{ header: "For", cell: (h: InterBranchHeld) => h.held_for.name }] : []),
+    { header: "Held by", cell: (h: InterBranchHeld) => <span className="font-semibold text-gray-01">{h.held_by.name}</span> },
+    { header: "For", cell: (h: InterBranchHeld) => h.held_for.name },
     ...(!access.isHidden("amount") ? [{ header: "Amount", align: "right" as const, cell: (h: InterBranchHeld) => <Money kobo={h.amount} currency={currency} align="right" /> }] : []),
   ];
 

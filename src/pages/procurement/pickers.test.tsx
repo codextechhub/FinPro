@@ -15,7 +15,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  destinations: vi.fn(), select: vi.fn(), free: vi.fn(), requisitionArgs: vi.fn(), requisitions: undefined as unknown, held: new Set<string>(),
+  destinations: vi.fn(), select: vi.fn(), free: vi.fn(), requisitionArgs: vi.fn(), requisitions: undefined as unknown, held: new Set<string>(), vendors: undefined as unknown,
 }));
 
 vi.mock("@/redux/services/procurement/procurement-ext-api", () => ({
@@ -34,7 +34,7 @@ vi.mock("@/hooks/use-permissions", () => ({
   }),
 }));
 vi.mock("@/redux/services/procurement/procurement-api", () => ({
-  useGetVendorsQuery: () => ({ data: undefined }),
+  useGetVendorsQuery: () => ({ data: mocks.vendors, isLoading: false }),
   useGetCategoriesQuery: () => ({ data: undefined }),
   useGetRequisitionsQuery: (args: unknown, options: unknown) => { mocks.requisitionArgs(args, options); return { data: mocks.requisitions }; },
   useGetPurchaseOrdersQuery: () => ({ data: undefined }),
@@ -51,7 +51,7 @@ vi.mock("@/components/custom/search-select", () => ({
 }));
 
 import { P } from "../../permissions";
-import { RequisitionPicker, StockTransferDestinationPicker, destinationLabel } from "./pickers";
+import { RequisitionPicker, StockTransferDestinationPicker, VendorPicker, destinationLabel } from "./pickers";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -146,5 +146,41 @@ describe("the requisition an order or RFQ is raised from", () => {
     mocks.held = new Set([P.PROC_VIEW_RFQS]);
     act(() => root.render(<RequisitionPicker entity="BSS" value="" onChange={vi.fn()} status="APPROVED" sourcing="order" />));
     expect(mocks.requisitionArgs.mock.lastCall?.[1]).toMatchObject({ skip: true });
+  });
+});
+
+/**
+ * The vendor picker marks a vendor unavailable for new commitments when it is
+ * inactive, on hold or KYC-rejected. A role with no switch on the hold or the
+ * KYC status is sent vendors without those keys, so it can neither be told nor
+ * infer that one is on hold: nothing is marked or filtered on a value it has
+ * not been sent.
+ */
+describe("the vendor picker", () => {
+  const ADE = { id: 1, code: "ADE", name: "Ade Stationers", is_active: true, on_hold: false, kyc_status: "VERIFIED" };
+  const PRIME = { id: 2, code: "PRIME", name: "Prime Uniforms", is_active: true, on_hold: true, kyc_status: "VERIFIED" };
+  const labels = () => [...container.querySelectorAll("option")].map((o) => o.textContent);
+
+  it("marks a vendor on hold, and drops it when only eligible vendors are wanted", () => {
+    mocks.vendors = { data: [ADE, PRIME] };
+    act(() => root.render(<VendorPicker entity="BSS" value="" onChange={vi.fn()} />));
+    expect(labels()).toEqual(["ADE - Ade Stationers", "PRIME - Prime Uniforms (Unavailable for new commitments)"]);
+    act(() => root.render(<VendorPicker entity="BSS" value="" onChange={vi.fn()} purchaseEligible />));
+    expect(labels()).toEqual(["ADE - Ade Stationers"]);
+  });
+
+  it("marks and drops nothing for a role sent vendors without the hold and KYC keys", () => {
+    const bare = ({ on_hold: _hold, kyc_status: _kyc, ...rest }: typeof PRIME) => { void [_hold, _kyc]; return rest; };
+    mocks.vendors = { data: [bare(ADE as typeof PRIME), bare(PRIME)] };
+    act(() => root.render(<VendorPicker entity="BSS" value="" onChange={vi.fn()} purchaseEligible />));
+    expect(labels()).toEqual(["ADE - Ade Stationers", "PRIME - Prime Uniforms"]);
+  });
+
+  it("still marks an inactive vendor, which is not behind a switch", () => {
+    const { on_hold: _hold, kyc_status: _kyc, ...rest } = PRIME;
+    void [_hold, _kyc];
+    mocks.vendors = { data: [{ ...rest, is_active: false }] };
+    act(() => root.render(<VendorPicker entity="BSS" value="" onChange={vi.fn()} />));
+    expect(labels()).toEqual(["PRIME - Prime Uniforms (Unavailable for new commitments)"]);
   });
 });

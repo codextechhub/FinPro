@@ -103,7 +103,7 @@ export interface ProcurementDashboard {
     open_purchase_orders: { count: number; partial_count: number; amount: ReportMoney } | null;
     pending_approvals: { count: number; amount: ReportMoney; slow_count: number; type_count: number };
     overdue_invoices: { count: number; amount: ReportMoney; oldest_days: number | null } | null;
-    active_vendors: { count: number; on_hold_count: number; first_time_count: number } | null;
+    active_vendors: { count: number; on_hold_count?: number; first_time_count: number } | null;
   };
   pipeline: Partial<Record<
     "requisitions" | "rfqs" | "orders" | "received_not_billed" | "bills" | "paid", ProcurementPipelineStage
@@ -205,7 +205,8 @@ export interface ProcurementSuppliersDashboard {
   scorecard: {
     vendor_id: number;
     name: string;
-    category: string | null;
+    /** Absent when the role may not read a vendor's category; null for an uncategorised vendor. */
+    category?: string | null;
     spend: ReportMoney;
     on_time_pct: number | null;
     accepted_pct: number | null;
@@ -234,7 +235,7 @@ export interface ProcurementSuppliersDashboard {
     total_days: number | null;
     slowest: string | null;
   } | null;
-  vendor_base: { active: number; on_hold: number; awaiting_kyc: number; ordered_once: number; added: number } | null;
+  vendor_base: { active: number; on_hold?: number; awaiting_kyc?: number; ordered_once: number; added: number } | null;
 }
 
 /**
@@ -311,7 +312,8 @@ export interface ApAgingRow {
   vendor_id: number;
   code: string;
   name: string;
-  payment_terms: string;   // vendor's net terms enum (e.g. "NET_30"); "" when unset
+  /** The vendor's net terms enum (for example "NET_30"), "" when unset, absent when the role may not read terms. */
+  payment_terms?: string;
   buckets: Record<string, ReportMoney>;
   outstanding: ReportMoney;
   /** Paid ahead of a bill: sits in the vendor-advance asset, not in AP. */
@@ -413,7 +415,8 @@ export interface SpendAnalysis {
   start_date: string | null;
   end_date: string | null;
   by_vendor: SpendRow[];
-  by_category: SpendRow[];
+  /** Absent when the role may not read a vendor's category: spend grouped by it would say which category each vendor is in. */
+  by_category?: SpendRow[];
   by_period: SpendPeriod[];
   total_net: ReportMoney;
   total_tax: ReportMoney;
@@ -434,7 +437,8 @@ export interface VendorPerformanceRow {
   vendor_id: number;
   code: string;
   name: string;
-  category: string;   // vendor's category name (table subtitle); "" when uncategorised
+  /** The vendor's category name, "" when uncategorised, absent when the role may not read categories. */
+  category?: string;
   po_count: number;
   total_ordered: ReportMoney;
   receipt_count: number;

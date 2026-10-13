@@ -2,9 +2,12 @@
  * Finance audit trail (§6.9) - rebuilt to the Vision prototype in the house
  * theme. The immutable log of every finance mutation for the selected entity:
  * who did what, to which document. Filterable by actor / entity type / action /
- * status / date. Clicking a row opens a detail drawer with the full record and
- * its field-level before/after diff. Export is disabled-with-tooltip until an
- * audit-export service exists (no fake download).
+ * status / date. Clicking a row opens a detail drawer with the entry's sentence,
+ * the reason a person gave for the act when there is one, and a list of what
+ * changed. The sentence names no figure: amounts and registered free text reach
+ * the drawer only as the `before` and `after` the reader's Field Access allows,
+ * written as a labelled change list (`audit-changes.ts`). Export is
+ * disabled-with-tooltip until an audit-export service exists (no fake download).
  */
 
 import { useMemo, useState } from "react";
@@ -21,8 +24,9 @@ import { useGetAuditLogQuery, useGetAuditFacetsQuery } from "@/redux/services/fi
 import type { FinanceAuditLog } from "@/redux/services/finance/setup-types";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
-import { useDates, type DateFormatter } from "../../lib/display-prefs";
+import { useDates } from "../../lib/display-prefs";
 import { sinceDate } from "../../utils/date-presets";
+import { auditChanges } from "./audit-changes";
 import { exitedOutline, exitedTitle } from "@/components/finance-ui/exited-person";
 import { proxyLabel } from "../../components/workflow/person-flags";
 import { FINANCE_HELP } from "./screen-help";
@@ -44,30 +48,6 @@ function initials(actor: string | null): string {
   const local = actor.split("@")[0] ?? actor;
   const parts = local.split(/[._-]+/).filter(Boolean);
   return (parts.length >= 2 ? parts[0][0] + parts[1][0] : local.slice(0, 2)).toUpperCase();
-}
-
-// The field-level diff: keys whose value changed (added/removed/edited).
-function diffRows(before: Record<string, unknown>, after: Record<string, unknown>) {
-  const b = before ?? {}, a = after ?? {};
-  return [...new Set([...Object.keys(b), ...Object.keys(a)])]
-    .filter((k) => JSON.stringify(b[k]) !== JSON.stringify(a[k]))
-    .map((k) => ({ key: k, before: b[k], after: a[k] }));
-}
-/**
- * One side of a field diff as a reader wants it. A timestamp is written like
- * the "When" column, in the school's format and zone, rather than as the raw
- * "2026-06-30T09:51:10.585498+00:00" the ledger stores.
- */
-function fmt(v: unknown, dates: DateFormatter): string {
-  if (v === null || v === undefined) return "-";
-  if (typeof v === "string") {
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) {
-      const when = dates.dateTime(v, null, { seconds: true });
-      if (when !== "-") return when;
-    }
-    return v;
-  }
-  return typeof v === "object" ? JSON.stringify(v) : String(v);
 }
 
 const DATE_PRESETS = [
@@ -136,9 +116,15 @@ export function auditActorLabel(
   return proxyLabel(log) ?? log.actor ?? "System";
 }
 
-function AuditDetail({ log }: { log: FinanceAuditLog }) {
+/**
+ * One entry in full. The Message is the entry's figure-free sentence; the
+ * Reason is the free text a person gave for the act and is left out when there
+ * is none or the reader may not see it. "What changed" lists the values the
+ * reader's snapshot carries: a hidden value is not in it, and so has no row.
+ */
+export function AuditDetail({ log, currency }: { log: FinanceAuditLog; currency?: string | null }) {
   const dates = useDates();
-  const rows = diffRows(log.before, log.after);
+  const rows = auditChanges(log.before, log.after, { currency, dates });
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
@@ -156,26 +142,27 @@ function AuditDetail({ log }: { log: FinanceAuditLog }) {
         <Stat label="Entity">{auditEntityLabel(log.target_type)}</Stat>
         <Stat label="Reference"><span className="font-mono">{log.document_number || (log.target_id ? `#${log.target_id}` : "-")}</span></Stat>
         {log.message ? <div className="col-span-2"><Stat label="Message">{log.message}</Stat></div> : null}
+        {log.reason ? <div className="col-span-2"><Stat label="Reason"><span className="whitespace-pre-line break-words font-normal">{log.reason}</span></Stat></div> : null}
       </div>
 
       <div>
-        <p className="mb-2 font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">Field changes</p>
+        <p className="mb-2 font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">What changed</p>
         {rows.length === 0 ? (
           <p className="rounded-md border border-dashed border-white-02 px-3 py-4 text-center font-mont text-xs text-gray-05">
-            No field-level changes recorded for this action.
+            No values were recorded for this action, or none are open to your role.
           </p>
         ) : (
           <div className="overflow-x-auto rounded-md border border-white-02">
             <table className="w-full">
               <thead><tr>
-                <th className={thd}>Field</th><th className={thd}>Before</th><th className={thd}>After</th>
+                <th className={thd}>Item</th><th className={thd}>Before</th><th className={thd}>After</th>
               </tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.key}>
-                    <td className={cn(tdd, "font-mono text-gray-01")}>{r.key}</td>
-                    <td className={cn(tdd, "bg-destructive/5 break-words text-gray-05")}>{fmt(r.before, dates)}</td>
-                    <td className={cn(tdd, "bg-green-01/5 break-words font-medium text-black-01")}>{fmt(r.after, dates)}</td>
+                    <td className={cn(tdd, "break-words font-medium text-gray-01")}>{r.label}</td>
+                    <td className={cn(tdd, "bg-destructive/5 break-words text-gray-05")}>{r.before}</td>
+                    <td className={cn(tdd, "bg-green-01/5 break-words font-medium text-black-01")}>{r.after}</td>
                   </tr>
                 ))}
               </tbody>
@@ -189,7 +176,7 @@ function AuditDetail({ log }: { log: FinanceAuditLog }) {
 
 export default function FinanceAuditPage() {
   const dates = useDates();
-  const { code: entity } = useActiveEntity();
+  const { code: entity, currency } = useActiveEntity();
   const [page, setPage] = useState(1);
   const [action, setAction] = useState("");
   const [targetType, setTargetType] = useState("");
@@ -299,7 +286,7 @@ export default function FinanceAuditPage() {
         <DetailDrawer open={!!selected} onOpenChange={(o) => { if (!o) setSelected(null); }}
           title={selected?.action_display || selected?.action || "Audit entry"}
           description={selected ? (selected.document_number || (selected.target_id ? `#${selected.target_id}` : undefined)) : undefined}>
-          {selected ? <AuditDetail log={selected} /> : null}
+          {selected ? <AuditDetail log={selected} currency={currency} /> : null}
         </DetailDrawer>
       </PageShell>
     </FinanceShell>

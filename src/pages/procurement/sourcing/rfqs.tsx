@@ -44,6 +44,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../../lib/display-prefs";
 import { useReaderReach } from "../../../host";
+import { VENDOR_CONTACT, canReadRfqRecipients } from "../vendors/vendor-contacts";
 import { SharedSourcingEditor, useFreeSourceLines } from "./shared-sourcing-editor";
 import { useDebounce } from "@/hooks/use-debounce";
 import { groupSharedLines, sharedRfqLinesBody, sharedSourcingProblem } from "./shared-sourcing";
@@ -163,7 +164,27 @@ export default function RfqsPage() {
   </ProcurementShell>;
 }
 
-function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
+/** The people an invitation went to: a name, or failing that an address, with the addresses beneath names. */
+function InvitationRecipients({ recipients }: { recipients: RfqInvitation["recipients"] }) {
+  const people = recipients.map((row) => row.name || row.email).filter(Boolean).join(", ");
+  const addresses = recipients.filter((row) => row.name && row.email).map((row) => row.email).join(", ");
+  return <>
+    <p>{people || "No RFQ contact"}</p>
+    {addresses ? <p className="mt-0.5 text-[10px] text-gray-05">{addresses}</p> : null}
+  </>;
+}
+
+/**
+ * An RFQ's detail drawer.
+ *
+ * The Contacts column of the invited vendors lists the people each invitation
+ * went to, which are the vendor's contact people under
+ * `procurement.vendor_contact`. The server sends the list empty unless the role
+ * may read the two flags that choose recipients, and each row carries only the
+ * name and email the role may read, so the column goes when none of that can be
+ * read, rather than saying nobody was invited.
+ */
+export function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
   const [tab, setTab] = useState("overview");
   const [editing, setEditing] = useState(false);
@@ -172,8 +193,7 @@ function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entit
   const [competitionExceptionReason, setCompetitionExceptionReason] = useState("");
   const { hasPermission } = usePermissions();
   const canOverrideCompetition = hasPermission(P.PROC_OVERRIDE_COMPETITION);
-  // Invitation recipients are the vendor's contact people, under the vendor's switch.
-  const showRecipients = !useFieldAccess("procurement.vendor").isHidden("contacts");
+  const showRecipients = canReadRfqRecipients(useFieldAccess(VENDOR_CONTACT));
   const { data, isLoading, isError, refetch } = useGetRfqQuery({ id: id!, entity }, { skip: id == null });
   const rfq = data?.data;
   const [issue] = useIssueRfqMutation();
@@ -259,7 +279,7 @@ function RfqDrawer({ id, entity, currency, onClose }: { id: number | null; entit
               <tr key={inv.vendor_id}>
                 <td className="border-t border-white-02 px-3 py-2 font-mont text-xs"><p className="font-semibold">{inv.vendor_name}</p><p className="mt-0.5 text-gray-05">{inv.vendor_code}</p></td>
                 <td className="border-t border-white-02 px-3 py-2"><StatusPill status={inv.status || (inv.responded ? "RESPONDED" : "AWAITED")} /><p className="mt-1 font-mont text-[10px] text-gray-05">{inv.deadline ? dates.dateTime(inv.deadline) : "No deadline"}</p></td>
-                {showRecipients ? <td className="border-t border-white-02 px-3 py-2 font-mont text-xs"><p>{inv.recipients.map((row) => row.name || row.email).join(", ") || "No RFQ contact"}</p><p className="mt-0.5 text-[10px] text-gray-05">{inv.recipients.map((row) => row.email).join(", ")}</p></td> : null}
+                {showRecipients ? <td className="border-t border-white-02 px-3 py-2 font-mont text-xs"><InvitationRecipients recipients={inv.recipients} /></td> : null}
                 <td className="border-t border-white-02 px-3 py-2 font-mont text-xs">{inv.quotation_id ? <span className="flex flex-wrap items-center gap-1.5"><StatusPill status={inv.quotation_status || ""} /></span> : "-"}</td>
                 <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{inv.quotation_total != null ? <Money kobo={inv.quotation_total} currency={currency} /> : "-"}</td>
                 <td className="border-t border-white-02 px-3 py-2"><div className="flex gap-1.5"><Button size="sm" variant="outline" onClick={async () => { try { await resend({ id: rfq.id, invitationId: inv.id, entity }).unwrap(); toast.success("Invitation resent."); } catch { /* central */ } }}><MailPlus className="size-3.5" /> Resend</Button><Button size="sm" variant="outline" onClick={() => setExtending(inv)}><CalendarPlus className="size-3.5" /> Extend</Button></div></td>

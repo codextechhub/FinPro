@@ -6,8 +6,11 @@
  * answers it under their branches, so this page draws the blocks that arrive and
  * leaves the rest out: a bursar who may read invoices but not the ledger sees
  * collections, aging and overdue payers, and never an empty "Cash & bank" tile.
- * The header buttons and every "open" link are gated the same way, on the key the
- * destination's own screen checks.
+ * A card an administrator closes with a Field Access switch is a missing key
+ * rather than a `null`, and is left out the same way: no card, no placeholder,
+ * and the cards beside it fill the row. The header buttons and every "open"
+ * link are gated like the blocks, on the key the destination's own screen
+ * checks.
  *
  * The window switch (this term, this month, year to date) changes the figures
  * that answer "for which span?": collected, billed against collected, how payers
@@ -52,6 +55,7 @@ import { collectedLabel, dashboardWords, greeting } from "./dashboard-words";
 import {
   AgingCard, AttentionCard, BankAccountsCard, BilledCollectedCard, BranchesCard, BudgetCard,
   ChannelsCard, DASH_COLORS, KpiTile, PayersCard, PostingsCard, UpcomingCard, YearCloseStrip,
+  closeProgressShown, KpiRow,
 } from "./dashboard-cards";
 import { useDates } from "../../lib/display-prefs";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
@@ -168,16 +172,20 @@ export default function FinanceDashboard() {
     petty_cash: can(P.FIN_VIEW_PETTY_CASH) ? `${F.EXPENSES}/petty-cash` : null,
   } as Record<string, string | null>)[key] ?? null;
 
-  const tile = (kpi: DashboardKpi | null) => kpi && { value: money(kpi.value.kobo), delta: kpi.spark.length ? kpi.delta_pct : null, spark: kpi.spark };
-  const cash = d && tile(d.kpis.cash_position);
-  const receivables = d && tile(d.kpis.receivables);
-  const payables = d && tile(d.kpis.payables);
-  const netIncome = d && tile(d.kpis.net_income_ytd);
+  const tile = (kpi: DashboardKpi | null | undefined) => kpi ? { value: money(kpi.value.kobo), delta: kpi.spark.length ? kpi.delta_pct : null, spark: kpi.spark } : null;
+  const cash = d ? tile(d.kpis.cash_position) : null;
+  const receivables = d ? tile(d.kpis.receivables) : null;
+  const payables = d ? tile(d.kpis.payables) : null;
+  const netIncome = d ? tile(d.kpis.net_income_ytd) : null;
   const collected = d?.collections?.collected ?? null;
+  const attention = d?.attention ?? null;
+  const upcoming = d?.upcoming?.length ? d.upcoming : null;
+  const close = closeProgressShown(d?.close_progress ?? null);
+  const tileCount = [cash, receivables, collected, payables, netIncome].filter(Boolean).length;
 
-  const nothingToShow = !!d && !cash && !receivables && !payables && !netIncome && !collected
+  const nothingToShow = !!d && tileCount === 0
     && !d.trend && !d.ar_aging && !d.bank_accounts && !d.channels && !d.branches && !d.budget
-    && !d.top_payers && !d.recent_journals && !d.close_progress && d.attention.length === 0 && d.upcoming.length === 0;
+    && !d.top_payers && !d.recent_journals && !close && !attention?.length && !upcoming;
 
   return (
     <FinanceShell>
@@ -256,7 +264,7 @@ export default function FinanceDashboard() {
                 onManage={() => navigate(`${F.SETUP}/periods`)} />
             )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <KpiRow count={tileCount}>
               {cash && <KpiTile label="Cash & bank" {...cash} note="vs end of last month" />}
               {receivables && <KpiTile label="Receivables" {...receivables} goodWhenUp={false}
                 note={receivables.spark.length ? "vs end of last month" : "Across your open invoices"} />}
@@ -272,15 +280,17 @@ export default function FinanceDashboard() {
                   ? `${d.payables_due.due_count} bill${d.payables_due.due_count === 1 ? "" : "s"} due in 30 days${d.payables_due.overdue_count ? ` · ${d.payables_due.overdue_count} overdue` : ""}`
                   : "vs end of last month"} />}
               {netIncome && <KpiTile label="Net income, year to date" {...netIncome} note="vs end of last month" />}
-            </div>
+            </KpiRow>
 
-            <div className={cn("grid grid-cols-1 gap-5", d.trend && "xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]")}>
-              {d.trend && (
-                <BilledCollectedCard trend={d.trend} collections={d.collections} windowName={d.window.label.toLowerCase()}
-                  basis={d.window.basis} currency={currency} subtitle={words.trendSubtitle} />
-              )}
-              <AttentionCard items={d.attention} linkFor={attentionLink} currency={currency} />
-            </div>
+            {(d.trend || attention) && (
+              <div className={cn("grid grid-cols-1 gap-5", d.trend && attention && "xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]")}>
+                {d.trend && (
+                  <BilledCollectedCard trend={d.trend} collections={d.collections ?? null} windowName={d.window.label.toLowerCase()}
+                    basis={d.window.basis} currency={currency} subtitle={words.trendSubtitle} />
+                )}
+                {attention && <AttentionCard items={attention} linkFor={attentionLink} currency={currency} />}
+              </div>
+            )}
 
             {(d.ar_aging || d.bank_accounts || d.channels) && (
               <div className={cn("grid grid-cols-1 gap-5", rowCols([d.ar_aging, d.bank_accounts, d.channels].filter(Boolean).length))}>
@@ -297,16 +307,16 @@ export default function FinanceDashboard() {
               </div>
             )}
 
-            {(d.top_payers || d.upcoming.length > 0 || d.recent_journals) && (
-              <div className={cn("grid grid-cols-1 gap-5", rowCols([d.top_payers, d.upcoming.length > 0, d.recent_journals].filter(Boolean).length))}>
+            {(d.top_payers || upcoming || d.recent_journals) && (
+              <div className={cn("grid grid-cols-1 gap-5", rowCols([d.top_payers, upcoming, d.recent_journals].filter(Boolean).length))}>
                 {d.top_payers && <PayersCard payers={d.top_payers} summary={d.receivables_summary} title={words.overdueTitle} noun={words.payers} currency={currency} to={`${F.RECEIVABLES}/invoices`} />}
-                {d.upcoming.length > 0 && <UpcomingCard items={d.upcoming} currency={currency} />}
+                {upcoming && <UpcomingCard items={upcoming} currency={currency} />}
                 {d.recent_journals && <PostingsCard journals={d.recent_journals} currency={currency} to={F.LEDGER} />}
               </div>
             )}
 
-            {(d.close_progress || d.fiscal_runway?.calendar_end) && (
-              <YearCloseStrip runway={d.fiscal_runway} close={d.close_progress} fiscalYear={d.fiscal_year} />
+            {(close || d.fiscal_runway?.calendar_end) && (
+              <YearCloseStrip runway={d.fiscal_runway} close={close} fiscalYear={d.fiscal_year} />
             )}
           </div>
         )}

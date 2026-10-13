@@ -21,6 +21,7 @@ import type {
   Vendor,
   VendorCategory,
   VendorCategoryInsight,
+  VendorContact,
   VendorInsights,
   DocumentAttachment,
   VendorInvoice,
@@ -75,11 +76,11 @@ export const procurementApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/procurement/vendors/${id}/insights/${qs({ entity })}`, method: "GET" }),
       providesTags: ["ProcVendors"],
     }),
-    createVendor: b.mutation<ApiEnvelope<Vendor>, { entity: string; name: string; category?: string; email?: string; phone?: string; address?: string; tax_id?: string; bank_name?: string; bank_account_number?: string; bank_account_name?: string; payable_account?: string; default_expense_account?: string; default_wht_tax_code?: string; payment_terms?: string; contacts?: Array<Record<string, unknown>> }>({
+    createVendor: b.mutation<ApiEnvelope<Vendor>, { entity: string; name: string; category?: string; email?: string; phone?: string; address?: string; tax_id?: string; bank_name?: string; bank_account_number?: string; bank_account_name?: string; payable_account?: string; default_expense_account?: string; default_wht_tax_code?: string; payment_terms?: string; contacts?: VendorContact[] }>({
       query: ({ entity, ...body }) => ({ url: `/procurement/vendors/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcVendors"],
     }),
-    updateVendor: b.mutation<ApiEnvelope<Vendor>, { id: number; entity: string; name?: string; category?: string; email?: string; phone?: string; address?: string; tax_id?: string; bank_name?: string; bank_account_number?: string; bank_account_name?: string; payable_account?: string; default_expense_account?: string; default_wht_tax_code?: string; payment_terms?: string; kyc_status?: string; risk?: string; on_hold?: boolean; is_active?: boolean; contacts?: Array<Record<string, unknown>> }>({
+    updateVendor: b.mutation<ApiEnvelope<Vendor>, { id: number; entity: string; name?: string; category?: string; email?: string; phone?: string; address?: string; tax_id?: string; bank_name?: string; bank_account_number?: string; bank_account_name?: string; payable_account?: string; default_expense_account?: string; default_wht_tax_code?: string; payment_terms?: string; kyc_status?: string; risk?: string; on_hold?: boolean; is_active?: boolean; contacts?: VendorContact[] }>({
       query: ({ id, entity, ...body }) => ({ url: `/procurement/vendors/${id}/${qs({ entity })}`, method: "PATCH", body }),
       invalidatesTags: ["ProcVendors"],
     }),

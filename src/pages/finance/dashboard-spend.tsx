@@ -8,9 +8,10 @@
  * It reads the same windows as the overview, always by date; the page owns the
  * switch and passes the payload in.
  *
- * Every card draws one block and is left out when the block is `null`. The cash,
- * bank, payroll and tax blocks arrive only for readers who see the whole school,
- * so a branch bursar's tab starts at spending and budgets.
+ * Every card draws one block and is left out when the block is `null` or, when a
+ * Field Access switch closes it, missing; the cards and tiles that remain fill
+ * their rows. The cash, bank, payroll and tax blocks arrive only for readers who
+ * see the whole school, so a branch bursar's tab starts at spending and budgets.
  */
 
 import { Money } from "@/components/finance-ui";
@@ -22,7 +23,7 @@ import type { BudgetRollup } from "@/redux/services/finance/ops-types";
 import { useGetBudgetRollupQuery } from "@/redux/services/finance/ops-api";
 import { routesPath } from "@/routes/routes-path";
 import {
-  AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, fmtShortDate, plural,
+  AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, fmtShortDate, KpiRow, plural,
 } from "./dashboard-cards";
 import type { DashboardWords } from "./dashboard-words";
 import { useDates } from "../../lib/display-prefs";
@@ -190,9 +191,11 @@ function ReconciliationCard({ accounts, unmatched, currency }: { accounts: NonNu
                 <div className="h-2 overflow-hidden rounded-full bg-gray-03/50">
                   <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: a.unmatched ? DASH_COLORS.amber : DASH_COLORS.green }} />
                 </div>
-                <span className="font-mont text-[11px] tabular-nums text-gray-05">
-                  {a.lines ? `${a.matched.toLocaleString()} of ${a.lines.toLocaleString()} lines matched` : a.bank_name}
-                </span>
+                {a.lines || a.bank_name ? (
+                  <span className="font-mont text-[11px] tabular-nums text-gray-05">
+                    {a.lines ? `${a.matched.toLocaleString()} of ${a.lines.toLocaleString()} lines matched` : a.bank_name}
+                  </span>
+                ) : null}
               </div>
             );
           })}
@@ -510,12 +513,13 @@ export function SpendTab({ d, words, currency }: { d: S; words: DashboardWords; 
     return <EmptyState title="Nothing to show here yet" message="None of the cash, spending or tax figures are in your access." />;
   }
   const row3 = [d.budgets, d.spending].filter(Boolean).length;
+  const tiles = [d.runway, d.spend, d.payroll, d.tax_owed, d.unmatched].filter(Boolean).length;
   const row4 = [d.payroll, d.claims, d.petty_cash].filter(Boolean).length;
   const row5 = [d.tax_calendar, d.assets].filter(Boolean).length;
   const tax = d.tax_owed;
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <KpiRow count={tiles}>
         {d.runway && <KpiTile label="Cash runway" value={runwayLabel(d.runway.months)}
           note={d.runway.monthly_outflow
             ? `At ${compactMoney(d.runway.monthly_outflow.kobo, currency)} a month, ${historyLabel(d.runway.based_on_days)}' average`
@@ -532,7 +536,7 @@ export function SpendTab({ d, words, currency }: { d: S; words: DashboardWords; 
           note={tax.next ? `${tax.next.name} ${dueIn(tax.next.days)}` : "Nothing owed on open returns"} />}
         {d.unmatched && <KpiTile label="Unmatched bank lines" value={d.unmatched.lines.toLocaleString()}
           note={d.unmatched.lines ? `${compactMoney(d.unmatched.amount.kobo, currency)} waiting on a match` : "Every imported line is matched"} />}
-      </div>
+      </KpiRow>
 
       {(d.cash_movement || d.reconciliation) && (
         <div className={cn("grid grid-cols-1 gap-5", d.cash_movement && d.reconciliation && "xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]")}>

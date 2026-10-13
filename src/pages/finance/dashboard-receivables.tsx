@@ -7,8 +7,9 @@
  * credit payers hold, and who owes the most. It reads the same windows as the
  * overview; the page owns the switch and passes the payload in.
  *
- * Every card draws one block and is left out when the block is `null`, as on the
- * overview; cards in a row share a height, so each ends in a summary line (see
+ * Every card draws one block and is left out when the block is `null` or, when a
+ * Field Access switch closes it, missing, as on the overview; the cards and
+ * tiles that remain fill their rows; cards in a row share a height, so each ends in a summary line (see
  * Panel in dashboard-cards).
  */
 
@@ -20,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import type { ReceivablesDashboard } from "@/redux/services/finance/reports-types";
 import { routesPath } from "@/routes/routes-path";
-import { AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, plural } from "./dashboard-cards";
+import { AllClear, DASH_COLORS, KpiTile, LinkAction, Panel, compactMoney, KpiRow, plural } from "./dashboard-cards";
 import { termWordOf, type DashboardWords } from "./dashboard-words";
 import { useDates } from "../../lib/display-prefs";
 
@@ -296,7 +297,7 @@ function ConcessionsCard({ concessions, payers, currency }: { concessions: NonNu
   );
 }
 
-function AdjustmentsCard({ items, currency }: { items: R["adjustments"]; currency?: string | null }) {
+function AdjustmentsCard({ items, currency }: { items: NonNullable<R["adjustments"]>; currency?: string | null }) {
   const pending = items.reduce((sum, i) => sum + i.pending, 0);
   return (
     <Panel title="Adjustments" subtitle="Credit notes, refunds and write-offs"
@@ -395,16 +396,18 @@ export function ReceivablesTab({ d, words, currency }: { d: R; words: DashboardW
   const windowName = d.window.label.toLowerCase();
   const c = d.collections;
   const s = d.receivables_summary;
+  const adjustments = d.adjustments?.length ? d.adjustments : null;
   const nothing = !c && !d.curve && !d.plans && !d.groups && !d.dunning && !d.concessions
-    && d.adjustments.length === 0 && !d.credit && !d.largest;
+    && !adjustments && !d.credit && !d.largest;
   if (nothing) {
     return <EmptyState title="Nothing to show here yet" message="None of the receivables figures are in your access." />;
   }
   const row2 = [d.groups, d.dunning].filter(Boolean).length;
-  const row3 = [d.concessions, d.adjustments.length > 0 || null, d.credit].filter(Boolean).length;
+  const row3 = [d.concessions, adjustments, d.credit].filter(Boolean).length;
+  const tiles = [c?.billed, c?.collected, d.days_to_pay != null, s, d.credit].filter(Boolean).length;
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <KpiRow count={tiles}>
         {c?.billed && <KpiTile label={`Billed ${windowName}`} value={formatMoney(c.billed.kobo, currency)}
           note={c.invoice_count != null ? plural(c.invoice_count, "invoice") : undefined} />}
         {c?.collected && <KpiTile label="Collected" value={formatMoney(c.collected.kobo, currency)} color={DASH_COLORS.green}
@@ -417,7 +420,7 @@ export function ReceivablesTab({ d, words, currency }: { d: R; words: DashboardW
           note={`${plural(s.overdue_payers, words.payers.replace(/s$/, ""), words.payers)} past their due date`} />}
         {d.credit && <KpiTile label="Credit held" value={formatMoney(d.credit.total.kobo, currency)}
           note={d.credit.payers ? `${plural(d.credit.payers, words.payers.replace(/s$/, ""), words.payers)} in credit` : "Nobody is in credit"} />}
-      </div>
+      </KpiRow>
 
       {(d.curve || d.plans) && (
         <div className={cn("grid grid-cols-1 gap-5", d.curve && d.plans && "xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]")}>
@@ -442,7 +445,7 @@ export function ReceivablesTab({ d, words, currency }: { d: R; words: DashboardW
       {row3 > 0 && (
         <div className={cn("grid grid-cols-1 gap-5", rowCols(row3))}>
           {d.concessions && <ConcessionsCard concessions={d.concessions} payers={words.payers} currency={currency} />}
-          {d.adjustments.length > 0 && <AdjustmentsCard items={d.adjustments} currency={currency} />}
+          {adjustments && <AdjustmentsCard items={adjustments} currency={currency} />}
           {d.credit && <CreditCard credit={d.credit} payers={words.payers} currency={currency} />}
         </div>
       )}

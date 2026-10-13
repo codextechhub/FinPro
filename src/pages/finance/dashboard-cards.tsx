@@ -2,8 +2,9 @@
  * The Finance overview's cards.
  *
  * Each card draws one block of the dashboard payload and nothing else: the page
- * decides whether a block arrived (a block the reader may not see is `null`), and
- * a card only lays it out. Money is formatted in the entity's currency; the charts
+ * decides whether a block arrived (a block the reader's keys withhold is `null`,
+ * one a Field Access switch closes is a missing key), and a card only lays it
+ * out. Money is formatted in the entity's currency; the charts
  * use the shared finance chart pieces where one fits and plain bars where the
  * shape is the design's own (billed against collected, per month).
  */
@@ -21,6 +22,24 @@ import { NO_BRANCH_YET } from "../../lib/branch-labels";
 import { DEFAULT_DISPLAY_PREFS, DEFAULT_TIME_ZONE, calendarDayOf, formatMonthName } from "../../utils/dates";
 
 type D = FinanceDashboard;
+
+/**
+ * The row of headline tiles: two across from the small breakpoint, and as many
+ * as there are tiles on a wide screen up to five, so a row with three tiles has
+ * no empty slots beside them. A row with no tiles is not drawn at all.
+ *
+ * `data-kpi-row` marks the row for a host that restyles the headline tiles
+ * itself and hides this one.
+ */
+export function KpiRow({ count, children }: { count: number; children: React.ReactNode }) {
+  if (count <= 0) return null;
+  const wide = count >= 5 ? "xl:grid-cols-5" : count === 4 ? "xl:grid-cols-4" : count === 3 ? "xl:grid-cols-3" : "";
+  return (
+    <div data-kpi-row="" className={cn("grid grid-cols-1 gap-4", count >= 2 && "sm:grid-cols-2", wide)}>
+      {children}
+    </div>
+  );
+}
 
 export const DASH_COLORS = {
   primary: CHART_COLORS.primary,
@@ -221,7 +240,7 @@ export function BilledCollectedCard({ trend, collections, windowName, basis, cur
 const TONE_DOT = { urgent: DASH_COLORS.red, warning: DASH_COLORS.amber, info: DASH_COLORS.primary } as const;
 
 export function AttentionCard({ items, linkFor, currency }: {
-  items: D["attention"]; linkFor: (key: string) => string | null; currency?: string | null;
+  items: NonNullable<D["attention"]>; linkFor: (key: string) => string | null; currency?: string | null;
 }) {
   const navigate = useNavigate();
   const urgent = items.filter((i) => i.tone === "urgent").length;
@@ -552,7 +571,7 @@ export function PayersCard({ payers, summary, title, noun, currency, to }: {
   );
 }
 
-export function UpcomingCard({ items, currency }: { items: D["upcoming"]; currency?: string | null }) {
+export function UpcomingCard({ items, currency }: { items: NonNullable<D["upcoming"]>; currency?: string | null }) {
   const into = items.filter((u) => u.direction === "in").reduce((sum, u) => sum + u.amount.kobo, 0);
   const out = items.filter((u) => u.direction === "out").reduce((sum, u) => sum + u.amount.kobo, 0);
   return (
@@ -624,15 +643,17 @@ export function YearCloseStrip({ runway, close, fiscalYear }: {
   const dates = useDates();
   const days = runway?.days_remaining;
   return (
-    <section className={cn(INFORMATION_CARD_SURFACE, "grid min-w-0 grid-cols-1 gap-6 rounded-md p-5", close && "lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]")}>
-      <div className="flex min-w-0 flex-col gap-2">
-        <h2 className="font-mont text-sm font-semibold text-gray-01">Fiscal year runway</h2>
-        <p className="font-mont text-xs text-gray-05">
-          {runway?.calendar_end
-            ? `FY ${fiscalYear ?? ""} periods run to ${dates.day(runway.calendar_end)}${days != null ? `, ${days} day${days === 1 ? "" : "s"} away` : ""}.`
-            : "No fiscal periods are set up yet."}
-        </p>
-      </div>
+    <section className={cn(INFORMATION_CARD_SURFACE, "grid min-w-0 grid-cols-1 gap-6 rounded-md p-5", runway && close && "lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]")}>
+      {runway && (
+        <div className="flex min-w-0 flex-col gap-2">
+          <h2 className="font-mont text-sm font-semibold text-gray-01">Fiscal year runway</h2>
+          <p className="font-mont text-xs text-gray-05">
+            {runway.calendar_end
+              ? `FY ${fiscalYear ?? ""} periods run to ${dates.day(runway.calendar_end)}${days != null ? `, ${days} day${days === 1 ? "" : "s"} away` : ""}.`
+              : "No fiscal periods are set up yet."}
+          </p>
+        </div>
+      )}
       {close && (
         <div className="flex min-w-0 flex-col gap-3">
           <div className="flex items-baseline justify-between gap-2 font-mont">
@@ -653,3 +674,11 @@ export function YearCloseStrip({ runway, close, fiscalYear }: {
   );
 }
 
+/**
+ * The close block when it has something to draw. A reader whose Field Access
+ * closes every check gets the block with no checks and a total of nothing, which
+ * would draw as an empty shell, so it counts as absent.
+ */
+export function closeProgressShown(close: D["close_progress"]): NonNullable<D["close_progress"]> | null {
+  return close && close.checks.length > 0 ? close : null;
+}

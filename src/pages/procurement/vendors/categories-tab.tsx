@@ -16,6 +16,7 @@ import {
   type TabStripItem,
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
+import { useFieldAccess } from "@/components/finance-ui/field-access";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +52,15 @@ const DETAIL_TAB_ITEMS: TabStripItem<(typeof DETAIL_TABS)[number][1]>[] = DETAIL
   value,
   label: <><Icon className="size-3.5" />{label}</>,
 }));
+const DETAIL_TAB_ITEMS_WITHOUT_SPEND = DETAIL_TAB_ITEMS.filter((item) => item.value !== "spend");
+
+/**
+ * The vendor field that decides who may read category spend. Spend is the
+ * invoices of the vendors filed under a category, grouped by that category, so a
+ * reader who cannot see the vendor's category is refused the whole answer.
+ */
+const VENDOR = "procurement.vendor";
+const CATEGORY_FIELD = "category_code";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return <div className="min-w-0"><dt className="font-mont text-[11px] text-gray-05">{label}</dt><dd className="mt-1 break-words font-mont text-sm font-semibold tabular-nums text-black-01">{value ?? "-"}</dd></div>;
@@ -96,12 +106,18 @@ function hierarchyRows(rows: VendorCategory[]) {
  * branch, and the server takes it only from a holder of the key who covers the
  * whole school. New Category and Edit Category are offered to that reader
  * alone; a branch's own buyer reads the list.
+ *
+ * Spend per category is a reading of the vendor's category, so a reader whose
+ * role hides that field is given no spend column, no spend tab and no request:
+ * the server refuses the call, and "Unavailable" would describe a refusal the
+ * screen should not have provoked.
  */
 export function CategoriesTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const { can } = useCan();
   const { canWholeSchool } = useWholeSchoolAccess();
   const canCreate = canWholeSchool(P.PROC_CREATE_CATEGORY);
   const canReports = can(P.PROC_VIEW_PROC_REPORTS);
+  const spendHidden = useFieldAccess(VENDOR).isHidden(CATEGORY_FIELD);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState<(typeof STATUS_TABS)[number][1]>("all");
@@ -125,7 +141,7 @@ export function CategoriesTab({ entity, currency }: { entity: string; currency?:
   }), [entity, page, debouncedSearch, status]);
   const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetCategoriesQuery(params);
   const { data: insightResponse, isLoading: insightLoading, isError: insightError } = useGetCategoryInsightsQuery(
-    { entity }, { skip: !canReports },
+    { entity }, { skip: !canReports || spendHidden },
   );
   const insightMap = useMemo(() => new Map(
     toArray(insightResponse?.data).map((insight) => [insight.category_id, insight]),
@@ -144,7 +160,7 @@ export function CategoriesTab({ entity, currency }: { entity: string; currency?:
     { header: "Parent", cell: (category) => category.parent_name || "Root" },
     { header: "Default expense", cell: (category) => category.default_expense_code || "-" },
     { header: "Vendors", align: "right", cell: (category) => <span className="tabular-nums">{category.vendor_count ?? 0}</span> },
-    { header: "Spend MTD", align: "right", cell: (category) => <span className="tabular-nums">{spend(category)}</span> },
+    ...(spendHidden ? [] : [{ header: "Spend MTD", align: "right" as const, cell: (category: VendorCategory) => <span className="tabular-nums">{spend(category)}</span> }]),
     { header: "Status", cell: (category) => <StatusPill status={category.is_active ? "ACTIVE" : "INACTIVE"} /> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
@@ -178,12 +194,12 @@ export function CategoriesTab({ entity, currency }: { entity: string; currency?:
         page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage}
         emptyTitle="No categories found"
         emptyMessage={debouncedSearch || status !== "all" ? "Try changing the search or status filter." : "Create the first vendor category for this entity."}
-        mobileCard={(category) => <CategoryMobileCard category={category} spend={spend(category)} />}
+        mobileCard={(category) => <CategoryMobileCard category={category} spend={spendHidden ? null : spend(category)} />}
         cardBreakpoint="lg"
       />
     </section>
 
-    <CategoryDrawer key={selectedId ?? "closed"} id={selectedId} entity={entity} currency={currency} canReports={canReports} insight={selectedId == null ? undefined : insightMap.get(selectedId)} onClose={() => setSelectedId(null)} />
+    <CategoryDrawer key={selectedId ?? "closed"} id={selectedId} entity={entity} currency={currency} canReports={canReports} spendHidden={spendHidden} insight={selectedId == null ? undefined : insightMap.get(selectedId)} onClose={() => setSelectedId(null)} />
     {creating && <CategoryForm entity={entity} onClose={() => setCreating(false)} />}
   </>;
 }
@@ -192,11 +208,11 @@ function CategoryIdentity({ category }: { category: VendorCategory }) {
   return <div className="flex min-w-44 items-center gap-3" style={{ paddingLeft: `${(category.level - 1) * 20}px` }}><span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><Tags className="size-4" /></span><div className="min-w-0"><p className="truncate font-mont text-sm font-semibold text-black-01">{category.name}</p><p className="mt-0.5 font-mont text-[11px] text-gray-05">{category.vendor_count ?? 0} linked vendor{category.vendor_count === 1 ? "" : "s"} · Level {category.level}</p></div></div>;
 }
 
-function CategoryMobileCard({ category, spend }: { category: VendorCategory; spend: string }) {
-  return <div className="space-y-3"><CategoryIdentity category={category} /><div className="flex flex-wrap gap-1"><StatusPill status={category.is_active ? "ACTIVE" : "INACTIVE"} /></div><div className="grid grid-cols-2 gap-3 text-xs"><div><p className="text-[11px] text-gray-05">Code</p><p className="mt-1 font-semibold text-primary">{category.code}</p></div><div><p className="text-[11px] text-gray-05">Parent</p><p className="mt-1 font-medium">{category.parent_name || "Root"}</p></div><div><p className="text-[11px] text-gray-05">Default expense</p><p className="mt-1 font-medium">{category.default_expense_code || "-"}</p></div><div><p className="text-[11px] text-gray-05">Spend MTD</p><p className="mt-1 font-medium tabular-nums">{spend}</p></div></div></div>;
+function CategoryMobileCard({ category, spend }: { category: VendorCategory; spend: string | null }) {
+  return <div className="space-y-3"><CategoryIdentity category={category} /><div className="flex flex-wrap gap-1"><StatusPill status={category.is_active ? "ACTIVE" : "INACTIVE"} /></div><div className="grid grid-cols-2 gap-3 text-xs"><div><p className="text-[11px] text-gray-05">Code</p><p className="mt-1 font-semibold text-primary">{category.code}</p></div><div><p className="text-[11px] text-gray-05">Parent</p><p className="mt-1 font-medium">{category.parent_name || "Root"}</p></div><div><p className="text-[11px] text-gray-05">Default expense</p><p className="mt-1 font-medium">{category.default_expense_code || "-"}</p></div>{spend == null ? null : <div><p className="text-[11px] text-gray-05">Spend MTD</p><p className="mt-1 font-medium tabular-nums">{spend}</p></div>}</div></div>;
 }
 
-function CategoryDrawer({ id, entity, currency, canReports, insight, onClose }: { id: number | null; entity: string; currency?: string | null; canReports: boolean; insight?: VendorCategoryInsight; onClose: () => void }) {
+function CategoryDrawer({ id, entity, currency, canReports, spendHidden, insight, onClose }: { id: number | null; entity: string; currency?: string | null; canReports: boolean; spendHidden: boolean; insight?: VendorCategoryInsight; onClose: () => void }) {
   const { data, isLoading, isError, error, refetch } = useGetCategoryQuery(
     { id: id!, entity }, { skip: id == null },
   );
@@ -208,7 +224,7 @@ function CategoryDrawer({ id, entity, currency, canReports, insight, onClose }: 
     <DetailDrawer open={id != null} onOpenChange={(open) => !open && onClose()} title={category?.name || "Category"} description={category ? `${category.code} · ${category.default_expense_code || "No default expense account"}` : "Loading category"} widthClass="sm:max-w-[640px]" footer={category && canEdit ? <Button variant="outline" onClick={() => setEditing(true)}>Edit Category</Button> : null}>
       {isLoading ? <RestrictedPanel>Loading category…</RestrictedPanel> : isForbidden(error) ? <RestrictedPanel>You do not have permission to view this category.</RestrictedPanel> : isError || !category ? <RestrictedPanel><button type="button" className="text-primary" onClick={() => refetch()}>Category could not be loaded. Try again.</button></RestrictedPanel> : <div className="space-y-5">
         <TabStrip
-          items={DETAIL_TAB_ITEMS}
+          items={spendHidden ? DETAIL_TAB_ITEMS_WITHOUT_SPEND : DETAIL_TAB_ITEMS}
           value={tab}
           onChange={setTab}
           variant="underline"
@@ -218,7 +234,7 @@ function CategoryDrawer({ id, entity, currency, canReports, insight, onClose }: 
         />
         {tab === "overview" && <dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Category name" value={category.name} /><Field label="Code" value={category.code} /><Field label="Level" value={`Level ${category.level}`} /><Field label="Parent category" value={category.parent_name || "Root category"} /><Field label="Default expense account" value={category.default_expense_code || "Not configured"} /><Field label="Status" value={<StatusPill status={category.is_active ? "ACTIVE" : "INACTIVE"} />} /></dl>}
         {tab === "usage" && <div className="space-y-4"><dl className="grid grid-cols-1 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-2"><Field label="Linked vendors" value={category.vendor_count ?? 0} /><Field label="Direct sub-categories" value={category.child_count ?? 0} /><Field label="Catalog items" value={category.catalog_item_count ?? 0} /><Field label="Hierarchy position" value={category.parent_name ? `${category.parent_name} · Level ${category.level}` : "Root · Level 1"} /><Field label="Assignment state" value={category.is_active ? "Available for new vendors" : "Historical links only"} /></dl><p className="rounded-md border border-dashed border-white-02 p-4 font-mont text-xs leading-5 text-gray-05">The hierarchy supports three levels. Catalog items counts reflect items assigned directly to this category, not its sub-categories.</p></div>}
-        {tab === "spend" && (!canReports ? <RestrictedPanel>Category spend requires Procurement report access.</RestrictedPanel> : <div className="space-y-3"><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><SpendCard label="This month" value={formatMoney(insight?.spend_mtd ?? 0, currency)} /><SpendCard label="Last month" value={formatMoney(insight?.spend_prior_month ?? 0, currency)} /><SpendCard label="Year to date" value={formatMoney(insight?.spend_ytd ?? 0, currency)} /></div><p className="font-mont text-xs text-gray-05">Realised spend is sourced only from posted vendor invoices for vendors currently linked to this category.</p></div>)}
+        {tab === "spend" && !spendHidden && (!canReports ? <RestrictedPanel>Category spend requires Procurement report access.</RestrictedPanel> : <div className="space-y-3"><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><SpendCard label="This month" value={formatMoney(insight?.spend_mtd ?? 0, currency)} /><SpendCard label="Last month" value={formatMoney(insight?.spend_prior_month ?? 0, currency)} /><SpendCard label="Year to date" value={formatMoney(insight?.spend_ytd ?? 0, currency)} /></div><p className="font-mont text-xs text-gray-05">Realised spend is sourced only from posted vendor invoices for vendors currently linked to this category.</p></div>)}
       </div>}
     </DetailDrawer>
     {editing && category && <CategoryForm entity={entity} initial={category} onClose={() => setEditing(false)} />}

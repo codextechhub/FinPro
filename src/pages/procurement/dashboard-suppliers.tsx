@@ -62,7 +62,7 @@ function ScorecardCard({ rows, windowName, currency }: { rows: NonNullable<S["sc
             {rows.map((r) => (
               <div key={r.vendor_id} className={cn("grid items-center gap-3 border-b border-white-02 py-2.5 font-mont text-[13px] last:border-0", cols)}>
                 <span className="min-w-0"><span className="block truncate font-medium text-gray-01">{r.name}</span>
-                  <span className="block truncate text-[11px] text-gray-05">{r.category ?? "Uncategorised"}</span></span>
+                  {"category" in r ? <span className="block truncate text-[11px] text-gray-05">{r.category ?? "Uncategorised"}</span> : null}</span>
                 <span className="text-right tabular-nums">{compactMoney(r.spend.kobo, currency)}</span>
                 <span className={cn("text-right tabular-nums", r.on_time_pct != null && r.on_time_pct < 80 && "text-amber-700")}>{pct(r.on_time_pct)}</span>
                 <span className={cn("text-right tabular-nums", r.accepted_pct != null && r.accepted_pct < 95 && "text-amber-700")}>{pct(r.accepted_pct)}</span>
@@ -78,7 +78,7 @@ function ScorecardCard({ rows, windowName, currency }: { rows: NonNullable<S["sc
                   <span className="min-w-0 truncate text-[13px] font-medium text-gray-01">{r.name}</span>
                   <span className="text-[13px] font-semibold tabular-nums"><Money kobo={r.spend.kobo} currency={currency} /></span>
                 </div>
-                <p className="mt-0.5 text-[11px] text-gray-05">{r.category ?? "Uncategorised"}</p>
+                {"category" in r ? <p className="mt-0.5 text-[11px] text-gray-05">{r.category ?? "Uncategorised"}</p> : null}
                 <div className="mt-2 grid grid-cols-4 gap-2 text-[11px] text-gray-05">
                   <span>On time<br /><span className="text-xs font-medium tabular-nums text-black-01">{pct(r.on_time_pct)}</span></span>
                   <span>Accepted<br /><span className="text-xs font-medium tabular-nums text-black-01">{pct(r.accepted_pct)}</span></span>
@@ -124,6 +124,11 @@ function OpenRfqsCard({ rfqs, currency }: { rfqs: NonNullable<S["open_rfqs"]>; c
   );
 }
 
+/**
+ * What competition saved. The per-category breakdown is spend grouped by a
+ * vendor field, so the server sends it empty to a role that may not read the
+ * category; the totals above it stay.
+ */
 function SavingsCard({ savings, currency }: { savings: NonNullable<S["savings"]>; currency?: string | null }) {
   const top = savings.items[0]?.saved.kobo || 1;
   return (
@@ -136,7 +141,7 @@ function SavingsCard({ savings, currency }: { savings: NonNullable<S["savings"]>
               {savings.pct != null ? `${savings.pct}% below the highest quote` : "Below the highest quote"} across {plural(savings.rfqs, "awarded RFQ")}
             </p>
           </div>
-          <div className="flex flex-1 flex-col justify-around gap-2.5">
+          {savings.items.length > 0 ? <div className="flex flex-1 flex-col justify-around gap-2.5">
             {savings.items.map((i) => (
               <div key={i.name} className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_4.5rem] items-center gap-3 font-mont text-[13px]">
                 <span className="truncate text-gray-01">{i.name}</span>
@@ -146,7 +151,7 @@ function SavingsCard({ savings, currency }: { savings: NonNullable<S["savings"]>
                 <span className="text-right font-semibold tabular-nums">{compactMoney(i.saved.kobo, currency)}</span>
               </div>
             ))}
-          </div>
+          </div> : null}
         </>
       )}
     </Panel>
@@ -215,11 +220,16 @@ function CycleCard({ cycle, windowName }: { cycle: NonNullable<S["cycle_times"]>
   );
 }
 
+/**
+ * The vendor base. The hold and KYC counts are each a Field Access field of the
+ * vendor and are absent when the role may not read it, so their rows are left
+ * out rather than shown as zero.
+ */
 function VendorBaseCard({ base, windowName }: { base: NonNullable<S["vendor_base"]>; windowName: string }) {
   const rows: [string, number, boolean][] = [
     ["Approved and active", base.active, false],
-    ["On hold", base.on_hold, base.on_hold > 0],
-    ["Still awaiting KYC checks", base.awaiting_kyc, base.awaiting_kyc > 0],
+    ...(base.on_hold == null ? [] : [["On hold", base.on_hold, base.on_hold > 0] as [string, number, boolean]]),
+    ...(base.awaiting_kyc == null ? [] : [["Still awaiting KYC checks", base.awaiting_kyc, base.awaiting_kyc > 0] as [string, number, boolean]]),
     ["Ordered from once only this year", base.ordered_once, false],
     [`Added ${windowName}`, base.added, false],
   ];

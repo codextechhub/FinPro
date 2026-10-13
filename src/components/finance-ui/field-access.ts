@@ -156,6 +156,56 @@ export function useFieldAccess(resource: string, record?: object | null): FieldA
 }
 
 /**
+ * The response names whose switch governs a body key, for a write alias.
+ *
+ * A form submits `bank_account` while the record carries `bank_account_id` and
+ * `bank_account_name`. The `/me` map lists the alias as read-only whenever its
+ * field may not be written, but a detail response lists only the names present
+ * in its payload, so a record cannot say that `bank_account` is locked. Mapping
+ * the body key to a response name lets a screen ask the question either way.
+ */
+export type WriteFollows = Readonly<Record<string, string>>;
+
+/** Whether a body key may not be written: its own entry, or the name it follows. */
+export function isReadOnlyFollowing(
+  access: FieldAccess, name: string, follows: WriteFollows, options?: ReadOnlyOptions,
+): boolean {
+  const followed = follows[name];
+  return access.isReadOnly(name, options) || (followed !== undefined && access.isReadOnly(followed, options));
+}
+
+/** {@link FieldAccess.writableOnly} for a body whose keys include write aliases. */
+export function writableOnlyFollowing<T extends object>(
+  access: FieldAccess, body: T, follows: WriteFollows, options?: ReadOnlyOptions,
+): T {
+  return Object.fromEntries(
+    Object.entries(body).filter(([name]) => !isReadOnlyFollowing(access, name, follows, options)),
+  ) as T;
+}
+
+/** Whether every one of these body keys may be written, for a form that cannot be completed otherwise. */
+export function allWritable(
+  access: FieldAccess, names: readonly string[], follows: WriteFollows = {}, options?: ReadOnlyOptions,
+): boolean {
+  return names.every((name) => !isReadOnlyFollowing(access, name, follows, options));
+}
+
+/**
+ * A refusal's messages re-keyed so each also appears under the response name its
+ * body key follows. The backend keys a refusal by the body key a client sent
+ * (`bank_account`); the control beside it is addressed by the response name
+ * (`bank_account_name`).
+ */
+export function errorsBesideFollowed(errors: FieldErrors | null, follows: WriteFollows): FieldErrors | null {
+  if (!errors) return errors;
+  const merged: Record<string, string> = { ...errors };
+  for (const [name, followed] of Object.entries(follows)) {
+    if (errors[name] && !merged[followed]) merged[followed] = errors[name];
+  }
+  return merged;
+}
+
+/**
  * The per-field messages of a 403 `field_write_denied` refusal, or null for any
  * other error.
  *

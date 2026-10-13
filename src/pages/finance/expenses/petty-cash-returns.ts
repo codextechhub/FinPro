@@ -20,7 +20,38 @@
  */
 
 import { formatMoney } from "@/utils/money";
-import type { PettyCashFund, PettyCashReturn, PettyCashVoucher } from "@/redux/services/finance/ops-types";
+import { allWritable, type FieldAccess, type WriteFollows } from "@/components/finance-ui/field-access";
+import type { PettyCashFund, PettyCashReturn, PettyCashReturnKind, PettyCashVoucher } from "@/redux/services/finance/ops-types";
+
+/** The Field Access resource of a petty cash return. */
+export const PETTY_CASH_RETURN = "finance.pettycash_return";
+
+/**
+ * The body keys of a return that are not response names, each beside the
+ * response name that carries the same switch. The host's map lists a write
+ * alias only under read-only, so a field the reader cannot see is recognised by
+ * its response name.
+ */
+export const RETURN_FOLLOWS: WriteFollows = { bank_account: "bank_account_name", counted_by: "counted_by_name" };
+
+const CREATING = { creating: true } as const;
+
+/**
+ * Whether a return cannot be raised by this reader: a field the server needs
+ * with the request is hidden from them or read-only. The count, the date and
+ * (for a float reduction) the new float are always needed; the bank account is
+ * needed once cash is banked; the reason is needed when the count differs from
+ * the books, a difference a reader who cannot see it is not asked to judge.
+ */
+export function raiseBlocked(access: FieldAccess, { kind, figures }: { kind: PettyCashReturnKind; figures: ReturnFigures }): boolean {
+  const needed = [
+    "counted_amount", "return_date",
+    ...(kind === "REDUCE" ? ["new_float_amount"] : []),
+    ...(figures.banked > 0 ? ["bank_account"] : []),
+    ...(figures.difference !== 0 && !access.isHidden("difference") ? ["difference_reason"] : []),
+  ];
+  return !allWritable(access, needed, RETURN_FOLLOWS, CREATING);
+}
 
 /** What a return will do with the cash counted. Every figure is kobo. */
 export interface ReturnFigures {
@@ -70,22 +101,30 @@ export function differenceSentence(figures: ReturnFigures, currency?: string | n
  * Why a float reduction cannot be sent yet, in the server's own terms, or null
  * when it can.
  */
-export function reduceProblem({ figures, newFloat, currentFloat, hasBank, reason, currency }: {
+export function reduceProblem({ figures, newFloat, currentFloat, hasBank, reason, currency, hideFloat, hideDifference }: {
   figures: ReturnFigures;
   newFloat: number;
   currentFloat: number;
   hasBank: boolean;
   reason: string;
   currency?: string | null;
+  /** The reader may not read the float before, so the message does not state it. */
+  hideFloat?: boolean;
+  /** The reader may not read the difference, so it is not judged for them. */
+  hideDifference?: boolean;
 }): string | null {
   const money = (kobo: number) => formatMoney(kobo, currency);
   if (newFloat <= 0) return "A float cut to nothing is a closure. Use Close fund instead.";
-  if (newFloat >= currentFloat) return `The new float must be lower than the current float of ${money(currentFloat)}.`;
+  if (newFloat >= currentFloat) {
+    return hideFloat
+      ? "The new float must be lower than the fund's current float."
+      : `The new float must be lower than the current float of ${money(currentFloat)}.`;
+  }
   if (figures.banked <= 0) {
     return `Nothing to bank: the count found no more than the new float of ${money(newFloat)}. Change the float with Edit fund instead.`;
   }
   if (!hasBank) return "Choose the bank account the cash goes into.";
-  if (figures.difference && !reason.trim()) return "The count differs from the books. Say why.";
+  if (!hideDifference && figures.difference && !reason.trim()) return "The count differs from the books. Say why.";
   return null;
 }
 
@@ -114,15 +153,17 @@ export function closeBlockers(fundId: number, vouchers: PettyCashVoucher[], retu
 }
 
 /** Why a closure cannot be sent yet, or null when it can. */
-export function closeProblem({ blockers, figures, hasBank, reason }: {
+export function closeProblem({ blockers, figures, hasBank, reason, hideDifference }: {
   blockers: string[];
   figures: ReturnFigures;
   hasBank: boolean;
   reason: string;
+  /** The reader may not read the difference, so it is not judged for them. */
+  hideDifference?: boolean;
 }): string | null {
   if (blockers.length) return blockers[0];
   if (figures.banked > 0 && !hasBank) return "Choose the bank account the cash goes into.";
-  if (figures.difference && !reason.trim()) return "The count differs from the books. Say why.";
+  if (!hideDifference && figures.difference && !reason.trim()) return "The count differs from the books. Say why.";
   return null;
 }
 
@@ -158,7 +199,7 @@ export function voidBlocker(ret: PettyCashReturn, { returns, fund, currency }: {
   if (ret.kind === "CLOSE" && fund.state !== "CLOSED") {
     return `The fund has been reopened since ${ret.document_number} closed it.`;
   }
-  if (fund.float_amount !== ret.new_float_amount) {
+  if (ret.new_float_amount != null && fund.float_amount !== ret.new_float_amount) {
     return `The float has changed since ${ret.document_number}. Put it back to ${formatMoney(ret.new_float_amount, currency)} first.`;
   }
   return null;

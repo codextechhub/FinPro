@@ -261,9 +261,11 @@ export const procurementExtApi = baseApi.injectEndpoints({
       invalidatesTags: ["ProcStock", "FinanceJournals"],
     }),
     // Between two branches' stores the receiving branch owes the cost through an
-    // inter-branch transfer, so the inter-branch lists refresh too.
+    // inter-branch transfer, so the inter-branch lists refresh too. The response
+    // omits `inter_branch_transfer_id`, and the receiving leg's store and balance,
+    // for a reader who may not see them.
     transferStock: b.mutation<
-      ApiEnvelope<{ movement: StockMovement; received: StockMovement; inter_branch_transfer_id: number | null; stock_item: StockItemDetail }>,
+      ApiEnvelope<{ movement: StockMovement; received: StockMovement; inter_branch_transfer_id?: number | null; stock_item: StockItemDetail }>,
       { id: number; entity: string; quantity: number; to_location: string | number; location?: string | number; movement_date?: string; reference?: string; narration?: string }
     >({
       query: ({ id, entity, ...body }) => ({ url: `/procurement/stock-items/${id}/transfer/${qs({ entity })}`, method: "POST", body }),

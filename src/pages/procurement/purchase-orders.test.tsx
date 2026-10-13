@@ -91,7 +91,7 @@ vi.mock("@/redux/services/dashboard/workflow-api", () => mocks.api({
 }));
 
 import { P } from "../../permissions";
-import PurchaseOrdersPage, { PurchaseOrderDrawer } from "./purchase-orders";
+import PurchaseOrdersPage, { EmailDetails, PurchaseOrderDrawer } from "./purchase-orders";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -184,5 +184,40 @@ describe("the purchase order export", () => {
     expect(mocks.state.exported).toEqual({ status: "PENDING_APPROVAL", search: "" });
     act(() => tab("Sent back").click());
     expect(mocks.state.exported).toEqual({ approval: "returned", search: "" });
+  });
+});
+
+/**
+ * Ade Stationers has two contact people who receive orders. The email preview
+ * tells each role what it may know of the recipients: the addresses, a bare
+ * count when it may not read the addresses, and nothing when it may not read
+ * the routing that chose the people either.
+ */
+describe("the purchase order email preview", () => {
+  const preview = (over: { recipients: string[]; recipient_count?: number }) => ({ bcc: ["procurement@bss.test"], subject: "Purchase order PO-0007", ...over });
+  const show = (value: ReturnType<typeof preview>) => act(() => root.render(<EmailDetails preview={value} loading={false} error={false} message="" onMessageChange={() => undefined} />));
+
+  it("lists the addresses for a role that may read them", () => {
+    show(preview({ recipients: ["ngozi@ade.test", "tunde@ade.test"], recipient_count: 2 }));
+    expect(container.textContent).toContain("To: ngozi@ade.test, tunde@ade.test");
+  });
+
+  it("gives the count alone when the addresses are withheld", () => {
+    show(preview({ recipients: [], recipient_count: 2 }));
+    expect(container.textContent).toContain("To: 2 recipients");
+    expect(container.textContent).not.toContain("ade.test");
+  });
+
+  it("says there is no recipient only when the server says there are none", () => {
+    show(preview({ recipients: [], recipient_count: 0 }));
+    expect(container.textContent).toContain("To: No recipient");
+  });
+
+  it("leaves the To line out when the role may not know who or how many", () => {
+    show(preview({ recipients: [] }));
+    expect(container.textContent).toContain("Subject:");
+    expect(container.textContent).toContain("BCC:");
+    expect(container.textContent).not.toContain("To:");
+    expect(container.textContent).not.toContain("No recipient");
   });
 });

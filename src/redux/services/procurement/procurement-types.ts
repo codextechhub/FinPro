@@ -34,8 +34,9 @@ export interface Vendor {
   // Absent from servers that do not report it.
   branch_id?: number | null;
   branch_name?: string | null;
-  category_id: number | null;
-  category_code: string | null;
+  /** Category, terms, KYC, risk and hold are each a Field Access field and absent when the role may not read them. */
+  category_id?: number | null;
+  category_code?: string | null;
   email?: string;
   phone?: string;
   address?: string;
@@ -50,23 +51,41 @@ export interface Vendor {
   default_expense_code?: string | null;
   default_wht_tax_code_id?: number | null;
   default_wht_tax_code_value?: string | null;
-  payment_terms: string;
-  kyc_status: string;
-  risk: string;
-  on_hold: boolean;
+  payment_terms?: string;
+  kyc_status?: string;
+  risk?: string;
+  on_hold?: boolean;
   is_active: boolean;
   active_po_count?: number;
-  contacts?: Array<{ id?: number; name: string; email: string; phone: string; is_primary: boolean; receives_rfqs: boolean; receives_purchase_orders: boolean; is_active: boolean }>;
+  /** Absent unless the role may read at least one of a contact's name, email and phone. */
+  contacts?: VendorContact[];
   _read_only_fields?: string[];
+}
+
+/**
+ * One person at a vendor, under `procurement.vendor_contact`. Each detail and
+ * each routing flag is its own Field Access field, so a row carries only the
+ * ones the role may read (`id` always).
+ */
+export interface VendorContact {
+  id?: number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  is_primary?: boolean;
+  receives_rfqs?: boolean;
+  receives_purchase_orders?: boolean;
+  is_active?: boolean;
 }
 
 export interface VendorSummary {
   active: number;
   inactive: number;
-  on_hold: number;
-  kyc_pending: number;
+  /** The three counts below are each withheld from a role that may not read the vendor field they count. */
+  on_hold?: number;
+  kyc_pending?: number;
   total_spend_ytd: number;
-  average_payment_days: number | null;
+  average_payment_days?: number | null;
 }
 
 export interface VendorInsights {
@@ -249,7 +268,10 @@ export interface PurchaseOrderEmailDelivery {
   parent_id: number | null;
 }
 export interface PurchaseOrderEmailPreview {
+  /** Empty for a role that may not read the addresses, or the routing that chose them. */
   recipients: string[];
+  /** Absent when the role may not read the routing flags that decide who is written to. */
+  recipient_count?: number;
   bcc: string[];
   subject: string;
   can_schedule: boolean;
@@ -453,7 +475,7 @@ export interface VendorInvoice {
   match_comparisons?: VendorInvoiceMatchComparison[];
   payments?: VendorInvoicePaymentHistory[];
   posting_lines?: { account_code: string; account_name: string; debit: number; credit: number }[];
-  activity?: { id: number; action: string; message: string; status: string; actor_name: string; created_at: string }[];
+  activity?: SourcingActivity[];
 }
 
 export interface VendorInvoiceSummary {
@@ -555,7 +577,7 @@ export interface VendorPayment {
   attachments?: DocumentAttachment[];
   workflow_instance_id?: string | null;
   posting_lines?: { account_code: string; account_name: string; debit: number; credit: number }[];
-  activity?: { id: number; action: string; message: string; status: string; actor_name: string; created_at: string }[];
+  activity?: SourcingActivity[];
 }
 
 // ── Sourcing & contracts ─────────────────────────────────────────────────────
@@ -617,11 +639,16 @@ export interface ContractLinkedPo {
   link_type: "linked" | "association";
 }
 
-// Sourcing activity feed row (finance-audit rows for one document).
+/**
+ * One row of a document's activity feed (a finance-audit row for that document).
+ * `message` is a figure-free sentence; `reason` is the free text a person gave
+ * for the act, empty when there is none.
+ */
 export interface SourcingActivity {
   id: number;
   action: string;
   message: string;
+  reason?: string;
   status: string;
   actor_name: string;
   created_at: string;
@@ -670,7 +697,8 @@ export interface RfqInvitation {
   submitted_at: string | null;
   declined_at: string | null;
   decline_reason: string;
-  recipients: Array<{ name: string; email: string }>;
+  /** Each row carries only the details the role may read; the list is empty when none may be shown. */
+  recipients: Array<{ name?: string; email?: string }>;
 }
 
 // List row (lean; counts are backend annotations).
@@ -862,26 +890,40 @@ export interface StockBalance {
   updated_at: string;
 }
 
+/**
+ * One stock-ledger event.
+ *
+ * Several keys are optional because the server leaves a value out rather than
+ * sending a blank: a transfer leg that booked an inter-branch document drops
+ * the value, balance, narration, reference, date and journal when the matching
+ * `finance.interbranch` switch is hidden for the reader, and the receiving
+ * store's leg drops the store and its running balance for a sender outside that
+ * store's reach. A key that is absent is not zero and not empty: render nothing
+ * for it, and drop a column no row carries.
+ */
 export interface StockMovement {
   id: number;
   stock_item_id: number;
   stock_item_code: string | null;
-  location_id: number | null;
-  location_code: string | null;
+  location_id?: number | null;
+  location_code?: string | null;
   movement_type: string;
-  movement_date: string;
+  movement_date?: string;
   quantity: string;
-  value_amount: number;
-  value_amount_naira: string;
+  value_amount?: number;
+  value_amount_naira?: string;
   /**
    * Running balance **at this movement's location**, not across the entity. The
    * ledger's balance column must say so once an entity has more than one store.
    */
-  balance_qty: string;
-  balance_value: number;
-  balance_value_naira: string;
-  reference: string;
-  narration: string;
+  balance_qty?: string;
+  balance_value?: number;
+  balance_value_naira?: string;
+  grn_id?: number | null;
+  journal_id?: number | null;
+  inter_branch_transfer_id?: number | null;
+  reference?: string;
+  narration?: string;
   /** Who the stock was issued to, when the issue named a cost centre. */
   cost_center_id: number | null;
   cost_center_name: string | null;

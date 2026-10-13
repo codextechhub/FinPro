@@ -22,7 +22,8 @@ import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField, Segmented,
   CustomerPicker, AccountPicker, BankAccountPicker, PostingRecap, toArray,
   type Column, type RecapRow,
-  PostingDateField, InfoHint,} from "@/components/finance-ui";
+  PostingDateField, InfoHint, useFieldAccess,
+} from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,7 @@ import {
   refundRequestBranch,
 } from "./refund-validation";
 import { BatchAdjustmentDrawer } from "./batch-adjustment-drawer";
+import { CUSTOMER_CREDIT_HIDDEN_NOTE, CUSTOMER_RESOURCE, customerCreditReadable } from "./customer-credit-access";
 import {
   useGetArAdjustmentsQuery, useCreateRefundMutation, usePostRefundMutation,
   useSubmitRefundMutation, useCreateWriteOffRequestMutation, usePostWriteOffRequestMutation,
@@ -108,6 +110,23 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/**
+ * Which of the refunds and write-offs figures the server sent. Refundable credit
+ * is null for a role that sees no refunds and absent for one that may not read
+ * customer balances; written-off is null for a role that sees no write-offs. A
+ * list still loading shows both, then settles on what arrived. The counts of
+ * pending and sent-back items always show, so the row holds two to four tiles.
+ */
+export function adjustmentKpiTiles(kpis: { written_off_ytd?: number | null; refundable_credit?: number | null } | undefined): {
+  showCredit: boolean; showWrittenOff: boolean; count: 2 | 3 | 4;
+} {
+  const showCredit = kpis ? kpis.refundable_credit !== null && kpis.refundable_credit !== undefined : true;
+  const showWrittenOff = kpis ? kpis.written_off_ytd !== null && kpis.written_off_ytd !== undefined : true;
+  return { showCredit, showWrittenOff, count: (2 + Number(showCredit) + Number(showWrittenOff)) as 2 | 3 | 4 };
+}
+
+const KPI_COLUMNS: Record<2 | 3 | 4, string> = { 2: "lg:grid-cols-2", 3: "lg:grid-cols-3", 4: "lg:grid-cols-4" };
+
 export function RefundsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
   const [searchParams] = useSearchParams();
@@ -138,6 +157,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
   // would always come back empty.
   const kinds = data?.kinds ?? ["REFUND", "WRITEOFF"];
   const bothKinds = kinds.length > 1;
+  const { showCredit, showWrittenOff, count: kpiCount } = adjustmentKpiTiles(data?.kpis);
   const resetPage = () => setPage(1);
   const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
 
@@ -153,11 +173,11 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
 
   return (
     <>
-      <div className={cn("mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2", bothKinds ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
-        {data?.kpis.refundable_credit !== null && (
+      <div className={cn("mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2", KPI_COLUMNS[kpiCount])}>
+        {showCredit && (
           <Stat label="Refundable credit" hint="Total customer credit available to refund." value={formatMoney(data?.kpis.refundable_credit ?? 0, currency)} />
         )}
-        {data?.kpis.written_off_ytd !== null && (
+        {showWrittenOff && (
           <Stat label="Written off (YTD)" value={formatMoney(data?.kpis.written_off_ytd ?? 0, currency)} />
         )}
         <Stat label={DOCUMENT_STATUS_WORDS.PENDING_APPROVAL} value={String(data?.kpis.pending ?? 0)} />
@@ -391,6 +411,7 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
   // draws on credit that must already exist on its own accounting date, so a customer
   // whose receipt lands next week has nothing to refund on a date before it - and the
   // list must not offer them, or the post fails with a 409 after the form is filled.
+  const creditReadable = customerCreditReadable(useFieldAccess(CUSTOMER_RESOURCE));
   const refundAvailabilityQ = useGetRefundAvailabilityQuery(
     {
       entity,
@@ -398,7 +419,7 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
       ...(date ? { as_of: date } : {}),
       ...(refundSearch ? { search: refundSearch } : {}),
     },
-    { skip: !open || wo || !date },
+    { skip: !open || wo || !date || !creditReadable },
   );
   const refundCustomers = useMemo(
     () => toArray(refundAvailabilityQ.data?.data),
@@ -581,10 +602,13 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
             )}
           </FormField>
         </div>
-        {!wo && refundAvailabilityQ.isError ? (
+        {!wo && !creditReadable ? (
+          <p data-testid="refund-credit-hidden" className="font-mont text-xs text-gray-05">{CUSTOMER_CREDIT_HIDDEN_NOTE} A refund is raised for one of them, so it cannot be started from this role.</p>
+        ) : null}
+        {!wo && creditReadable && refundAvailabilityQ.isError ? (
           <p className="font-mont text-xs text-destructive">Refundable customers could not be loaded. Try again.</p>
         ) : null}
-        {!wo && !refundAvailabilityQ.isFetching && !refundAvailabilityQ.isError
+        {!wo && creditReadable && !refundAvailabilityQ.isFetching && !refundAvailabilityQ.isError
           && refundAvailabilityQ.data && refundCustomers.length === 0 && !refundSearch ? (
             <p className="font-mont text-xs text-gray-05">
               No customer had credit available to refund as at {dates.day(date)}. Credit received

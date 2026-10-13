@@ -20,7 +20,17 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ split: vi.fn(), preview: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  split: vi.fn(), preview: vi.fn(),
+  fieldAccess: {} as Record<string, { hidden?: string[]; read_only?: string[] }>,
+}));
+
+vi.mock("@/hooks/use-permissions", () => ({
+  usePermissions: () => ({
+    hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true, hasModuleAccess: () => true,
+    fieldAccess: mocks.fieldAccess,
+  }),
+}));
 
 vi.mock("@/redux/services/finance/interbranch-api", () => ({
   useSplitBankAccountByBranchMutation: () => [mocks.split, { isLoading: false }],
@@ -36,6 +46,8 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import type { BankAccount } from "@/redux/services/finance/ops-types";
 import { BankSplitDrawer, canSplitAccount } from "./bank-split-drawer";
+import { splitIsWritable } from "./bank-split-model";
+import { resolveFieldAccess } from "@/components/finance-ui/field-access";
 import type { InterBranchReader } from "./inter-branch/use-inter-branch";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -65,6 +77,7 @@ const PREVIEW = {
 };
 
 beforeEach(() => {
+  mocks.fieldAccess = {};
   mocks.split.mockReset();
   mocks.preview.mockReset();
   mocks.preview.mockReturnValue({ data: undefined });
@@ -100,6 +113,16 @@ describe("who is offered the split", () => {
     expect(canSplitAccount(SHARED, { ...who, multiBranch: false })).toBe(false);
     expect(canSplitAccount({ ...SHARED, branch_id: 1 }, who)).toBe(false);
     expect(canSplitAccount({ ...SHARED, is_active: false }, who)).toBe(false);
+  });
+
+  it("is withheld from a reader who may not write something the split needs", () => {
+    const who = { multiBranch: true, wholeSchool: true, canUpdate: true };
+    for (const name of ["split_date", "agreement_reference", "opening_balance", "ledger_account_code", "ledger_account_name"]) {
+      const access = resolveFieldAccess({ "finance.bankaccount": { read_only: [name] } }, "finance.bankaccount");
+      expect(canSplitAccount(SHARED, { ...who, writable: splitIsWritable(access) })).toBe(false);
+    }
+    const treatmentOnly = resolveFieldAccess({ "finance.bankaccount": { read_only: ["difference_treatment"], hidden: ["legacy_balance"] } }, "finance.bankaccount");
+    expect(canSplitAccount(SHARED, { ...who, writable: splitIsWritable(treatmentOnly) })).toBe(true);
   });
 });
 
@@ -215,5 +238,143 @@ describe("splitting the account", () => {
     act(() => { button("Use these as the shares")?.click(); });
     expect(button("Split account")?.disabled).toBe(true);
     expect(document.body.textContent).toContain("₦25,000.00 on this account is in journals no branch holds yet.");
+  });
+});
+
+const BA = "finance.bankaccount";
+const mount = () => act(() => root.render(
+  <MemoryRouter>
+    <BankSplitDrawer account={SHARED} bookBalance={500_000_000} entity="BSS" currency="NGN" reader={READER} onClose={() => undefined} />
+  </MemoryRouter>,
+));
+const text = () => document.body.textContent ?? "";
+
+describe("Field Access on the split form", () => {
+  it("leaves out the shared balance and what restates it when the balance is hidden", () => {
+    mocks.fieldAccess = { [BA]: { hidden: ["legacy_balance"] } };
+    mocks.preview.mockReturnValue({ data: { data: { bank_account_id: 7, unbranched_balance: 0, split_date: "2026-09-30", branches: PREVIEW.branches } } });
+    mount();
+    expect(text()).not.toContain("Book balance to share");
+    expect(text()).not.toContain("Left to place");
+    expect(text()).toContain("Agreed so far");
+    expect(text()).not.toContain("₦5,000,000.00");
+  });
+
+  it("leaves out the branch table and its button when the branch list is hidden", () => {
+    mocks.fieldAccess = { [BA]: { hidden: ["branches"] } };
+    mocks.preview.mockReturnValue({ data: { data: { bank_account_id: 7, legacy_balance: 500_000_000, unbranched_balance: 0, split_date: "2026-09-30" } } });
+    mount();
+    expect(text()).not.toContain("Each branch's entries on this account");
+    expect(button("Use these as the shares")).toBeUndefined();
+    expect(text()).toContain("Book balance to share");
+  });
+
+  it("drops the as-of date and the treatment note when the date and the treatment are hidden", () => {
+    mocks.fieldAccess = { [BA]: { hidden: ["split_date", "difference_treatment"] } };
+    mocks.preview.mockReturnValue({ data: { data: { bank_account_id: 7, legacy_balance: 500_000_000, unbranched_balance: 0, branches: PREVIEW.branches } } });
+    mount();
+    expect(text()).not.toContain("Book balances as of");
+    expect(text()).not.toContain("A branch under its share owes");
+    expect(document.body.querySelector('[role="radiogroup"]')).toBeNull();
+    expect(text()).not.toContain("Where a branch's entries differ");
+    expect(mocks.preview).toHaveBeenLastCalledWith({ id: 7, entity: "BSS", split_date: undefined });
+  });
+
+  it("never asks the preview for a split date the reader may not read", () => {
+    mocks.fieldAccess = { [BA]: { hidden: ["split_date"] } };
+    mocks.preview.mockReturnValue({ data: undefined });
+    mount();
+    expect(mocks.preview).toHaveBeenLastCalledWith({ id: 7, entity: "BSS", split_date: undefined });
+  });
+
+  it("greys a read-only treatment and does not send it", async () => {
+    mocks.fieldAccess = { [BA]: { read_only: ["difference_treatment"] } };
+    mocks.split.mockReturnValue({ unwrap: () => Promise.resolve({ data: { legacy_bank_account_id: 7 } }) });
+    mount();
+    expect(document.body.querySelector('[data-field="difference_treatment"]')?.hasAttribute("disabled")).toBe(true);
+    const money = inputs().filter((i) => i.inputMode === "decimal");
+    type(money[0], "3000000");
+    type(money[1], "2000000");
+    const codes = inputs().filter((i) => i.inputMode === "numeric");
+    type(codes[0], "1111");
+    type(codes[1], "1112");
+    type(inputs().find((i) => i.getAttribute("aria-label") === "Split date"), "2026-09-30");
+    type(inputs().find((i) => i.placeholder.startsWith("e.g. Bursars")), "Minute 14/2026");
+    await act(async () => { button("Split account")?.click(); });
+    await act(async () => { button("Split account")?.click(); await Promise.resolve(); });
+    const body = mocks.split.mock.calls[0][0];
+    expect(body).not.toHaveProperty("difference_treatment");
+    expect(body.split_date).toBe("2026-09-30");
+    expect(body.allocations).toHaveLength(2);
+  });
+});
+
+describe("Field Access on the split result", () => {
+  const RESULT = {
+    legacy_bank_account_id: 7, legacy_balance: 500_000_000, journal_ids: [1, 2], difference_treatment: "DEBT" as const,
+    bank_accounts: [
+      { id: 21, name: "GTBank - Ikeja", branch_id: 1, gl_account_id: 31, gl_account_code: "1111", opening_balance: 600_000_000, is_primary: true, is_primary_collection: false },
+      { id: 22, name: "GTBank - Lekki", branch_id: 2, gl_account_id: 32, gl_account_code: "1112", opening_balance: -100_000_000, is_primary: false, is_primary_collection: false },
+    ],
+    inter_branch_transfers: [{ id: 55, document_number: "IBT-0055", from_branch_id: 1, to_branch_id: 2, amount: 40_000_000 }],
+  };
+
+  async function splitWith(result: Record<string, unknown>) {
+    mocks.split.mockReturnValue({ unwrap: () => Promise.resolve({ data: result }) });
+    mount();
+    const money = inputs().filter((i) => i.inputMode === "decimal");
+    type(money[0], "6000000");
+    type(money[1], "1000000");
+    act(() => { inputs().find((i) => i.getAttribute("aria-label") === "Lekki's share is an overdraft")?.click(); });
+    const codes = inputs().filter((i) => i.inputMode === "numeric");
+    type(codes[0], "1111");
+    type(codes[1], "1112");
+    type(inputs().find((i) => i.getAttribute("aria-label") === "Split date"), "2026-09-30");
+    type(inputs().find((i) => i.placeholder.startsWith("e.g. Bursars")), "Minute 14/2026");
+    await act(async () => { button("Split account")?.click(); });
+    await act(async () => { button("Split account")?.click(); await Promise.resolve(); });
+  }
+
+  it("shows no new-accounts section when the reader may not see the accounts opened", async () => {
+    mocks.fieldAccess = { [BA]: { hidden: ["bank_accounts"] } };
+    const { bank_accounts: _hidden, ...rest } = RESULT;
+    await splitWith(rest);
+    expect(text()).toContain("Split done");
+    expect(text()).not.toContain("New branch accounts");
+    expect(text()).toContain("Lekki owes Ikeja");
+  });
+
+  it("shows no debts section, and does not claim nothing is owed, when the debts are hidden", async () => {
+    mocks.fieldAccess = { [BA]: { hidden: ["inter_branch_transfers"] } };
+    const { inter_branch_transfers: _hidden, ...rest } = RESULT;
+    await splitWith(rest);
+    expect(text()).toContain("New branch accounts");
+    expect(text()).not.toContain("owed between");
+    expect(text()).not.toContain("nothing is owed");
+  });
+
+  it("words a debt with its amount only where the amount was sent, always naming both branches", async () => {
+    mocks.fieldAccess = {};
+    await splitWith({ ...RESULT, inter_branch_transfers: [{ id: 55, to_branch_id: 2, from_branch_id: 1 }, { id: 56, to_branch_id: 1, from_branch_id: 2, amount: 10_000_000 }] });
+    expect(text()).toContain("Lekki owes Ikeja");
+    expect(text()).not.toContain("Lekki owes Ikeja ₦");
+    expect(text()).toContain("Ikeja owes Lekki ₦100,000.00");
+    expect(document.body.querySelectorAll("a")).toHaveLength(0);
+  });
+
+  it("names the branch of a new account whatever the map lists", async () => {
+    mocks.fieldAccess = { [BA]: { hidden: ["branch", "split_branch"] } };
+    await splitWith(RESULT);
+    expect(text()).toContain("Ikeja · ledger 1111");
+    expect(text()).toContain("Lekki · ledger 1112");
+  });
+
+  it("leaves out the ledger and agreed balance of a new account that its switches hide", async () => {
+    mocks.fieldAccess = { [BA]: { hidden: ["ledger_account_code", "opening_balance"] } };
+    // Their writes are closed too, so the form cannot be completed; the result is judged on its own.
+    mocks.split.mockReturnValue({ unwrap: () => Promise.resolve({ data: RESULT }) });
+    mount();
+    expect(text()).toContain("Agreed so far");
+    expect(document.body.querySelector('[data-field="opening_balance"]')).toBeNull();
   });
 });

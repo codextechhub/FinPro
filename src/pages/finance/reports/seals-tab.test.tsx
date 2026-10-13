@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   result: { data: undefined as unknown, isFetching: false, isError: false, error: undefined as unknown },
   wholeSchool: true,
   denied: new Set<string>(),
+  access: {} as Record<string, { hidden?: string[] }>,
+  yearArgs: [] as unknown[],
   lens: { applies: true, pinnedBranch: null, branch: "all", choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false },
 }));
 
@@ -24,7 +26,7 @@ vi.mock("@/redux/services/finance/records-api", () => ({
 }));
 
 vi.mock("@/redux/services/finance/ops-api", () => ({
-  useGetFiscalYearsQuery: () => ({ data: { data: [{ id: 7, year: 2026, start_date: "2026-01-01", end_date: "2026-12-31", status: "OPEN" }] } }),
+  useGetFiscalYearsQuery: (args: unknown) => (mocks.yearArgs.push(args), { data: { data: [{ id: 7, year: 2026, start_date: "2026-01-01", end_date: "2026-12-31", status: "OPEN" }] } }),
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -33,6 +35,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasAnyPermission: () => true,
     hasAllPermissions: () => true,
     hasModuleAccess: () => true,
+    fieldAccess: mocks.access,
   }),
 }));
 
@@ -74,6 +77,8 @@ beforeEach(() => {
   mocks.result = { data: undefined, isFetching: false, isError: false, error: undefined };
   mocks.wholeSchool = true;
   mocks.denied = new Set();
+  mocks.access = {};
+  mocks.yearArgs = [];
 });
 
 afterEach(async () => {
@@ -140,5 +145,97 @@ describe("Closed figures", () => {
     await render();
 
     expect(container.textContent).toContain("Your role can't verify the closed figures");
+  });
+});
+
+/** A result with the parts a role's Field Access closed taken out, the way the server omits them. */
+const withoutParts = (check: Record<string, unknown>, ...names: string[]) => {
+  const copy = { ...check };
+  for (const name of names) delete copy[name];
+  return copy;
+};
+
+const showResult = async (data: unknown) => {
+  mocks.result = { data: { data }, isFetching: false, isError: false, error: undefined };
+  await render();
+};
+
+describe("Closed figures with parts a Field Access switch closed", () => {
+  it("draws a row from the parts that remain when the checksum, counts and names are closed", async () => {
+    await showResult({
+      ok: false, checked: 2, mismatches: 1, chain_breaks: [],
+      checks: [
+        withoutParts(MARCH, "seal_checksum", "line_count", "line_count_now"),
+        withoutParts(APRIL, "label", "kind", "fiscal_year", "period_id", "seal_id", "line_count", "line_count_now"),
+      ],
+    });
+
+    const text = container.textContent ?? "";
+    expect(text).toContain("March 2026 (FY2026)");
+    expect(text).toContain("Month closed");
+    expect(text).not.toContain("ledger lines");
+    expect(text).not.toContain("NaN");
+    expect(text).not.toContain("undefined");
+    expect(text).toContain("Closed month or year 1");
+    expect(text).toContain("1 ledger line was added");
+  });
+
+  it("draws no balance table when the moved balances and their sentence are closed", async () => {
+    await showResult({ ok: false, checked: 1, mismatches: 1, chain_breaks: [], checks: [withoutParts(APRIL, "differences", "summary")] });
+
+    expect(container.textContent).toContain("Differs");
+    expect(container.textContent).not.toContain("Closed debit");
+    expect(container.textContent).not.toContain("1 ledger line was added");
+  });
+
+  it("draws no verdict banner and no badge when the verdict is closed, keeping the list", async () => {
+    await showResult({
+      chain_breaks: [], checks: [withoutParts(MARCH, "ok"), withoutParts(APRIL, "ok")],
+    });
+
+    expect(container.querySelector("[role='status']")?.textContent).toBe("Every close follows the close before it.");
+    expect(container.textContent).not.toContain("Matches");
+    expect(container.textContent).not.toContain("Differs");
+    expect(container.textContent).toContain("April 2026 (FY2026)");
+  });
+
+  it("states the broken chain on its own when only the chain is readable", async () => {
+    await showResult({ chain_breaks: [12] });
+
+    expect(container.querySelector("[role='status']")?.textContent).toBe("1 close does not follow the close before it.");
+    expect(container.querySelector("ul")).toBeNull();
+  });
+
+  it("states the verdict without the chain when the chain is closed", async () => {
+    await showResult({ ok: false, checked: 3, mismatches: 0 });
+
+    expect(container.textContent).toContain("The closed figures do not all match the ledger.");
+    await showResult({ ok: true, checked: 3, mismatches: 0 });
+    expect(container.textContent).toContain("All 3 closed months and years still match the ledger.");
+  });
+
+  it("leaves out the whole list when it is closed, and a row with nothing readable", async () => {
+    await showResult({ ok: true, checked: 2, mismatches: 0, chain_breaks: [] });
+    expect(container.querySelector("ul")).toBeNull();
+    expect(container.textContent).toContain("All 2 closed months and years still match");
+
+    await showResult({ ok: true, checked: 2, mismatches: 0, chain_breaks: [], checks: [{}, {}] });
+    expect(container.querySelector("ul")).toBeNull();
+  });
+
+  it("says neutrally that nothing is readable when every part is closed", async () => {
+    await showResult({});
+
+    expect(container.textContent).toContain("none of its results are in your access");
+  });
+
+  it("asks for archived years only when the role may read the archive state", async () => {
+    await render();
+    expect(mocks.yearArgs.at(-1)).toEqual({ entity: "BRIGHTSTAR", include_archived: "true" });
+
+    mocks.access = { "finance.fiscalyear": { hidden: ["archived_at", "is_archived"] } };
+    mocks.yearArgs = [];
+    await render();
+    expect(mocks.yearArgs.at(-1)).toEqual({ entity: "BRIGHTSTAR" });
   });
 });

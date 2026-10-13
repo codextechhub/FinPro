@@ -207,8 +207,11 @@ export const arApi = baseApi.injectEndpoints({
     getArAdjustments: builder.query<
       {
         pagination: Pagination;
-        /** A KPI drawn from a kind the reader may not see is `null`. */
-        kpis: { written_off_ytd: number | null; pending: number; sent_back?: number; refundable_credit: number | null };
+        /**
+         * A KPI drawn from a kind the reader may not see is `null`. The refundable
+         * credit is also absent for a role that may not read customer balances.
+         */
+        kpis: { written_off_ytd: number | null; pending: number; sent_back?: number; refundable_credit?: number | null };
         /** The row kinds this reader receives: refunds need the refund key, write-offs theirs. */
         kinds: ("REFUND" | "WRITEOFF")[];
         data: ArAdjustment[];
@@ -377,7 +380,7 @@ export const arApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/customers/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceCustomers"],
     }),
-    createCustomer: builder.mutation<ApiEnvelope<Customer>, { entity: string; branch?: number; opening_branch?: number; name: string; billing_email: string; billing_phone: string; billing_address?: string; receivable_account?: string; opening_balance?: number; opening_date?: string; is_active?: boolean }>({
+    createCustomer: builder.mutation<ApiEnvelope<Customer>, { entity: string; branch?: number; opening_branch?: number; name: string; billing_email?: string; billing_phone?: string; billing_address?: string; receivable_account?: string; opening_balance?: number; opening_date?: string; is_active?: boolean }>({
       query: ({ entity, ...body }) => ({ url: `/finance/customers/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceCustomers"],
     }),

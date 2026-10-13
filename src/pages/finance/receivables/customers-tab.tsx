@@ -3,11 +3,22 @@
  * prototype's shape: KPI cards (total / receivable / in-credit / overdue), search
  * + status filter, an avatar table with each customer's net balance and status,
  * a server-side Export, New customer, and a rich detail drawer (with the Customer Statement tab).
+ *
+ * Field Access (`finance.customer`): a customer's code and name carry no switch
+ * and are always shown. Every other column and card follows its own switch and
+ * is left out, header and cells together, when the role may not read it: the
+ * contact column needs the billing email or phone, the balance column and the
+ * receivable and in-credit cards need the balance, the status column and the
+ * overdue card need the account status or the active flag, and the "Pays for"
+ * mark needs its count. The status tabs filter on the account status, so they
+ * are offered only when it is readable (and the Inactive tab only when the
+ * active flag is), and the filter is never sent for a field the role cannot
+ * read, which the server would refuse.
  */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { Search, Plus, FileUp } from "lucide-react";
-import { DataTable, toArray, type Column } from "@/components/finance-ui";
+import { DataTable, toArray, useFieldAccess, type Column } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
@@ -22,6 +33,7 @@ import { NewCustomerDrawer } from "./new-customer-drawer";
 import { CustomerDetailDrawer } from "./customer-detail-drawer";
 import { OpeningImportDrawer } from "./opening-import-drawer";
 
+const CUSTOMER = "finance.customer";
 const STATUS_TABS = [
   { key: "", label: "All" }, { key: "ACTIVE", label: "Active" }, { key: "OVERDUE", label: "Overdue" },
   { key: "CREDIT", label: "In credit" }, { key: "INACTIVE", label: "Inactive" },
@@ -47,7 +59,21 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
   );
 }
 
-const statusOf = (c: Customer) => (!c.is_active ? "INACTIVE" : c.account_status ?? "ACTIVE");
+/**
+ * The status a row's pill shows: inactive when the active flag says so, else the
+ * account status. A role that may not read one of the two leaves the other to
+ * answer; a row carrying neither has no status.
+ */
+export function statusOf(c: Customer): keyof typeof STATUS_LABEL | null {
+  if (c.is_active === false) return "INACTIVE";
+  return c.account_status ?? (c.is_active ? "ACTIVE" : null);
+}
+
+/** The status tabs a role may use: the filter needs the account status, the Inactive tab the active flag. */
+export function statusTabsFor(statusReadable: boolean, activeReadable: boolean) {
+  if (!statusReadable) return [];
+  return STATUS_TABS.filter((t) => t.key !== "INACTIVE" || activeReadable);
+}
 
 /**
  * The mark on a payer's row: "Pays for 2" when the account pays other
@@ -66,6 +92,7 @@ export function CustomersTab({ entity, currency }: { entity: string; currency?: 
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const { can } = useCan();
+  const access = useFieldAccess(CUSTOMER);
   useActionParam("new", can(P.FIN_CREATE_CUSTOMER), () => setNewOpen(true));
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -78,7 +105,11 @@ export function CustomersTab({ entity, currency }: { entity: string; currency?: 
     setPage(1);
   }
 
-  const listParams = useMemo(() => ({ entity, page, ...(search ? { search } : {}), ...(status ? { status } : {}) }), [entity, page, search, status]);
+  const statusReadable = !access.isHidden("account_status");
+  const activeReadable = !access.isHidden("is_active");
+  const tabs = statusTabsFor(statusReadable, activeReadable);
+  const statusFilter = statusReadable ? status : "";
+  const listParams = useMemo(() => ({ entity, page, ...(search ? { search } : {}), ...(statusFilter ? { status: statusFilter } : {}) }), [entity, page, search, statusFilter]);
   const { data, isLoading, isFetching, isError, refetch } = useGetCustomersQuery(listParams);
   const { data: summaryRes } = useGetCustomerSummaryQuery({ entity, ...(search ? { search } : {}) });
   const rows = toArray<Customer>(data?.data);
@@ -86,6 +117,8 @@ export function CustomersTab({ entity, currency }: { entity: string; currency?: 
   const sum = summaryRes?.data;
   const counts = sum?.status_counts ?? {};
 
+  const showContact = access.anyVisible("billing_email", "billing_phone");
+  const showStatus = statusReadable || activeReadable;
   const columns: Column<Customer>[] = [
     { header: "Code", cell: (c) => <span className="font-semibold tabular-nums">{c.code}</span> },
     { header: "Customer", cell: (c) => {
@@ -97,15 +130,18 @@ export function CustomersTab({ entity, currency }: { entity: string; currency?: 
         </span>
       );
     } },
-    { header: "Contact", cell: (c) => <span className="text-gray-05">{c.billing_email || c.billing_phone || "-"}</span> },
-    { header: "Balance", align: "right", cell: (c) => {
+    ...(showContact ? [{ header: "Contact", cell: (c: Customer) => <span className="text-gray-05">{c.billing_email || c.billing_phone || "-"}</span> }] : []),
+    ...(!access.isHidden("balance") ? [{ header: "Balance", align: "right" as const, cell: (c: Customer) => {
       const bal = c.balance ?? 0;
       if (bal === 0) return <span className="text-gray-05">-</span>;
       return bal < 0
         ? <span className="block text-right tabular-nums text-green-01">{formatMoney(-bal, currency)} cr</span>
         : <span className="block text-right tabular-nums">{formatMoney(bal, currency)}</span>;
-    } },
-    { header: "Status", cell: (c) => { const s = statusOf(c); return <span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[s])}>{STATUS_LABEL[s]}</span>; } },
+    } }] : []),
+    ...(showStatus ? [{ header: "Status", cell: (c: Customer) => {
+      const s = statusOf(c);
+      return s ? <span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[s])}>{STATUS_LABEL[s]}</span> : null;
+    } }] : []),
   ];
 
   return (
@@ -113,20 +149,23 @@ export function CustomersTab({ entity, currency }: { entity: string; currency?: 
       {/* KPI cards */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Total customers" value={String(sum?.total ?? 0)} />
-        <Kpi label="Total receivable" value={formatMoney(sum?.receivable.kobo ?? 0, currency)} hint="Across open invoices" />
-        <Kpi label="Customers in credit" value={String(sum?.on_credit ?? 0)} />
-        <Kpi label="Overdue accounts" value={String(sum?.overdue ?? 0)} />
+        {!access.isHidden("receivable") ? <Kpi label="Total receivable" value={formatMoney(sum?.receivable?.kobo ?? 0, currency)} hint="Across open invoices" /> : null}
+        {!access.isHidden("on_credit") ? <Kpi label="Customers in credit" value={String(sum?.on_credit ?? 0)} /> : null}
+        {!access.isHidden("overdue") ? <Kpi label="Overdue accounts" value={String(sum?.overdue ?? 0)} /> : null}
       </div>
 
       {/* status tabs */}
-      <div className="flex flex-wrap items-center gap-1 rounded-md border border-white-02 bg-white p-1">
-        {STATUS_TABS.map((t) => (
-          <button key={t.key} onClick={() => setStatus(t.key)}
-            className={cn("rounded-md px-3 py-1.5 font-mont text-xs font-semibold", status === t.key ? "bg-primary text-white" : "text-gray-05 hover:bg-gray-50 hover:text-gray-01")}>
-            {t.label} <span className="ml-1 opacity-70">{t.key ? (counts[t.key] ?? 0) : (sum?.total ?? 0)}</span>
-          </button>
-        ))}
-      </div>
+      {tabs.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1 rounded-md border border-white-02 bg-white p-1">
+          {tabs.map((t) => (
+            <button key={t.key} onClick={() => setStatus(t.key)}
+              className={cn("rounded-md px-3 py-1.5 font-mont text-xs font-semibold", statusFilter === t.key ? "bg-primary text-white" : "text-gray-05 hover:bg-gray-50 hover:text-gray-01")}>
+              {t.label}
+              {t.key === "" ? <span className="ml-1 opacity-70">{sum?.total ?? 0}</span> : sum?.status_counts ? <span className="ml-1 opacity-70">{counts[t.key] ?? 0}</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {/* search + actions */}
       <div className="flex flex-wrap items-center gap-2">
@@ -135,14 +174,10 @@ export function CustomersTab({ entity, currency }: { entity: string; currency?: 
           <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search code or name" className="h-9 w-64 pl-8 font-mont text-sm" />
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {/* Was a client-side CSV of the current page that wrote billing_email
-              and billing_phone straight out of the row. Those are `sensitive` on
-              the customers dataset and need exports.sensitive_field.export - a
-              gate a CSV built in the browser cannot apply. The server-side
-              export both covers every matching row and honours the gate. */}
+          {/* Server-side export: covers every matching row and applies the sensitive-field gate */}
           <QuickExportButton
             screen="finance.customers"
-            params={{ search, status }}
+            params={{ search, status: statusFilter }}
             entity={entity}
             typeface="geist"
             defaultName="Customer master"

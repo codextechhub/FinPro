@@ -32,6 +32,7 @@ export function ActivityFeed({
       {items.map((item) => (
         <div key={item.key} className="py-3 first:pt-0">
           <p className="font-mont text-sm font-medium">{item.message}</p>
+          {item.reason ? <p className="mt-1 whitespace-pre-line break-words font-mont text-xs text-gray-01">Reason: {item.reason}</p> : null}
           <p className="mt-1 font-mont text-xs text-gray-05">
             {item.actorName || (item.actorId ? resolveActorName?.(item.actorId) : "System") || "System"} · {activityAge(item.occurredAt)}
           </p>

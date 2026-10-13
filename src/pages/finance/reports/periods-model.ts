@@ -9,7 +9,7 @@ export interface PeriodSummary {
   progressed: number;
 }
 
-export type YearCloseState = "EMPTY" | "OPEN_PERIODS" | "FINAL_LOCKED" | "READY" | "SEALED";
+export type YearCloseState = "EMPTY" | "OPEN_PERIODS" | "FINAL_LOCKED" | "READY" | "SEALED" | "UNCHECKED";
 
 export function summarizePeriods(periods: FiscalPeriod[]): PeriodSummary {
   const summary: PeriodSummary = {
@@ -30,19 +30,35 @@ export function summarizePeriods(periods: FiscalPeriod[]): PeriodSummary {
   return summary;
 }
 
+/**
+ * Whether the months carry their close state. A role whose Field Access closes
+ * the state receives months without it, and no count, progress or readiness
+ * judgement can be drawn from them.
+ */
+export function periodStatesReadable(periods: FiscalPeriod[]): boolean {
+  return periods.length > 0 && periods.every((period) => period.status !== undefined);
+}
+
+/** The action a month offers; a month whose state is unreadable offers the neutral review. */
 export function periodActionLabel(status: FiscalPeriod["status"]): string {
-  if (status === "OPEN") return "Review close";
+  if (status === undefined || status === "OPEN") return "Review close";
   if (status === "SOFT_CLOSED") return "Continue close";
   if (status === "CLOSED") return "Re-open or lock";
   return "View locked period";
 }
 
+/**
+ * Where a year stands. An open year whose months carry no close state cannot be
+ * judged ready or blocked, so it reads `UNCHECKED`, and the server decides when
+ * the close is asked for.
+ */
 export function yearCloseState(
   fiscalYearStatus: string,
   periods: FiscalPeriod[],
 ): YearCloseState {
   if (fiscalYearStatus !== "OPEN") return "SEALED";
   if (periods.length === 0) return "EMPTY";
+  if (!periodStatesReadable(periods)) return "UNCHECKED";
   if (periods.some((period) => period.status === "OPEN")) return "OPEN_PERIODS";
   const finalPeriod = periods.reduce((latest, period) => (
     period.end_date > latest.end_date ? period : latest

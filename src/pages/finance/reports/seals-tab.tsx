@@ -22,6 +22,8 @@ import { CheckCircle2, ShieldCheck, TriangleAlert } from "lucide-react";
 
 import { Money, useReaderBranchLens } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
+import { includeArchivedArg } from "@/components/finance-ui/archived-years";
+import { useCalendarFieldAccess } from "@/components/finance-ui/calendar-access";
 import { EmptyState, ErrorState, ForbiddenState, LoadingState } from "@/components/finance-ui/states";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Button } from "@/components/ui/button";
@@ -43,24 +45,36 @@ const KIND_LABEL: Record<string, string> = {
   YEAR_CLOSED: "Year closed",
 };
 
-/** The one-line verdict above the list. */
-export function sealVerdict(result: Pick<SealVerification, "ok" | "checked" | "mismatches" | "chain_breaks">): string {
-  if (result.checked === 0) return "No month or year has been closed yet. Its figures are stored when it closes.";
+/**
+ * The one-line verdict above the list, drawn from the parts of the result the
+ * reader may read. The overall verdict (`ok`, `checked`, `mismatches`) travels
+ * as one switch and the broken chain as another, so either may be missing:
+ * `null` when neither is there to say anything.
+ */
+export function sealVerdict(result: Pick<SealVerification, "ok" | "checked" | "mismatches" | "chain_breaks">): string | null {
+  const broken = result.chain_breaks?.length ?? 0;
+  const chain = `${broken} ${broken === 1 ? "close does" : "closes do"} not follow the close before it.`;
+  const verdictShown = result.ok !== undefined || result.checked !== undefined || result.mismatches !== undefined;
+  if (!verdictShown) return result.chain_breaks === undefined ? null : broken ? chain : "Every close follows the close before it.";
+  const checked = result.checked;
+  if (checked === 0) return "No month or year has been closed yet. Its figures are stored when it closes.";
   const things = (n: number) => `${n} closed ${n === 1 ? "month or year" : "months and years"}`;
-  if (result.ok) return `All ${things(result.checked)} still match the ledger.`;
+  if (result.ok) return checked === undefined ? "The closed figures still match the ledger." : `All ${things(checked)} still match the ledger.`;
   const parts = [];
-  if (result.mismatches) parts.push(`${result.mismatches} of ${things(result.checked)} differ from the ledger.`);
-  if (result.chain_breaks.length) {
-    parts.push(`${result.chain_breaks.length} ${result.chain_breaks.length === 1 ? "close does" : "closes do"} not follow the close before it.`);
+  if (result.mismatches) {
+    parts.push(checked === undefined
+      ? `${result.mismatches} closed ${result.mismatches === 1 ? "month or year differs" : "months and years differ"} from the ledger.`
+      : `${result.mismatches} of ${things(checked)} differ from the ledger.`);
   }
-  return parts.join(" ");
+  if (broken) parts.push(chain);
+  return parts.length ? parts.join(" ") : "The closed figures do not all match the ledger.";
 }
 
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const tdCls = "border-t border-white-02 px-3 py-2 font-mont text-xs";
 
 function Differences({ check, showBranch, currency }: { check: SealCheck; showBranch: boolean; currency?: string | null }) {
-  if (!check.differences.length) return null;
+  if (!check.differences?.length) return null;
   return (
     <div className="mt-3 overflow-x-auto rounded-md border border-white-02">
       <table className="w-full min-w-[560px]">
@@ -91,25 +105,39 @@ function Differences({ check, showBranch, currency }: { check: SealCheck; showBr
   );
 }
 
-function CheckRow({ check, showBranch, currency }: { check: SealCheck; showBranch: boolean; currency?: string | null }) {
+/**
+ * One seal that was checked, from whichever of its parts the reader may read:
+ * its name, the line "kind, stored when, lines sealed and now", whether it
+ * matches, the sentence about what failed and the balances that moved. A part
+ * that is missing is left out, and a row with no part left is not drawn.
+ */
+function CheckRow({ check, showBranch, currency, position }: { check: SealCheck; showBranch: boolean; currency?: string | null; position: number }) {
   const dates = useDates();
+  const meta = [
+    check.kind !== undefined ? KIND_LABEL[check.kind] ?? check.kind : null,
+    check.sealed_at !== undefined ? `stored ${dates.dateTime(check.sealed_at)}` : null,
+    check.line_count !== undefined ? `${check.line_count} ledger ${check.line_count === 1 ? "line" : "lines"}` : null,
+  ].filter(Boolean);
+  const nowCount = check.line_count_now !== undefined && check.line_count_now !== check.line_count
+    ? `${check.line_count_now} now` : null;
+  const metaLine = [meta.join(" · "), nowCount].filter(Boolean).join(", ");
+  const title = check.label ?? (check.kind !== undefined || check.fiscal_year !== undefined ? null : `Closed month or year ${position}`);
   return (
-    <li className={cn("rounded-md border bg-white p-3", check.ok ? "border-white-02" : "border-red-200 bg-red-50/40")}>
+    <li className={cn("rounded-md border bg-white p-3", check.ok === false ? "border-red-200 bg-red-50/40" : "border-white-02")}>
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-mont text-sm font-semibold text-gray-01">{check.label}</p>
-          <p className="mt-0.5 font-mont text-[11px] text-gray-05">
-            {KIND_LABEL[check.kind] ?? check.kind} · stored {dates.dateTime(check.sealed_at)} · {check.line_count} ledger {check.line_count === 1 ? "line" : "lines"}
-            {check.line_count_now !== check.line_count ? `, ${check.line_count_now} now` : ""}
-          </p>
+          {title ? <p className="font-mont text-sm font-semibold text-gray-01">{title}</p> : null}
+          {metaLine ? <p className={cn("font-mont text-[11px] text-gray-05", title && "mt-0.5")}>{metaLine}</p> : null}
         </div>
-        <span className={cn(
-          "inline-flex items-center gap-1 rounded px-2 py-0.5 font-mont text-[11px] font-medium",
-          check.ok ? "bg-green-01/10 text-green-01" : "bg-destructive/10 text-destructive",
-        )}>
-          {check.ok ? <CheckCircle2 className="size-3" /> : <TriangleAlert className="size-3" />}
-          {check.ok ? "Matches" : "Differs"}
-        </span>
+        {check.ok !== undefined ? (
+          <span className={cn(
+            "inline-flex items-center gap-1 rounded px-2 py-0.5 font-mont text-[11px] font-medium",
+            check.ok ? "bg-green-01/10 text-green-01" : "bg-destructive/10 text-destructive",
+          )}>
+            {check.ok ? <CheckCircle2 className="size-3" /> : <TriangleAlert className="size-3" />}
+            {check.ok ? "Matches" : "Differs"}
+          </span>
+        ) : null}
       </div>
       {check.summary ? <p className="mt-2 font-mont text-xs leading-5 text-gray-01">{check.summary}</p> : null}
       <Differences check={check} showBranch={showBranch} currency={currency} />
@@ -117,13 +145,20 @@ function CheckRow({ check, showBranch, currency }: { check: SealCheck; showBranc
   );
 }
 
+/** Whether a row carries anything to draw after the reader's switches. */
+const hasContent = (check: SealCheck) => Object.keys(check).length > 0;
+
+/** Failed seals first, a seal whose verdict is hidden last. */
+const failedFirst = (a: SealCheck, b: SealCheck) => Number(a.ok ?? true) - Number(b.ok ?? true);
+
 export function SealsReport({ entity, currency }: { entity: string; currency?: string | null }) {
   const { can } = useCan();
   const { wholeSchool, canWholeSchool } = useWholeSchoolAccess();
   const showBranch = useReaderBranchLens().applies;
   const allowed = canWholeSchool(P.FIN_VIEW_SEALS);
   const [year, setYear] = useState("");
-  const yearsQ = useGetFiscalYearsQuery({ entity, include_archived: "true" }, { skip: !allowed });
+  const { archiveReadable } = useCalendarFieldAccess();
+  const yearsQ = useGetFiscalYearsQuery({ entity, ...includeArchivedArg(archiveReadable) }, { skip: !allowed });
   const years = useMemo(
     () => [...toArray(yearsQ.data?.data)].sort((a, b) => b.year - a.year),
     [yearsQ.data],
@@ -139,6 +174,9 @@ export function SealsReport({ entity, currency }: { entity: string; currency?: s
 
   const run = () => { void verify({ entity, ...(year ? { fiscal_year: Number(year) } : {}) }); };
   const data = result.data?.data;
+  const verdict = data ? sealVerdict(data) : null;
+  const good = data ? (data.ok ?? !(data.chain_breaks?.length)) : true;
+  const checks = data?.checks ? data.checks.filter(hasContent).sort(failedFirst) : [];
 
   return (
     <div className="space-y-5">
@@ -169,19 +207,26 @@ export function SealsReport({ entity, currency }: { entity: string; currency?: s
         </div>
       ) : (
         <>
-          <div role="status" className={cn(
-            "flex items-start gap-2.5 rounded-md px-4 py-3 ring-1",
-            data.ok ? "bg-green-01/5 ring-green-01/25" : "bg-destructive/5 ring-destructive/25",
-          )}>
-            {data.ok
-              ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-01" />
-              : <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />}
-            <p className={cn("font-mont text-sm font-semibold", data.ok ? "text-gray-01" : "text-destructive")}>{sealVerdict(data)}</p>
-          </div>
-          {data.checks.length ? (
+          {verdict ? (
+            <div role="status" className={cn(
+              "flex items-start gap-2.5 rounded-md px-4 py-3 ring-1",
+              good ? "bg-green-01/5 ring-green-01/25" : "bg-destructive/5 ring-destructive/25",
+            )}>
+              {good
+                ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-01" />
+                : <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />}
+              <p className={cn("font-mont text-sm font-semibold", good ? "text-gray-01" : "text-destructive")}>{verdict}</p>
+            </div>
+          ) : null}
+          {!verdict && checks.length === 0 ? (
+            <div className="rounded-md border border-white-02 bg-white">
+              <EmptyState title="Nothing to show" message="The check ran, and none of its results are in your access." />
+            </div>
+          ) : null}
+          {checks.length ? (
             <ul className="space-y-2">
-              {[...data.checks].sort((a, b) => Number(a.ok) - Number(b.ok)).map((check) => (
-                <CheckRow key={check.seal_id} check={check} showBranch={showBranch} currency={currency} />
+              {checks.map((check, index) => (
+                <CheckRow key={check.seal_id ?? index} check={check} position={index + 1} showBranch={showBranch} currency={currency} />
               ))}
             </ul>
           ) : null}

@@ -12,6 +12,11 @@
  * archived year: at a school that has archived nothing it would change nothing,
  * so it is absent rather than a dead control. Once on, it stays offered so it
  * can be turned off again.
+ *
+ * A role that may not read whether a year is archived (Field Access,
+ * `finance.fiscalyear`) is offered no switch and never asks for archived years:
+ * the server refuses that request, and the lists it would show are the ones
+ * the role cannot tell apart from the rest.
  */
 
 import { useCallback, useMemo } from "react";
@@ -19,6 +24,7 @@ import { useSearchParams } from "react-router";
 import { Archive } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useCalendarFieldAccess } from "./calendar-access";
 import { useGetFiscalYearsQuery } from "@/redux/services/finance/ops-api";
 import { toArray } from "@/redux/services/finance/api-types";
 import type { FiscalYear } from "@/redux/services/finance/ops-types";
@@ -31,10 +37,15 @@ export function includeArchivedArg(show: boolean): { include_archived?: "true" }
   return show ? { include_archived: "true" } : {};
 }
 
-/** Whether archived years are shown on this tab, and the setter that keeps it in the address. */
+/**
+ * Whether archived years are shown on this tab, and the setter that keeps it in
+ * the address. Always false for a role that may not read the archive state, even
+ * when the address asks for it.
+ */
 export function useShowArchived(): [boolean, (next: boolean) => void] {
   const [params, setParams] = useSearchParams();
-  const show = params.get(SHOW_ARCHIVED_PARAM) === "1";
+  const { archiveReadable } = useCalendarFieldAccess();
+  const show = archiveReadable && params.get(SHOW_ARCHIVED_PARAM) === "1";
   const set = useCallback((next: boolean) => {
     setParams((current) => {
       const updated = new URLSearchParams(current);
@@ -48,9 +59,10 @@ export function useShowArchived(): [boolean, (next: boolean) => void] {
 
 /** The school's archived years, newest first. Shares the year list's cache. */
 export function useArchivedYears(entity: string | null | undefined): { years: FiscalYear[]; isLoading: boolean } {
+  const { archiveReadable } = useCalendarFieldAccess();
   const { data, isLoading } = useGetFiscalYearsQuery(
     { entity: entity ?? "", include_archived: "true" },
-    { skip: !entity },
+    { skip: !entity || !archiveReadable },
   );
   const years = useMemo(
     () => toArray(data?.data).filter((year) => year.is_archived).sort((a, b) => b.year - a.year),

@@ -14,6 +14,7 @@ import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api
 import { toArray } from "@/redux/services/finance/api-types";
 import { taxCodeSupportsUsage, type TaxCodeUsage } from "./tax-code-usage";
 import { useBranches } from "../../host";
+import { useFieldAccess } from "./field-access";
 
 interface PickerProps {
   entity: string;
@@ -48,13 +49,18 @@ export function AccountPicker({ entity, value, onChange, label, placeholder = "S
  * on hand, is not narrowed. At a school with one branch, or while the
  * document's branch is not known (undefined), every account is offered, and so
  * is every account from a server whose rows do not name their bank.
+ *
+ * A role that may not read the ledger account of a bank account gets no
+ * `bank_account_id`, but the row still carries the bank's `bank_branch_id`, so
+ * a row naming a branch is treated as bank-backed.
  */
 export function depositAccountFits(
   account: { bank_account_id?: number | null; bank_branch_id?: number | null },
   documentBranch: number | null | undefined,
   multiBranch: boolean,
 ): boolean {
-  if (!multiBranch || documentBranch === undefined || account.bank_account_id == null) return true;
+  const bankBacked = account.bank_account_id != null || account.bank_branch_id != null;
+  if (!multiBranch || documentBranch === undefined || !bankBacked) return true;
   return (account.bank_branch_id ?? null) === documentBranch;
 }
 
@@ -87,8 +93,21 @@ export function ReceivableAccountPicker({ entity, value, onChange, label, placeh
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} />;
 }
 
-/** The list CustomerPicker reads; `useCustomerBranch` reads the same cache. */
-const customerListArgs = (entity: string) => ({ entity, is_active: "true", page_size: 100 });
+/**
+ * The list CustomerPicker reads; `useCustomerBranch` reads the same cache.
+ *
+ * Only active customers are asked for, unless the reader's role may not read
+ * the active flag: a filter on a hidden field is refused, so the picker then
+ * lists every customer rather than naming a field it cannot see.
+ */
+const customerListArgs = (entity: string, activeOnly: boolean) => ({
+  entity, ...(activeOnly ? { is_active: "true" } : {}), page_size: 100,
+});
+
+/** Whether the picker may ask for active customers only (the active flag is readable). */
+function useActiveFilter(): boolean {
+  return !useFieldAccess("finance.customer").isHidden("is_active");
+}
 
 /**
  * Customer / payer picker. List-backed (grows per entity) → reveal-on-search.
@@ -100,7 +119,8 @@ const customerListArgs = (entity: string) => ({ entity, is_active: "true", page_
  * that does not know `?own=` lists every customer, as before.
  */
 export function CustomerPicker({ entity, value, onChange, label, placeholder = "Select customer", isRequired, disabled, own }: PickerProps & { own?: boolean }) {
-  const { data, isLoading } = useGetCustomersQuery({ ...customerListArgs(entity), ...(own ? { own: "true" } : {}) });
+  const activeOnly = useActiveFilter();
+  const { data, isLoading } = useGetCustomersQuery({ ...customerListArgs(entity, activeOnly), ...(own ? { own: "true" } : {}) });
   const options = toArray(data?.data).map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }));
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
 }
@@ -113,7 +133,8 @@ export function CustomerPicker({ entity, value, onChange, label, placeholder = "
  * request of its own.
  */
 export function useCustomerBranch(entity: string, code: string): number | null | undefined {
-  const { data } = useGetCustomersQuery(customerListArgs(entity), { skip: !code });
+  const activeOnly = useActiveFilter();
+  const { data } = useGetCustomersQuery(customerListArgs(entity, activeOnly), { skip: !code });
   if (!code) return undefined;
   return toArray(data?.data).find((c) => c.code === code)?.branch_id;
 }
@@ -226,7 +247,7 @@ export function bankAccountPays(
 export function BankAccountPicker({ entity, value, onChange, label, placeholder = "Select bank account", isRequired, disabled, documentBranchId, documentBranchIds }: PickerProps & { documentBranchId?: number | null; documentBranchIds?: (number | null | undefined)[] }) {
   const { data, isLoading } = useGetBankAccountsQuery({ entity, page: 1 });
   const { data: branchRows } = useBranches();
-  const accounts = toArray(data?.data).filter((a) => a.is_active);
+  const accounts = toArray(data?.data).filter((a) => a.is_active !== false);
   const accountBranches = new Set(accounts.map((a) => a.branch_id).filter((b) => b != null));
   const multiBranch = (branchRows?.length ?? 0) > 1 || accountBranches.size > 1;
   const documents = [documentBranchId, ...(documentBranchIds ?? [])].filter((b): b is number | null => b !== undefined);

@@ -11,6 +11,7 @@ import {
   PostingRecap,
   Segmented,
   toArray,
+  useFieldAccess,
   type RecapRow,
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
@@ -20,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
 import { gatedBatchRows, isBatchGateRefusal } from "./adjustment-approval";
+import { CUSTOMER_CREDIT_HIDDEN_NOTE, CUSTOMER_RESOURCE, customerCreditReadable } from "./customer-credit-access";
 import { useAdjustmentGate } from "./use-adjustment-gate";
 import {
   useCreateArAdjustmentBatchMutation,
@@ -102,9 +104,10 @@ export function BatchAdjustmentDrawer({
   // Every line in the batch shares one posting date, so eligibility is asked for as at
   // that date. A customer whose credit arrives after it has nothing to refund, and an
   // invoice raised after it cannot be written off - neither may be offered.
+  const creditReadable = customerCreditReadable(useFieldAccess(CUSTOMER_RESOURCE));
   const refundAvailability = useGetRefundAvailabilityQuery(
     { entity, page_size: 100, ...(date ? { as_of: date } : {}) },
-    { skip: !open || writeOff || !date },
+    { skip: !open || writeOff || !date || !creditReadable },
   );
   const invoices = useGetInvoicesQuery(
     { entity, status: "POSTED", page_size: 100 },
@@ -310,6 +313,11 @@ export function BatchAdjustmentDrawer({
             value === "REFUND" ? !canCreateRefund : !canCreateWriteOff
           )}
         />
+        {!writeOff && !creditReadable ? (
+          <p data-testid="refund-credit-hidden" className="font-mont text-xs text-gray-05">
+            {CUSTOMER_CREDIT_HIDDEN_NOTE} A refund batch is built from them, so it cannot be started from this role.
+          </p>
+        ) : null}
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Metric label="Lines" value={String(lines.length)} />

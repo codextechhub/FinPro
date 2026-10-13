@@ -14,7 +14,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { List, CreditCard, BookOpen, BellRing, Activity, Printer, Check, Globe } from "lucide-react";
-import { DetailDrawer, DocumentEmailAction, Money, StatusPill, ConfirmActionModal, TabStrip, type TabStripItem } from "@/components/finance-ui";
+import { DetailDrawer, DocumentEmailAction, Money, StatusPill, ConfirmActionModal, TabStrip, useFieldAccess, type TabStripItem } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState, EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { P } from "../../../permissions";
 import { useGetInvoiceDetailQuery, useRemindInvoiceMutation } from "@/redux/services/finance/ar-api";
 import { useGetTaxCodesQuery } from "@/redux/services/finance/setup-api";
 import { toArray } from "@/redux/services/finance/api-types";
+import type { ArMoney } from "@/redux/services/finance/ar-types";
 import { lineTreatment } from "../../../utils/tax-treatment";
 import { openInvoiceDocument } from "@/utils/finance-documents";
 import { RecordPaymentModal } from "./record-payment-modal";
@@ -61,6 +62,31 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
       <p className="font-mont text-[11px] text-gray-05">{label}</p>
       <div className="mt-1 font-mont text-sm font-semibold tabular-nums text-black-01">{children}</div>
     </div>
+  );
+}
+
+/**
+ * What part of this invoice is still deferred income and what has been released
+ * to revenue. Each figure is a `finance.deferredincome` field of its own: a
+ * role that may not read one is sent the block without it, and the sentence
+ * then carries the other alone; with neither, or with nothing deferred, there
+ * is no note.
+ */
+export function DeferredIncomeNote({ block, currency }: {
+  block?: { pending?: ArMoney; released?: ArMoney } | null; currency?: string | null;
+}) {
+  const access = useFieldAccess("finance.deferredincome", block);
+  const pending = block?.pending && !access.isHidden("pending") ? block.pending : null;
+  const released = block?.released && !access.isHidden("released") ? block.released : null;
+  if (!(pending && pending.kobo > 0) && !(released && released.kobo > 0)) return null;
+  const figure = (money: ArMoney) => <span className="font-semibold text-gray-01"><Money kobo={money.kobo} currency={currency} /></span>;
+  return (
+    <p className="rounded-md border border-white-02 bg-gray-01/5 px-3 py-2 font-mont text-xs text-gray-05">
+      Deferred income:{" "}
+      {pending ? <>{figure(pending)} still to be released{released ? "," : "."}</> : null}
+      {pending && released ? " " : null}
+      {released ? <>{figure(released)} released to revenue.</> : null}
+    </p>
   );
 }
 
@@ -212,12 +238,7 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
             buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
           />
 
-          {tab === "lines" && d.deferred_income && (d.deferred_income.pending.kobo > 0 || d.deferred_income.released.kobo > 0) ? (
-            <p className="rounded-md border border-white-02 bg-gray-01/5 px-3 py-2 font-mont text-xs text-gray-05">
-              Deferred income: <span className="font-semibold text-gray-01"><Money kobo={d.deferred_income.pending.kobo} currency={currency} /></span> still to be released,
-              {" "}<span className="font-semibold text-gray-01"><Money kobo={d.deferred_income.released.kobo} currency={currency} /></span> released to revenue.
-            </p>
-          ) : null}
+          {tab === "lines" ? <DeferredIncomeNote block={d.deferred_income} currency={currency} /> : null}
 
           {tab === "lines" && (
             d.lines.length === 0 ? <EmptyState title="No lines" /> : (

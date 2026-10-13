@@ -30,7 +30,8 @@ vi.mock("@/hooks/use-permissions", () => ({
 }));
 
 import {
-  fieldWriteErrors, resolveFieldAccess, useFieldAccess, type FieldAccess, type FieldAccessMap,
+  allWritable, errorsBesideFollowed, fieldWriteErrors, isReadOnlyFollowing, resolveFieldAccess, useFieldAccess, writableOnlyFollowing,
+  type FieldAccess, type FieldAccessMap,
 } from "./field-access";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -268,5 +269,40 @@ describe("useFieldAccess", () => {
     act(() => root.render(createElement(Probe)));
     expect(seen!.isHidden("phone")).toBe(false);
     act(() => root.unmount());
+  });
+});
+
+describe("a body key that follows a response name", () => {
+  const FOLLOWS = { bank_account: "bank_account_name" } as const;
+
+  it("is read-only when the detail record locks the name it follows, though it lists no alias", () => {
+    const access = resolveFieldAccess({}, VENDOR, { bank_account_name: "GTBank", _read_only_fields: ["bank_account_name"] });
+    expect(access.isReadOnly("bank_account")).toBe(false);
+    expect(isReadOnlyFollowing(access, "bank_account", FOLLOWS)).toBe(true);
+    expect(writableOnlyFollowing(access, { bank_account: 3, narration: "x" }, FOLLOWS)).toEqual({ narration: "x" });
+  });
+
+  it("is read-only when the map lists the alias itself", () => {
+    const access = resolveFieldAccess({ [VENDOR]: { read_only: ["bank_account"] } }, VENDOR);
+    expect(isReadOnlyFollowing(access, "bank_account", FOLLOWS)).toBe(true);
+  });
+
+  it("is writable when neither entry is locked", () => {
+    const access = resolveFieldAccess({}, VENDOR);
+    expect(isReadOnlyFollowing(access, "bank_account", FOLLOWS)).toBe(false);
+    expect(allWritable(access, ["bank_account", "narration"], FOLLOWS)).toBe(true);
+  });
+
+  it("makes a form unfinishable when one of its required keys is locked", () => {
+    const access = resolveFieldAccess({ [VENDOR]: { hidden: ["bank_account_name"], read_only: ["bank_account_name"] } }, VENDOR);
+    expect(allWritable(access, ["bank_account", "narration"], FOLLOWS)).toBe(false);
+  });
+});
+
+describe("a refusal keyed by a body key", () => {
+  it("also answers to the response name the key follows", () => {
+    const errors = errorsBesideFollowed({ bank_account: "No." }, { bank_account: "bank_account_name" });
+    expect(errors).toEqual({ bank_account: "No.", bank_account_name: "No." });
+    expect(errorsBesideFollowed(null, { bank_account: "bank_account_name" })).toBeNull();
   });
 });

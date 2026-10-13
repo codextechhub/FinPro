@@ -15,6 +15,12 @@
  * application asks the reader to confirm posting without approval and sends
  * the same request again. The form only reports what came back: the server's
  * message, and the approval block when nobody can approve it.
+ *
+ * Every field of a return follows Field Access (`finance.pettycash_return`).
+ * A field the reader may not read leaves the form and the preview with every
+ * sentence that would restate it; a field they may not change is greyed and
+ * left out of the request. A return the server needs a field for, and the
+ * reader cannot set, is not offered: the form says so and Send stays off.
  */
 
 import { useMemo, useState } from "react";
@@ -22,8 +28,9 @@ import { toast } from "sonner";
 import { Ban, Landmark, Pencil, RotateCcw } from "lucide-react";
 
 import {
-  BankAccountPicker, ConfirmActionModal, DetailDrawer, FormField, MoneyInput, PostingDateField,
-  PostingRecap, ReasonField, hasReason, toArray,
+  AccessField, BankAccountPicker, ConfirmActionModal, DetailDrawer, FormField, MoneyInput, PostingDateField,
+  PostingRecap, ReasonField, errorsBesideFollowed, fieldWriteErrors, hasReason, toArray, useFieldAccess,
+  writableOnlyFollowing, type FieldAccess, type FieldErrors,
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -40,8 +47,8 @@ import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-type
 import { P } from "../../../permissions";
 import { useDates } from "../../../lib/display-prefs";
 import {
-  closeFigures, closeProblem, differenceSentence, fundEditProblem, reduceFigures, reduceProblem,
-  type ReturnFigures,
+  PETTY_CASH_RETURN, RETURN_FOLLOWS, closeFigures, closeProblem, differenceSentence, fundEditProblem,
+  raiseBlocked, reduceFigures, reduceProblem, type ReturnFigures,
 } from "./petty-cash-returns";
 
 const NOTE = "rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] leading-5 text-gray-05";
@@ -56,35 +63,53 @@ function useBankName(entity: string, id: string): string {
 }
 
 /** The count against the books, and where the cash goes, before it is sent. */
-function ReturnSummary({ fund, figures, bankName, currency, floatAfter }: {
+function ReturnSummary({ fund, figures, bankName, currency, floatAfter, access }: {
   fund: PettyCashFund;
   figures: ReturnFigures;
   bankName: string;
   currency?: string | null;
   floatAfter: number;
+  access: FieldAccess;
 }) {
   const money = (kobo: number) => formatMoney(kobo, currency);
-  const differs = differenceSentence(figures, currency);
+  const showAmount = !access.isHidden("amount");
+  const showDifference = !access.isHidden("difference");
+  const differs = showDifference ? differenceSentence(figures, currency) : null;
   const pettyCash = { code: fund.gl_account, name: "Petty cash" };
   const dr = [
-    ...(figures.banked ? [{ code: "Bank", name: bankName || "the bank account", amount: figures.banked }] : []),
-    ...(figures.shortage ? [{ code: "Cash over and short", name: "", amount: figures.shortage }] : []),
-    ...(figures.overage ? [{ ...pettyCash, amount: figures.overage }] : []),
+    ...(showAmount && figures.banked ? [{ code: "Bank", name: bankName || "the bank account", amount: figures.banked }] : []),
+    ...(showDifference && figures.shortage ? [{ code: "Cash over and short", name: "", amount: figures.shortage }] : []),
+    ...(showDifference && figures.overage ? [{ ...pettyCash, amount: figures.overage }] : []),
   ];
   const cr = [
-    ...(figures.banked ? [{ ...pettyCash, amount: figures.banked }] : []),
-    ...(figures.shortage ? [{ ...pettyCash, amount: figures.shortage }] : []),
-    ...(figures.overage ? [{ code: "Cash over and short", name: "", amount: figures.overage }] : []),
+    ...(showAmount && figures.banked ? [{ ...pettyCash, amount: figures.banked }] : []),
+    ...(showDifference && figures.shortage ? [{ ...pettyCash, amount: figures.shortage }] : []),
+    ...(showDifference && figures.overage ? [{ code: "Cash over and short", name: "", amount: figures.overage }] : []),
   ];
+  const floatBefore = !access.isHidden("previous_float_amount");
+  const floatKept = !access.isHidden("new_float_amount");
+  const rows: [string, React.ReactNode][] = [
+    ...(!access.isHidden("book_balance") ? [["Books say", money(fund.current_balance)] as [string, React.ReactNode]] : []),
+    ...(!access.isHidden("counted_amount") ? [["Counted", money(figures.banked + figures.tinKeeps)] as [string, React.ReactNode]] : []),
+    ...(showAmount ? [["To the bank", <span key="b" className="font-semibold">{money(figures.banked)}</span>] as [string, React.ReactNode]] : []),
+    ...(!access.isHidden("cash_left") ? [["Tin keeps", money(figures.tinKeeps)] as [string, React.ReactNode]] : []),
+  ];
+  const floatRow: [string, string] | null = floatBefore && floatKept
+    ? ["Float", `${money(fund.float_amount)} to ${money(floatAfter)}`]
+    : floatBefore ? ["Float before", money(fund.float_amount)]
+      : floatKept ? ["Float after", money(floatAfter)] : null;
   return (
     <div className="space-y-3" data-testid="return-summary">
-      <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 rounded-md bg-white p-3 font-mont text-xs ring-1 ring-white-02 sm:grid-cols-2">
-        <div className="flex justify-between gap-2"><dt className="text-gray-05">Books say</dt><dd className="tabular-nums">{money(fund.current_balance)}</dd></div>
-        <div className="flex justify-between gap-2"><dt className="text-gray-05">Counted</dt><dd className="tabular-nums">{money(figures.banked + figures.tinKeeps)}</dd></div>
-        <div className="flex justify-between gap-2"><dt className="text-gray-05">To the bank</dt><dd className="font-semibold tabular-nums">{money(figures.banked)}</dd></div>
-        <div className="flex justify-between gap-2"><dt className="text-gray-05">Tin keeps</dt><dd className="tabular-nums">{money(figures.tinKeeps)}</dd></div>
-        <div className="flex justify-between gap-2 sm:col-span-2"><dt className="text-gray-05">Float</dt><dd className="tabular-nums">{money(fund.float_amount)} to {money(floatAfter)}</dd></div>
-      </dl>
+      {rows.length || floatRow ? (
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 rounded-md bg-white p-3 font-mont text-xs ring-1 ring-white-02 sm:grid-cols-2">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-2"><dt className="text-gray-05">{label}</dt><dd className="tabular-nums">{value}</dd></div>
+          ))}
+          {floatRow ? (
+            <div className="flex justify-between gap-2 sm:col-span-2"><dt className="text-gray-05">{floatRow[0]}</dt><dd className="tabular-nums">{floatRow[1]}</dd></div>
+          ) : null}
+        </dl>
+      ) : null}
       {differs ? (
         <p className={cn("rounded-md px-3 py-2 font-mont text-xs font-medium", figures.shortage ? "bg-destructive/5 text-destructive" : "bg-green-01/10 text-green-01")} data-testid="return-difference">
           {differs}
@@ -93,6 +118,24 @@ function ReturnSummary({ fund, figures, bankName, currency, floatAfter }: {
       {dr.length ? <PostingRecap title="What this posts" dr={dr} cr={cr} currency={currency} stackOnMobile /> : null}
     </div>
   );
+}
+
+/** The note shown where a return cannot be raised because a field it needs is out of this reader's hands. */
+function BlockedNote() {
+  return (
+    <p className={PROBLEM} role="alert" data-testid="raise-blocked">
+      Your access does not let you fill in every field this return needs, so it cannot be raised from here. Ask an administrator.
+    </p>
+  );
+}
+
+/** The sentence under the count that states what the books and the float hold, naming only what the reader may read. */
+function booksLine(access: FieldAccess, fund: PettyCashFund, currency: string | null | undefined, withFloat: boolean): string | null {
+  const parts = [
+    ...(!access.isHidden("book_balance") ? [`The books say ${formatMoney(fund.current_balance, currency)}.`] : []),
+    ...(withFloat && !access.isHidden("previous_float_amount") ? [`The float is ${formatMoney(fund.float_amount, currency)}.`] : []),
+  ];
+  return parts.length ? parts.join(" ") : null;
 }
 
 /**
@@ -118,6 +161,8 @@ const APPROVAL_NOTE = "If the school uses an approval route for petty cash retur
 export function ReduceFloatDrawer({ fund, entity, currency, onClose, onRaised }: {
   fund: PettyCashFund; entity: string; currency?: string | null; onClose: () => void; onRaised: ReturnRaised;
 }) {
+  const access = useFieldAccess(PETTY_CASH_RETURN);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [touched, touch] = useTouched();
   const [counted, setCounted] = useState(fund.current_balance);
   const [newFloat, setNewFloat] = useState(0);
@@ -128,19 +173,28 @@ export function ReduceFloatDrawer({ fund, entity, currency, onClose, onRaised }:
   const [reduce, { isLoading }] = useReducePettyCashFloatMutation();
   const bankName = useBankName(entity, bank);
   const figures = reduceFigures({ counted, book: fund.current_balance, newFloat });
-  const problem = reduceProblem({ figures, newFloat, currentFloat: fund.float_amount, hasBank: !!bank, reason, currency });
+  const hideDifference = access.isHidden("difference");
+  const problem = reduceProblem({
+    figures, newFloat, currentFloat: fund.float_amount, hasBank: !!bank, reason, currency,
+    hideFloat: access.isHidden("previous_float_amount"), hideDifference,
+  });
+  const blocked = raiseBlocked(access, { kind: "REDUCE", figures });
+  const errors = errorsBesideFollowed(denied, RETURN_FOLLOWS);
 
   const submit = async () => {
     try {
       const res = await reduce({
-        id: fund.id, entity, counted_amount: counted, new_float_amount: newFloat, return_date: date,
-        bank_account: bank, difference_reason: figures.difference ? reason.trim() : undefined,
-        reference: reference.trim() || undefined,
+        id: fund.id, entity,
+        ...writableOnlyFollowing(access, {
+          counted_amount: counted, new_float_amount: newFloat, return_date: date,
+          bank_account: bank, difference_reason: figures.difference ? reason.trim() : undefined,
+          reference: reference.trim() || undefined,
+        }, RETURN_FOLLOWS, { creating: true }),
       }).unwrap();
       toast.success(res.message || "Float reduced.");
       onClose();
       onRaised(res.data?.approval);
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
@@ -150,28 +204,31 @@ export function ReduceFloatDrawer({ fund, entity, currency, onClose, onRaised }:
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !!problem || !date} onClick={submit} className="gap-1.5">
-          <Landmark className="size-4" />{isLoading ? "Saving…" : `Bank ${formatMoney(figures.banked, currency)}`}
+        <Button disabled={isLoading || blocked || !!problem || !date} onClick={submit} className="gap-1.5">
+          <Landmark className="size-4" />{isLoading ? "Saving…" : access.isHidden("amount") ? "Bank the cash" : `Bank ${formatMoney(figures.banked, currency)}`}
         </Button>
       </>}
     >
       <div className="space-y-4">
         <p className={NOTE}>Count the cash in the tin first. Everything above the new float goes back to the bank, and any difference from the books goes to Cash over and short.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Cash counted" required><MoneyInput valueKobo={counted} onChangeKobo={touch(setCounted)} currency={currency} className="[&_input]:h-9" /></FormField>
-          <FormField label="New float" required><MoneyInput valueKobo={newFloat} onChangeKobo={touch(setNewFloat)} currency={currency} className="[&_input]:h-9" /></FormField>
+          <AccessField access={access} name="counted_amount" label="Cash counted" required creating errors={errors}><MoneyInput valueKobo={counted} onChangeKobo={touch(setCounted)} currency={currency} className="[&_input]:h-9" /></AccessField>
+          <AccessField access={access} name="new_float_amount" label="New float" required creating errors={errors}><MoneyInput valueKobo={newFloat} onChangeKobo={touch(setNewFloat)} currency={currency} className="[&_input]:h-9" /></AccessField>
         </div>
-        <p className="-mt-2 font-mont text-[11px] text-gray-05">The books say {formatMoney(fund.current_balance, currency)}. The float is {formatMoney(fund.float_amount, currency)}.</p>
+        {booksLine(access, fund, currency, true) ? <p className="-mt-2 font-mont text-[11px] text-gray-05">{booksLine(access, fund, currency, true)}</p> : null}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Into bank account" required><BankAccountPicker entity={entity} value={bank} onChange={touch(setBank)} documentBranchId={fund.branch_id} /></FormField>
-          <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
+          <AccessField access={access} name="bank_account_name" label="Into bank account" required creating errors={errors}><BankAccountPicker entity={entity} value={bank} onChange={touch(setBank)} documentBranchId={fund.branch_id} /></AccessField>
+          <AccessField access={access} name="return_date" creating errors={errors}><PostingDateField label="Date" entity={entity} value={date} onChange={setDate} /></AccessField>
         </div>
-        {figures.difference ? (
-          <ReasonField label="Why the count differs" value={reason} onChange={touch(setReason)} placeholder="e.g. coins missing" hint="Kept on the return and the audit record." />
+        {figures.difference || hideDifference ? (
+          <AccessField access={access} name="difference_reason" creating errors={errors}>
+            <ReasonField label={hideDifference ? "Reason for any difference" : "Why the count differs"} value={reason} onChange={touch(setReason)} placeholder="e.g. coins missing" hint={hideDifference ? "Needed when the count differs from the books." : "Kept on the return and the audit record."} />
+          </AccessField>
         ) : null}
-        <FormField label="Reference"><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Deposit slip number" className="h-9 bg-white" /></FormField>
-        <ReturnSummary fund={fund} figures={figures} bankName={bankName} currency={currency} floatAfter={newFloat} />
-        {problem && touched ? <p className={PROBLEM} role="alert">{problem}</p> : null}
+        <AccessField access={access} name="reference" label="Reference" creating errors={errors}><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Deposit slip number" className="h-9 bg-white" /></AccessField>
+        <ReturnSummary fund={fund} figures={figures} bankName={bankName} currency={currency} floatAfter={newFloat} access={access} />
+        {blocked ? <BlockedNote /> : null}
+        {problem && touched && !blocked ? <p className={PROBLEM} role="alert">{problem}</p> : null}
         <p className="font-mont text-[11px] text-gray-05">{APPROVAL_NOTE}</p>
       </div>
     </DetailDrawer>
@@ -186,6 +243,8 @@ export function CloseFundDrawer({ fund, entity, currency, blockers, onClose, onR
   fund: PettyCashFund; entity: string; currency?: string | null; blockers: string[]; onClose: () => void; onRaised: ReturnRaised;
 }) {
   const dates = useDates();
+  const access = useFieldAccess(PETTY_CASH_RETURN);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [touched, touch] = useTouched();
   const [counted, setCounted] = useState(fund.current_balance);
   const [bank, setBank] = useState("");
@@ -195,19 +254,25 @@ export function CloseFundDrawer({ fund, entity, currency, blockers, onClose, onR
   const [close, { isLoading }] = useClosePettyCashFundMutation();
   const bankName = useBankName(entity, bank);
   const figures = closeFigures({ counted, book: fund.current_balance });
-  const problem = closeProblem({ blockers, figures, hasBank: !!bank, reason });
+  const hideDifference = access.isHidden("difference");
+  const problem = closeProblem({ blockers, figures, hasBank: !!bank, reason, hideDifference });
+  const blocked = raiseBlocked(access, { kind: "CLOSE", figures });
+  const errors = errorsBesideFollowed(denied, RETURN_FOLLOWS);
 
   const submit = async () => {
     try {
       const res = await close({
-        id: fund.id, entity, counted_amount: counted, return_date: date,
-        bank_account: bank || undefined, difference_reason: figures.difference ? reason.trim() : undefined,
-        reference: reference.trim() || undefined,
+        id: fund.id, entity,
+        ...writableOnlyFollowing(access, {
+          counted_amount: counted, return_date: date,
+          bank_account: bank || undefined, difference_reason: figures.difference ? reason.trim() : undefined,
+          reference: reference.trim() || undefined,
+        }, RETURN_FOLLOWS, { creating: true }),
       }).unwrap();
       toast.success(res.message || "Fund closed.");
       onClose();
       onRaised(res.data?.approval);
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
@@ -217,7 +282,7 @@ export function CloseFundDrawer({ fund, entity, currency, blockers, onClose, onR
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !!problem || !date} onClick={submit} className="gap-1.5 bg-error-01 text-white hover:bg-error-01/90">
+        <Button disabled={isLoading || blocked || !!problem || !date} onClick={submit} className="gap-1.5 bg-error-01 text-white hover:bg-error-01/90">
           <Ban className="size-4" />{isLoading ? "Closing…" : "Close fund"}
         </Button>
       </>}
@@ -231,20 +296,23 @@ export function CloseFundDrawer({ fund, entity, currency, blockers, onClose, onR
         ) : null}
         <p className={NOTE}>Count the cash in the tin. All of it goes back to the bank. After this the fund takes no vouchers, top-ups or float changes until it is reopened.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Cash counted" required><MoneyInput valueKobo={counted} onChangeKobo={touch(setCounted)} currency={currency} className="[&_input]:h-9" /></FormField>
-          <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
+          <AccessField access={access} name="counted_amount" label="Cash counted" required creating errors={errors}><MoneyInput valueKobo={counted} onChangeKobo={touch(setCounted)} currency={currency} className="[&_input]:h-9" /></AccessField>
+          <AccessField access={access} name="return_date" creating errors={errors}><PostingDateField label="Date" entity={entity} value={date} onChange={setDate} /></AccessField>
         </div>
-        <p className="-mt-2 font-mont text-[11px] text-gray-05">The books say {formatMoney(fund.current_balance, currency)}.</p>
+        {booksLine(access, fund, currency, false) ? <p className="-mt-2 font-mont text-[11px] text-gray-05">{booksLine(access, fund, currency, false)}</p> : null}
         {figures.banked > 0 ? (
-          <FormField label="Into bank account" required><BankAccountPicker entity={entity} value={bank} onChange={touch(setBank)} documentBranchId={fund.branch_id} /></FormField>
+          <AccessField access={access} name="bank_account_name" label="Into bank account" required creating errors={errors}><BankAccountPicker entity={entity} value={bank} onChange={touch(setBank)} documentBranchId={fund.branch_id} /></AccessField>
         ) : null}
-        {figures.difference ? (
-          <ReasonField label="Why the count differs" value={reason} onChange={touch(setReason)} placeholder="e.g. coins missing" hint="Kept on the return and the audit record." />
+        {figures.difference || hideDifference ? (
+          <AccessField access={access} name="difference_reason" creating errors={errors}>
+            <ReasonField label={hideDifference ? "Reason for any difference" : "Why the count differs"} value={reason} onChange={touch(setReason)} placeholder="e.g. coins missing" hint={hideDifference ? "Needed when the count differs from the books." : "Kept on the return and the audit record."} />
+          </AccessField>
         ) : null}
-        <FormField label="Reference"><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Deposit slip number" className="h-9 bg-white" /></FormField>
-        <ReturnSummary fund={fund} figures={figures} bankName={bankName} currency={currency} floatAfter={0} />
+        <AccessField access={access} name="reference" label="Reference" creating errors={errors}><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Deposit slip number" className="h-9 bg-white" /></AccessField>
+        <ReturnSummary fund={fund} figures={figures} bankName={bankName} currency={currency} floatAfter={0} access={access} />
         {date ? <p className="font-mont text-xs text-gray-01">The fund closes on {dates.day(date)}.</p> : null}
-        {problem && touched && !blockers.length ? <p className={PROBLEM} role="alert">{problem}</p> : null}
+        {blocked ? <BlockedNote /> : null}
+        {problem && touched && !blockers.length && !blocked ? <p className={PROBLEM} role="alert">{problem}</p> : null}
         <p className="font-mont text-[11px] text-gray-05">{APPROVAL_NOTE}</p>
       </div>
     </DetailDrawer>
@@ -362,20 +430,32 @@ export function EditFundDrawer({ fund, entity, currency, onClose, onSwitch }: {
   );
 }
 
-/** A return's Void, with the server's reasons for refusing one up front. */
+/**
+ * A return's Void, with the server's reasons for refusing one up front.
+ *
+ * The words follow Field Access: a return whose status or kind the reader may
+ * not read is described in neutral terms.
+ */
 export function VoidReturnDialog({ ret, blocker, onClose, onVoid, loading }: {
   ret: PettyCashReturn; blocker: string | null; onClose: () => void; onVoid: () => void; loading: boolean;
 }) {
-  const draft = ret.status === "DRAFT";
+  const access = useFieldAccess(PETTY_CASH_RETURN, ret);
+  const statusKnown = !access.isHidden("status");
+  const kindKnown = !access.isHidden("kind");
+  const draft = statusKnown && ret.status === "DRAFT";
   return (
     <ConfirmActionModal
       open onOpenChange={(o) => !o && onClose()}
       title={draft ? `Cancel ${ret.document_number}?` : `Void ${ret.document_number}?`}
-      description={draft
-        ? "It never reached the books, so cancelling it writes nothing."
-        : ret.kind === "CLOSE"
-          ? "Reverses the closure: the cash comes back on the fund's books, its float is restored and the fund reopens."
-          : "Reverses the return: the cash comes back on the fund's books and its float is restored."}
+      description={!statusKnown
+        ? "A return that reached the books is reversed; one that never did is cancelled."
+        : draft
+          ? "It never reached the books, so cancelling it writes nothing."
+          : kindKnown && ret.kind === "CLOSE"
+            ? "Reverses the closure: the cash comes back on the fund's books, its float is restored and the fund reopens."
+            : kindKnown
+              ? "Reverses the return: the cash comes back on the fund's books and its float is restored."
+              : "Reverses the return: the cash comes back on the fund's books, its float is restored and a fund it closed reopens."}
       confirmText={draft ? "Cancel return" : "Void return"}
       destructive
       loading={loading}

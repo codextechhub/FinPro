@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   voidReturn: vi.fn(),
   denied: new Set<string>(),
+  fieldAccess: {} as Record<string, { hidden?: string[]; read_only?: string[] }>,
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
@@ -51,6 +52,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasAnyPermission: () => true,
     hasAllPermissions: () => true,
     hasModuleAccess: () => true,
+    fieldAccess: mocks.fieldAccess,
   }),
 }));
 
@@ -60,6 +62,7 @@ import type { PettyCashFund, PettyCashReturn } from "@/redux/services/finance/op
 import { P } from "../../../permissions";
 import { pettyCashBranchFor } from "./petty-cash-branch";
 import { PettyCashReturnsList } from "./petty-cash-returns-list";
+import { PETTY_CASH_RETURN } from "./petty-cash-returns";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -93,6 +96,7 @@ let root: Root;
 beforeEach(() => {
   mocks.rows = [LEKKI_CLOSE, IKEJA_REDUCE];
   mocks.denied = new Set();
+  mocks.fieldAccess = {};
   mocks.list.mockReset();
   mocks.voidReturn.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Petty cash return PCR-0011 voided." }) });
   container = document.createElement("div");
@@ -198,5 +202,137 @@ describe("petty cash returns", () => {
     act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
     act(() => (tableRows()[0] as HTMLElement).click());
     expect(button("Void")).toBeUndefined();
+  });
+});
+
+/**
+ * Field Access on the returns list and its detail, told as a reader whose role
+ * may not see some fields of a return. The server leaves a hidden field out of
+ * every row, so the rows below omit it too.
+ */
+describe("Field Access on petty cash returns", () => {
+  const restrict = (hidden: string[]) => { mocks.fieldAccess = { [PETTY_CASH_RETURN]: { hidden } }; };
+  const omit = (row: PettyCashReturn, ...keys: string[]) => Object.fromEntries(Object.entries(row).filter(([k]) => !keys.includes(k))) as unknown as PettyCashReturn;
+  const render = (view = pettyCashBranchFor(LENS, null)) => act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={view} />));
+  const cellCounts = () => tableRows().map((r) => r.querySelectorAll("td").length);
+
+  it("drops a hidden column with its header, row by row", () => {
+    restrict(["amount", "amount_naira", "difference", "shortage", "overage", "kind", "kind_label"]);
+    mocks.rows = [omit(LEKKI_CLOSE, "amount", "amount_naira", "difference", "shortage", "overage", "kind", "kind_label"), omit(IKEJA_REDUCE, "amount", "amount_naira", "difference", "shortage", "overage", "kind", "kind_label")];
+    render();
+    expect(headers()).toEqual(["Return no.", "Fund", "Branch", "Date", "Status"]);
+    expect(cellCounts()).toEqual([5, 5]);
+    expect(container.textContent).not.toContain("₦38,500.00");
+    expect(container.textContent).not.toContain("short");
+  });
+
+  it("keeps header and cell counts equal for every combination of one hidden field", () => {
+    for (const hidden of ["return_date", "status"]) {
+      restrict([hidden]);
+      render();
+      expect(cellCounts()).toEqual(tableRows().map(() => headers().length));
+      act(() => root.render(<div />));
+    }
+  });
+
+  it("always shows the Fund column and filter, and sends the fund picked, however the map is restricted", () => {
+    restrict(["fund_id", "fund_name", "kind", "kind_label", "return_date", "amount", "status"]);
+    render();
+    expect(headers()).toContain("Fund");
+    const select = container.querySelector('select[aria-label="Fund"]') as HTMLSelectElement;
+    expect(select).not.toBeNull();
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "2");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(mocks.list).toHaveBeenLastCalledWith({ entity: "BSS", page_size: 100, fund: 2 });
+  });
+
+  it("removes the Status filter, the Status column and the sent-back request when the status is hidden", () => {
+    restrict(["status", "approval_state", "approval_returned"]);
+    render();
+    expect(container.querySelector('select[aria-label="Status"]')).toBeNull();
+    expect(headers()).not.toContain("Status");
+    for (const call of mocks.list.mock.calls) {
+      expect(call[0]).not.toHaveProperty("status");
+      expect(call[0]).not.toHaveProperty("approval");
+    }
+  });
+
+  it("shows the number and the branch, and asks for the picked branch, whatever the map lists", () => {
+    restrict(["document_number", "branch_id", "branch_name"]);
+    render();
+    expect(headers()).toEqual(expect.arrayContaining(["Return no.", "Branch"]));
+    act(() => root.render(<div />));
+    render(pettyCashBranchFor(LENS, "2"));
+    expect(mocks.list).toHaveBeenLastCalledWith({ entity: "BSS", page_size: 100, branch: 2 });
+  });
+
+  it("keeps the filters and the branch request for a reader who can read them", () => {
+    mocks.fieldAccess = { [PETTY_CASH_RETURN]: { read_only: ["reference"] } };
+    render(pettyCashBranchFor(LENS, "2"));
+    expect(mocks.list).toHaveBeenLastCalledWith({ entity: "BSS", page_size: 100, branch: 2 });
+    expect(container.querySelector('select[aria-label="Fund"]')).not.toBeNull();
+    expect(container.querySelector('select[aria-label="Status"]')).not.toBeNull();
+  });
+
+  it("leaves out the detail rows, and the sentences, of hidden fields", () => {
+    const hidden = ["book_balance", "difference", "shortage", "overage", "previous_float_amount", "counted_by_id", "counted_by_name", "counted_by_is_exited"];
+    restrict(hidden);
+    mocks.rows = [omit(IKEJA_REDUCE, ...hidden)];
+    render();
+    act(() => (tableRows()[0] as HTMLElement).click());
+    const text = document.body.textContent ?? "";
+    for (const gone of ["Books said", "Difference", "Counted by", "Float before", "₦1,000.00"]) expect(text).not.toContain(gone);
+    expect(text).toContain("Float after");
+    expect(text).toContain("Raised byMrs Bello");
+    expect(text).toContain("Banked");
+  });
+
+  it("leaves only the fund and the branch in the detail section when every other field is hidden", () => {
+    const hidden = ["kind", "kind_label", "return_date", "counted_amount", "book_balance", "difference", "shortage", "overage",
+      "difference_reason", "amount", "amount_naira", "bank_account_id", "bank_account_name", "cash_left", "previous_float_amount", "new_float_amount",
+      "counted_by_id", "counted_by_name", "counted_by_is_exited", "created_by_id", "created_by_name", "created_by_is_exited", "reference", "narration"];
+    restrict(hidden);
+    mocks.rows = [omit(IKEJA_REDUCE, ...hidden)];
+    render();
+    act(() => (tableRows()[0] as HTMLElement).click());
+    expect(document.body.querySelector("dl")?.textContent).toBe("FundIkeja front deskBranchIkeja");
+  });
+
+  it("offers Void by neutral words, naming the number, when the kind and status are hidden", async () => {
+    const hidden = ["kind", "kind_label", "status", "approval_state", "approval_returned"];
+    restrict(["document_number", ...hidden]);
+    mocks.rows = [omit(LEKKI_CLOSE, ...hidden)];
+    render();
+    act(() => (tableRows()[0] as HTMLElement).click());
+    expect(document.body.textContent).toContain("PCR-0011");
+    act(() => button("Void")!.click());
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Void PCR-0011?");
+    expect(text).toContain("A return that reached the books is reversed; one that never did is cancelled.");
+    expect(text).not.toContain("the fund reopens");
+    await act(async () => button("Void return")!.click());
+    expect(mocks.voidReturn).toHaveBeenCalledWith({ id: 11, entity: "BSS" });
+  });
+
+  it("does not describe a closure in the void dialog when only the kind is hidden", () => {
+    restrict(["kind", "kind_label"]);
+    mocks.rows = [omit(LEKKI_CLOSE, "kind", "kind_label")];
+    render();
+    act(() => (tableRows()[0] as HTMLElement).click());
+    act(() => button("Void")!.click());
+    expect(document.body.textContent).toContain("Void PCR-0011?");
+    expect(document.body.textContent).toContain("a fund it closed reopens");
+    expect(document.body.textContent).not.toContain("Reverses the closure");
+  });
+
+  it("names a later return by its number whatever the map lists", () => {
+    restrict(["document_number"]);
+    mocks.rows = [ret({ id: 12, document_number: "PCR-0012" }), IKEJA_REDUCE];
+    render();
+    act(() => (tableRows()[1] as HTMLElement).click());
+    act(() => button("Void")!.click());
+    expect(document.body.querySelector("[role=alert]")?.textContent).toBe("Return PCR-0012 of this fund came after PCR-0010. Void it first.");
   });
 });

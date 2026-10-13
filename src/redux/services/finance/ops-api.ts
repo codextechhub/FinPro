@@ -87,7 +87,8 @@ export const opsApi = baseApi.injectEndpoints({
         statementId: number;
         statement_date: string;
         period_label?: string;
-        opening_balance: number;
+        /** Left out, the stored opening balance stands; sent by a role that may not read it, the server refuses it. */
+        opening_balance?: number;
         lines: {
           id?: number;
           txn_date: string;

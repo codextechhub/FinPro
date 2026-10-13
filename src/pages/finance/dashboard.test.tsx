@@ -312,7 +312,13 @@ describe("Finance overview attention and edge cases", () => {
       top_payers: [], ar_aging: AGING,
       upcoming: [{ date: "2026-09-28", kind: "payroll", direction: "out", title: "September payroll", detail: "24 staff", amount: money(100) }],
       trend: { labels: ["Sep 26"], issued: [1], collected: [1] },
-      close_progress: { period: "2026-09", period_label: "September 2026", done: 1, total: 2, checks: [] },
+      close_progress: {
+        period: "2026-09", period_label: "September 2026", done: 1, total: 2,
+        checks: [
+          { name: "trial_balance_balanced", passed: true, blocking: true },
+          { name: "no_draft_journals", passed: false, blocking: true },
+        ],
+      },
       recent_journals: [],
     };
     const text = render(full, "finance.report.view", "finance.invoice.create", "finance.payment.create");

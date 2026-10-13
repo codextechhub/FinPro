@@ -1,6 +1,22 @@
 import type { Account } from "@/redux/services/finance/setup-types";
 
-export type AccountTreeNode = Account & { children: AccountTreeNode[]; rolled: number };
+/**
+ * One chart row with its rolled-up balance. `rolled` is null when the figure
+ * cannot be stated: the account, or a posting account beneath it, is a bank
+ * account whose book balance the role may not read, so a total would silently
+ * leave that balance out.
+ */
+export type AccountTreeNode = Account & { children: AccountTreeNode[]; rolled: number | null };
+
+/**
+ * Whether the role may not read this account's balance. The chart is always
+ * requested with balances, where an unannotated account carries `null`, so an
+ * absent key means the server withheld it (`finance.bankaccount.book_balance`
+ * on a bank account's ledger account).
+ */
+export function isBalanceHidden(account: Account): boolean {
+  return account.balance === undefined;
+}
 
 export function balanceContribution(
   balance: number,
@@ -25,11 +41,12 @@ export function buildAccountTree(accounts: Account[]): AccountTreeNode[] {
       .sort((a, b) => a.code.localeCompare(b.code))
       .map((account) => {
         const children = build(account.id);
-        const ownBalance = account.balance?.kobo ?? 0;
+        const ownBalance = isBalanceHidden(account) ? null : (account.balance?.kobo ?? 0);
+        const known = ownBalance !== null && children.every((child) => child.rolled !== null);
         const descendantBalance = children.reduce(
           (total, child) =>
             total + balanceContribution(
-              child.rolled,
+              child.rolled ?? 0,
               child.normal_balance,
               account.normal_balance,
             ),
@@ -38,7 +55,7 @@ export function buildAccountTree(accounts: Account[]): AccountTreeNode[] {
         return {
           ...account,
           children,
-          rolled: ownBalance + descendantBalance,
+          rolled: known ? (ownBalance as number) + descendantBalance : null,
         };
       });
 
@@ -68,7 +85,9 @@ export function descendantPostingAccounts(accounts: Account[], rootId: number): 
     .sort((a, b) => a.code.localeCompare(b.code));
 }
 
-export function accountGroupContribution(account: Account, groupNormalBalance: string): number {
+/** What an account adds to its group's balance, or null when its balance is hidden. */
+export function accountGroupContribution(account: Account, groupNormalBalance: string): number | null {
+  if (isBalanceHidden(account)) return null;
   const balance = account.balance?.kobo ?? 0;
   return balanceContribution(balance, account.normal_balance, groupNormalBalance);
 }

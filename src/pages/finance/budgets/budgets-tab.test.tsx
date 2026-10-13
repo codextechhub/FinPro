@@ -24,6 +24,9 @@ const mocks = vi.hoisted(() => ({
   rollup: undefined as unknown,
   heatmap: { periods: [], rows: [] } as unknown,
   mutation: () => [() => undefined, { isLoading: false }],
+  access: {} as Record<string, { hidden?: string[] }>,
+  yearArgs: [] as unknown[],
+  years: [{ id: 1, year: 2026, status: "OPEN" }] as Array<{ id: number; year: number; status?: string }>,
 }));
 
 const holds = (code: PermissionCode) => mocks.held.has(FINANCE_PERMISSION_REGISTRY[code]);
@@ -34,7 +37,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasAnyPermission: (...codes: PermissionCode[]) => codes.some(holds),
     hasAllPermissions: (...codes: PermissionCode[]) => codes.every(holds),
     hasModuleAccess: () => true,
-    fieldAccess: {},
+    fieldAccess: mocks.access,
   }),
 }));
 
@@ -60,7 +63,10 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetBudgetQuery: () => ({ data: undefined }),
   useGetBudgetVarianceQuery: () => ({ data: undefined }),
   useGetBudgetHeatmapQuery: () => ({ data: { data: mocks.heatmap }, isFetching: false, isError: false }),
-  useGetFiscalYearsQuery: () => ({ data: { data: [{ id: 1, year: 2026, status: "OPEN" }] } }),
+  useGetFiscalYearsQuery: (args: unknown) => {
+    mocks.yearArgs.push(args);
+    return { data: { data: mocks.years } };
+  },
   useGetBudgetRollupQuery: () => ({ data: mocks.rollup }),
   useCreateBudgetMutation: mocks.mutation,
   useUpdateBudgetMutation: mocks.mutation,
@@ -165,6 +171,36 @@ describe("Budgets for a branch bursar", () => {
   it("offers no New budget to a reader who may file for nobody", () => {
     const text = render([SCHOOL_PLAN_TO_BRANCH], { branches: [] }, true, "finance.budget.create");
     expect(text).not.toContain("New budget");
+  });
+});
+
+describe("The fiscal year picker in the New budget drawer", () => {
+  it("asks for open years only, and names a year that is not open", () => {
+    mocks.access = {};
+    mocks.yearArgs = [];
+    mocks.years = [{ id: 1, year: 2026, status: "OPEN" }, { id: 2, year: 2025, status: "CLOSED" }];
+    render([MAIN_PLAN], { branches: [ANNEX, MAIN] }, false, "finance.budget.create");
+    openNewBudget();
+
+    expect(mocks.yearArgs.at(-1)).toEqual({ entity: "HOLYCROSS", status: "OPEN" });
+    expect(optionLabels(document.body)).toContain("2025 (closed)");
+  });
+
+  it("sends no status filter, and names no status, to a role that may not read a year's close state", () => {
+    mocks.access = { "finance.fiscalyear": { hidden: ["branch_states", "status"] } };
+    mocks.yearArgs = [];
+    mocks.years = [{ id: 1, year: 2026 }, { id: 2, year: 2025 }];
+    render([MAIN_PLAN], { branches: [ANNEX, MAIN] }, false, "finance.budget.create");
+    openNewBudget();
+
+    expect(mocks.yearArgs.length).toBeGreaterThan(0);
+    for (const args of mocks.yearArgs) expect(args).toEqual({ entity: "HOLYCROSS" });
+    const labels = optionLabels(document.body);
+    expect(labels).toContain("2026");
+    expect(labels).toContain("2025");
+    expect(document.body.textContent).not.toContain("closed)");
+    mocks.access = {};
+    mocks.years = [{ id: 1, year: 2026, status: "OPEN" }];
   });
 });
 

@@ -25,6 +25,15 @@
  * It changes several branches at once, so it is offered only to a whole-school
  * reader holding the bank account update key, and only on a live account no
  * branch owns, at a school with more than one branch.
+ *
+ * Every figure and every input of the split is a Field Access field of the bank
+ * account (`finance.bankaccount`). The split is offered only to a reader who may
+ * write all it needs (`splitIsWritable`). A figure the reader may not see is
+ * left out together with whatever would restate it: without the shared
+ * account's balance there is no "Left to place", without the branch list no
+ * table of each branch's own entries, and a result the reader may not read
+ * shows no section for it. The debts a split books are inter-branch documents,
+ * so their rows carry only the parts the reader may read there too.
  */
 
 import { useState } from "react";
@@ -32,7 +41,7 @@ import { Link } from "react-router";
 import { toast } from "sonner";
 import { ArrowRight, Split } from "lucide-react";
 
-import { ConfirmActionModal, DetailDrawer, FormField, Money, MoneyInput, PostingDateField } from "@/components/finance-ui";
+import { AccessField, ConfirmActionModal, DetailDrawer, Money, MoneyInput, PostingDateField, fieldWriteErrors, useFieldAccess, type FieldAccess, type FieldErrors } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -41,16 +50,18 @@ import { useDates } from "../../lib/display-prefs";
 import { useGetBankSplitPreviewQuery, useSplitBankAccountByBranchMutation } from "@/redux/services/finance/interbranch-api";
 import type { BankSplitDifferenceTreatment, BankSplitPreview, BankSplitResult } from "@/redux/services/finance/interbranch-types";
 import type { BankAccount } from "@/redux/services/finance/ops-types";
-import { DIFFERENCE_TREATMENTS, branchDifferences, differenceNote, splitProblems, splitTotals, type SplitRow } from "./bank-split-model";
+import { BANK_ACCOUNT, DIFFERENCE_TREATMENTS, branchDifferences, differenceNote, splitProblems, splitTotals, type SplitRow } from "./bank-split-model";
 import { transferLink } from "./inter-branch/links";
 import { Note } from "./inter-branch/parts";
 import type { InterBranchReader } from "./inter-branch/use-inter-branch";
 
 /** Whether this reader is offered the split on `account`. */
-export function canSplitAccount(account: Pick<BankAccount, "branch_id" | "is_active">, { multiBranch, wholeSchool, canUpdate }: {
+export function canSplitAccount(account: Pick<BankAccount, "branch_id" | "is_active">, { multiBranch, wholeSchool, canUpdate, writable = true }: {
   multiBranch: boolean; wholeSchool: boolean; canUpdate: boolean;
+  /** The reader may write every field a split needs (`splitIsWritable`). */
+  writable?: boolean;
 }): boolean {
-  return multiBranch && wholeSchool && canUpdate && account.is_active && account.branch_id == null;
+  return multiBranch && wholeSchool && canUpdate && writable && account.is_active !== false && account.branch_id == null;
 }
 
 interface EditRow extends SplitRow {
@@ -69,7 +80,7 @@ function startingRows(account: BankAccount, reader: InterBranchReader): EditRow[
     bank_account_name: `${account.name} - ${b.name}`,
     ledger_account_code: "",
     ledger_account_name: `${account.gl_account_name || account.name} - ${b.name}`,
-    is_primary: index === 0 && account.is_primary,
+    is_primary: index === 0 && account.is_primary === true,
     is_primary_collection: false,
   }));
 }
@@ -82,6 +93,8 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
   reader: InterBranchReader;
   onClose: () => void;
 }) {
+  const access = useFieldAccess(BANK_ACCOUNT);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [rows, setRows] = useState<EditRow[]>(() => startingRows(account, reader));
   const [date, setDate] = useState("");
   const [reference, setReference] = useState("");
@@ -91,10 +104,11 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
   const [split, { isLoading }] = useSplitBankAccountByBranchMutation();
   const dates = useDates();
   const { data: previewData } = useGetBankSplitPreviewQuery(
-    { id: account.id, entity, split_date: date && date <= dates.today() ? date : undefined }, { skip: !!result },
+    { id: account.id, entity, split_date: !access.isHidden("split_date") && date && date <= dates.today() ? date : undefined }, { skip: !!result },
   );
   const preview = previewData?.data ?? null;
   const toShare = preview?.legacy_balance ?? bookBalance;
+  const showBalance = !access.isHidden("legacy_balance");
 
   const chosen: SplitRow[] = rows.filter((r) => r.include).map((r) => ({ ...r, opening_balance: r.overdraft ? -r.share : r.share }));
   const totals = splitTotals(toShare, chosen);
@@ -105,9 +119,9 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
     unbranched: preview?.unbranched_balance ?? 0, formatAmount: money,
   });
   const startFromBooks = () => {
-    if (!preview) return;
+    if (!preview?.branches) return;
     setRows((prev) => prev.map((row) => {
-      const own = preview.branches.find((b) => b.branch_id === Number(row.branch))?.book_balance ?? 0;
+      const own = preview.branches!.find((b) => b.branch_id === Number(row.branch))?.book_balance ?? 0;
       return { ...row, share: Math.abs(own), overdraft: own < 0 };
     }));
   };
@@ -117,18 +131,24 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
   const submit = async () => {
     try {
       const res = await split({
-        id: account.id, entity, split_date: date, agreement_reference: reference.trim(), difference_treatment: treatment,
-        allocations: chosen.map((row) => ({
-          branch: Number(row.branch), opening_balance: row.opening_balance,
-          bank_account_name: row.bank_account_name.trim(), ledger_account_code: row.ledger_account_code,
-          ledger_account_name: row.ledger_account_name.trim(), is_primary: row.is_primary,
-          is_primary_collection: row.is_primary_collection,
-        })),
+        id: account.id, entity,
+        ...access.writableOnly({
+          split_date: date, agreement_reference: reference.trim(), difference_treatment: treatment,
+          allocations: chosen.map((row) => ({
+            branch: Number(row.branch),
+            ...access.writableOnly({
+              opening_balance: row.opening_balance,
+              bank_account_name: row.bank_account_name.trim(), ledger_account_code: row.ledger_account_code,
+              ledger_account_name: row.ledger_account_name.trim(), is_primary: row.is_primary,
+              is_primary_collection: row.is_primary_collection,
+            }, { creating: true }),
+          })),
+        }, { creating: true }),
       }).unwrap();
       toast.success(res.message || "Bank account split into branch accounts.");
       setConfirming(false);
       setResult(res.data);
-    } catch { setConfirming(false); /* central */ }
+    } catch (error) { setConfirming(false); setDenied(fieldWriteErrors(error)); }
   };
 
   return (
@@ -145,12 +165,12 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
           </>
         )}
       >
-        {result ? <SplitResult result={result} reader={reader} currency={currency} /> : (
+        {result ? <SplitResult result={result} access={access} reader={reader} currency={currency} /> : (
           <div className="space-y-5">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Total label="Book balance to share" kobo={toShare} currency={currency} />
+            <div className={cn("grid grid-cols-1 gap-3", showBalance ? "sm:grid-cols-3" : "sm:grid-cols-1")}>
+              {showBalance ? <Total label="Book balance to share" kobo={toShare} currency={currency} /> : null}
               <Total label="Agreed so far" kobo={totals.agreed} currency={currency} />
-              <Total label="Left to place" kobo={totals.remaining} currency={currency} danger={!totals.balanced} />
+              {showBalance ? <Total label="Left to place" kobo={totals.remaining} currency={currency} danger={!totals.balanced} /> : null}
             </div>
 
             <section className="space-y-2">
@@ -172,26 +192,28 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
                     </div>
                     {row.include ? (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                          <FormField label="Agreed share" required>
+                        <AccessField access={access} name="opening_balance" creating errors={denied}>
+                          <label className="block space-y-1">
+                            <span className="font-mont text-xs text-gray-05">Agreed share *</span>
                             <MoneyInput valueKobo={row.share} onChangeKobo={(share) => edit(index, { share })} currency={currency} className="[&_input]:h-9" />
-                          </FormField>
+                          </label>
                           <label className="mt-1 flex items-center gap-1.5 font-mont text-[11px] text-gray-05">
                             <input
                               type="checkbox" checked={row.overdraft} aria-label={`${reader.nameOf(Number(row.branch))}'s share is an overdraft`}
                               onChange={(e) => edit(index, { overdraft: e.target.checked })}
                             /> This share is an overdraft
                           </label>
-                        </div>
-                        <FormField label="New bank account name" required>
+                        </AccessField>
+                        <label className="block space-y-1">
+                          <span className="font-mont text-xs text-gray-05">New bank account name *</span>
                           <Input value={row.bank_account_name} maxLength={160} onChange={(e) => edit(index, { bank_account_name: e.target.value })} className="h-9 bg-white" />
-                        </FormField>
-                        <FormField label="New ledger code" required>
+                        </label>
+                        <AccessField access={access} name="ledger_account_code" label="New ledger code" required creating errors={denied}>
                           <Input value={row.ledger_account_code} inputMode="numeric" maxLength={4} placeholder={`${ledgerPrefix || "1"}xxx`} onChange={(e) => edit(index, { ledger_account_code: e.target.value.replace(/\D/g, "") })} className="h-9 bg-white tabular-nums" />
-                        </FormField>
-                        <FormField label="New ledger name" required>
+                        </AccessField>
+                        <AccessField access={access} name="ledger_account_name" label="New ledger name" required creating errors={denied}>
                           <Input value={row.ledger_account_name} maxLength={160} onChange={(e) => edit(index, { ledger_account_name: e.target.value })} className="h-9 bg-white" />
-                        </FormField>
+                        </AccessField>
                       </div>
                     ) : null}
                   </div>
@@ -199,30 +221,34 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
               </div>
             </section>
 
-            <section className="space-y-2">
-              <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Where a branch's entries differ from its share</p>
-              <div className="space-y-2" role="radiogroup" aria-label="Difference treatment">
-                {DIFFERENCE_TREATMENTS.map((option) => (
-                  <label key={option.value} className={cn("flex cursor-pointer gap-3 rounded-md border p-3", treatment === option.value ? "border-primary bg-primary/5" : "border-white-02")}>
-                    <input type="radio" name="split-treatment" className="mt-1" checked={treatment === option.value} onChange={() => setTreatment(option.value)} />
-                    <span className="min-w-0">
-                      <span className="block font-mont text-sm font-medium text-black-01">{option.label}{option.value === "DEBT" ? " (usual)" : ""}</span>
-                      <span className="mt-0.5 block font-mont text-xs leading-5 text-gray-05">{option.help}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </section>
+            <AccessField access={access} name="difference_treatment" creating errors={denied}>
+              <section className="space-y-2">
+                <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Where a branch's entries differ from its share</p>
+                <div className="space-y-2" role="radiogroup" aria-label="Difference treatment">
+                  {DIFFERENCE_TREATMENTS.map((option) => (
+                    <label key={option.value} className={cn("flex cursor-pointer gap-3 rounded-md border p-3", treatment === option.value ? "border-primary bg-primary/5" : "border-white-02")}>
+                      <input type="radio" name="split-treatment" className="mt-1" checked={treatment === option.value} onChange={() => setTreatment(option.value)} />
+                      <span className="min-w-0">
+                        <span className="block font-mont text-sm font-medium text-black-01">{option.label}{option.value === "DEBT" ? " (usual)" : ""}</span>
+                        <span className="mt-0.5 block font-mont text-xs leading-5 text-gray-05">{option.help}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+            </AccessField>
 
-            {preview ? (
-              <BranchBooks preview={preview} rows={chosen} treatment={treatment} currency={currency} onStartFromBooks={startFromBooks} />
+            {preview?.branches ? (
+              <BranchBooks preview={{ ...preview, branches: preview.branches }} rows={chosen} treatment={treatment} currency={currency} onStartFromBooks={startFromBooks} showTreatment={!access.isHidden("difference_treatment")} />
             ) : null}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <PostingDateField label="Split date" entity={entity} value={date} onChange={setDate} hint="Nothing may be booked on this account after this day." />
-              <FormField label="Agreement reference" required>
+              <AccessField access={access} name="split_date" creating errors={denied}>
+                <PostingDateField label="Split date" entity={entity} value={date} onChange={setDate} hint="Nothing may be booked on this account after this day." />
+              </AccessField>
+              <AccessField access={access} name="agreement_reference" label="Agreement reference" required creating errors={denied}>
                 <Input value={reference} maxLength={64} onChange={(e) => setReference(e.target.value)} placeholder="e.g. Bursars' minute 14/2026" className="h-9 bg-white" />
-              </FormField>
+              </AccessField>
             </div>
 
             {problems.length ? (
@@ -249,10 +275,12 @@ export function BankSplitDrawer({ account, bookBalance, entity, currency, reader
  * under the table follow the chosen treatment: a debt between branches, or a
  * move through retained earnings with nothing owed.
  */
-function BranchBooks({ preview, rows, treatment, currency, onStartFromBooks }: {
-  preview: BankSplitPreview;
+function BranchBooks({ preview, rows, treatment, showTreatment, currency, onStartFromBooks }: {
+  preview: BankSplitPreview & Required<Pick<BankSplitPreview, "branches">>;
   rows: SplitRow[];
   treatment: BankSplitDifferenceTreatment;
+  /** False where the reader may not see how differences are treated, so the note does not say. */
+  showTreatment: boolean;
   currency?: string | null;
   onStartFromBooks: () => void;
 }) {
@@ -278,8 +306,8 @@ function BranchBooks({ preview, rows, treatment, currency, onStartFromBooks }: {
         ))}
       </div>
       <p className="font-mont text-[11px] leading-5 text-gray-05">
-        {`Book balances as of ${dates.day(preview.split_date)}. `}
-        {differenceNote(lines, treatment)}
+        {preview.split_date ? `Book balances as of ${dates.day(preview.split_date)}. ` : ""}
+        {showTreatment || lines.every((line) => line.difference === 0) ? differenceNote(lines, treatment) : ""}
       </p>
     </section>
   );
@@ -294,44 +322,69 @@ function Total({ label, kobo, currency, danger }: { label: string; kobo: number;
   );
 }
 
-function SplitResult({ result, reader, currency }: { result: BankSplitResult; reader: InterBranchReader; currency?: string | null }) {
+/** One debt a split booked; its amount shows only where the reader may read it. */
+function DebtRow({ debt, reader, money }: {
+  debt: NonNullable<BankSplitResult["inter_branch_transfers"]>[number]; reader: InterBranchReader; money: (kobo: number) => string;
+}) {
+  const sentence = `${reader.nameOf(debt.to_branch_id!)} owes ${reader.nameOf(debt.from_branch_id!)}${debt.amount != null ? ` ${money(debt.amount)}` : ""}`;
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white-02 px-3 py-2">
+      <span className="font-mont text-sm text-black-01">{sentence}</span>
+      {debt.document_number ? (
+        <Link to={transferLink(debt.id)} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline">
+          {debt.document_number} <ArrowRight className="size-3.5" />
+        </Link>
+      ) : null}
+    </li>
+  );
+}
+
+function SplitResult({ result, access, reader, currency }: { result: BankSplitResult; access: FieldAccess; reader: InterBranchReader; currency?: string | null }) {
   const money = (kobo: number) => formatMoney(kobo, currency);
+  const debts = result.inter_branch_transfers;
+  const showLedger = !access.isHidden("ledger_account_code");
+  const showShare = !access.isHidden("opening_balance");
+  const accounts = result.bank_accounts;
   return (
     <div className="space-y-5">
-      <section className="space-y-2">
-        <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">New branch accounts</p>
-        <div className="divide-y divide-white-02 rounded-md border border-white-02">
-          {result.bank_accounts.map((a) => (
-            <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-              <div className="min-w-0">
-                <p className="font-mont text-sm text-black-01">{a.name}</p>
-                <p className="font-mont text-[11px] text-gray-05">{reader.nameOf(a.branch_id)} · ledger {a.gl_account_code}{a.is_primary ? " · main account" : ""}{a.is_primary_collection ? " · collection account" : ""}</p>
-              </div>
-              <Money kobo={a.opening_balance} currency={currency} />
-            </div>
-          ))}
-        </div>
-      </section>
-      {result.difference_treatment === "PERMANENT_MOVE" ? (
+      {accounts ? (
+        <section className="space-y-2">
+          <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">New branch accounts</p>
+          <div className="divide-y divide-white-02 rounded-md border border-white-02">
+            {accounts.map((a) => {
+              const facts = [
+                reader.nameOf(a.branch_id),
+                showLedger ? `ledger ${a.gl_account_code}` : null,
+                a.is_primary ? "main account" : null,
+                a.is_primary_collection ? "collection account" : null,
+              ].filter(Boolean);
+              return (
+                <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-mont text-sm text-black-01">{a.name}</p>
+                    {facts.length ? <p className="font-mont text-[11px] text-gray-05">{facts.join(" · ")}</p> : null}
+                  </div>
+                  {showShare ? <Money kobo={a.opening_balance} currency={currency} /> : null}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+      {debts === undefined ? null : result.difference_treatment === "PERMANENT_MOVE" ? (
         <Note>Each branch's difference moved through retained earnings, so nothing is owed between branches.</Note>
-      ) : result.inter_branch_transfers.length === 0 ? (
+      ) : debts.length === 0 ? (
         <Note>Every branch's entries matched its share, so nothing is owed between branches.</Note>
       ) : (
         <section className="space-y-2">
           <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Now owed between branches</p>
           <ul className="space-y-1.5">
-            {result.inter_branch_transfers.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white-02 px-3 py-2">
-                <span className="font-mont text-sm text-black-01">{`${reader.nameOf(t.to_branch_id)} owes ${reader.nameOf(t.from_branch_id)} ${money(t.amount)}`}</span>
-                <Link to={transferLink(t.id)} className="inline-flex items-center gap-1 font-mont text-xs font-medium text-primary hover:underline">
-                  {t.document_number} <ArrowRight className="size-3.5" />
-                </Link>
-              </li>
-            ))}
+            {debts.map((t) => <DebtRow key={t.id} debt={t} reader={reader} money={money} />)}
           </ul>
           <p className="font-mont text-[11px] leading-5 text-gray-05">These are never voided. The branch that owes repays with a cash transfer.</p>
         </section>
       )}
+      {!accounts && debts === undefined ? <Note>The account is split and its branch accounts are open.</Note> : null}
     </div>
   );
 }

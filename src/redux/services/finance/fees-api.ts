@@ -15,7 +15,7 @@
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
 import type { ApiEnvelope, PaginatedEnvelope } from "./api-types";
-import type { CreditNote, Invoice, WriteOffRequest } from "./ar-types";
+import type { Invoice, WriteOffRequest } from "./ar-types";
 import type {
   CustomerCreditTransfer,
   CustomerDeposit,
@@ -23,6 +23,7 @@ import type {
   DeferredIncomeReleaseRow,
   DeferredIncomeSummary,
   DepositForfeitResult,
+  DepositReleaseNote,
   DepositStatus,
   DoubtfulDebtProvision,
   FeeItemAssignments,
@@ -77,7 +78,7 @@ export const feesApi = baseApi.injectEndpoints({
       query: (params) => ({ url: `/finance/deferred-income/releases/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceDeferredIncome"],
     }),
-    reverseDeferredIncome: builder.mutation<ApiEnvelope<{ period: number; reversed: number }>, { entity: string; period: number }>({
+    reverseDeferredIncome: builder.mutation<ApiEnvelope<{ period?: number; reversed?: number }>, { entity: string; period: number }>({
       query: ({ entity, ...body }) => ({ url: `/finance/deferred-income/reverse/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceDeferredIncome", "FinancePeriods", ...LEDGER_TAGS],
     }),
@@ -87,7 +88,7 @@ export const feesApi = baseApi.injectEndpoints({
       query: (params) => ({ url: `/finance/provisions/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceProvisions"],
     }),
-    createProvision: builder.mutation<ApiEnvelope<DoubtfulDebtProvision>, { entity: string; as_of: string; narration?: string }>({
+    createProvision: builder.mutation<ApiEnvelope<DoubtfulDebtProvision>, { entity: string; as_of?: string; narration?: string }>({
       query: ({ entity, ...body }) => ({ url: `/finance/provisions/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceProvisions"],
     }),
@@ -108,7 +109,7 @@ export const feesApi = baseApi.injectEndpoints({
       query: (params) => ({ url: `/finance/deposits/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceDeposits"],
     }),
-    releaseDeposits: builder.mutation<ApiEnvelope<{ credit_notes: CreditNote[] }>, { entity: string; customer: string | number; offset?: boolean }>({
+    releaseDeposits: builder.mutation<ApiEnvelope<{ credit_notes: DepositReleaseNote[] }>, { entity: string; customer: string | number; offset?: boolean }>({
       query: ({ entity, ...body }) => ({ url: `/finance/deposits/release/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceDeposits", "FinanceCreditNotes", "FinanceRefunds", ...LEDGER_TAGS],
     }),

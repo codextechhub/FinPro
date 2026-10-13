@@ -33,6 +33,18 @@ describe("income given back", () => {
     expect(incomeGivenBackLine({ ...ROW, status: "REVERSED" }, naira)).toContain("(reversed with this document)");
   });
 
+  it("drops the amount, the reversal note or both when their switches are closed", () => {
+    const { amount: _amount, ...noAmount } = ROW;
+    const { status: _status, ...noStatus } = ROW;
+    expect(incomeGivenBackLine(noAmount, naira)).toBe("Ikeja Branch gives back income it booked");
+    expect(incomeGivenBackLine({ ...noAmount, status: "REVERSED" }, naira)).toBe("Ikeja Branch gives back income it booked (reversed with this document)");
+    expect(incomeGivenBackLine(noStatus, naira)).toBe("Ikeja Branch gives back N64,500 of income it booked");
+    const { amount: _a, status: _s, ...bare } = ROW;
+    act(() => root.render(<MemoryRouter><IncomeGivenBack rows={[bare]} currency="NGN" /></MemoryRouter>));
+    expect(container.textContent).toContain("Ikeja Branch gives back income it booked");
+    expect(container.textContent).not.toMatch(/NaN|undefined|N0/);
+  });
+
   it("links each give-back to its transfer in the register", () => {
     act(() => root.render(<MemoryRouter><IncomeGivenBack rows={[ROW]} currency="NGN" /></MemoryRouter>));
     const link = container.querySelector("a");

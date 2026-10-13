@@ -17,6 +17,9 @@
  *
  * When a save is refused with 403 `field_write_denied`, pass the parsed
  * messages as `errors` and each appears under its own field.
+ *
+ * The wrapper sets no margin of its own, so a parent's `space-y-*` stack spaces
+ * it like any other field.
  */
 
 import type { ReactNode } from "react";
@@ -50,7 +53,7 @@ export function AccessField({
       disabled={readOnly}
       data-field={name}
       data-read-only={readOnly || undefined}
-      className={cn("m-0 block min-w-0 border-0 p-0", readOnly && "cursor-not-allowed opacity-60", className)}
+      className={cn("block min-w-0 border-0 p-0", readOnly && "cursor-not-allowed opacity-60", className)}
     >
       {label ? (
         <label className="block space-y-1">

@@ -16,13 +16,21 @@
  * totals (`partial_view`). Such a part offers nothing to submit or post and says
  * nothing about approval: `approval_required` is null there, because whether a
  * run needs approval turns on its whole total.
+ *
+ * Every figure here is a `finance.provision` Field Access field. A role that
+ * may not read one has it, its column and its header left out; the run's status
+ * (with its approval facts) also decides whether a draft can be submitted or
+ * posted, so without it no action is offered. Only the provision date and the
+ * narration are typed in, and a new run needs the date, so a role that may not
+ * write it is not offered one. The age bands travel with their own switch,
+ * apart from the branch lines' totals.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Check, Plus, Send } from "lucide-react";
 import {
-  ConfirmActionModal, DataTable, DetailDrawer, FormField, FormModal, Money, PostingDateField,
-  PostingRecap, StatusPill, toArray, type Column,
+  AccessField, ConfirmActionModal, DataTable, DetailDrawer, FormModal, Money, PostingDateField,
+  PostingRecap, StatusPill, fieldWriteErrors, toArray, useFieldAccess, type Column, type FieldErrors,
 } from "@/components/finance-ui";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { RETURNED_HINT, SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
@@ -42,6 +50,8 @@ import {
 import type { DoubtfulDebtProvision, ProvisionLine } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, bandLabel, bpsToPercent, useBranchColumn } from "./fees-parts";
 import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
+
+const RESOURCE = "finance.provision";
 
 const th = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 const td = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
@@ -63,7 +73,7 @@ function yourBranchesPart(branchIds: number[] | null): string {
 
 /** The journal a provision's net movement posts: raising the allowance, or releasing it. */
 export function provisionRecap(lines: ProvisionLine[]) {
-  const net = lines.reduce((sum, line) => sum + line.movement, 0);
+  const net = lines.reduce((sum, line) => sum + (line.movement ?? 0), 0);
   const amount = Math.abs(net);
   const expense = { code: "5350", name: "Bad debts", amount };
   const allowance = { code: "1290", name: "Allowance for doubtful debts", amount };
@@ -72,49 +82,55 @@ export function provisionRecap(lines: ProvisionLine[]) {
 
 export function ProvisionsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
+  const access = useFieldAccess(RESOURCE);
   const { branchIds } = useReaderReach();
   const { wholeSchool, canWholeSchool, heldWithoutReach } = useWholeSchoolAccess();
   const list = useListBranch();
+  const statusHidden = access.isHidden("status");
   const [page, setPage] = useState(1);
   // Runs have no status filter: the one choice is all runs, or those sent back.
   const [approval, setApproval] = useState("");
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<DoubtfulDebtProvision | null>(null);
   // A run names no branch; a branch's list keeps the runs with a line for it.
-  const { data, isLoading, isFetching, isError, refetch } = useGetProvisionsQuery({ entity, page, ...statusFilterArgs(approval), ...listBranchArg(list.view) });
+  const { data, isLoading, isFetching, isError, refetch } = useGetProvisionsQuery({
+    entity, page, ...(statusHidden ? {} : statusFilterArgs(approval)), ...listBranchArg(list.view),
+  });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
   const open = selected ? rows.find((r) => r.id === selected.id) ?? selected : null;
   const showsParts = useMemo(() => rows.some(isPartOfRun), [rows]);
 
   const columns: Column<DoubtfulDebtProvision>[] = [
-    { header: "Ref", cell: (r) => <span className="font-semibold tabular-nums">{r.document_number}</span> },
-    { header: "As of", cell: (r) => <span className="tabular-nums">{dates.day(r.as_of)}</span> },
-    {
-      header: "Allowance required", align: "right",
-      cell: (r) => (
+    { header: "Ref", cell: (r: DoubtfulDebtProvision) => <span className="font-semibold tabular-nums">{r.document_number}</span> },
+    ...(!access.isHidden("as_of") ? [{ header: "As of", cell: (r: DoubtfulDebtProvision) => <span className="tabular-nums">{r.as_of ? dates.day(r.as_of) : ""}</span> }] : []),
+    ...(!access.isHidden("required_total") ? [{
+      header: "Allowance required", align: "right" as const,
+      cell: (r: DoubtfulDebtProvision) => (
         <div className="flex flex-col items-end">
-          <Money kobo={r.required_total} currency={currency} align="right" />
+          <Money kobo={r.required_total ?? 0} currency={currency} align="right" />
           {isPartOfRun(r) ? <span className="font-mont text-[11px] text-gray-05">{yourBranchesPart(branchIds)}</span> : null}
         </div>
       ),
-    },
-    { header: "Change", align: "right", cell: (r) => <Money kobo={r.movement_total} currency={currency} align="right" /> },
-    { header: "Status", cell: (r) => <StatusPill {...sentBackPill(r, r.status, statusWord(r.status), true)} /> },
+    }] : []),
+    ...(!access.isHidden("movement_total") ? [{ header: "Change", align: "right" as const, cell: (r: DoubtfulDebtProvision) => <Money kobo={r.movement_total ?? 0} currency={currency} align="right" /> }] : []),
+    ...(!statusHidden ? [{ header: "Status", cell: (r: DoubtfulDebtProvision) => <StatusPill {...sentBackPill(r, r.status, statusWord(r.status), true)} /> }] : []),
   ];
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <select value={approval} onChange={(e) => { setApproval(e.target.value); setPage(1); }} className={selectCls} aria-label="Status">
-            <option value="">All runs</option>
-            <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
-          </select>
+          {!statusHidden ? (
+            <select value={approval} onChange={(e) => { setApproval(e.target.value); setPage(1); }} className={selectCls} aria-label="Status">
+              <option value="">All runs</option>
+              <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
+            </select>
+          ) : null}
           <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
           <p className="font-mont text-xs text-gray-05">One journal per branch, worked out from each branch&apos;s aged debts.</p>
         </div>
-        {canWholeSchool(P.FIN_CREATE_PROVISION) ? (
+        {canWholeSchool(P.FIN_CREATE_PROVISION) && !access.isReadOnly("as_of") ? (
           <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New provision run</Button>
         ) : null}
       </div>
@@ -142,17 +158,21 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
 function NewProvisionModal({ open, onClose, entity, onCreated }: {
   open: boolean; onClose: () => void; entity: string; onCreated: (p: DoubtfulDebtProvision) => void;
 }) {
+  const access = useFieldAccess(RESOURCE);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [asOf, setAsOf] = useState("");
   const [narration, setNarration] = useState("");
   const [create, { isLoading }] = useCreateProvisionMutation();
-  const close = () => { setAsOf(""); setNarration(""); onClose(); };
+  const close = () => { setAsOf(""); setNarration(""); setDenied(null); onClose(); };
   const submit = async () => {
     try {
-      const res = await create({ entity, as_of: asOf, narration: narration.trim() || undefined }).unwrap();
+      const res = await create({
+        entity, ...access.writableOnly({ as_of: asOf, narration: narration.trim() || undefined }, { creating: true }),
+      }).unwrap();
       toast.success(res.message || "Provision prepared.");
       onCreated(res.data);
       close();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
   return (
     <FormModal
@@ -161,10 +181,12 @@ function NewProvisionModal({ open, onClose, entity, onCreated }: {
       description="Works out each branch's allowance from its debts aged to this date. Nothing posts until it is approved."
       submitText="Prepare run" loading={isLoading} canSubmit={!!asOf} onSubmit={submit}
     >
-      <PostingDateField label="Age debts to" entity={entity} value={asOf} onChange={setAsOf} />
-      <FormField label="Narration">
+      <AccessField access={access} name="as_of" creating errors={denied}>
+        <PostingDateField label="Age debts to" entity={entity} value={asOf} onChange={setAsOf} />
+      </AccessField>
+      <AccessField access={access} name="narration" label="Narration" creating errors={denied}>
         <Input value={narration} onChange={(e) => setNarration(e.target.value)} maxLength={255} placeholder="e.g. Year-end provision" className="bg-white" />
-      </FormField>
+      </AccessField>
     </FormModal>
   );
 }
@@ -173,6 +195,7 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
   provision: DoubtfulDebtProvision | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
+  const access = useFieldAccess(RESOURCE, provision);
   const { branchIds } = useReaderReach();
   const { canWholeSchool } = useWholeSchoolAccess();
   const branches = useBranchColumn();
@@ -184,12 +207,18 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
   const { standing, request, workflowId, requestNamed } = useFinanceReturned(provision, { path: "provisions", entity });
   if (!provision) return null;
 
-  const isDraft = provision.status === "DRAFT" && !standing;
+  const statusHidden = access.isHidden("status");
+  const isDraft = !statusHidden && provision.status === "DRAFT" && !standing;
   const partOnly = isPartOfRun(provision);
   const gated = provision.approval_required !== false;
   const allowed = !partOnly && (gated ? canWholeSchool(P.FIN_SUBMIT_PROVISION) : canWholeSchool(P.FIN_POST_PROVISION));
-  const recap = provisionRecap(provision.lines);
-  const bandKeys = [...new Set(provision.lines.flatMap((l) => Object.keys(l.bands)))].sort((a, b) => Number(a) - Number(b));
+  const lines = provision.lines ?? [];
+  const figures = (["required", "current", "movement"] as const).filter((name) => !access.isHidden(name));
+  const showBands = !access.isHidden("bands");
+  const recap = provisionRecap(lines);
+  const bandKeys = showBands ? [...new Set(lines.flatMap((l) => Object.keys(l.bands ?? {})))].sort((a, b) => Number(a) - Number(b)) : [];
+  const showRecap = !access.isHidden("movement") && lines.length > 0;
+  const showCards = access.anyVisible("status", "required_total", "movement_total");
 
   const act = async () => {
     try {
@@ -208,12 +237,13 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
     } catch { /* central */ }
   };
 
+
   return (
     <>
       <DetailDrawer
         open onOpenChange={(o) => (o ? undefined : onClose())}
-        title={provision.document_number}
-        description={`Doubtful debts aged to ${dates.day(provision.as_of)}`}
+        title={provision.document_number ?? "Provision run"}
+        description={!access.isHidden("as_of") && provision.as_of ? `Doubtful debts aged to ${dates.day(provision.as_of)}` : "Doubtful debts"}
         widthClass="sm:max-w-2xl"
         footer={standing === "sender" ? (
           <ResumeButton workflowId={workflowId} tags={["FinanceProvisions"]} onResumed={onClose} />
@@ -227,11 +257,13 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
           {partOnly ? (
             <Note>{`This run covers the whole school. You are shown only ${yourBranchesPart(branchIds)}. Submitting and posting it are for someone who covers the whole school.`}</Note>
           ) : null}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <DetailField label="Status"><StatusPill {...sentBackPill(provision, provision.status, statusWord(provision.status), true)} /></DetailField>
-            <DetailField label="Allowance required"><Money kobo={provision.required_total} currency={currency} /></DetailField>
-            <DetailField label="Change to the allowance"><Money kobo={provision.movement_total} currency={currency} /></DetailField>
-          </div>
+          {showCards ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {!statusHidden ? <DetailField label="Status"><StatusPill {...sentBackPill(provision, provision.status, statusWord(provision.status), true)} /></DetailField> : null}
+              {!access.isHidden("required_total") ? <DetailField label="Allowance required"><Money kobo={provision.required_total ?? 0} currency={currency} /></DetailField> : null}
+              {!access.isHidden("movement_total") ? <DetailField label="Change to the allowance"><Money kobo={provision.movement_total ?? 0} currency={currency} /></DetailField> : null}
+            </div>
+          ) : null}
           <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} />
           {isDraft ? (
             <Note>
@@ -241,31 +273,33 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
             </Note>
           ) : null}
 
-          <div>
-            <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">
-              {branches.show ? "By branch" : "Figures"}
-            </p>
-            <div className="overflow-x-auto rounded-md border border-white-02">
-              <table className="w-full border-collapse">
-                <thead><tr>
-                  {branches.show ? <th className={th}>Branch</th> : null}
-                  <th className={`${th} text-right`}>Required</th>
-                  <th className={`${th} text-right`}>Held now</th>
-                  <th className={`${th} text-right`}>Change</th>
-                </tr></thead>
-                <tbody>
-                  {provision.lines.map((line) => (
-                    <tr key={line.branch_id ?? "none"}>
-                      {branches.show ? <td className={td}>{branches.name(line.branch_id, line.branch_name)}</td> : null}
-                      <td className={`${td} text-right`}><Money kobo={line.required} currency={currency} align="right" /></td>
-                      <td className={`${td} text-right`}><Money kobo={line.current} currency={currency} align="right" /></td>
-                      <td className={`${td} text-right`}><Money kobo={line.movement} currency={currency} align="right" /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {figures.length ? (
+            <div>
+              <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">
+                {branches.show ? "By branch" : "Figures"}
+              </p>
+              <div className="overflow-x-auto rounded-md border border-white-02">
+                <table className="w-full border-collapse">
+                  <thead><tr>
+                    {branches.show ? <th className={th}>Branch</th> : null}
+                    {figures.includes("required") ? <th className={`${th} text-right`}>Required</th> : null}
+                    {figures.includes("current") ? <th className={`${th} text-right`}>Held now</th> : null}
+                    {figures.includes("movement") ? <th className={`${th} text-right`}>Change</th> : null}
+                  </tr></thead>
+                  <tbody>
+                    {lines.map((line, index) => (
+                      <tr key={line.branch_id ?? `line-${index}`}>
+                        {branches.show ? <td className={td}>{branches.name(line.branch_id, line.branch_name)}</td> : null}
+                        {figures.includes("required") ? <td className={`${td} text-right`}><Money kobo={line.required ?? 0} currency={currency} align="right" /></td> : null}
+                        {figures.includes("current") ? <td className={`${td} text-right`}><Money kobo={line.current ?? 0} currency={currency} align="right" /></td> : null}
+                        {figures.includes("movement") ? <td className={`${td} text-right`}><Money kobo={line.movement ?? 0} currency={currency} align="right" /></td> : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {bandKeys.length ? (
             <div>
@@ -279,18 +313,18 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
                     <th className={`${th} text-right`}>Required</th>
                   </tr></thead>
                   <tbody>
-                    {provision.lines.flatMap((line) => bandKeys.filter((k) => line.bands[k]).map((k) => (
-                      <tr key={`${line.branch_id}-${k}`}>
+                    {lines.flatMap((line, index) => bandKeys.filter((k) => line.bands?.[k]).map((k) => (
+                      <tr key={`${line.branch_id ?? index}-${k}`}>
                         {branches.show ? <td className={td}>{branches.name(line.branch_id, line.branch_name)}</td> : null}
                         <td className={td}>
                           {bandLabel(k)}
                           {(() => {
-                            const band = provision.policy_snapshot.find((b) => String(b.over_days) === k);
+                            const band = access.isHidden("policy_snapshot") ? undefined : provision.policy_snapshot?.find((b) => String(b.over_days) === k);
                             return band ? <span className="text-gray-05"> at {bpsToPercent(band.rate_bps)}</span> : null;
                           })()}
                         </td>
-                        <td className={`${td} text-right`}><Money kobo={line.bands[k].owed} currency={currency} align="right" /></td>
-                        <td className={`${td} text-right`}><Money kobo={line.bands[k].required} currency={currency} align="right" /></td>
+                        <td className={`${td} text-right`}><Money kobo={line.bands![k].owed} currency={currency} align="right" /></td>
+                        <td className={`${td} text-right`}><Money kobo={line.bands![k].required} currency={currency} align="right" /></td>
                       </tr>
                     )))}
                   </tbody>
@@ -299,12 +333,14 @@ function ProvisionDrawer({ provision, entity, currency, onClose }: {
             </div>
           ) : null}
 
-          <PostingRecap
-            title={recap.net >= 0 ? "Raising the allowance" : "Releasing the allowance"}
-            dr={recap.dr} cr={recap.cr} currency={currency} stackOnMobile
-            helper={branches.show && provision.lines.length > 1 ? "Posted as one journal per branch; this is their total." : undefined}
-          />
-          {provision.narration ? <DetailField label="Narration"><span className="font-normal">{provision.narration}</span></DetailField> : null}
+          {showRecap ? (
+            <PostingRecap
+              title={recap.net >= 0 ? "Raising the allowance" : "Releasing the allowance"}
+              dr={recap.dr} cr={recap.cr} currency={currency} stackOnMobile
+              helper={branches.show && lines.length > 1 ? "Posted as one journal per branch; this is their total." : undefined}
+            />
+          ) : null}
+          {!access.isHidden("narration") && provision.narration ? <DetailField label="Narration"><span className="font-normal">{provision.narration}</span></DetailField> : null}
         </div>
       </DetailDrawer>
       <ConfirmActionModal

@@ -15,11 +15,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   denied: new Set<string>(),
   wholeSchool: true,
+  summary: undefined as unknown,
 }));
 
 const { idle } = vi.hoisted(() => ({ idle: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/redux/services/finance/ar-api", () => ({
-  useGetDunningSummaryQuery: () => ({ data: undefined }),
+  useGetDunningSummaryQuery: () => ({ data: mocks.summary === undefined ? undefined : { data: mocks.summary } }),
   useGetDunningPoliciesQuery: () => ({
     data: { data: [{ id: 1, name: "Standard 7/14/30-day", is_active: true, is_default: true, stages: [] }] },
   }),
@@ -56,6 +57,7 @@ let root: Root;
 beforeEach(() => {
   mocks.denied = new Set();
   mocks.wholeSchool = true;
+  mocks.summary = undefined;
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -100,5 +102,41 @@ describe("the reminder policies", () => {
     expect(button("New policy")).toBeUndefined();
     expect(button("Edit")).toBeUndefined();
     expect(container.querySelector("[data-testid=dunning-read-only]")).toBeNull();
+  });
+});
+
+describe("the ageing strip", () => {
+  const tiles = () => [...container.querySelectorAll("[data-testid=aging-tile]")];
+  const open = () => act(() => root.render(<DunningTab entity="BSS" currency="NGN" />));
+
+  it("shows each bucket's amount and invoice count when the balance is readable", () => {
+    mocks.summary = {
+      due_soon: { amount: 100000, count: 2 }, overdue_1_30: { amount: 250000, count: 1 },
+      overdue_31_60: { amount: 0, count: 0 }, overdue_60_plus: { amount: 500000, count: 3 },
+    };
+    open();
+    expect(tiles()).toHaveLength(4);
+    expect(tiles()[0].textContent).toContain("2 invoices");
+    expect(tiles()[0].textContent).toContain("1,000");
+    expect(tiles()[3].textContent).toContain("3 invoices");
+  });
+
+  it("shows counts without amounts when the balance is hidden", () => {
+    mocks.summary = {
+      due_soon: { count: 2 }, overdue_1_30: { count: 1 }, overdue_31_60: { count: 0 }, overdue_60_plus: { count: 3 },
+    };
+    open();
+    expect(tiles()).toHaveLength(4);
+    expect(tiles().map((t) => t.querySelectorAll("p").length)).toEqual([2, 2, 2, 2]);
+    expect(tiles()[0].textContent).toBe("Due soon (0–7d)2 invoices");
+    expect(tiles()[1].textContent).toBe("Overdue 1–30d1 invoice");
+    expect(container.textContent).not.toMatch(/NaN|undefined|₦0/);
+  });
+
+  it("leaves the strip out when the account status is hidden", () => {
+    mocks.summary = {};
+    open();
+    expect(tiles()).toHaveLength(0);
+    expect(container.textContent).not.toContain("Due soon");
   });
 });

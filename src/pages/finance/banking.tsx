@@ -22,7 +22,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { Plus, Search, Trash2, Upload, RefreshCw, ListChecks, FileText, History, Settings as SettingsIcon, ArrowLeftRight, ChevronDown, Rows3, FileSpreadsheet, Eye, Pencil, Undo2, Split } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
-import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, AccessField, useFieldAccess, fieldWriteErrors, RaisingBranchChoiceField, useRaisingBranchChoice, type Column, type TabStripItem, type FieldErrors } from "@/components/finance-ui";
+import { DataTable, DetailDrawer, Money, StatusPill, FormField, AccountPicker, CurrencyPicker, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, toArray, AccessField, useFieldAccess, fieldWriteErrors, RaisingBranchChoiceField, useRaisingBranchChoice, type Column, type FieldAccess, type TabStripItem, type FieldErrors } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,8 @@ import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 import { BankDocumentsSection } from "./bank-documents";
 import { BankSplitDrawer, canSplitAccount } from "./bank-split-drawer";
+import { BANK_ACCOUNT, bankBalances, cardColumns } from "./bank-account-access";
+import { splitIsWritable } from "./bank-split-model";
 import { useInterBranchReader } from "./inter-branch/use-inter-branch";
 import { CollectionSubaccountBlock } from "./online-payments";
 
@@ -73,8 +75,11 @@ const partialMask = (n: string) => {
   const s = n.replace(/\s+/g, "");
   return s.length <= 4 ? s : `${s.slice(0, 4)} **** ${s.slice(-4)}`;
 };
-/** Field Access resource for a bank account; `account_number` is its one registered field. */
-const BANK_ACCOUNT = "finance.bankaccount";
+/** The search box's hint, naming only the columns the role can see: "Search name, bank or GL". */
+export function searchPlaceholder(bank: boolean, gl: boolean): string {
+  const fields = ["name", ...(bank ? ["bank"] : []), ...(gl ? ["GL"] : [])];
+  return `Search ${fields.length > 1 ? `${fields.slice(0, -1).join(", ")} or ${fields[fields.length - 1]}` : fields[0]}`;
+}
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -93,6 +98,14 @@ export default function BankingPage() {
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
   const access = useFieldAccess(BANK_ACCOUNT);
+  const shown = bankBalances(access);
+  const showBank = !access.isHidden("bank_name");
+  const showGl = !access.isHidden("gl_account");
+  const showStatus = !access.isHidden("is_active");
+  const showCurrency = !access.isHidden("currency");
+  const showUnreconciled = !access.isHidden("unreconciled_count");
+  const showLastReconciled = !access.isHidden("last_reconciled_at");
+  const searchHint = searchPlaceholder(showBank, showGl);
   useActionParam("new", can(P.FIN_CREATE_BANK_ACCOUNT), () => setCreating(true));
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput.trim().toLowerCase(), 250);
@@ -126,11 +139,11 @@ export default function BankingPage() {
         )}
       </div>
     ) },
-    { header: "GL", cell: (a) => <span className="tabular-nums text-gray-05">{a.gl_account}</span> },
-    { header: "Currency", cell: (a) => a.currency ?? "-" },
-    { header: "Book balance", align: "right", cell: (a) => <Money kobo={a.book_balance} currency={currency} align="right" /> },
-    { header: "Last reconciled", cell: (a) => <span className="tabular-nums text-gray-05">{dates.day(a.last_reconciled_at, a.branch_id)}</span> },
-    { header: "Status", cell: (a) => <StatusPill status={a.is_active ? "ACTIVE" : "INACTIVE"} /> },
+    ...(showGl ? [{ header: "GL", cell: (a: BankAccount) => <span className="tabular-nums text-gray-05">{a.gl_account}</span> }] : []),
+    ...(showCurrency ? [{ header: "Currency", cell: (a: BankAccount) => a.currency ?? "-" }] : []),
+    ...(shown.book ? [{ header: "Book balance", align: "right" as const, cell: (a: BankAccount) => <Money kobo={a.book_balance ?? 0} currency={currency} align="right" /> }] : []),
+    ...(showLastReconciled ? [{ header: "Last reconciled", cell: (a: BankAccount) => <span className="tabular-nums text-gray-05">{dates.day(a.last_reconciled_at, a.branch_id)}</span> }] : []),
+    ...(showStatus ? [{ header: "Status", cell: (a: BankAccount) => <StatusPill status={a.is_active ? "ACTIVE" : "INACTIVE"} /> }] : []),
   ];
 
   if (!entity) {
@@ -154,15 +167,15 @@ export default function BankingPage() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Kpi label="Total bank balance" value={formatMoney(kpis.total, currency)} hint="Across active accounts" />
-          <Kpi label="Active accounts" value={String(kpis.active)} />
-          <Kpi label="Unreconciled lines" value={String(kpis.unrec)} hint="Awaiting a match" />
-          <Kpi label="Last reconciled" value={dates.day(kpis.last)} />
+          {shown.book ? <Kpi label="Total bank balance" value={formatMoney(kpis.total, currency)} hint="Across active accounts" /> : null}
+          {showStatus ? <Kpi label="Active accounts" value={String(kpis.active)} /> : null}
+          {showUnreconciled ? <Kpi label="Unreconciled lines" value={String(kpis.unrec)} hint="Awaiting a match" /> : null}
+          {showLastReconciled ? <Kpi label="Last reconciled" value={dates.day(kpis.last)} /> : null}
         </div>
 
         <div className="relative w-72">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
-          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search name, bank or GL" className="h-9 bg-white pl-8 font-mont" />
+          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder={searchHint} className="h-9 bg-white pl-8 font-mont" />
         </div>
 
         <DataTable
@@ -196,6 +209,9 @@ const TAB_ITEMS: TabStripItem<(typeof TABS)[number]["key"]>[] = TABS.map((t) => 
   label: <><t.icon className="size-3.5" /> {t.label}</>,
 }));
 
+/** The drawer sections a role may open: recent activity is a field of its own and leaves with its switch. */
+const withoutActivity = TAB_ITEMS.filter((t) => t.value !== "transactions");
+
 function MetricCard({ label, kobo, currency, danger }: { label: string; kobo: number; currency?: string | null; danger?: boolean }) {
   return (
     <div className="rounded-md border border-white-02 bg-white p-3">
@@ -203,6 +219,15 @@ function MetricCard({ label, kobo, currency, danger }: { label: string; kobo: nu
       <p className={cn("mt-1 font-mont text-base font-semibold tabular-nums", danger && kobo !== 0 ? "text-destructive" : "text-black-01")}>{formatMoney(kobo, currency)}</p>
     </div>
   );
+}
+
+/** The drawer's subtitle: the bank, ledger account and account number, each only while the role may read it. */
+export function bankDescription(access: FieldAccess, account: BankAccount): string {
+  return [
+    ...(access.isHidden("bank_name") ? [] : [account.bank_name || "-"]),
+    ...(access.isHidden("gl_account") ? [] : [account.gl_account ?? "-"]),
+    ...(access.isHidden("account_number") ? [] : [account.account_number || "-"]),
+  ].join(" · ");
 }
 
 function BankAccountDrawer({ account, entity, currency, onClose }: { account: BankAccount | null; entity: string; currency?: string | null; onClose: () => void }) {
@@ -213,12 +238,18 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
   const { data } = useGetBankAccountQuery(account ? { id: account.id, entity } : skipToken);
   const detail = data?.data;
   const access = useFieldAccess(BANK_ACCOUNT, detail ?? account);
+  const shown = bankBalances(access);
+  const showTransactions = !access.isHidden("transactions");
+  const tabItems = showTransactions ? TAB_ITEMS : withoutActivity;
+  const activeTab = tabItems.some((t) => t.value === tab) ? tab : tabItems[0].value;
   const [reconcile, { isLoading: reconciling }] = useAutoReconcileMutation();
   const reader = useInterBranchReader();
   const [splitting, setSplitting] = useState(false);
+  const splitAccess = useFieldAccess(BANK_ACCOUNT);
   if (!account) return null;
   const offerSplit = canSplitAccount(detail ?? account, {
     multiBranch: reader.applies, wholeSchool: reader.reach.wholeSchool, canUpdate: can(P.FIN_UPDATE_BANK_ACCOUNT),
+    writable: splitIsWritable(splitAccess),
   });
 
   const m = detail?.metrics;
@@ -234,11 +265,11 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
       <DetailDrawer
         open={!!account} onOpenChange={(o) => (o ? undefined : onClose())}
         title={account.name}
-        description={[account.bank_name || "-", account.gl_account, ...(access.isHidden("account_number") ? [] : [account.account_number || "-"])].join(" · ")}
+        description={bankDescription(access, account) || undefined}
         widthClass="sm:max-w-3xl"
         footer={
           <>
-            <StatusPill status={account.is_active ? "ACTIVE" : "INACTIVE"} />
+            {!access.isHidden("is_active") ? <StatusPill status={account.is_active ? "ACTIVE" : "INACTIVE"} /> : null}
             <div className="flex-1" />
             {offerSplit ? (
               <Button variant="outline" onClick={() => setSplitting(true)} className="gap-1.5"><Split className="size-4" /> Split by branch</Button>
@@ -271,15 +302,17 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
         }
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <MetricCard label="Book balance" kobo={m?.book_balance ?? account.book_balance} currency={currency} />
-            <MetricCard label="Statement balance" kobo={m?.statement_balance ?? 0} currency={currency} />
-            <MetricCard label="Unreconciled diff" kobo={m?.unreconciled_diff ?? 0} currency={currency} danger />
-          </div>
+          {shown.book || shown.statement || shown.difference ? (
+            <div className={cn("grid gap-3", cardColumns([shown.book, shown.statement, shown.difference].filter(Boolean).length))}>
+              {shown.book ? <MetricCard label="Book balance" kobo={m?.book_balance ?? account.book_balance ?? 0} currency={currency} /> : null}
+              {shown.statement ? <MetricCard label="Statement balance" kobo={m?.statement_balance ?? 0} currency={currency} /> : null}
+              {shown.difference ? <MetricCard label="Unreconciled diff" kobo={m?.unreconciled_diff ?? 0} currency={currency} danger /> : null}
+            </div>
+          ) : null}
 
           <TabStrip
-            items={TAB_ITEMS}
-            value={tab}
+            items={tabItems}
+            value={activeTab}
             onChange={setTab}
             variant="underline"
             ariaLabel="Bank account sections"
@@ -287,18 +320,19 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
             buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
           />
 
-          {tab === "transactions" && <TransactionsTab detail={detail} currency={currency} />}
-          {tab === "lines" && <StatementLinesTab id={account.id} entity={entity} currency={currency} />}
-          {tab === "statements" && (
+          {activeTab === "transactions" && <TransactionsTab detail={detail} currency={currency} showBalance={shown.book} />}
+          {activeTab === "lines" && <StatementLinesTab id={account.id} entity={entity} currency={currency} />}
+          {activeTab === "statements" && (
             <StatementsTab
               detail={detail}
               currency={currency}
               canEdit={can(P.FIN_IMPORT_BANK)}
               onEdit={setEditingStatement}
+              showBalances={shown.statement}
             />
           )}
-          {tab === "reconciliations" && <ReconciliationsTab detail={detail} currency={currency} />}
-          {tab === "settings" && <SettingsTab account={account} record={detail ?? account} entity={entity} canEdit={can(P.FIN_UPDATE_BANK_ACCOUNT)} />}
+          {activeTab === "reconciliations" && <ReconciliationsTab detail={detail} currency={currency} shown={shown} />}
+          {activeTab === "settings" && <SettingsTab account={account} record={detail ?? account} entity={entity} canEdit={can(P.FIN_UPDATE_BANK_ACCOUNT)} />}
         </div>
       </DetailDrawer>
 
@@ -315,7 +349,7 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
       {splitting ? (
         <BankSplitDrawer
           account={detail ?? account}
-          bookBalance={m?.book_balance ?? account.book_balance}
+          bookBalance={m?.book_balance ?? account.book_balance ?? 0}
           entity={entity}
           currency={currency}
           reader={reader}
@@ -335,7 +369,8 @@ function BankAccountDrawer({ account, entity, currency, onClose }: { account: Ba
   );
 }
 
-function TransactionsTab({ detail, currency }: { detail?: { transactions: import("@/redux/services/finance/ops-types").BankTransaction[] }; currency?: string | null }) {
+/** Recent ledger activity. The running balance walks back from the book balance, so it leaves with that switch. */
+function TransactionsTab({ detail, currency, showBalance }: { detail?: { transactions?: import("@/redux/services/finance/ops-types").BankTransaction[] }; currency?: string | null; showBalance: boolean }) {
   const dates = useDates();
   const txns = detail?.transactions ?? [];
   if (txns.length === 0) return <EmptyState title="No transactions" message="Posted movements on this account's GL appear here." />;
@@ -345,7 +380,7 @@ function TransactionsTab({ detail, currency }: { detail?: { transactions: import
         <thead><tr>
           <th className={thCls}>Date</th><th className={thCls}>Description</th><th className={thCls}>Reference</th>
           <th className={cn(thCls, "text-right")}>Debit</th><th className={cn(thCls, "text-right")}>Credit</th>
-          <th className={cn(thCls, "text-right")}>Balance</th><th className={thCls} />
+          {showBalance ? <th className={cn(thCls, "text-right")}>Balance</th> : null}<th className={thCls} />
         </tr></thead>
         <tbody>
           {txns.map((t) => (
@@ -355,7 +390,7 @@ function TransactionsTab({ detail, currency }: { detail?: { transactions: import
               <td className={cn(tdCls, "tabular-nums text-gray-05")}>{t.reference || "-"}</td>
               <td className={cn(tdCls, "text-right tabular-nums")}>{t.debit ? <span className="text-black-01">{formatMoney(t.debit, currency)}</span> : <span className="text-gray-05">-</span>}</td>
               <td className={cn(tdCls, "text-right tabular-nums text-green-01")}>{t.credit ? formatMoney(t.credit, currency) : <span className="text-gray-05">-</span>}</td>
-              <td className={cn(tdCls, "text-right tabular-nums font-medium")}>{formatMoney(t.running_balance, currency)}</td>
+              {showBalance ? <td className={cn(tdCls, "text-right tabular-nums font-medium")}>{formatMoney(t.running_balance ?? 0, currency)}</td> : null}
               <td className={cn(tdCls, "text-center")}>{t.matched ? <span title="Reconciled" className="text-green-01">✓</span> : null}</td>
             </tr>
           ))}
@@ -442,17 +477,24 @@ function StatementLinesTab({ id, entity, currency }: { id: number; entity: strin
  * the server says it would succeed (`import_rollback`), and to the holders of
  * the bank-statement import key, whom the rollback endpoint accepts for a
  * statement batch.
+ *
+ * The opening and closing columns are the bank's own figures and follow the
+ * statement balance switch (`showBalances`), leaving with their headings. The
+ * edit stays open to a role that cannot read them: its correction leaves the
+ * stored opening balance as it is (`EditStatementForm`).
  */
 export function StatementsTab({
   detail,
   currency,
   canEdit,
   onEdit,
+  showBalances = true,
 }: {
   detail?: { statements: import("@/redux/services/finance/ops-types").BankStatement[] };
   currency?: string | null;
   canEdit: boolean;
   onEdit: (statementId: number) => void;
+  showBalances?: boolean;
 }) {
   const dates = useDates();
   const dispatch = useAppDispatch();
@@ -483,7 +525,8 @@ export function StatementsTab({
       <table className="w-full border-collapse">
         <thead><tr>
           <th className={thCls}>Statement date</th><th className={thCls}>Period</th>
-          <th className={cn(thCls, "text-right")}>Opening</th><th className={cn(thCls, "text-right")}>Closing</th>
+          {showBalances ? <th className={cn(thCls, "text-right")}>Opening</th> : null}
+          {showBalances ? <th className={cn(thCls, "text-right")}>Closing</th> : null}
           <th className={cn(thCls, "text-right")}>Lines</th><th className={thCls}>Status</th>
           {canEdit ? <th className={thCls} /> : null}
         </tr></thead>
@@ -492,8 +535,12 @@ export function StatementsTab({
             <tr key={s.id}>
               <td className={cn(tdCls, "tabular-nums")}>{dates.day(s.statement_date)}</td>
               <td className={tdCls}>{s.period_label || "-"}</td>
-              <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(s.opening_balance, currency)}</td>
-              <td className={cn(tdCls, "text-right tabular-nums font-medium")}>{formatMoney(s.closing_balance, currency)}</td>
+              {showBalances ? (
+                <td className={cn(tdCls, "text-right tabular-nums")}>{s.opening_balance === undefined ? "-" : formatMoney(s.opening_balance, currency)}</td>
+              ) : null}
+              {showBalances ? (
+                <td className={cn(tdCls, "text-right tabular-nums font-medium")}>{s.closing_balance === undefined ? "-" : formatMoney(s.closing_balance, currency)}</td>
+              ) : null}
               <td className={cn(tdCls, "text-right tabular-nums text-gray-05")}>{s.line_count}</td>
               <td className={tdCls}><span className={cn(PILL, s.status === "RECONCILED" ? "bg-green-01/10 text-green-01" : "bg-amber-50 text-amber-700")}>{s.status_display}</span></td>
               {canEdit ? (
@@ -550,7 +597,11 @@ export function StatementsTab({
   );
 }
 
-function ReconciliationsTab({ detail, currency }: { detail?: { reconciliations: import("@/redux/services/finance/ops-types").BankReconciliationRun[] }; currency?: string | null }) {
+/**
+ * The reconciliation runs. A run restates the books and the statement, so each
+ * balance column follows its own switch and the difference needs both.
+ */
+function ReconciliationsTab({ detail, currency, shown }: { detail?: { reconciliations: import("@/redux/services/finance/ops-types").BankReconciliationRun[] }; currency?: string | null; shown: ReturnType<typeof bankBalances> }) {
   const dates = useDates();
   const recs = detail?.reconciliations ?? [];
   if (recs.length === 0) return <EmptyState title="No reconciliations yet" message="Each Auto-reconcile run is recorded here for audit." />;
@@ -558,17 +609,19 @@ function ReconciliationsTab({ detail, currency }: { detail?: { reconciliations: 
     <div className="overflow-hidden rounded-md border border-white-02">
       <table className="w-full border-collapse">
         <thead><tr>
-          <th className={thCls}>Date</th><th className={cn(thCls, "text-right")}>Book</th>
-          <th className={cn(thCls, "text-right")}>Statement</th><th className={cn(thCls, "text-right")}>Diff</th>
+          <th className={thCls}>Date</th>
+          {shown.book ? <th className={cn(thCls, "text-right")}>Book</th> : null}
+          {shown.statement ? <th className={cn(thCls, "text-right")}>Statement</th> : null}
+          {shown.difference ? <th className={cn(thCls, "text-right")}>Diff</th> : null}
           <th className={cn(thCls, "text-right")}>Matched</th><th className={thCls}>Status</th><th className={thCls}>By</th>
         </tr></thead>
         <tbody>
           {recs.map((r) => (
             <tr key={r.id}>
               <td className={cn(tdCls, "tabular-nums")}>{dates.day(r.created_at)}</td>
-              <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(r.book_balance, currency)}</td>
-              <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(r.statement_balance, currency)}</td>
-              <td className={cn(tdCls, "text-right tabular-nums", r.difference !== 0 ? "text-destructive" : "")}>{formatMoney(r.difference, currency)}</td>
+              {shown.book ? <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(r.book_balance ?? 0, currency)}</td> : null}
+              {shown.statement ? <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(r.statement_balance ?? 0, currency)}</td> : null}
+              {shown.difference ? <td className={cn(tdCls, "text-right tabular-nums", r.difference ? "text-destructive" : "")}>{formatMoney(r.difference ?? 0, currency)}</td> : null}
               <td className={cn(tdCls, "text-right tabular-nums text-gray-05")}>{r.matched_count}</td>
               <td className={tdCls}><span className={cn(PILL, r.status === "BALANCED" ? "bg-green-01/10 text-green-01" : "bg-amber-50 text-amber-700")}>{r.status_display}</span></td>
               <td className={cn(tdCls, "text-gray-05")}>{r.performed_by_name || "-"}</td>
@@ -589,12 +642,12 @@ function ReconciliationsTab({ detail, currency }: { detail?: { reconciliations: 
  */
 export function SettingsTab({ account, record, entity, canEdit }: { account: BankAccount; record: BankAccount; entity: string; canEdit: boolean }) {
   const [name, setName] = useState(account.name);
-  const [bankName, setBankName] = useState(account.bank_name);
+  const [bankName, setBankName] = useState(account.bank_name ?? "");
   const [accountNumber, setAccountNumber] = useState(account.account_number ?? "");
   const [currency, setCurrency] = useState(account.currency ?? "");
-  const [active, setActive] = useState(account.is_active);
-  const [primary, setPrimary] = useState(account.is_primary);
-  const [primaryCollection, setPrimaryCollection] = useState(account.is_primary_collection);
+  const [active, setActive] = useState(account.is_active ?? false);
+  const [primary, setPrimary] = useState(account.is_primary ?? false);
+  const [primaryCollection, setPrimaryCollection] = useState(account.is_primary_collection ?? false);
   const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [update, { isLoading }] = useUpdateBankAccountMutation();
   const access = useFieldAccess(BANK_ACCOUNT, record);
@@ -603,32 +656,47 @@ export function SettingsTab({ account, record, entity, canEdit }: { account: Ban
     setDenied(null);
     try {
       const res = await update({
-        id: account.id, entity, name: name.trim(), bank_name: bankName.trim(),
-        ...access.writableOnly({ account_number: accountNumber.trim() }),
-        currency: currency || undefined, is_active: active, is_primary: primary,
-        is_primary_collection: primaryCollection,
+        id: account.id, entity, name: name.trim(),
+        ...access.writableOnly({
+          bank_name: bankName.trim(), account_number: accountNumber.trim(),
+          currency: currency || undefined, is_active: active, is_primary: primary,
+          is_primary_collection: primaryCollection,
+        }),
       }).unwrap();
       toast.success(res.message || "Bank account updated.");
     } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
+  const flag = (field: string, label: string, checked: boolean, set: (value: boolean) => void) => (
+    <AccessField access={access} name={field} errors={denied}>
+      <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={checked} onChange={(e) => set(e.target.checked)} disabled={!canEdit} className="accent-primary" /> {label}</label>
+    </AccessField>
+  );
+  const showFlags = access.anyVisible("is_active", "is_primary", "is_primary_collection");
+
   return (
     <div className="space-y-4">
       <FormField label="Account name" required><Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} className="bg-white" /></FormField>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField label="Bank name"><Input value={bankName} onChange={(e) => setBankName(e.target.value)} disabled={!canEdit} className="bg-white" /></FormField>
-        <AccessField access={access} name="account_number" label="Account number" errors={denied}>
-          <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} disabled={!canEdit} className="bg-white font-mont" />
-        </AccessField>
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField label="Currency"><CurrencyPicker value={currency} onChange={setCurrency} disabled={!canEdit} /></FormField>
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-2 pb-2">
-          <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} disabled={!canEdit} className="accent-primary" /> Active</label>
-          <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={primary} onChange={(e) => setPrimary(e.target.checked)} disabled={!canEdit} className="accent-primary" /> Primary</label>
-          <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={primaryCollection} onChange={(e) => setPrimaryCollection(e.target.checked)} disabled={!canEdit} className="accent-primary" /> Collection</label>
+      {access.anyVisible("bank_name", "account_number") ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <AccessField access={access} name="bank_name" label="Bank name" errors={denied}><Input value={bankName} onChange={(e) => setBankName(e.target.value)} disabled={!canEdit} className="bg-white" /></AccessField>
+          <AccessField access={access} name="account_number" label="Account number" errors={denied}>
+            <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} disabled={!canEdit} className="bg-white font-mont" />
+          </AccessField>
         </div>
-      </div>
+      ) : null}
+      {access.anyVisible("currency", "is_active", "is_primary", "is_primary_collection") ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <AccessField access={access} name="currency" label="Currency" errors={denied}><CurrencyPicker value={currency} onChange={setCurrency} disabled={!canEdit} /></AccessField>
+          {showFlags ? (
+            <div className="flex flex-wrap items-end gap-x-4 gap-y-2 pb-2">
+              {flag("is_active", "Active", active, setActive)}
+              {flag("is_primary", "Primary", primary, setPrimary)}
+              {flag("is_primary_collection", "Collection", primaryCollection, setPrimaryCollection)}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {canEdit ? (
         <div className="flex justify-end"><Button disabled={isLoading || !name.trim()} onClick={save}>{isLoading ? "Saving…" : "Save changes"}</Button></div>
       ) : null}
@@ -686,6 +754,17 @@ function EditStatementDrawer({
   );
 }
 
+/**
+ * The correction form for a manually keyed statement.
+ *
+ * The opening balance is the bank's own figure and is read under the account's
+ * statement balance switch. A role that may read it sees the field and the
+ * recalculated closing balance, and sends the opening balance it typed. A role
+ * that may not has neither on screen and sends no opening balance at all, so
+ * the server keeps the stored one; sending it anyway is refused with 403
+ * `field_write_denied`, and that refusal shows beside the field when it is on
+ * screen and above the lines when it is not.
+ */
 function EditStatementForm({
   id,
   entity,
@@ -701,7 +780,10 @@ function EditStatementForm({
 }) {
   const [statementDate, setStatementDate] = useState(statement.statement_date);
   const [periodLabel, setPeriodLabel] = useState(statement.period_label);
-  const [opening, setOpening] = useState(String(statement.opening_balance / 100));
+  const access = useFieldAccess(BANK_ACCOUNT);
+  const openingReadable = statement.opening_balance !== undefined && !access.isHidden("statement_balance");
+  const [opening, setOpening] = useState(String((statement.opening_balance ?? 0) / 100));
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [rows, setRows] = useState<CorrectionRow[]>(
     statement.lines.map((line) => ({
       id: line.id,
@@ -732,14 +814,14 @@ function EditStatementForm({
   const canSave = (
     statement.can_edit
     && statementDate
-    && opening.trim() !== ""
-    && !Number.isNaN(Number(opening))
+    && (!openingReadable || (opening.trim() !== "" && !Number.isNaN(Number(opening))))
     && validRows.length === rows.length
     && rows.length > 0
   );
 
   const save = async () => {
     if (!canSave) return;
+    setDenied(null);
     try {
       const response = await update({
         id,
@@ -747,7 +829,7 @@ function EditStatementForm({
         entity,
         statement_date: statementDate,
         period_label: periodLabel.trim() || undefined,
-        opening_balance: openingKobo,
+        ...(openingReadable ? { opening_balance: openingKobo } : {}),
         lines: rows.map((row) => ({
           ...(row.id ? { id: row.id } : {}),
           txn_date: row.txn_date,
@@ -759,11 +841,14 @@ function EditStatementForm({
       }).unwrap();
       toast.success(response.message || "Bank statement corrected.");
       onClose();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
     <div className="space-y-4">
+      {!openingReadable && denied?.opening_balance ? (
+        <p role="alert" className="rounded-md bg-destructive/5 px-3 py-2 font-mont text-xs text-destructive ring-1 ring-destructive/20">{denied.opening_balance}</p>
+      ) : null}
       {!statement.can_edit && statement.edit_block_reason ? (
         <p className="rounded-md bg-amber-50 px-3 py-2 font-mont text-xs text-amber-900 ring-1 ring-amber-200">
           {statement.edit_block_reason}
@@ -777,19 +862,28 @@ function EditStatementForm({
           <Input value={periodLabel} onChange={(event) => setPeriodLabel(event.target.value)} disabled={!statement.can_edit} placeholder="e.g. Apr 2026" className="bg-white" />
         </FormField>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <FormField label="Opening balance" required>
-          <Input type="number" value={opening} onChange={(event) => setOpening(event.target.value)} disabled={!statement.can_edit} className="bg-white font-mont" />
-        </FormField>
-        <FormField label="Calculated closing balance">
-          <div className="flex h-9 items-center rounded-md border border-gray-03 bg-gray-03 px-3 font-mont text-sm font-medium tabular-nums text-gray-01">
-            {formatMoney(closingKobo, currency)}
+      {openingReadable ? (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormField label="Opening balance" required>
+              <Input type="number" value={opening} onChange={(event) => setOpening(event.target.value)} disabled={!statement.can_edit} className="bg-white font-mont" />
+              {denied?.opening_balance ? <p role="alert" className="mt-1 font-mont text-[11px] text-destructive">{denied.opening_balance}</p> : null}
+            </FormField>
+            <FormField label="Calculated closing balance">
+              <div className="flex h-9 items-center rounded-md border border-gray-03 bg-gray-03 px-3 font-mont text-sm font-medium tabular-nums text-gray-01">
+                {formatMoney(closingKobo, currency)}
+              </div>
+            </FormField>
           </div>
-        </FormField>
-      </div>
-      <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
-        The closing balance is recalculated as opening balance plus all corrected statement lines. Every correction is recorded in the finance audit trail.
-      </p>
+          <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
+            The closing balance is recalculated as opening balance plus all corrected statement lines. Every correction is recorded in the finance audit trail.
+          </p>
+        </>
+      ) : (
+        <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
+          Your role cannot read this statement&apos;s balances, so its opening balance stays as it was recorded and is not shown here. Every correction is recorded in the finance audit trail.
+        </p>
+      )}
       <div>
         <div className="mb-2 flex items-center justify-between">
           <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Lines</p>
@@ -1131,16 +1225,18 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
 
   const reset = () => { setName(""); setBankName(""); setAccountNumber(""); setGlAccount(""); setCurrency(""); setActive(true); setPrimary(false); setPrimaryCollection(false); setDenied(null); branch.reset(); };
   const close = () => { reset(); onClose(); };
+  const needsLedger = !access.isReadOnly("gl_account", { creating: true });
 
   const submit = async () => {
     setDenied(null);
     try {
       const res = await create({
-        entity, name: name.trim(), bank_name: bankName.trim() || undefined,
-        ...access.writableOnly({ account_number: accountNumber.trim() || undefined }, { creating: true }),
-        gl_account: glAccount,
-        currency: currency || undefined, is_active: active, is_primary: primary,
-        is_primary_collection: primaryCollection,
+        entity, name: name.trim(),
+        ...access.writableOnly({
+          bank_name: bankName.trim() || undefined, account_number: accountNumber.trim() || undefined,
+          gl_account: glAccount, currency: currency || undefined, is_active: active,
+          is_primary: primary, is_primary_collection: primaryCollection,
+        }, { creating: true }),
         ...branch.body(),
       }).unwrap();
       toast.success(res.message || "Bank account created.");
@@ -1155,7 +1251,7 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
-        <Button disabled={isLoading || !name.trim() || !glAccount || !branch.ready} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create account"}</Button>
+        <Button disabled={isLoading || !name.trim() || (needsLedger && !glAccount) || !branch.ready} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create account"}</Button>
       </>}
     >
       <div className="space-y-4">
@@ -1164,20 +1260,28 @@ function CreateBankAccountModal({ open, onClose, entity }: { open: boolean; onCl
         </p>
         <FormField label="Account name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. GTBank Operations" className="bg-white" /></FormField>
         <RaisingBranchChoiceField choice={branch} hint="This account pays and receives for this branch's documents only." />
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Bank name"><Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" className="bg-white" /></FormField>
-          <AccessField access={access} name="account_number" label="Account number" creating errors={denied}>
-            <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" className="bg-white font-mont" />
+        {access.anyVisible("bank_name", "account_number") ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <AccessField access={access} name="bank_name" label="Bank name" creating errors={denied}><Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" className="bg-white" /></AccessField>
+            <AccessField access={access} name="account_number" label="Account number" creating errors={denied}>
+              <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" className="bg-white font-mont" />
+            </AccessField>
+          </div>
+        ) : null}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <AccessField access={access} name="gl_account" label="GL cash account" required creating errors={denied}><AccountPicker entity={entity} value={glAccount} onChange={setGlAccount} postableOnly accountType="ASSET" placeholder="Cash / bank account" /></AccessField>
+          <AccessField access={access} name="currency" label="Currency" creating errors={denied}><CurrencyPicker value={currency} onChange={setCurrency} /></AccessField>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <AccessField access={access} name="is_active" creating errors={denied}>
+            <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active</label>
           </AccessField>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="GL cash account" required><AccountPicker entity={entity} value={glAccount} onChange={setGlAccount} postableOnly accountType="ASSET" placeholder="Cash / bank account" /></FormField>
-          <FormField label="Currency"><CurrencyPicker value={currency} onChange={setCurrency} /></FormField>
-        </div>
-        <div className="flex items-center gap-5">
-          <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active</label>
-          <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={primary} onChange={(e) => setPrimary(e.target.checked)} className="accent-primary" /> Primary operating account</label>
-          <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={primaryCollection} onChange={(e) => setPrimaryCollection(e.target.checked)} className="accent-primary" /> Print on invoices/receipts</label>
+          <AccessField access={access} name="is_primary" creating errors={denied}>
+            <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={primary} onChange={(e) => setPrimary(e.target.checked)} className="accent-primary" /> Primary operating account</label>
+          </AccessField>
+          <AccessField access={access} name="is_primary_collection" creating errors={denied}>
+            <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={primaryCollection} onChange={(e) => setPrimaryCollection(e.target.checked)} className="accent-primary" /> Print on invoices/receipts</label>
+          </AccessField>
         </div>
       </div>
     </DetailDrawer>

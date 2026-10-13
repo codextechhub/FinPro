@@ -132,6 +132,7 @@ function ApAgingBody({ d, cash, currency, entity, asOf }: {
                     <tr key={r.vendor_id} onClick={() => setSel({ code: r.code, name: r.name })} className="cursor-pointer transition-colors hover:bg-primary/5">
                       <td className={TD}>
                         <span className="font-semibold text-gray-01">{r.name}</span>
+                        {/* Terms come with the row only for a role that may read a vendor's payment terms. */}
                         {paymentTermsLabel(r.payment_terms) && (
                           <span className="mt-0.5 block font-mont text-[11px] text-gray-05">{paymentTermsLabel(r.payment_terms)}</span>
                         )}

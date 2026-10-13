@@ -385,16 +385,25 @@ export interface BankSplitBody {
  */
 export interface BankSplitPreview {
   bank_account_id: number;
-  legacy_balance: number;
-  unbranched_balance: number;
-  split_date: string;
-  branches: { branch_id: number; branch_name: string; book_balance: number }[];
+  /** Absent where the reader may not see the shared account's balance. */
+  legacy_balance?: number;
+  /** Absent where the reader may not see the part not yet given a branch. */
+  unbranched_balance?: number;
+  /** Absent where the reader may not read the split date. */
+  split_date?: string;
+  /** Absent where the reader may not see each branch's own balance. */
+  branches?: { branch_id: number; branch_name: string; book_balance: number }[];
 }
 
+/**
+ * What a split produced. Each key is a Field Access field of the bank account
+ * and is absent where the reader may not see it; a debt row carries only the
+ * parts the reader may read of an inter-branch document.
+ */
 export interface BankSplitResult {
   legacy_bank_account_id: number;
-  legacy_balance: number;
-  bank_accounts: {
+  legacy_balance?: number;
+  bank_accounts?: {
     id: number;
     name: string;
     branch_id: number;
@@ -404,14 +413,14 @@ export interface BankSplitResult {
     is_primary: boolean;
     is_primary_collection: boolean;
   }[];
-  journal_ids: number[];
-  difference_treatment: BankSplitDifferenceTreatment;
+  journal_ids?: number[];
+  difference_treatment?: BankSplitDifferenceTreatment;
   /** The BANK_SPLIT transfers a debt treatment booked, empty otherwise. */
-  inter_branch_transfers: {
+  inter_branch_transfers?: {
     id: number;
-    document_number: string;
-    from_branch_id: number;
-    to_branch_id: number;
-    amount: number;
+    document_number?: string;
+    from_branch_id?: number;
+    to_branch_id?: number;
+    amount?: number;
   }[];
 }

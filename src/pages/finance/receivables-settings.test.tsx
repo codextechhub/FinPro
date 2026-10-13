@@ -5,6 +5,11 @@
  * Every one of these settings binds every branch, so Mrs Adeyemi reads them and
  * cannot save; Mrs Bello can. The provision bands default to 25% over 180 days,
  * 50% over 365 and 100% over 730.
+ *
+ * Field Access: each policy value is a `finance.settings` field with its own
+ * Read and Write switch. A value the role may not read is absent and so is its
+ * panel, with the Save row moving to the last panel still shown; a value it may
+ * read and not change is greyed and left out of the saved body.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -14,6 +19,10 @@ import { FINANCE_PERMISSION_REGISTRY, type PermissionCode } from "../../permissi
 const mocks = vi.hoisted(() => ({
   held: new Set<string>(),
   wholeSchool: true,
+  access: {} as Record<string, unknown>,
+  hiddenKeys: [] as string[],
+  readOnlyKeys: [] as string[],
+  update: vi.fn(),
   mutation: () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }],
 }));
 const holds = (code: PermissionCode) => mocks.held.has(FINANCE_PERMISSION_REGISTRY[code]);
@@ -24,7 +33,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasAnyPermission: (...codes: PermissionCode[]) => codes.some(holds),
     hasAllPermissions: (...codes: PermissionCode[]) => codes.every(holds),
     hasModuleAccess: () => true,
-    fieldAccess: {},
+    fieldAccess: mocks.access,
   }),
 }));
 vi.mock("../../host", async (importOriginal) => ({
@@ -40,9 +49,8 @@ vi.mock("@/redux/services/finance/setup-api", async (importOriginal) => ({
   useUpdateFinanceDocumentSettingsMutation: mocks.mutation,
 }));
 vi.mock("@/redux/services/finance/fees-api", () => ({
-  useGetReceivablesSettingsQuery: () => ({
-    isLoading: false,
-    data: { data: { consumers: {}, history: [], settings: {
+  useGetReceivablesSettingsQuery: () => {
+    const settings: Record<string, unknown> = {
       revenue_recognition: "SPREAD_MONTHLY", revenue_recognition_label: "",
       revenue_recognition_options: [{ value: "SPREAD_MONTHLY", label: "Spread evenly over each month of the service period" }, { value: "AT_PERIOD_START", label: "All in the month the service period starts" }],
       provision_bands: [{ over_days: 180, rate_bps: 2500 }, { over_days: 365, rate_bps: 5000 }, { over_days: 730, rate_bps: 10000 }],
@@ -50,9 +58,12 @@ vi.mock("@/redux/services/finance/fees-api", () => ({
       payer_payment_split: "OLDEST_FIRST", payer_payment_split_options: [{ value: "OLDEST_FIRST", label: "Oldest first" }],
       payer_payment_surplus: "MOST_RECENT_BILL", payer_payment_surplus_options: [{ value: "MOST_RECENT_BILL", label: "Most recent" }],
       updated_at: "y", updated_by: null,
-    } } },
-  }),
-  useUpdateReceivablesSettingsMutation: mocks.mutation,
+    };
+    for (const key of mocks.hiddenKeys) delete settings[key];
+    if (mocks.readOnlyKeys.length) settings._read_only_fields = mocks.readOnlyKeys;
+    return { isLoading: false, data: { data: { consumers: {}, history: [], settings } } };
+  },
+  useUpdateReceivablesSettingsMutation: () => [mocks.update, { isLoading: false }],
 }));
 
 import { ReceivablesSettings } from "./receivables-settings";
@@ -61,7 +72,13 @@ import { ReceivablesSettings } from "./receivables-settings";
 
 let container: HTMLDivElement;
 let root: Root;
-beforeEach(() => { container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container); });
+beforeEach(() => {
+  container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
+  mocks.access = {};
+  mocks.hiddenKeys = [];
+  mocks.readOnlyKeys = [];
+  mocks.update.mockReset().mockReturnValue({ unwrap: async () => ({ message: "Saved." }) });
+});
 afterEach(() => { act(() => root.unmount()); container.remove(); });
 
 const render = (wholeSchool: boolean) => {
@@ -98,5 +115,118 @@ describe("the release method hint", () => {
     expect(text).toContain("Spread evenly over each month of the service period: an equal share is released each month");
     expect(text).toContain("All in the month the service period starts: the whole fee is released in the term's first month");
     expect(text).not.toContain("Spread monthly");
+  });
+});
+
+const RESOURCE = "finance.settings";
+const RECOGNITION = ["revenue_recognition", "revenue_recognition_label", "revenue_recognition_options"];
+const SPLIT = ["payer_payment_split", "payer_payment_split_options"];
+const SURPLUS = ["payer_payment_surplus", "payer_payment_surplus_options"];
+
+/** Restricts the role and serves the policy as the server would, hidden values absent. */
+const restrict = (restrictions: { hidden?: string[]; read_only?: string[] }) => {
+  mocks.access = { [RESOURCE]: restrictions };
+  mocks.hiddenKeys = restrictions.hidden ?? [];
+  mocks.readOnlyKeys = restrictions.read_only ?? [];
+};
+const panelTitles = () => Array.from(container.querySelectorAll("h2, h3, h4, p"))
+  .map((el) => el.textContent?.trim() ?? "")
+  .filter((t) => ["Fees billed ahead", "Doubtful debts", "Deposits", "Payments from a payer"].includes(t));
+const saveButtons = () => [...container.querySelectorAll("button")].filter((b) => b.textContent?.includes("Save receivables policy"));
+const typeInto = (el: HTMLInputElement, value: string) => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, value);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+};
+const save = async () => { await act(async () => { saveButtons()[0].click(); }); };
+
+describe("receivables settings under Field Access", () => {
+  it("shows the four panels, with the Save row in the last, when nothing is restricted", () => {
+    render(true);
+    expect(panelTitles()).toEqual(["Fees billed ahead", "Doubtful debts", "Deposits", "Payments from a payer"]);
+    expect(saveButtons()).toHaveLength(1);
+    expect(container.querySelector('[data-field="payer_payment_split"]')?.textContent).toContain("Split the payment");
+  });
+
+  it("removes a panel whose value is hidden, under every name the value travels under", () => {
+    restrict({ hidden: RECOGNITION });
+    render(true);
+    expect(panelTitles()).toEqual(["Doubtful debts", "Deposits", "Payments from a payer"]);
+    expect(container.textContent).not.toContain("Release method");
+    expect(container.textContent).not.toContain("Spread evenly");
+  });
+
+  it("moves the Save row to the last panel still shown", () => {
+    restrict({ hidden: [...SPLIT, ...SURPLUS] });
+    render(true);
+    expect(panelTitles()).toEqual(["Fees billed ahead", "Doubtful debts", "Deposits"]);
+    expect(saveButtons()).toHaveLength(1);
+    expect(container.textContent).not.toContain("Split the payment");
+    restrict({ hidden: [...SPLIT, ...SURPLUS, "deposits_offset_unpaid_bills", "unclaimed_deposit_years", "provision_bands"] });
+    act(() => root.unmount());
+    root = createRoot(container);
+    render(true);
+    expect(panelTitles()).toEqual(["Fees billed ahead"]);
+    expect(saveButtons()).toHaveLength(1);
+  });
+
+  it("keeps a panel with one of its two values hidden, showing the other", () => {
+    restrict({ hidden: ["unclaimed_deposit_years"] });
+    render(true);
+    expect(panelTitles()).toContain("Deposits");
+    expect(container.textContent).toContain("Set a leaver's deposit against their unpaid bills");
+    expect(container.textContent).not.toContain("Forfeit unclaimed deposits after");
+  });
+
+  it("offers no Save when nothing in the policy may be read", () => {
+    restrict({ hidden: [...RECOGNITION, "provision_bands", "deposits_offset_unpaid_bills", "unclaimed_deposit_years", ...SPLIT, ...SURPLUS, "updated_at", "updated_by"] });
+    render(true);
+    expect(panelTitles()).toEqual([]);
+    expect(saveButtons()).toHaveLength(0);
+  });
+
+  it("greys a read-only value and sends only what may be written", async () => {
+    restrict({ read_only: ["provision_bands"] });
+    render(true);
+    expect(container.querySelector('[data-field="provision_bands"]')?.getAttribute("data-read-only")).toBe("true");
+    expect(input("Band 1 days")?.disabled).toBe(true);
+    expect([...container.querySelectorAll("button")].some((b) => b.textContent?.includes("Add band"))).toBe(false);
+    const years = container.querySelector<HTMLInputElement>('input[type=number][max="50"]')!;
+    await act(async () => { typeInto(years, "3"); });
+    await save();
+    expect(mocks.update).toHaveBeenCalledWith({ entity: "BSS", unclaimed_deposit_years: 3 });
+  });
+
+  it("leaves a read-only value out of the body even when the role changed the form around it", async () => {
+    restrict({ read_only: ["unclaimed_deposit_years", "payer_payment_split"] });
+    render(true);
+    expect(container.querySelector('[data-field="unclaimed_deposit_years"]')?.getAttribute("data-read-only")).toBe("true");
+    expect(container.querySelector<HTMLSelectElement>('[aria-label="Split the payment"]')?.disabled).toBe(true);
+    await act(async () => { container.querySelector<HTMLElement>('[aria-label="Set a leaver\'s deposit against their unpaid bills"]')?.click(); });
+    await save();
+    expect(mocks.update).toHaveBeenCalledWith({ entity: "BSS", deposits_offset_unpaid_bills: true });
+  });
+
+  it("sends every changed value when all may be written", async () => {
+    render(true);
+    await act(async () => { typeInto(container.querySelector<HTMLInputElement>('input[type=number][max="50"]')!, "3"); });
+    await save();
+    expect(mocks.update).toHaveBeenCalledWith({ entity: "BSS", unclaimed_deposit_years: 3 });
+  });
+
+  it("does not demand valid bands from a role that cannot see or change them", async () => {
+    restrict({ hidden: ["provision_bands"] });
+    render(true);
+    await act(async () => { typeInto(container.querySelector<HTMLInputElement>('input[type=number][max="50"]')!, "4"); });
+    await save();
+    expect(mocks.update).toHaveBeenCalledWith({ entity: "BSS", unclaimed_deposit_years: 4 });
+  });
+
+  it("shows a refusal beside the value it names", async () => {
+    mocks.update.mockReturnValue({ unwrap: async () => { throw { status: 403, data: { error: { code: "field_write_denied", detail: { unclaimed_deposit_years: ["You do not have permission to change this field."] } } } }; } });
+    render(true);
+    await act(async () => { typeInto(container.querySelector<HTMLInputElement>('input[type=number][max="50"]')!, "3"); });
+    await save();
+    expect(container.querySelector('[data-field="unclaimed_deposit_years"] [role=alert]')?.textContent).toContain("do not have permission");
+    expect(container.querySelector('[data-field="provision_bands"] [role=alert]')).toBeNull();
   });
 });

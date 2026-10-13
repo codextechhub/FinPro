@@ -9,6 +9,11 @@
  * bursar reading the credit note can see what it did at the other branch.
  *
  * It renders nothing for a document that touched no other branch's income.
+ *
+ * Each row's amount and status are `finance.interbranch` fields and are absent
+ * for a role that may not read them. The sentence then drops the amount, or the
+ * reversal note, and keeps naming the branch; the transfer's number and the
+ * branch it was given back to always show.
  */
 
 import { Link } from "react-router";
@@ -20,7 +25,9 @@ import { transferLink } from "../inter-branch/links";
 
 /** One row's sentence: who gives back how much, and whether it still stands. */
 export function incomeGivenBackLine(row: IncomeGivenBackRow, money: (kobo: number) => string): string {
-  const base = `${row.to_branch_name} gives back ${money(row.amount)} of income it booked`;
+  const base = row.amount === undefined
+    ? `${row.to_branch_name} gives back income it booked`
+    : `${row.to_branch_name} gives back ${money(row.amount)} of income it booked`;
   return row.status === "REVERSED" ? `${base} (reversed with this document)` : base;
 }
 

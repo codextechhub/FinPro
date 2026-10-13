@@ -13,14 +13,23 @@
  * customer at a school with several branches the form therefore asks which
  * branch the opening balance is for, once one is entered, and sends it as
  * `opening_branch`; a customer filed under a branch takes that branch.
+ *
+ * Field Access (`finance.customer`): the name carries no switch. The billing
+ * email, phone and opening balance are open on create, so a role that may not
+ * read or change them afterwards can still give them here; the billing address,
+ * receivable account and active flag follow their switches (absent when hidden,
+ * greyed and unsent when read-only). The opening balance, its date and its
+ * branch are one block that answers to the opening balance switch. A refusal
+ * names the fields and each message appears beside its control.
  */
 import { useState } from "react";
 import { toast } from "sonner";
 import { toKobo } from "@/utils/money";
 import { Plus } from "lucide-react";
 import {
-  DetailDrawer, FormField, ReceivableAccountPicker, PostingDateField, RaisingBranchChoiceField,
-  useRaisingBranchChoice, useReaderBranchLens,
+  AccessField, DetailDrawer, FormField, ReceivableAccountPicker, PostingDateField, RaisingBranchChoiceField,
+  errorsBesideFollowed, fieldWriteErrors, useFieldAccess, useRaisingBranchChoice, useReaderBranchLens,
+  type FieldErrors, type WriteFollows,
 } from "@/components/finance-ui";
 import { NativeSelect } from "@/components/ui/native-select";
 import type { ReaderBranchLens } from "@/components/finance-ui/raising-branch";
@@ -29,6 +38,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useCreateCustomerMutation } from "@/redux/services/finance/ar-api";
 
+const CUSTOMER = "finance.customer";
+
+/** Body keys that answer to a registered field of another name, for refusals shown beside a control. */
+const BODY_FOLLOWS: WriteFollows = {
+  receivable_account: "receivable_account_code",
+  opening_date: "opening_balance",
+  opening_branch: "opening_balance",
+};
 
 /**
  * Whether a new customer's branch is asked, whether it must be named, and what
@@ -55,35 +72,46 @@ export function NewCustomerDrawer({ open, onOpenChange, entity }: {
   const [openingDate, setOpeningDate] = useState("");
   const [active, setActive] = useState(true);
   const [create, { isLoading }] = useCreateCustomerMutation();
+  const access = useFieldAccess(CUSTOMER);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const filing = customerBranchChoice(useReaderBranchLens(), useReaderReach().wholeSchool);
   const [picked, setPicked] = useState<string | null>(null);
   const customerBranch = picked ?? filing.initial;
-  const hasOpening = toKobo(opening) > 0;
+  const writes = (field: string) => !access.isReadOnly(field, { creating: true });
+  const openingOpen = writes("opening_balance");
+  const hasOpening = openingOpen && toKobo(opening) > 0;
   // A customer filed under a branch gives its opening balance that branch.
   const openingBranch = useRaisingBranchChoice({ unless: !hasOpening || !!customerBranch });
 
-  const canSubmit = name.trim() !== "" && email.trim() !== "" && phone.trim() !== "" && openingBranch.ready
+  const canSubmit = name.trim() !== "" && (!writes("billing_email") || email.trim() !== "")
+    && (!writes("billing_phone") || phone.trim() !== "") && openingBranch.ready
     && (!filing.required || !!customerBranch);
-  const reset = () => { setName(""); setEmail(""); setPhone(""); setAddress(""); setAccount(""); setOpening(""); setOpeningDate(""); setActive(true); setPicked(null); openingBranch.reset(); };
+  const reset = () => { setName(""); setEmail(""); setPhone(""); setAddress(""); setAccount(""); setOpening(""); setOpeningDate(""); setActive(true); setPicked(null); setDenied(null); openingBranch.reset(); };
   const close = () => { reset(); onOpenChange(false); };
 
   const submit = async () => {
+    setDenied(null);
     try {
       const res = await create({
         entity, name: name.trim(),
         ...(filing.ask && customerBranch ? { branch: Number(customerBranch) } : {}),
-        billing_email: email.trim(), billing_phone: phone.trim(),
-        billing_address: address || undefined,
-        receivable_account: account || undefined,
-        opening_balance: opening ? toKobo(opening) : undefined,
-        opening_date: opening && openingDate ? openingDate : undefined,
-        ...openingBranch.body("opening_branch"),
-        is_active: active,
+        ...access.writableOnly({
+          billing_email: email.trim(), billing_phone: phone.trim(),
+          billing_address: address || undefined,
+          receivable_account: account || undefined,
+          is_active: active,
+        }, { creating: true }),
+        ...(openingOpen ? {
+          opening_balance: opening ? toKobo(opening) : undefined,
+          opening_date: opening && openingDate ? openingDate : undefined,
+          ...openingBranch.body("opening_branch"),
+        } : {}),
       }).unwrap();
       toast.success(res.message || "Customer created.");
       close();
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
+  const beside = errorsBesideFollowed(denied, BODY_FOLLOWS);
 
   return (
     <DetailDrawer
@@ -104,8 +132,8 @@ export function NewCustomerDrawer({ open, onOpenChange, entity }: {
       <div className="space-y-4">
         <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acme Ltd" className="bg-white" /></FormField>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Billing email" required><Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="billing@acme.com" className="bg-white" /></FormField>
-          <FormField label="Billing phone" required><Input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+234…" className="bg-white" /></FormField>
+          <AccessField access={access} name="billing_email" label="Billing email" required creating errors={beside}><Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="billing@acme.com" className="bg-white" /></AccessField>
+          <AccessField access={access} name="billing_phone" label="Billing phone" required creating errors={beside}><Input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+234…" className="bg-white" /></AccessField>
         </div>
         {filing.ask ? (
           <FormField label="Branch" required={filing.required}>
@@ -118,19 +146,23 @@ export function NewCustomerDrawer({ open, onOpenChange, entity }: {
             </span>
           </FormField>
         ) : null}
-        <FormField label="Billing address"><Input value={address} onChange={(e) => setAddress(e.target.value)} className="bg-white" /></FormField>
-        <FormField label="Receivable account">
+        <AccessField access={access} name="billing_address" label="Billing address" creating errors={beside}><Input value={address} onChange={(e) => setAddress(e.target.value)} className="bg-white" /></AccessField>
+        <AccessField access={access} name="receivable_account_code" label="Receivable account" creating errors={beside}>
           <ReceivableAccountPicker entity={entity} value={account} onChange={setAccount} placeholder="Defaults to 1200 Accounts Receivable" />
-        </FormField>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Opening balance (₦)"><Input type="number" min="0" step="0.01" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0.00" className="bg-white" /></FormField>
-          <PostingDateField label="Opening as of" entity={entity} value={openingDate} onChange={setOpeningDate} required={false} disabled={!opening} />
-        </div>
-        {opening ? <p className="-mt-1 font-mont text-[11px] text-gray-05">Backdates the opening-balance invoice into its period. Leave blank to date it today. The period must be open.</p> : null}
-        <RaisingBranchChoiceField choice={openingBranch} label="Opening balance branch" hint="The branch the opening-balance invoice is raised for." />
-        <label className="flex items-center gap-2 font-mont text-sm text-gray-01">
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active
-        </label>
+        </AccessField>
+        <AccessField access={access} name="opening_balance" creating errors={beside} className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormField label="Opening balance (₦)"><Input type="number" min="0" step="0.01" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0.00" className="bg-white" /></FormField>
+            <PostingDateField label="Opening as of" entity={entity} value={openingDate} onChange={setOpeningDate} required={false} disabled={!opening} />
+          </div>
+          {opening ? <p className="-mt-1 font-mont text-[11px] text-gray-05">Backdates the opening-balance invoice into its period. Leave blank to date it today. The period must be open.</p> : null}
+          <RaisingBranchChoiceField choice={openingBranch} label="Opening balance branch" hint="The branch the opening-balance invoice is raised for." />
+        </AccessField>
+        <AccessField access={access} name="is_active" creating errors={beside}>
+          <label className="flex items-center gap-2 font-mont text-sm text-gray-01">
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active
+          </label>
+        </AccessField>
       </div>
     </DetailDrawer>
   );

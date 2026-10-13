@@ -14,6 +14,9 @@ import type { CustomerCreditTransfer } from "@/redux/services/finance/fees-types
 
 const mocks = vi.hoisted(() => ({
   rows: [] as unknown[],
+  fieldAccess: {} as Record<string, unknown>,
+  permit: false,
+  skipped: [] as boolean[],
   mutation: () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }],
 }));
 
@@ -30,11 +33,11 @@ vi.mock("@/redux/services/dashboard/workflow-api", async (importOriginal) => ({
 }));
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
-    hasPermission: () => false,
-    hasAnyPermission: () => false,
-    hasAllPermissions: () => false,
+    hasPermission: () => mocks.permit,
+    hasAnyPermission: () => mocks.permit,
+    hasAllPermissions: () => mocks.permit,
     hasModuleAccess: () => true,
-    fieldAccess: {},
+    fieldAccess: mocks.fieldAccess,
   }),
 }));
 vi.mock("@/redux/store", () => ({
@@ -51,12 +54,18 @@ vi.mock("@/components/finance-ui/no-approver-prompt", () => ({
   useNoApproverPrompt: () => ({ promptIfParked: vi.fn(), noApproverDialog: null }),
 }));
 vi.mock("@/redux/services/finance/ar-api", () => ({
-  useGetRefundAvailabilityQuery: () => ({ data: undefined }),
+  useGetRefundAvailabilityQuery: (_args: unknown, options?: { skip?: boolean }) => {
+    mocks.skipped.push(options?.skip === true);
+    return {
+      data: options?.skip ? undefined : { data: [{ customer_code: "C-001", refundable_credit: 2_500_000 }] },
+      isFetching: false,
+    };
+  },
   useGetCustomersQuery: () => ({ data: undefined }),
 }));
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  CustomerPicker: () => <div>customer-picker</div>,
+  CustomerPicker: ({ onChange }: { onChange: (v: string) => void }) => <button type="button" onClick={() => onChange("C-001")}>customer-picker</button>,
   PostingDateField: () => <div>posting-date</div>,
 }));
 vi.mock("@/redux/services/finance/fees-api", () => ({
@@ -80,7 +89,12 @@ const transfer = (id: number, status: string): CustomerCreditTransfer => ({
 
 let container: HTMLDivElement;
 let root: Root;
-beforeEach(() => { container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container); });
+beforeEach(() => {
+  mocks.fieldAccess = {};
+  mocks.permit = false;
+  mocks.skipped = [];
+  container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
+});
 afterEach(() => { act(() => root.unmount()); container.remove(); });
 
 describe("credit transfer states", () => {
@@ -104,5 +118,28 @@ describe("credit transfer states", () => {
 
   it("has a word for every state the backend gives a transfer", () => {
     expect(Object.keys(CREDIT_TRANSFER_STATUS).sort()).toEqual(["APPROVED", "DRAFT", "PENDING_APPROVAL", "POSTED", "REVERSED"]);
+  });
+});
+
+describe("the credit a new transfer can move", () => {
+  const open = () => {
+    mocks.permit = true;
+    mocks.rows = [];
+    act(() => root.render(<MemoryRouter><CreditTransfersTab entity="BSS" currency="NGN" /></MemoryRouter>));
+    act(() => [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("New transfer"))!.click());
+    act(() => [...document.body.querySelectorAll("button")].find((b) => b.textContent === "customer-picker")!.click());
+  };
+
+  it("is shown beside the sender when the balance is readable", () => {
+    open();
+    expect(document.body.textContent).toContain("Unused credit available:");
+    expect(document.body.textContent).toContain("25,000");
+  });
+
+  it("is neither asked for nor shown as nothing when the balance is hidden", () => {
+    mocks.fieldAccess = { "finance.customer": { hidden: ["balance"] } };
+    open();
+    expect(document.body.textContent).not.toContain("Unused credit available");
+    expect(mocks.skipped.every((skipped) => skipped)).toBe(true);
   });
 });

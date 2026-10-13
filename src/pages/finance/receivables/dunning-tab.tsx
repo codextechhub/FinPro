@@ -33,7 +33,7 @@ import {
   useGenerateDunningMutation, useCancelDunningNoticeMutation, useSendDunningNoticeMutation,
   useCreateDunningPolicyMutation, useUpdateDunningPolicyMutation,
 } from "@/redux/services/finance/ar-api";
-import type { DunningNotice, DunningPolicy, DunningStage } from "@/redux/services/finance/ar-types";
+import type { DunningNotice, DunningPolicy, DunningStage, DunningSummary } from "@/redux/services/finance/ar-types";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const CHANNELS: [string, string][] = [["EMAIL", "Email"], ["IN_APP", "In-app"]];
@@ -57,12 +57,53 @@ function Initials({ name }: { name: string }) {
   const init = name.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join("");
   return <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-pry-01 font-mont text-[10px] font-semibold text-primary">{init || "-"}</span>;
 }
-function AgingKpi({ label, amount, count, currency }: { label: string; amount: number; count: number; currency?: string | null }) {
+/**
+ * One ageing bucket. The amount is absent when the role may not read the
+ * customer balance, and then the invoice count is the headline figure.
+ */
+function AgingKpi({ label, amount, count, currency }: { label: string; amount?: number; count: number; currency?: string | null }) {
+  const invoices = `${count} invoice${count === 1 ? "" : "s"}`;
   return (
-    <div className="rounded-md bg-white p-4 ring-1 ring-white-02">
+    <div data-testid="aging-tile" className="rounded-md bg-white p-4 ring-1 ring-white-02">
       <p className="font-mont text-xs text-gray-05">{label}</p>
-      <p className="mt-1 font-mont text-xl font-semibold tabular-nums text-black-01">{formatMoney(amount, currency)}</p>
-      <p className="mt-0.5 font-mont text-[11px] text-gray-05 tabular-nums">{count} invoice{count === 1 ? "" : "s"}</p>
+      {amount === undefined ? (
+        <p className="mt-1 font-mont text-xl font-semibold tabular-nums text-black-01">{invoices}</p>
+      ) : (
+        <>
+          <p className="mt-1 font-mont text-xl font-semibold tabular-nums text-black-01">{formatMoney(amount, currency)}</p>
+          <p className="mt-0.5 font-mont text-[11px] text-gray-05 tabular-nums">{invoices}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+const AGING_BUCKETS = [
+  ["due_soon", "Due soon (0–7d)"],
+  ["overdue_1_30", "Overdue 1–30d"],
+  ["overdue_31_60", "Overdue 31–60d"],
+  ["overdue_60_plus", "Overdue 60d+"],
+] as const;
+
+/**
+ * The ageing strip, or nothing. The server sends no buckets to a role that may
+ * not read the customer's account status, so a summary without them leaves the
+ * strip out altogether rather than drawing four empty tiles; while the summary
+ * is still loading the strip shows zeros, as before.
+ */
+export function AgingStrip({ summary, loaded, currency }: {
+  summary: DunningSummary | undefined; loaded: boolean; currency?: string | null;
+}) {
+  if (loaded && !summary?.due_soon) return null;
+  return (
+    <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {AGING_BUCKETS.map(([key, label]) => (
+        <AgingKpi
+          key={key} label={label} currency={currency}
+          amount={summary ? summary[key]?.amount : 0}
+          count={summary?.[key]?.count ?? 0}
+        />
+      ))}
     </div>
   );
 }
@@ -95,12 +136,7 @@ export function DunningTab({ entity, currency }: { entity: string; currency?: st
 
   return (
     <>
-      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <AgingKpi label="Due soon (0–7d)" amount={s?.due_soon.amount ?? 0} count={s?.due_soon.count ?? 0} currency={currency} />
-        <AgingKpi label="Overdue 1–30d" amount={s?.overdue_1_30.amount ?? 0} count={s?.overdue_1_30.count ?? 0} currency={currency} />
-        <AgingKpi label="Overdue 31–60d" amount={s?.overdue_31_60.amount ?? 0} count={s?.overdue_31_60.count ?? 0} currency={currency} />
-        <AgingKpi label="Overdue 60d+" amount={s?.overdue_60_plus.amount ?? 0} count={s?.overdue_60_plus.count ?? 0} currency={currency} />
-      </div>
+      <AgingStrip summary={s} loaded={summaryQ.data !== undefined} currency={currency} />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <TabStrip items={viewTabs} value={tab} onChange={setTab} variant="segmented" ariaLabel="Dunning view" />

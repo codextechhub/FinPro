@@ -16,6 +16,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { ArrowLeft, ChevronDown, ChevronRight, Check, Plus, Printer, Activity, Columns2, Network, Settings2 } from "lucide-react";
+import { cardColumns } from "../bank-account-access";
 import { Money, FormField, DetailDrawer, InfoHint, StatusPill, DataTable, TabStrip, toArray, useActiveEntity, type Column, type TabStripItem } from "@/components/finance-ui";
 import { SearchSelect } from "@/components/custom/search-select";
 import { useCan } from "@/components/finance-ui/can";
@@ -36,6 +37,7 @@ import {
   accountGroupContribution,
   buildAccountTree,
   descendantPostingAccounts,
+  isBalanceHidden,
   type AccountTreeNode,
 } from "./account-group";
 import { getAccountDetailTabKeys, type AccountDetailTabKey } from "./account-detail-tabs";
@@ -67,8 +69,9 @@ function Tag({ label }: { label: string }) {
   return <span className="ml-1.5 rounded bg-gray-03/60 px-1.5 py-0.5 font-mont text-[10px] font-semibold uppercase tracking-wide text-gray-05">{label}</span>;
 }
 
-function AccountRow({ node, depth, expanded, toggle, currency, onSelect }: {
-  node: Node; depth: number; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void;
+/** One chart row. `showBalance` follows the header: the balance cell leaves with its column. */
+function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showBalance }: {
+  node: Node; depth: number; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; showBalance: boolean;
 }) {
   const hasChildren = node.children.length > 0;
   const open = expanded.has(node.id);
@@ -97,13 +100,17 @@ function AccountRow({ node, depth, expanded, toggle, currency, onSelect }: {
         <td className={cn(cell, "text-gray-05")}>{node.subtype || "-"}</td>
         <td className={cn(cell, "text-gray-05")}>{node.normal_balance === "DEBIT" ? "Dr" : "Cr"}</td>
         <td className={cn(cell, "text-gray-05")}>{currency ?? "NGN"}</td>
-        <td className={cn(cell, "text-right")}><Money kobo={node.rolled} currency={currency} align="right" /></td>
+        {showBalance ? (
+          <td className={cn(cell, "text-right")}>
+            {node.rolled === null ? <span className="text-gray-05">-</span> : <Money kobo={node.rolled} currency={currency} align="right" />}
+          </td>
+        ) : null}
         <td className={cn(cell, "text-center")}>
           {node.is_active ? <Check className="mx-auto size-4 text-green-01" /> : <span className="text-gray-05">-</span>}
         </td>
       </tr>
       {hasChildren && open && node.children.map((c) => (
-        <AccountRow key={c.id} node={c} depth={depth + 1} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} />
+        <AccountRow key={c.id} node={c} depth={depth + 1} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} showBalance={showBalance} />
       ))}
     </>
   );
@@ -146,9 +153,11 @@ export function AccountsTab({ entity }: { entity: string }) {
   const tree = useMemo(() => buildAccountTree(filtered), [filtered]);
   const flat = useMemo(
     () => filtered.slice().sort((a, b) => a.code.localeCompare(b.code))
-      .map<Node>((a) => ({ ...a, children: [], rolled: a.balance?.kobo ?? 0 })),
+      .map<Node>((a) => ({ ...a, children: [], rolled: isBalanceHidden(a) ? null : (a.balance?.kobo ?? 0) })),
     [filtered],
   );
+  // The Balance column stays while at least one account's balance is readable.
+  const showBalance = useMemo(() => accounts.some((a) => !isBalanceHidden(a)), [accounts]);
   // Tree view only makes sense unfiltered; an active search/type filter falls back to flat.
   const rows = view === "tree" && !search && !type ? tree : flat;
 
@@ -184,13 +193,13 @@ export function AccountsTab({ entity }: { entity: string }) {
                 <th className={headCls}>Subtype</th>
                 <th className={headCls}>Normal</th>
                 <th className={headCls}>Currency</th>
-                <th className={cn(headCls, "text-right")}>Balance</th>
+                {showBalance ? <th className={cn(headCls, "text-right")}>Balance</th> : null}
                 <th className={cn(headCls, "text-center")}>Active</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((n) => (
-                <AccountRow key={n.id} node={n} depth={0} expanded={effectiveExpanded} toggle={toggle} currency={currency} onSelect={setDetailId} />
+                <AccountRow key={n.id} node={n} depth={0} expanded={effectiveExpanded} toggle={toggle} currency={currency} onSelect={setDetailId} showBalance={showBalance} />
               ))}
             </tbody>
           </table>
@@ -366,6 +375,10 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
       ),
     }));
 
+  // A bank account's balance figures leave the summary and the activity together.
+  const balances = { current: d?.summary.current_balance, opening: d?.summary.opening_balance };
+  const showRunning = (d?.activity ?? []).some((a) => a.running_balance !== undefined);
+
   const cell = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-01";
   const th = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
 
@@ -381,24 +394,26 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
       {isLoading ? <LoadingState rows={6} /> : isError || !d || !acc ? <ErrorState onRetry={refetch} /> : (
         <div className="space-y-4">
           {/* KPI cards */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {acc.is_postable ? (
+          <div className={cn("grid gap-3", cardColumns(1 + (balances.current ? 1 : 0) + (balances.opening ? 1 : 0)))}>
+            {!balances.current ? null : acc.is_postable ? (
               <div className="rounded-md bg-white p-3 ring-1 ring-white-02">
                 <p className="font-mont text-[11px] text-gray-05">Current balance</p>
-                <p className="mt-1 font-mont text-base font-semibold tabular-nums"><Money kobo={d.summary.current_balance.kobo} currency={currency} /></p>
+                <p className="mt-1 font-mont text-base font-semibold tabular-nums"><Money kobo={balances.current.kobo} currency={currency} /></p>
               </div>
             ) : (
               <button type="button" onClick={() => setGroupView("balances")}
                 className="rounded-md bg-white p-3 text-left ring-1 ring-white-02 transition hover:bg-primary/5 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 <p className="font-mont text-[11px] text-gray-05">Group balance</p>
-                <p className="mt-1 font-mont text-base font-semibold tabular-nums"><Money kobo={d.summary.current_balance.kobo} currency={currency} /></p>
+                <p className="mt-1 font-mont text-base font-semibold tabular-nums"><Money kobo={balances.current.kobo} currency={currency} /></p>
                 <span className="mt-1 inline-flex items-center gap-0.5 font-mont text-[11px] font-semibold text-primary">View breakdown <ChevronRight className="size-3" /></span>
               </button>
             )}
-            <div className="rounded-md bg-white p-3 ring-1 ring-white-02">
-              <p className="font-mont text-[11px] text-gray-05">{acc.is_postable ? "Opening (FY carry-in)" : "Opening group balance"}</p>
-              <p className="mt-1 font-mont text-base font-semibold tabular-nums"><Money kobo={d.summary.opening_balance.kobo} currency={currency} /></p>
-            </div>
+            {balances.opening ? (
+              <div className="rounded-md bg-white p-3 ring-1 ring-white-02">
+                <p className="font-mont text-[11px] text-gray-05">{acc.is_postable ? "Opening (FY carry-in)" : "Opening group balance"}</p>
+                <p className="mt-1 font-mont text-base font-semibold tabular-nums"><Money kobo={balances.opening.kobo} currency={currency} /></p>
+              </div>
+            ) : null}
             {acc.is_postable ? (
               <div className="rounded-md bg-white p-3 ring-1 ring-white-02">
                 <p className="font-mont text-[11px] text-gray-05">Posted YTD</p>
@@ -447,7 +462,8 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
                   <thead><tr>
                     <th className={th}>Date</th><th className={th}>Journal</th><th className={th}>Description</th>
                     <th className={th}>Cost centre</th><th className={cn(th, "text-right")}>Debit</th>
-                    <th className={cn(th, "text-right")}>Credit</th><th className={cn(th, "text-right")}>Balance</th>
+                    <th className={cn(th, "text-right")}>Credit</th>
+                    {showRunning ? <th className={cn(th, "text-right")}>Balance</th> : null}
                   </tr></thead>
                   <tbody>
                     {d.activity.map((a, i) => (
@@ -458,7 +474,11 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
                         <td className={cn(cell, "text-gray-05")}>{a.cost_center || "-"}</td>
                         <td className={cn(cell, "text-right tabular-nums")}>{a.debit.kobo ? <Money kobo={a.debit.kobo} currency={currency} align="right" /> : "-"}</td>
                         <td className={cn(cell, "text-right tabular-nums")}>{a.credit.kobo ? <Money kobo={a.credit.kobo} currency={currency} align="right" /> : "-"}</td>
-                        <td className={cn(cell, "text-right font-medium tabular-nums")}><Money kobo={a.running_balance.kobo} currency={currency} align="right" /></td>
+                        {showRunning ? (
+                          <td className={cn(cell, "text-right font-medium tabular-nums")}>
+                            {a.running_balance ? <Money kobo={a.running_balance.kobo} currency={currency} align="right" /> : "-"}
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>
@@ -508,7 +528,8 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
 
 type GroupBalanceRow = {
   account: Account;
-  contribution: number;
+  /** Null when the posting account's balance is hidden from the role. */
+  contribution: number | null;
 };
 
 function GroupLedger({ initialView, entity, account, accounts, summary, currency, onBack }: {
@@ -571,6 +592,8 @@ function GroupLedger({ initialView, entity, account, accounts, summary, currency
   } = useGetAccountActivityQuery(activityArgs);
   const activityRows = toArray(activityData?.data);
 
+  // Both money columns leave together when no posting account's balance is readable.
+  const showBalances = postingAccounts.some((candidate) => !isBalanceHidden(candidate));
   const balanceColumns: Column<GroupBalanceRow>[] = [
     {
       header: "Posting account",
@@ -582,16 +605,22 @@ function GroupLedger({ initialView, entity, account, accounts, summary, currency
         </span>
       ),
     },
-    {
-      header: "Account balance",
-      align: "right",
-      cell: ({ account: candidate }) => <Money kobo={candidate.balance?.kobo ?? 0} currency={currency} align="right" />,
-    },
-    {
-      header: "Group contribution",
-      align: "right",
-      cell: (row) => <Money kobo={row.contribution} currency={currency} align="right" />,
-    },
+    ...(showBalances ? [
+      {
+        header: "Account balance",
+        align: "right" as const,
+        cell: ({ account: candidate }: GroupBalanceRow) => isBalanceHidden(candidate)
+          ? <span className="text-gray-05">-</span>
+          : <Money kobo={candidate.balance?.kobo ?? 0} currency={currency} align="right" />,
+      },
+      {
+        header: "Group contribution",
+        align: "right" as const,
+        cell: (row: GroupBalanceRow) => row.contribution === null
+          ? <span className="text-gray-05">-</span>
+          : <Money kobo={row.contribution} currency={currency} align="right" />,
+      },
+    ] : []),
   ];
   const activityColumns: Column<ConsolidatedAccountActivityLine>[] = [
     { header: "Date", cell: (line) => <span className="whitespace-nowrap text-gray-05">{dates.day(line.date)}</span> },

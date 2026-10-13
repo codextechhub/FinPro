@@ -5,9 +5,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { PettyCashFund, PettyCashReturn, PettyCashVoucher } from "@/redux/services/finance/ops-types";
+import { resolveFieldAccess } from "@/components/finance-ui/field-access";
 import {
-  closeBlockers, closeFigures, closeProblem, differenceSentence, floatBeforeClosure, fundEditProblem,
-  reduceFigures, reduceProblem, registerTone, returnVoidable, voidBlocker,
+  PETTY_CASH_RETURN, closeBlockers, closeFigures, closeProblem, differenceSentence, floatBeforeClosure, fundEditProblem,
+  raiseBlocked, reduceFigures, reduceProblem, registerTone, returnVoidable, voidBlocker,
 } from "./petty-cash-returns";
 
 const NAIRA = 100;
@@ -136,5 +137,55 @@ describe("the fund register and fund edits", () => {
     const closure = ret({ id: 20, kind: "CLOSE", previous_float_amount: 80_000 * NAIRA, new_float_amount: 0 });
     expect(floatBeforeClosure(1, [ret({}), closure])).toBe(80_000 * NAIRA);
     expect(floatBeforeClosure(2, [closure])).toBe(0);
+  });
+});
+
+describe("Field Access on a return", () => {
+  const access = (entry: { hidden?: string[]; read_only?: string[] }) => resolveFieldAccess({ [PETTY_CASH_RETURN]: entry }, PETTY_CASH_RETURN);
+  const agree = reduceFigures({ counted: 100_000 * NAIRA, book: 100_000 * NAIRA, newFloat: 60_000 * NAIRA });
+  const short = reduceFigures({ counted: 98_500 * NAIRA, book: 100_000 * NAIRA, newFloat: 60_000 * NAIRA });
+
+  it("can be raised when every field it needs may be written", () => {
+    expect(raiseBlocked(access({}), { kind: "REDUCE", figures: agree })).toBe(false);
+    expect(raiseBlocked(access({ read_only: ["reference", "narration", "counted_by"] }), { kind: "CLOSE", figures: agree })).toBe(false);
+  });
+
+  it("cannot be raised when the count, the date or the new float is hidden or read-only", () => {
+    for (const entry of [{ hidden: ["counted_amount"] }, { read_only: ["counted_amount"] }, { read_only: ["return_date"] }, { hidden: ["new_float_amount"] }]) {
+      expect(raiseBlocked(access(entry), { kind: "REDUCE", figures: agree })).toBe(true);
+    }
+    expect(raiseBlocked(access({ hidden: ["new_float_amount"] }), { kind: "CLOSE", figures: agree })).toBe(false);
+  });
+
+  it("follows the bank account through its alias and through its name", () => {
+    expect(raiseBlocked(access({ read_only: ["bank_account"] }), { kind: "REDUCE", figures: agree })).toBe(true);
+    expect(raiseBlocked(access({ hidden: ["bank_account_id", "bank_account_name"], read_only: ["bank_account_name"] }), { kind: "REDUCE", figures: agree })).toBe(true);
+    const nothing = closeFigures({ counted: 0, book: 0 });
+    expect(raiseBlocked(access({ read_only: ["bank_account"] }), { kind: "CLOSE", figures: nothing })).toBe(false);
+  });
+
+  it("needs the reason only when the count differs and the reader can see that it does", () => {
+    expect(raiseBlocked(access({ read_only: ["difference_reason"] }), { kind: "REDUCE", figures: short })).toBe(true);
+    expect(raiseBlocked(access({ read_only: ["difference_reason"] }), { kind: "REDUCE", figures: agree })).toBe(false);
+    expect(raiseBlocked(access({ hidden: ["difference", "shortage", "overage"], read_only: ["difference_reason"] }), { kind: "REDUCE", figures: short })).toBe(false);
+  });
+
+  it("words the problems without the float or the difference a reader cannot read", () => {
+    const base = { figures: short, newFloat: 120_000 * NAIRA, currentFloat: 100_000 * NAIRA, hasBank: true, reason: "" };
+    expect(reduceProblem({ ...base, hideFloat: true })).toBe("The new float must be lower than the fund's current float.");
+    expect(reduceProblem({ ...base, newFloat: 60_000 * NAIRA, hideDifference: true })).toBeNull();
+    expect(closeProblem({ blockers: [], figures: short, hasBank: true, reason: "", hideDifference: true })).toBeNull();
+  });
+
+  it("names a return and its neighbours by their numbers", () => {
+    expect(closeBlockers(1, [], [ret({ status: "PENDING_APPROVAL" })]))
+      .toEqual(["Return PCR-0010 of this fund is still waiting on approval. Settle it before counting the tin again."]);
+    expect(voidBlocker(ret({}), { returns: [ret({ id: 12, document_number: "PCR-0012" })], fund: FUND }))
+      .toBe("Return PCR-0012 of this fund came after PCR-0010. Void it first.");
+  });
+
+  it("does not call the float changed when the new float was not sent", () => {
+    const hidden = ret({ new_float_amount: undefined as unknown as number });
+    expect(voidBlocker(hidden, { returns: [hidden], fund: { ...FUND, float_amount: 50_000 * NAIRA } })).toBeNull();
   });
 });

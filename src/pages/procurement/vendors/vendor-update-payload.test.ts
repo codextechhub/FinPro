@@ -46,17 +46,20 @@ const values: VendorFormValues = {
   payable: vendor.payable_code!,
   expense: vendor.default_expense_code!,
   wht: vendor.default_wht_tax_code_value!,
-  terms: vendor.payment_terms,
-  kyc: vendor.kyc_status,
-  risk: vendor.risk,
-  onHold: vendor.on_hold,
+  terms: vendor.payment_terms!,
+  kyc: vendor.kyc_status!,
+  risk: vendor.risk!,
+  onHold: vendor.on_hold!,
   active: vendor.is_active,
 };
 
 const VENDOR = "procurement.vendor";
 const SENSITIVE = ["email", "phone", "address", "tax_id", "bank_name", "bank_account_number", "bank_account_name"];
+const OPEN_FIELDS = ["category", "payment_terms", "kyc_status", "risk", "on_hold"];
 /** A role that may read the vendor's contact and banking fields but change none of them. */
 const readOnly = resolveFieldAccess({}, VENDOR, { ...vendor, _read_only_fields: SENSITIVE });
+/** A role that may read every vendor field and change none of them. */
+const locked = resolveFieldAccess({}, VENDOR, { ...vendor, _read_only_fields: [...SENSITIVE, ...OPEN_FIELDS] });
 /** A role with full access: nothing restricted on the record. */
 const open = resolveFieldAccess({}, VENDOR, { ...vendor, _read_only_fields: [] });
 
@@ -120,5 +123,39 @@ describe("buildVendorUpdatePayload", () => {
       { ...values, bankNumber: "9999999999", phone: "08011111111" },
       { fields, canManage: false },
     )).toEqual({ phone: "08011111111" });
+  });
+
+  it("sends the category under its body key, and never when the role may not change it", () => {
+    const body = { ...values, category: "STATIONERY" };
+    expect(buildVendorUpdatePayload(vendor, body, { fields: open, canManage: false })).toEqual({ category: "STATIONERY" });
+    expect(buildVendorUpdatePayload(vendor, body, { fields: locked, canManage: false })).toEqual({});
+  });
+
+  it("sends the payment terms only to a role that may change them", () => {
+    const body = { ...values, terms: "NET_60" };
+    expect(buildVendorUpdatePayload(vendor, body, { fields: open, canManage: false })).toEqual({ payment_terms: "NET_60" });
+    expect(buildVendorUpdatePayload(vendor, body, { fields: locked, canManage: false })).toEqual({});
+  });
+
+  it("holds each compliance value to its own switch as well as to the governance key", () => {
+    const body = { ...values, kyc: "REJECTED", risk: "HIGH", onHold: true };
+    const riskLocked = resolveFieldAccess({}, VENDOR, { ...vendor, _read_only_fields: ["risk"] });
+    expect(buildVendorUpdatePayload(vendor, body, { fields: open, canManage: true })).toEqual({ kyc_status: "REJECTED", risk: "HIGH", on_hold: true });
+    expect(buildVendorUpdatePayload(vendor, body, { fields: riskLocked, canManage: true })).toEqual({ kyc_status: "REJECTED", on_hold: true });
+    expect(buildVendorUpdatePayload(vendor, body, { fields: open, canManage: false })).toEqual({});
+  });
+
+  it("builds from a vendor that arrived without the compliance and category keys", () => {
+    const { category_id: _id, category_code: _code, payment_terms: _terms, kyc_status: _kyc, risk: _risk, on_hold: _hold, ...bare } = vendor;
+    void [_id, _code, _terms, _kyc, _risk, _hold];
+    const fields = resolveFieldAccess(
+      { [VENDOR]: { hidden: ["category_id", "category_code", "payment_terms", "kyc_status", "risk", "on_hold"], read_only: ["category", "payment_terms", "kyc_status", "risk", "on_hold"] } },
+      VENDOR, { ...bare, _read_only_fields: ["category", "payment_terms", "kyc_status", "risk", "on_hold"] },
+    );
+    expect(buildVendorUpdatePayload(
+      bare as Vendor,
+      { ...values, category: "OFFICE", terms: "NET_60", kyc: "VERIFIED", risk: "HIGH", onHold: true, name: "Acme Office Supplies" },
+      { fields, canManage: true },
+    )).toEqual({ name: "Acme Office Supplies" });
   });
 });

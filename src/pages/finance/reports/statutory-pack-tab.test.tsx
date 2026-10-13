@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   export: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-permissions", () => ({ usePermissions: () => ({ fieldAccess: {} }) }));
+
 vi.mock("@/redux/services/finance/reports-api", () => ({
   useGetStatutoryPackQuery: (...args: unknown[]) => mocks.packQuery(...args),
 }));

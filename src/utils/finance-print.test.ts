@@ -238,6 +238,19 @@ describe("finance print dates", () => {
     expect(textOf(html)).toContain("GL 1100 · 1 Oct 2026");
   });
 
+  it("leaves off a balance, the bank and the ledger account that the reader may not see", () => {
+    const html = renderFinancePrintHtml(buildBankReconciliationPrintDocument({
+      account: { name: "Main" } as BankAccount,
+      currency: "NGN", book: undefined, statement: 5_000_00, difference: undefined, matched: [], unmatched: [],
+      prefs: PREFS,
+      now: new Date("2026-09-30T10:00:00Z"),
+    }));
+    expect(textOf(html)).toContain("Statement balance");
+    expect(textOf(html)).not.toContain("Book balance");
+    expect(textOf(html)).not.toContain("Difference");
+    expect(textOf(html)).not.toContain("GL ");
+  });
+
   it("names a tax period by its months, and a calendar year as FY", () => {
     expect(taxPeriodLabel("2026-09-01", "2026-09-30", PREFS)).toBe("Sep 2026");
     expect(taxPeriodLabel("2026-07-01", "2026-09-30", PREFS)).toBe("Jul–Sep 2026");

@@ -16,6 +16,14 @@
  * server for the branch shown (`?branch=`) and the fund picked. Each row names
  * its branch and its people as the server sent them.
  *
+ * Every column, filter and detail row follows Field Access
+ * (`finance.pettycash_return`): a field the reader may not read has no column
+ * and no row. The fund a return belongs to is an identifying label, as a bank
+ * account's name is, so it always shows and the Fund filter is open to every
+ * reader. The Status filter follows the status field, since "Sent back" is a
+ * question about where the return stands. A title, a description or a refusal
+ * never names a kind or amount that is hidden.
+ *
  * A link to one return (a journal's "Open return", `?document=<id>`) opens it
  * in `LinkedReturnDrawer`, whichever fund the page is on.
  */
@@ -25,7 +33,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { Ban } from "lucide-react";
 
-import { DataTable, DetailDrawer, StatusPill, toArray, type Column } from "@/components/finance-ui";
+import { DataTable, DetailDrawer, StatusPill, toArray, useFieldAccess, type Column } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
@@ -39,7 +47,7 @@ import { P } from "../../../permissions";
 import { useDates } from "../../../lib/display-prefs";
 import { VoidReturnDialog } from "./petty-cash-return-drawers";
 import { branchQueryArg, inBranch, rowBranchName, type PettyCashBranch } from "./petty-cash-branch";
-import { returnVoidable, voidBlocker } from "./petty-cash-returns";
+import { PETTY_CASH_RETURN, returnVoidable, voidBlocker } from "./petty-cash-returns";
 import { RETURNED_HINT, SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 
@@ -62,28 +70,33 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
   entity: string; currency?: string | null; funds: PettyCashFund[]; view: PettyCashBranch;
 }) {
   const dates = useDates();
+  const access = useFieldAccess(PETTY_CASH_RETURN);
+  const showStatus = !access.isHidden("status");
   const [fundFilter, setFundFilter] = useState("");
   // Returns have no status filter: the one choice is all of them, or those sent back.
   const [approval, setApproval] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
   const { data, isLoading, isError, refetch } = useGetPettyCashReturnsQuery({
-    entity, page_size: RETURNS_PAGE, ...branchQueryArg(view), ...(fundFilter ? { fund: Number(fundFilter) } : {}),
-    ...statusFilterArgs(approval),
+    entity, page_size: RETURNS_PAGE,
+    ...branchQueryArg(view),
+    ...(fundFilter ? { fund: Number(fundFilter) } : {}),
+    ...(showStatus ? statusFilterArgs(approval) : {}),
   });
   const all = useMemo(() => toArray(data?.data), [data]);
   const total = data?.pagination?.totalItems ?? all.length;
   const fundOptions = useMemo(() => inBranch(funds, view), [funds, view]);
   const open = openId != null ? all.find((r) => r.id === openId) : undefined;
 
+  const shown = (name: string) => !access.isHidden(name);
   const cols: Column<PettyCashReturn>[] = [
-    { header: "Return no.", cell: (r) => <span className="font-semibold tabular-nums">{r.document_number}</span> },
-    { header: "Fund", cell: (r) => r.fund_name },
+    { header: "Return no.", cell: (r: PettyCashReturn) => <span className="font-semibold tabular-nums">{r.document_number}</span> },
+    { header: "Fund", cell: (r: PettyCashReturn) => r.fund_name },
     ...(view.showBranch ? [{ header: "Branch", cell: (r: PettyCashReturn) => rowBranchName(view, r) }] : []),
-    { header: "Kind", cell: (r) => returnKindLabel(r) },
-    { header: "Date", cell: (r) => <span className="tabular-nums text-gray-05">{dates.day(r.return_date)}</span> },
-    { header: "Banked", align: "right", cell: (r) => <span className="tabular-nums">{formatMoney(r.amount, currency)}</span> },
-    { header: "Difference", align: "right", cell: (r) => <Difference ret={r} currency={currency} /> },
-    { header: "Status", cell: (r) => <StatusPill {...sentBackPill(r, r.status, undefined, true)} /> },
+    ...(shown("kind_label") ? [{ header: "Kind", cell: (r: PettyCashReturn) => returnKindLabel(r) }] : []),
+    ...(shown("return_date") ? [{ header: "Date", cell: (r: PettyCashReturn) => <span className="tabular-nums text-gray-05">{dates.day(r.return_date)}</span> }] : []),
+    ...(shown("amount") ? [{ header: "Banked", align: "right" as const, cell: (r: PettyCashReturn) => <span className="tabular-nums">{formatMoney(r.amount, currency)}</span> }] : []),
+    ...(shown("difference") ? [{ header: "Difference", align: "right" as const, cell: (r: PettyCashReturn) => <Difference ret={r} currency={currency} /> }] : []),
+    ...(showStatus ? [{ header: "Status", cell: (r: PettyCashReturn) => <StatusPill {...sentBackPill(r, r.status, undefined, true)} /> }] : []),
   ];
 
   return (
@@ -95,12 +108,14 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
             {fundOptions.map((f) => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
           </NativeSelect>
         </div>
-        <div className="w-full sm:w-48">
-          <NativeSelect value={approval} onChange={(e) => setApproval(e.target.value)} aria-label="Status" className="h-9">
-            <option value="">All statuses</option>
-            <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
-          </NativeSelect>
-        </div>
+        {showStatus ? (
+          <div className="w-full sm:w-48">
+            <NativeSelect value={approval} onChange={(e) => setApproval(e.target.value)} aria-label="Status" className="h-9">
+              <option value="">All statuses</option>
+              <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
+            </NativeSelect>
+          </div>
+        ) : null}
         {total > all.length ? <span className="font-mont text-[11px] text-gray-05">Showing the latest {all.length} of {total}.</span> : null}
       </div>
       <DataTable
@@ -136,7 +151,8 @@ export function LinkedReturnDrawer({ id, entity, currency, view, funds, onClose 
 }) {
   const { data } = useGetPettyCashReturnQuery({ id, entity });
   const ret = data?.data;
-  const siblings = useGetPettyCashReturnsQuery(ret ? { entity, fund: ret.fund_id, page_size: RETURNS_PAGE } : skipToken);
+  // Without the fund the siblings cannot be told apart, and the server refuses to filter by it.
+  const siblings = useGetPettyCashReturnsQuery(ret && ret.fund_id != null ? { entity, fund: ret.fund_id, page_size: RETURNS_PAGE } : skipToken);
   if (!ret) return null;
   return (
     <ReturnDetailDrawer
@@ -156,13 +172,16 @@ export function ReturnDetailDrawer({ ret: row, entity, currency, view, fund, ret
   const { can } = useCan();
   const { data } = useGetPettyCashReturnQuery({ id: row.id, entity });
   const ret = data?.data ?? row;
+  const access = useFieldAccess(PETTY_CASH_RETURN, ret);
+  const shown = (name: string) => !access.isHidden(name);
   // No edit route: a return sent back is resumed as it is, or withdrawn to change it.
   const { standing, request, workflowId, requestNamed } = useFinanceReturned(ret);
   const [confirming, setConfirming] = useState(false);
   const [voidReturn, { isLoading }] = useVoidPettyCashReturnMutation();
   const money = (kobo: number) => formatMoney(kobo, currency);
   const blocker = voidBlocker(ret, { returns, fund, currency });
-  const canVoid = can(P.FIN_REVERSE_PETTY_CASH) && returnVoidable(ret);
+  // A reader who cannot see the status is offered Void and the server decides.
+  const canVoid = can(P.FIN_REVERSE_PETTY_CASH) && (!shown("status") || returnVoidable(ret));
 
   const doVoid = async () => {
     try {
@@ -173,53 +192,64 @@ export function ReturnDetailDrawer({ ret: row, entity, currency, view, fund, ret
     } catch { /* central */ }
   };
 
-  const facts: [string, React.ReactNode][] = [
-    ["Kind", returnKindLabel(ret)],
-    ["Fund", ret.fund_name],
-    ...(view.applies ? [["Branch", rowBranchName(view, ret)] as [string, React.ReactNode]] : []),
-    ["Date", dates.day(ret.return_date)],
-    ["Counted", money(ret.counted_amount)],
-    ["Books said", money(ret.book_balance)],
-    ["Difference", <Difference key="d" ret={ret} currency={currency} />],
-    ...(ret.difference_reason ? [["Why it differs", ret.difference_reason] as [string, React.ReactNode]] : []),
-    ["Banked", money(ret.amount)],
-    ["Into", ret.bank_account_name || "-"],
-    ["Tin kept", money(ret.cash_left)],
-    ["Float", `${money(ret.previous_float_amount)} to ${money(ret.new_float_amount)}`],
-    ["Counted by", <Person key="counted" name={ret.counted_by_name} exited={ret.counted_by_is_exited} />],
-    ["Raised by", <Person key="raised" name={ret.created_by_name} exited={ret.created_by_is_exited} />],
-    ...(ret.reference ? [["Reference", ret.reference] as [string, React.ReactNode]] : []),
-    ...(ret.narration ? [["Note", ret.narration] as [string, React.ReactNode]] : []),
-  ];
+  const facts: [string, React.ReactNode][] = [];
+  const add = (name: string, label: string, value: React.ReactNode) => { if (shown(name)) facts.push([label, value]); };
+  add("kind_label", "Kind", returnKindLabel(ret));
+  facts.push(["Fund", ret.fund_name]);
+  if (view.applies) facts.push(["Branch", rowBranchName(view, ret)]);
+  add("return_date", "Date", dates.day(ret.return_date));
+  add("counted_amount", "Counted", money(ret.counted_amount));
+  add("book_balance", "Books said", money(ret.book_balance));
+  add("difference", "Difference", <Difference key="d" ret={ret} currency={currency} />);
+  if (ret.difference_reason) add("difference_reason", "Why it differs", ret.difference_reason);
+  add("amount", "Banked", money(ret.amount));
+  add("bank_account_name", "Into", ret.bank_account_name || "-");
+  add("cash_left", "Tin kept", money(ret.cash_left));
+  if (shown("previous_float_amount") && shown("new_float_amount")) {
+    facts.push(["Float", `${money(ret.previous_float_amount)} to ${money(ret.new_float_amount)}`]);
+  } else {
+    add("previous_float_amount", "Float before", money(ret.previous_float_amount));
+    add("new_float_amount", "Float after", money(ret.new_float_amount));
+  }
+  add("counted_by_name", "Counted by", <Person key="counted" name={ret.counted_by_name} exited={ret.counted_by_is_exited} />);
+  add("created_by_name", "Raised by", <Person key="raised" name={ret.created_by_name} exited={ret.created_by_is_exited} />);
+  if (ret.reference) add("reference", "Reference", ret.reference);
+  if (ret.narration) add("narration", "Note", ret.narration);
+  const description = [
+    shown("kind_label") ? returnKindLabel(ret) : null,
+    ret.fund_name,
+  ].filter(Boolean).join(" · ");
 
   return (
     <>
       <DetailDrawer
         open onOpenChange={(o) => (o ? undefined : onClose())}
-        title={ret.document_number} description={`${returnKindLabel(ret)} · ${ret.fund_name}`}
+        title={ret.document_number} description={description || undefined}
         widthClass="sm:max-w-lg"
         footer={standing === "sender" ? (
           <ResumeButton workflowId={workflowId} tags={["FinancePettyCash"]} onResumed={onClose} />
         ) : canVoid ? (
           <Button variant="outline" onClick={() => setConfirming(true)} className="gap-1.5 text-destructive hover:text-destructive">
-            <Ban className="size-4" /> {ret.status === "DRAFT" ? "Cancel return" : "Void"}
+            <Ban className="size-4" /> {shown("status") && ret.status === "DRAFT" ? "Cancel return" : "Void"}
           </Button>
         ) : undefined}
       >
         <div className="space-y-4">
-          <StatusPill {...sentBackPill(ret, ret.status, undefined, true)} />
+          {shown("status") ? <StatusPill {...sentBackPill(ret, ret.status, undefined, true)} /> : null}
           <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOrCancel} />
           {ret.status === "PENDING_APPROVAL" ? (
             <p className="font-mont text-xs text-gray-05">Waiting for a second person under the school's approval route. It reaches the books once approved.</p>
           ) : null}
-          <dl className="divide-y divide-white-02 rounded-md bg-white font-mont text-sm ring-1 ring-white-02">
-            {facts.map(([label, value]) => (
-              <div key={label} className="flex items-start justify-between gap-4 px-3 py-2">
-                <dt className="shrink-0 text-xs text-gray-05">{label}</dt>
-                <dd className="min-w-0 text-right tabular-nums text-black-01">{value}</dd>
-              </div>
-            ))}
-          </dl>
+          {facts.length ? (
+            <dl className="divide-y divide-white-02 rounded-md bg-white font-mont text-sm ring-1 ring-white-02">
+              {facts.map(([label, value]) => (
+                <div key={label} className="flex items-start justify-between gap-4 px-3 py-2">
+                  <dt className="shrink-0 text-xs text-gray-05">{label}</dt>
+                  <dd className="min-w-0 text-right tabular-nums text-black-01">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
         </div>
       </DetailDrawer>
       {confirming ? (

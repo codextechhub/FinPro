@@ -25,6 +25,11 @@
  * names no branch and the invoice names Ikeja: its payment is offered Ikeja's
  * collection ledger and the cash tin. From a server whose invoice rows do not
  * name their branch it falls back to the customer's, as before.
+ *
+ * Field Access: the customer picker asks only for active customers. A role that
+ * may not read the active flag would be refused that filter, so the picker lists
+ * every customer for it and never names the field; a bank account without the
+ * flag (hidden) is offered, only an account saying it is inactive is not.
  */
 
 import { act } from "react";
@@ -41,7 +46,15 @@ const mocks = vi.hoisted(() => ({
   customerSkips: [] as boolean[],
   customers: [] as { code: string; branch_id?: number | null }[],
   vendorArgs: [] as Record<string, unknown>[],
-  banks: [] as { id: number; name: string; bank_name: string; branch_id: number | null; is_active: boolean }[],
+  banks: [] as { id: number; name: string; bank_name: string; branch_id: number | null; is_active?: boolean }[],
+  fieldAccess: {} as Record<string, { hidden?: string[]; read_only?: string[] } | undefined>,
+}));
+
+vi.mock("@/hooks/use-permissions", () => ({
+  usePermissions: () => ({
+    hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true,
+    hasModuleAccess: () => true, fieldAccess: mocks.fieldAccess,
+  }),
 }));
 
 vi.mock("../../host", () => ({
@@ -113,6 +126,8 @@ let root: Root;
 beforeEach(() => {
   mocks.taggedCalls = 0;
   mocks.chartCalls = 0;
+  mocks.fieldAccess = {};
+  mocks.customerArgs = [];
   mocks.branches = [{ id: 10, name: "Ikeja Branch" }, { id: 20, name: "Lekki Branch" }];
   mocks.banks = [bank(1, "Ikeja Collections", 10), bank(2, "Lekki Collections", 20), bank(3, "GTBank Operations", null)];
   container = document.createElement("div");
@@ -212,6 +227,12 @@ describe("DepositAccountPicker", () => {
     expect(offered()).toEqual(["1110", "1120", "1100"]);
   });
 
+  it("still narrows by branch when the ledger account link is hidden from the role", () => {
+    mocks.ledgers = [ledger("1110", undefined, 10), ledger("1120", undefined, 20), ledger("1100", undefined, null)];
+    act(() => root.render(<DepositAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={10} />));
+    expect(offered()).toEqual(["1110", "1100"]);
+  });
+
   it("narrows nothing when the server's rows do not name their bank", () => {
     mocks.ledgers = [ledger("1110", undefined, undefined), ledger("1120", undefined, undefined)];
     act(() => root.render(<DepositAccountPicker entity="CORONA" value="" onChange={() => undefined} documentBranchId={10} />));
@@ -269,5 +290,40 @@ describe("useDocumentBranch", () => {
   it("narrows nothing for a shared customer's invoice from such a server", () => {
     act(() => root.render(<PaymentDeposit doc={{ customer_code: "CADEY" }} />));
     expect(offered()).toEqual(["1110", "1120", "1100"]);
+  });
+});
+
+describe("Field Access on the pickers", () => {
+  it("asks for active customers only while the active flag is readable", () => {
+    act(() => root.render(<CustomerPicker entity="CORONA" value="" onChange={() => undefined} />));
+    expect(mocks.customerArgs.at(-1)).toMatchObject({ is_active: "true" });
+  });
+
+  it("never names the active flag when its role may not read it", () => {
+    mocks.fieldAccess = { "finance.customer": { hidden: ["is_active"] } };
+    act(() => root.render(<CustomerPicker entity="CORONA" value="" onChange={() => undefined} />));
+    expect(mocks.customerArgs.length).toBeGreaterThan(0);
+    expect(mocks.customerArgs.every((args) => !("is_active" in args))).toBe(true);
+  });
+
+  it("reads the branch of a chosen customer from the same unfiltered list", () => {
+    mocks.fieldAccess = { "finance.customer": { hidden: ["is_active"] } };
+    mocks.customers = [{ code: "COKAF", branch_id: 20 }];
+    function Branch() {
+      const branch = useDocumentBranch("CORONA", { customer_code: "COKAF" });
+      return <span data-branch={String(branch)} />;
+    }
+    act(() => root.render(<Branch />));
+    expect(container.querySelector("[data-branch]")?.getAttribute("data-branch")).toBe("20");
+    expect(mocks.customerArgs.every((args) => !("is_active" in args))).toBe(true);
+  });
+
+  it("offers a bank account whose active flag is hidden and drops one that is inactive", () => {
+    mocks.banks = [
+      { id: 1, name: "Ikeja Collections", bank_name: "", branch_id: null },
+      { id: 2, name: "Old account", bank_name: "", branch_id: null, is_active: false },
+    ];
+    act(() => root.render(<BankAccountPicker entity="CORONA" value="" onChange={() => undefined} />));
+    expect(mocks.options.map((o) => o.label)).toEqual(["Ikeja Collections"]);
   });
 });

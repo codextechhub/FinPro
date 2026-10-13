@@ -40,7 +40,8 @@ const mocks = vi.hoisted(() => ({
   checklist: vi.fn(),
   years: vi.fn(),
   periods: vi.fn(),
-  yearRows: [] as { id: number; year: number; start_date: string; end_date: string; status: string; is_archived?: boolean; branch_states?: unknown[] }[],
+  yearRows: [] as { id: number; year: number; start_date: string; end_date: string; status?: string; is_archived?: boolean; branch_states?: unknown[] }[],
+  access: {} as Record<string, { hidden?: string[] }>,
   periodRows: [] as unknown[],
   denied: new Set<string>(),
   wholeSchool: true,
@@ -87,6 +88,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasAnyPermission: () => true,
     hasAllPermissions: () => true,
     hasModuleAccess: () => true,
+    fieldAccess: mocks.access,
   }),
 }));
 
@@ -141,6 +143,7 @@ beforeEach(() => {
   mocks.toast.success.mockReset();
   mocks.toast.error.mockReset();
   mocks.denied = new Set();
+  mocks.access = {};
   mocks.wholeSchool = true;
   mocks.yearRows = [{ ...FY, status: "OPEN" }];
   mocks.periodRows = [H1, H2];
@@ -267,6 +270,28 @@ describe("Harbour Primary, a school with one branch", () => {
     await click(button("Close fiscal year", dialog()!));
 
     expect(mocks.closeYear).toHaveBeenCalledWith({ id: 7, entity: "HARBOUR" });
+  });
+
+  it("reports the net result in the close message only when the response carries it", async () => {
+    mocks.closeYear.mockReturnValue({ unwrap: () => Promise.resolve({
+      message: "Fiscal year 2026 closed.",
+      data: { net_income: { kobo: 125_000_00, naira: "125,000.00" }, closing_journal: { id: 3, lines: [] } },
+    }) });
+    await mountWorkbench("HARBOUR");
+    await click(button("Close fiscal year", container));
+    await click(button("Close fiscal year", dialog()!));
+    expect(mocks.toast.success).toHaveBeenLastCalledWith("Fiscal year 2026 closed. · Net 125,000.00 → Retained Earnings");
+  });
+
+  it("closes a year cleanly when the net result and the closing journal's lines are left out", async () => {
+    mocks.closeYear.mockReturnValue({ unwrap: () => Promise.resolve({
+      message: "Fiscal year 2026 closed.",
+      data: { fiscal_year: { id: 7, year: 2026 }, closing_journal: { id: 3, document_number: "JV-0003" } },
+    }) });
+    await mountWorkbench("HARBOUR");
+    await click(button("Close fiscal year", container));
+    await click(button("Close fiscal year", dialog()!));
+    expect(mocks.toast.success).toHaveBeenLastCalledWith("Fiscal year 2026 closed.");
   });
 
   it("re-opens a closed year with the reason alone", async () => {
@@ -728,5 +753,121 @@ describe("each branch's state under All branches", () => {
 
     expect(yearReads().at(-1)).toEqual({ entity: "BRIGHTSTAR", branch: 2 });
     expect(container.textContent).not.toContain("Each branch's year:");
+  });
+});
+
+/** The rows as the server sends them once a switch closes these names. */
+const stripped = <T extends object>(row: T, ...names: string[]): T => {
+  const copy = { ...row } as Record<string, unknown>;
+  for (const name of names) delete copy[name];
+  return copy as T;
+};
+
+const PERIOD_STATE = ["status", "closed_at", "branch_states"];
+
+describe("the workbench when a role may not read a month's or a year's close state", () => {
+  it("draws no status pill, count, progress or stat cards for months without a state", async () => {
+    mocks.access = { "finance.period": { hidden: PERIOD_STATE } };
+    mocks.periodRows = [stripped(H1, ...PERIOD_STATE), stripped(H2, ...PERIOD_STATE)];
+    await mountWorkbench("BRIGHTSTAR");
+
+    const text = container.textContent ?? "";
+    expect(text).toContain("H1 2026");
+    expect(text).not.toContain("Close progress");
+    expect(text).not.toContain("Soft-closed");
+    expect(text).not.toContain("Ordinary posting allowed");
+    expect(text).not.toContain("undefined");
+    expect(text).toContain("Review close");
+    const card = container.querySelector("[data-guide='finance-periods.period']")!;
+    expect(card.textContent).toMatch(/^Period 01H1 2026\d/);
+  });
+
+  it("offers an open year with unreadable months a neutral year-end card the server judges", async () => {
+    mocks.periodRows = [stripped(H1, ...PERIOD_STATE), stripped(H2, ...PERIOD_STATE)];
+    await mountWorkbench("BRIGHTSTAR");
+
+    expect(container.textContent).toContain("Year-end close");
+    expect(container.textContent).not.toContain("Ready for year-end close");
+    expect(container.textContent).not.toContain("still open");
+    expect(button("Close fiscal year", container)?.disabled).toBe(false);
+  });
+
+  it("draws no year pill, no readiness card and no archive action when the year's state is closed", async () => {
+    mocks.access = { "finance.fiscalyear": { hidden: ["branch_states", "status"] } };
+    mocks.yearRows = [stripped({ ...FY, status: "CLOSED" }, "status", "branch_states")];
+    mocks.periodRows = [H1, H2];
+    mocks.retention = { archive_min_age_years: 1 };
+    await mountWorkbench("BRIGHTSTAR");
+
+    const text = container.textContent ?? "";
+    expect(text).toContain("Fiscal year 2026");
+    expect(text).not.toContain("Year-end close");
+    expect(text).not.toContain("Ready for year-end close");
+    expect(text).not.toContain("is closed");
+    expect(button("Archive year", container)).toBeUndefined();
+    expect(button("Re-open year", container)).toBeUndefined();
+    const option = container.querySelector("select option");
+    expect(option?.textContent).toBe("FY 2026");
+  });
+
+  it("sends no archived-years request when the archive state is closed, even if the address asks", async () => {
+    mocks.access = { "finance.fiscalyear": { hidden: ["archived_at", "is_archived"] } };
+    await mountWorkbench("BRIGHTSTAR", "?archived=1");
+
+    const sent = mocks.years.mock.calls.filter(([, options]) => !options?.skip).map(([args]) => args);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.every((args) => args.include_archived === undefined)).toBe(true);
+    expect(container.textContent).not.toContain("Show archived years");
+  });
+
+  it("draws the drawer's checks that arrive, with no count or status when those are closed", async () => {
+    const { passed: _passed, done: _done, total: _total, ...bare } = { passed: true, done: 3, total: 3, period: stripped(MARCH, "status", "closed_at"), items: [
+      { name: "no_draft_journals", label: "Draft journals left in the month", passed: true, blocking: true, detail: "" },
+    ] };
+    mocks.checklist.mockReturnValue({ data: { data: bare }, isLoading: false, isError: false, refetch: vi.fn() });
+    await mountDrawer();
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Draft journals left in the month");
+    expect(text).not.toContain("Current status");
+    expect(text).not.toContain("Checklist 3 / 3");
+    expect(text).not.toContain("NaN");
+    expect(button("Run close steps")).toBeUndefined();
+    expect(button("Re-open")).toBeUndefined();
+  });
+
+  it("draws no checklist section when every check is closed", async () => {
+    mocks.checklist.mockReturnValue({
+      data: { data: { period: stripped(MARCH, "status", "closed_at"), items: [] } }, isLoading: false, isError: false, refetch: vi.fn(),
+    });
+    await mountDrawer();
+
+    expect(document.body.textContent).toContain("Manage March 2026");
+    expect(document.body.textContent).not.toContain("Close checklist");
+  });
+
+  it("counts only the checks it was sent", async () => {
+    mocks.checklist.mockReturnValue({
+      data: { data: { period: MARCH, passed: false, done: 1, total: 2, items: [
+        { name: "no_draft_journals", label: "Draft journals", passed: true, blocking: true, detail: "" },
+        { name: "ar_reconciled", label: "Receivables reconciled", passed: false, blocking: true, detail: "Off by 5" },
+      ] } }, isLoading: false, isError: false, refetch: vi.fn(),
+    });
+    await mountDrawer();
+
+    expect(document.body.textContent).toContain("1 / 2");
+    expect(document.body.textContent).toContain("Receivables reconciled");
+  });
+
+  it("closes a month and reports it from a result that names no checks", async () => {
+    mocks.checklist.mockReturnValue({
+      data: { data: { period: { ...MARCH, status: "OPEN" }, items: [], done: 0, total: 0 } }, isLoading: false, isError: false, refetch: vi.fn(),
+    });
+    await mountDrawer();
+    await click(button("Run close steps"));
+    await click(button("Run period close", dialog()!) ?? Array.from(dialog()!.querySelectorAll("button")).at(-1));
+
+    expect(mocks.closePeriod).toHaveBeenCalled();
+    expect(mocks.toast.success).toHaveBeenCalledWith("Closed March 2026.");
   });
 });

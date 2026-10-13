@@ -90,6 +90,50 @@ describe("Spend & suppliers for the proprietor", () => {
   });
 });
 
+/**
+ * A clerk with no switch on a vendor's category, hold or KYC status is sent the
+ * tab without them. The scorecard names no category under a vendor (and does not
+ * call it Uncategorised, which would be a statement about the category), the
+ * vendor base has no hold or KYC row, and the savings card keeps its totals and
+ * drops the per-category list.
+ */
+describe("Spend & suppliers for a role without the vendor category, hold and KYC", () => {
+  const WITHHELD: ProcurementSuppliersDashboard = {
+    ...FULL,
+    scorecard: FULL.scorecard!.map(({ category: _category, ...row }) => { void _category; return row; }),
+    savings: { ...FULL.savings!, items: [] },
+    vendor_base: { active: 8, ordered_once: 4, added: 8 },
+  };
+
+  it("leaves the category line off every scorecard row, desktop and phone", () => {
+    const text = render(WITHHELD);
+    expect(text).toContain("Eterna Oil");
+    expect(text).not.toContain("Fuel and power");
+    expect(text).not.toContain("Uncategorised");
+  });
+
+  it("still names an uncategorised vendor's category for a role that may read it", () => {
+    const text = render({ ...FULL, scorecard: [{ ...FULL.scorecard![0], category: null }] });
+    expect(text).toContain("Uncategorised");
+  });
+
+  it("drops the hold and KYC rows of the vendor base and keeps the rest", () => {
+    const text = render(WITHHELD);
+    expect(text).toContain("Vendor base");
+    expect(text).toContain("Approved and active");
+    expect(text).toContain("Ordered from once only this year");
+    expect(text).not.toContain("On hold");
+    expect(text).not.toContain("Still awaiting KYC checks");
+  });
+
+  it("keeps the savings totals and drops the empty category list", () => {
+    const text = render(WITHHELD);
+    expect(text).toContain("What competition saved");
+    expect(text).toContain("18.3% below the highest quote");
+    expect(text).not.toContain("Facilities and repairs");
+  });
+});
+
 describe("Spend & suppliers for a branch reader", () => {
   it("compares spend with the window before when no plan is sent, and leaves out the branch comparison", () => {
     const text = render({ ...FULL, narrowed: true, by_branch: null,

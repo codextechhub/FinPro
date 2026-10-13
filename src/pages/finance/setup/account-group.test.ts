@@ -4,6 +4,7 @@ import {
   accountGroupContribution,
   buildAccountTree,
   descendantPostingAccounts,
+  isBalanceHidden,
 } from "./account-group";
 
 const account = (overrides: Partial<Account>): Account => ({
@@ -80,5 +81,19 @@ describe("account group helpers", () => {
     const [income] = buildAccountTree(accounts);
 
     expect(income.rolled).toBe(2_909_500_000);
+  });
+
+  it("withholds a group total and a contribution when a posting account's balance is hidden", () => {
+    const group = account({ id: 1, code: "1000", balance: { kobo: 0, naira: "0.00" } });
+    const open = account({ id: 2, code: "1100", parent_id: 1, is_postable: true, balance: { kobo: 500, naira: "5.00" } });
+    const bank = account({ id: 3, code: "1210", parent_id: 1, is_postable: true });
+
+    expect(isBalanceHidden(bank)).toBe(true);
+    expect(isBalanceHidden(open)).toBe(false);
+    expect(isBalanceHidden(account({ balance: null }))).toBe(false);
+    expect(accountGroupContribution(bank, "DEBIT")).toBeNull();
+    const [root] = buildAccountTree([group, open, bank]);
+    expect(root.rolled).toBeNull();
+    expect(root.children.map((child) => child.rolled)).toEqual([500, null]);
   });
 });

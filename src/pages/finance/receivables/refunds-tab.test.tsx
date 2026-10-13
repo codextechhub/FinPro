@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ArAdjustment } from "@/redux/services/finance/ar-types";
 
 const mocks = vi.hoisted(() => ({
-  held: new Set<string>(), detail: undefined as unknown, uid: 4, request: undefined as unknown, resume: vi.fn(), availability: undefined as unknown,
+  held: new Set<string>(), detail: undefined as unknown, uid: 4, request: undefined as unknown, resume: vi.fn(), availability: undefined as unknown, fieldAccess: {} as Record<string, unknown>, availabilityAsked: [] as unknown[],
 }));
 
 vi.mock("@/redux/services/finance/approval-request-api", () => ({
@@ -35,7 +35,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasAnyPermission: () => false,
     hasAllPermissions: () => false,
     hasModuleAccess: () => true,
-    fieldAccess: {},
+    fieldAccess: mocks.fieldAccess,
   }),
 }));
 /** The school writes dates day first: "03/10/2026". */
@@ -57,14 +57,14 @@ vi.mock("@/redux/services/finance/ar-api", () => {
   const mutation = () => [() => ({ unwrap: async () => ({ data: {} }) }), { isLoading: false }];
   const query = () => ({ data: undefined, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() });
   return {
-    useGetArAdjustmentsQuery: query, useGetInvoicesQuery: query, useGetRefundAvailabilityQuery: () => ({ data: mocks.availability, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
+    useGetArAdjustmentsQuery: query, useGetInvoicesQuery: query, useGetRefundAvailabilityQuery: (_args: unknown, options?: { skip?: boolean }) => (mocks.availabilityAsked.push(options?.skip === true), { data: options?.skip ? undefined : mocks.availability, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
     useCreateRefundMutation: mutation, usePostRefundMutation: mutation, useSubmitRefundMutation: mutation,
     useCreateWriteOffRequestMutation: mutation, usePostWriteOffRequestMutation: mutation, useSubmitWriteOffRequestMutation: mutation,
   };
 });
 
 import { P } from "../../../permissions";
-import { AdjustmentDetailDrawer, NewActionDrawer } from "./refunds-tab";
+import { AdjustmentDetailDrawer, NewActionDrawer, adjustmentKpiTiles } from "./refunds-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -85,6 +85,8 @@ beforeEach(() => {
   mocks.request = RETURNED;
   mocks.uid = 4;
   mocks.resume.mockReset();
+  mocks.fieldAccess = {};
+  mocks.availabilityAsked = [];
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -126,5 +128,37 @@ describe("the date a new refund is measured on", () => {
     const text = document.body.textContent ?? "";
     expect(text).toContain("No customer had credit available to refund as at 05/09/2026.");
     expect(text).not.toContain("2026-09-05");
+  });
+});
+
+describe("the refund picker for a role that may not read customer balances", () => {
+  it("is not asked for and says why, rather than reporting that nobody holds credit", async () => {
+    mocks.fieldAccess = { "finance.customer": { hidden: ["balance"] } };
+    mocks.availability = { data: [], pagination: { currentPage: 1, totalPages: 1 } };
+    act(() => root.render(<NewActionDrawer open onClose={vi.fn()} entity="BSS" currency="NGN" />));
+    await act(async () => { button("Pick date")!.click(); });
+    const text = document.body.textContent ?? "";
+    expect(document.body.querySelector("[data-testid=refund-credit-hidden]")).not.toBeNull();
+    expect(text).not.toContain("No customer had credit available");
+    expect(mocks.availabilityAsked.every((skipped) => skipped === true)).toBe(true);
+  });
+
+  it("asks for the list when the balance is readable", async () => {
+    mocks.availability = { data: [], pagination: { currentPage: 1, totalPages: 1 } };
+    act(() => root.render(<NewActionDrawer open onClose={vi.fn()} entity="BSS" currency="NGN" />));
+    await act(async () => { button("Pick date")!.click(); });
+    expect(document.body.querySelector("[data-testid=refund-credit-hidden]")).toBeNull();
+    expect(mocks.availabilityAsked.at(-1)).toBe(false);
+  });
+});
+
+describe("the refunds and write-offs figures", () => {
+  it("count the tiles the server sent so the row is always full", () => {
+    expect(adjustmentKpiTiles(undefined)).toEqual({ showCredit: true, showWrittenOff: true, count: 4 });
+    expect(adjustmentKpiTiles({ written_off_ytd: 5, refundable_credit: 9 })).toEqual({ showCredit: true, showWrittenOff: true, count: 4 });
+    expect(adjustmentKpiTiles({ written_off_ytd: 5 })).toEqual({ showCredit: false, showWrittenOff: true, count: 3 });
+    expect(adjustmentKpiTiles({ written_off_ytd: null, refundable_credit: 9 })).toEqual({ showCredit: true, showWrittenOff: false, count: 3 });
+    expect(adjustmentKpiTiles({ written_off_ytd: null, refundable_credit: null })).toEqual({ showCredit: false, showWrittenOff: false, count: 2 });
+    expect(adjustmentKpiTiles({ written_off_ytd: 0, refundable_credit: 0 }).count).toBe(4);
   });
 });

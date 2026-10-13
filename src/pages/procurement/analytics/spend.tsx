@@ -29,7 +29,7 @@ export default function SpendScreen({ entity, currency }: SectionProps) {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <SectionHeader title="Spend Analytics" subtitle="Spend by category, vendor and over time." screen="spend">
+      <SectionHeader title="Spend Analytics" subtitle={d && d.by_category === undefined ? "Spend by vendor and over time." : "Spend by category, vendor and over time."} screen="spend">
         <DateFilter label="From" value={start} onChange={setStart} />
         <DateFilter label="To" value={end} onChange={setEnd} />
       </SectionHeader>
@@ -55,6 +55,8 @@ function SpendBody({ d, currency, entity, start, end }: {
   end: string;
 }) {
   const [sel, setSel] = useState<{ key: string; label: string } | null>(null);
+  // The category breakdown is withheld from a role that may not read a vendor's category.
+  const showCategories = d.by_category !== undefined;
   const byCategory = toArray(d.by_category);
   const byVendor = toArray(d.by_vendor);
   const byPeriod = toArray(d.by_period);
@@ -69,8 +71,8 @@ function SpendBody({ d, currency, entity, start, end }: {
         <StatCard label="Invoices" value={String(d.invoice_count)} icon={FileText} tone="primary" sub="posted in window" />
       </div>
 
-      <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
-        <Card title="Spend by category" subtitle="Gross across vendor categories">
+      <div className={cn("grid min-w-0 grid-cols-1 gap-5", showCategories && "lg:grid-cols-2")}>
+        {showCategories ? <Card title="Spend by category" subtitle="Gross across vendor categories">
           {byCategory.length === 0 ? (
             <ChartEmpty>No posted spend in this window.</ChartEmpty>
           ) : (
@@ -80,7 +82,7 @@ function SpendBody({ d, currency, entity, start, end }: {
               formatValue={(v) => formatMoney(v, currency)}
             />
           )}
-        </Card>
+        </Card> : null}
 
         <Card title="Top vendors by spend" subtitle="Highest gross suppliers in the window">
           {byVendor.length === 0 ? (
@@ -105,7 +107,7 @@ function SpendBody({ d, currency, entity, start, end }: {
         )}
       </Card>
 
-      <section className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
+      {showCategories ? <section className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
         {byCategory.length === 0 ? (
           <EmptyState title="No spend" message="No posted vendor invoices fall in this window." />
         ) : (
@@ -140,7 +142,7 @@ function SpendBody({ d, currency, entity, start, end }: {
             </table>
           </div>
         )}
-      </section>
+      </section> : null}
 
       <SpendCategoryDrawer sel={sel} entity={entity} start={start} end={end} currency={currency} onClose={() => setSel(null)} />
     </div>

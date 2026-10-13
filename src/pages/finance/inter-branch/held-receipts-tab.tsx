@@ -25,7 +25,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { ArrowRight, Ban, Forward, Plus } from "lucide-react";
 
 import {
-  AccessField, BankAccountPicker, ConfirmActionModal, CustomerPicker, DataTable, DetailDrawer, FormDrawer, Money,
+  AccessField, BankAccountPicker, ConfirmActionModal, CustomerPicker, DataTable, DetailDrawer, FormDrawer, FormField, Money,
   MoneyInput, PostingDateField, RaisingBranchChoiceField, fieldWriteErrors, toArray, useFieldAccess,
   useRaisingBranchChoice, type Column, type FieldErrors,
 } from "@/components/finance-ui";
@@ -145,10 +145,10 @@ export function HeldReceiptsTab({ entity, currency, reader }: { entity: string; 
   const rows = toArray(data?.data);
 
   const columns: Column<HeldReceipt>[] = [
-    ...(!access.isHidden("document_number") ? [{ header: "Number", cell: (h: HeldReceipt) => <span className="font-semibold tabular-nums text-gray-01">{h.document_number}</span> }] : []),
+    { header: "Number", cell: (h: HeldReceipt) => <span className="font-semibold tabular-nums text-gray-01">{h.document_number}</span> },
     ...(!access.isHidden("receipt_date") ? [{ header: "Date", cell: (h: HeldReceipt) => <span className="tabular-nums text-gray-05">{dates.day(h.receipt_date, h.branch_id)}</span> }] : []),
-    ...(!access.isHidden("branch_name") ? [{ header: "Collected at", cell: (h: HeldReceipt) => h.branch_name }] : []),
-    ...(!access.isHidden("for_branch_name") ? [{ header: "For", cell: (h: HeldReceipt) => h.for_branch_name }] : []),
+    { header: "Collected at", cell: (h: HeldReceipt) => h.branch_name },
+    { header: "For", cell: (h: HeldReceipt) => h.for_branch_name },
     ...(!access.isHidden("customer_name") ? [{ header: "Customer", cell: (h: HeldReceipt) => h.customer_name }] : []),
     ...(!access.isHidden("amount") ? [{ header: "Amount", align: "right" as const, cell: (h: HeldReceipt) => <Money kobo={h.amount} currency={currency} align="right" /> }] : []),
     ...(!access.isHidden("status") ? [{ header: "Status", cell: (h: HeldReceipt) => <HeldStatus h={h} /> }] : []),
@@ -198,7 +198,7 @@ function HeldReceiptDrawer({ id, entity, currency, reader, onClose }: {
       <DetailDrawer
         open={id != null} onOpenChange={(o) => (o ? undefined : onClose())}
         title={held?.document_number ?? "Held receipt"}
-        description={held && access.anyVisible("branch_name", "for_branch_name") ? `Collected at ${held.branch_name ?? "hidden branch"} for ${held.for_branch_name ?? "hidden branch"}` : undefined}
+        description={held ? `Collected at ${held.branch_name} for ${held.for_branch_name}` : undefined}
         widthClass="sm:max-w-lg"
         footer={held && (allowed.forward || allowed.void) ? (
           <>
@@ -228,7 +228,7 @@ function HeldReceiptDrawer({ id, entity, currency, reader, onClose }: {
                   Open the transfer <ArrowRight className="size-3.5" />
                 </Link>
               </div>
-            ) : held.status === "POSTED" && !access.isHidden("branch_name") && !access.isHidden("for_branch_name") ? (
+            ) : held.status === "POSTED" ? (
               <Note>{`${held.branch_name} holds this for ${held.for_branch_name} (Held for other branches). ${held.for_branch_name}'s bill is settled once it is forwarded.`}</Note>
             ) : null}
           </div>
@@ -273,7 +273,7 @@ function ForwardDrawer({ held, entity, currency, reader, onClose }: {
         title={[
           "Forward",
           !access.isHidden("amount") ? formatMoney(held.amount, currency) : null,
-          !access.isHidden("for_branch_name") ? `to ${held.for_branch_name}` : null,
+          `to ${held.for_branch_name}`,
         ].filter(Boolean).join(" ")}
         description="It follows the approval route for money sent between branches. Once sent, it settles the customer's bills there."
         onSubmit={submit} submitText="Forward" loading={isLoading}
@@ -285,9 +285,9 @@ function ForwardDrawer({ held, entity, currency, reader, onClose }: {
           <AccessField access={access} name="to_bank_account" label="Paid into" creating={false} errors={denied}>
             <BankAccountPicker entity={entity} value={toAccount} onChange={setToAccount} documentBranchId={held.for_branch_id} placeholder="Its collection account" />
           </AccessField>
-        ) : !access.isHidden("for_branch_name") ? (
+        ) : (
           <Note>{`The money lands in ${held.for_branch_name}'s collection account.`}</Note>
-        ) : null}
+        )}
         <AccessField access={access} name="transfer_date" creating={false} errors={denied}><PostingDateField label="Date" entity={entity} value={date} onChange={setDate} /></AccessField>
         <AccessField access={access} name="purpose" label="Note" creating={false} errors={denied}>
           <Input value={purpose} maxLength={255} onChange={(e) => setPurpose(e.target.value)} placeholder={!access.isHidden("customer_name") ? `Forwarding ${held.customer_name}'s payment` : "Forwarding held payment"} className="h-9 bg-white" />
@@ -315,10 +315,10 @@ function VoidHeldDialog({ held, entity, currency, onClose }: {
   return (
     <ConfirmActionModal
       open onOpenChange={(o) => !o && onClose()} loading={isLoading} onConfirm={submit} destructive
-      title={!access.isHidden("document_number") ? `Void ${held.document_number}?` : "Void this held receipt?"}
+      title={`Void ${held.document_number}?`}
       description={[
         !access.isHidden("amount") ? `Reverses the ${formatMoney(held.amount, currency)}` : "Reverses this receipt",
-        !access.isHidden("branch_name") && !access.isHidden("for_branch_name") ? `${held.branch_name} recorded for ${held.for_branch_name}.` : ".",
+        `${held.branch_name} recorded for ${held.for_branch_name}.`,
         "Refused while it is matched to a bank statement line.",
       ].join(" ")}
       confirmText="Void receipt"
@@ -353,11 +353,14 @@ function RecordHeldDrawer({ entity, currency, reader, onClose }: {
 
   const submit = async () => {
     try {
-      const res = await record(access.writableOnly({
-        entity, bank_account: Number(bank), for_branch: Number(forBranch), customer: customer.trim(),
-        amount, receipt_date: date, method, reference: reference.trim() || undefined,
-        narration: narration.trim() || undefined,
-      }, { creating: true })).unwrap();
+      const res = await record({
+        entity, for_branch: Number(forBranch),
+        ...access.writableOnly({
+          bank_account: Number(bank), customer: customer.trim(),
+          amount, receipt_date: date, method, reference: reference.trim() || undefined,
+          narration: narration.trim() || undefined,
+        }, { creating: true }),
+      }).unwrap();
       toast.success(res.message || "Held for the other branch.");
       onClose();
     } catch (error) { setDenied(fieldWriteErrors(error)); }
@@ -369,13 +372,13 @@ function RecordHeldDrawer({ entity, currency, reader, onClose }: {
       description="Money paid into this branch's bank for another branch's bill. It is held until forwarded."
       onSubmit={submit} submitText={amount > 0 ? `Hold ${formatMoney(amount, currency)}` : "Hold"} loading={isLoading} canSubmit={canSubmit}
     >
-      <AccessField access={access} name="branch" creating errors={denied}><RaisingBranchChoiceField choice={{ ...collecting, setValue: (v) => { collecting.setValue(v); setBank(""); if (v === forBranch) setForBranch(""); } }} label="Collected at" /></AccessField>
+      <RaisingBranchChoiceField choice={{ ...collecting, setValue: (v) => { collecting.setValue(v); setBank(""); if (v === forBranch) setForBranch(""); } }} label="Collected at" />
       <AccessField access={access} name="bank_account" label="Paid into" required creating errors={denied}>
         <BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={collecting.branchId} />
       </AccessField>
-      <AccessField access={access} name="for_branch" label="For branch" required creating errors={denied}>
+      <FormField label="For branch" required>
         <BranchSelect label="For branch" branches={others} value={forBranch} onChange={(v) => { setForBranch(v); setCustomer(""); }} />
-      </AccessField>
+      </FormField>
       <AccessField access={access} name="customer" label="Customer who paid" required creating errors={denied}>
         {canListCustomers
           ? <CustomerPicker entity={entity} value={customer} onChange={setCustomer} />

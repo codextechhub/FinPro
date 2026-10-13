@@ -52,7 +52,8 @@ import {
   type ConsoleSettingsGroup,
   type ConsoleSettingsSection,
 } from "@/components/settings/settings-layout";
-import { InfoHint, useActiveEntity } from "@/components/finance-ui";
+import { InfoHint, useActiveEntity, useFieldAccess } from "@/components/finance-ui";
+import { BANK_ACCOUNT, bankOptionLabel } from "./bank-account-access";
 import { DEFAULT_FINANCE_SETTINGS_SECTION, type FinanceSettingsSection } from "./console-sections";
 import { FeeDuePolicyPanel, financeSettingsSections, setupSections } from "@xvs/finance/host";
 import { FinanceShell } from "./finance-shell";
@@ -333,12 +334,20 @@ function DocumentSettings({ entityCode }: { entityCode: string | null }) {
   );
 }
 
-function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate, readOnlyNote }: { entityCode: string; values: FinanceDocumentSettingsValues; consumers: Record<string, SettingConsumer>; history: FinanceAuditLog[]; canUpdate: boolean; readOnlyNote: string | null }) {
+/**
+ * The document and collection policy form. The primary collection account choice
+ * writes that account's collection flag, so it follows the bank account switch
+ * for that flag: greyed and left out of the saved body when the role may not
+ * change it.
+ */
+export function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate, readOnlyNote }: { entityCode: string; values: FinanceDocumentSettingsValues; consumers: Record<string, SettingConsumer>; history: FinanceAuditLog[]; canUpdate: boolean; readOnlyNote: string | null }) {
   const [dueDays, setDueDays] = useState(String(values.default_invoice_due_days));
   const [narration, setNarration] = useState(values.default_invoice_narration);
   const [autoPost, setAutoPost] = useState(values.auto_post_manual_invoices);
   const [openingBalances, setOpeningBalances] = useState(values.allow_customer_opening_balances);
   const [bankAccount, setBankAccount] = useState(values.primary_collection_bank_account ? String(values.primary_collection_bank_account.id) : "");
+  // Naming another collection account writes that account's collection flag.
+  const bankWritable = !useFieldAccess(BANK_ACCOUNT).isReadOnly("is_primary_collection");
   const [target, setTarget] = useState(String(values.term_collection_target_pct));
   const [update, state] = useUpdateFinanceDocumentSettingsMutation();
   const dueDaysValue = Number(dueDays);
@@ -351,7 +360,7 @@ function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate
     || autoPost !== values.auto_post_manual_invoices
     || openingBalances !== values.allow_customer_opening_balances
     || targetValue !== values.term_collection_target_pct
-    || bankAccount !== (values.primary_collection_bank_account ? String(values.primary_collection_bank_account.id) : "")
+    || (bankWritable && bankAccount !== (values.primary_collection_bank_account ? String(values.primary_collection_bank_account.id) : ""))
   );
   const save = async () => {
     try {
@@ -362,7 +371,7 @@ function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate
         auto_post_manual_invoices: autoPost,
         allow_customer_opening_balances: openingBalances,
         term_collection_target_pct: targetValue,
-        primary_collection_bank_account: bankAccount ? Number(bankAccount) : null,
+        ...(bankWritable ? { primary_collection_bank_account: bankAccount ? Number(bankAccount) : null } : {}),
       }).unwrap();
       toast.success(response.message || "Finance document policy saved.");
     } catch { /* Central API handling shows the actionable error. */ }
@@ -371,7 +380,7 @@ function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate
     <SettingsPanel title="Billing defaults" description="These defaults are applied by the backend when a user leaves the corresponding field blank.">
       <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
         <label className="font-mont text-xs font-semibold text-gray-01">Default invoice due days<Input className="mt-2 bg-white" type="number" min="0" max="365" step="1" value={dueDays} onChange={(event) => setDueDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Used for manual and fee-generated invoices without a due date.</span><SettingsConsumer consumer={consumers.default_invoice_due_days} /></label>
-        <label className="font-mont text-xs font-semibold text-gray-01">Primary collection account<select className="mt-2 h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={bankAccount} onChange={(event) => setBankAccount(event.target.value)} disabled={!canUpdate}><option value="">Automatic fallback</option>{values.bank_account_options.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}{bank.bank_name ? ` · ${bank.bank_name}` : ""} · {bank.currency}</option>)}</select><span className="mt-1 block font-normal leading-5 text-gray-05">Printed as the payment destination on invoices and receipts.</span><SettingsConsumer consumer={consumers.primary_collection_bank_account} /></label>
+        <label className="font-mont text-xs font-semibold text-gray-01">Primary collection account<select className="mt-2 h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={bankAccount} onChange={(event) => setBankAccount(event.target.value)} disabled={!canUpdate || !bankWritable}><option value="">Automatic fallback</option>{values.bank_account_options.map((bank) => <option key={bank.id} value={bank.id}>{bankOptionLabel(bank)}</option>)}</select><span className="mt-1 block font-normal leading-5 text-gray-05">Printed as the payment destination on invoices and receipts.</span><SettingsConsumer consumer={consumers.primary_collection_bank_account} /></label>
         <label className="font-mont text-xs font-semibold text-gray-01">Term collection target (%)<Input className="mt-2 bg-white" type="number" min="1" max="100" step="1" value={target} onChange={(event) => setTarget(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">The share of a term&rsquo;s fees you aim to have collected by the end of the term. Drawn as the target on the collection curve.</span><SettingsConsumer consumer={consumers.term_collection_target_pct} /></label>
         <label className="font-mont text-xs font-semibold text-gray-01 lg:col-span-2">Default invoice narration<Textarea className="mt-2 min-h-20 bg-white font-mont text-sm" value={narration} onChange={(event) => setNarration(event.target.value)} disabled={!canUpdate} maxLength={255} placeholder="Optional text for new manual invoices" /><SettingsConsumer consumer={consumers.default_invoice_narration} /></label>
       </div>

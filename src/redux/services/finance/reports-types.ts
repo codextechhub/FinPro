@@ -308,7 +308,10 @@ export interface FiscalRunway {
  *
  * The endpoint opens to anyone working in finance and computes each block only
  * for a reader who holds the key behind it, so every block may be `null`: absent,
- * not empty. `narrowed` says every figure covers only the entries of the
+ * not empty. A block that a Field Access switch closes is a missing key instead,
+ * and so is a row of a list the switch narrows (an attention item, a close check),
+ * so a screen reads every block as possibly `undefined` and draws neither a card
+ * nor a placeholder for it. `narrowed` says every figure covers only the entries of the
  * reader's branches, ledger figures included; the budget and the period close
  * are then always `null`, because both belong to the school as a whole.
  */
@@ -321,19 +324,19 @@ export interface FinanceDashboard {
   /** The span the window-aware cards read, and every span on offer (default first). */
   window: DashboardWindow;
   windows: { key: string; label: string; name: string }[];
-  collections: {
+  collections?: {
     billed: ReportMoney | null;
     invoice_count: number | null;
     collected: ReportMoney | null;
     rate_pct: number | null;
   } | null;
-  channels: {
+  channels?: {
     total: ReportMoney;
     receipts: number;
     items: { key: string; label: string; amount: ReportMoney; receipts: number; pct: number | null }[];
   } | null;
   /** Per-branch comparison; null for a branch reader and for a one-branch school. */
-  branches: {
+  branches?: {
     branch_id: number | null;
     name: string | null;
     billed: ReportMoney;
@@ -341,10 +344,11 @@ export interface FinanceDashboard {
     rate_pct: number | null;
     overdue: ReportMoney;
   }[] | null;
-  bank_accounts: {
+  bank_accounts?: {
     id: number;
     name: string;
-    bank_name: string;
+    /** A `finance.bankaccount` field: absent for a role that may not read the bank. */
+    bank_name?: string;
     balance: ReportMoney;
     unmatched_lines: number;
     unmatched_amount: ReportMoney;
@@ -353,12 +357,12 @@ export interface FinanceDashboard {
     spark: number[];
   }[] | null;
   /** The school's plan line by line, with how much of the year has gone. */
-  budget: {
+  budget?: {
     budget_name: string;
     year_elapsed_pct: number;
     lines: { label: string; kind: "income" | "expense"; actual: ReportMoney; plan: ReportMoney; pct: number | null }[];
   } | null;
-  top_payers: {
+  top_payers?: {
     customer_id: number;
     name: string;
     code: string;
@@ -368,7 +372,7 @@ export interface FinanceDashboard {
     days_overdue: number;
   }[] | null;
   /** Payers owing, overdue and falling due within 7 days (counts of payers). */
-  receivables_summary: {
+  receivables_summary?: {
     owing_payers: number;
     overdue_payers: number;
     overdue_amount: ReportMoney;
@@ -377,7 +381,7 @@ export interface FinanceDashboard {
     due_soon_amount: ReportMoney;
   } | null;
   /** Things to act on, most urgent first; each appears only for its key holders. */
-  attention: {
+  attention?: {
     key: string;
     tone: "urgent" | "warning" | "info";
     title: string;
@@ -386,7 +390,7 @@ export interface FinanceDashboard {
     amount: ReportMoney | null;
   }[];
   /** Money due in or out over the next 30 days, soonest first. */
-  upcoming: {
+  upcoming?: {
     date: string;
     kind: "payroll" | "instalments" | "vendor_bills" | "tax";
     direction: "in" | "out";
@@ -394,7 +398,7 @@ export interface FinanceDashboard {
     detail: string;
     amount: ReportMoney;
   }[];
-  payables_due: {
+  payables_due?: {
     due_count: number;
     due_amount: ReportMoney;
     overdue_count: number;
@@ -406,42 +410,42 @@ export interface FinanceDashboard {
   period_label: string | null;
   as_of: string;
   narrowed: boolean;
-  fiscal_runway: FiscalRunway;
+  fiscal_runway?: FiscalRunway;
   kpis: {
-    cash_position: DashboardKpi | null;
-    receivables: DashboardKpi | null;
-    payables: DashboardKpi | null;
-    net_income_ytd: DashboardKpi | null;
+    cash_position?: DashboardKpi | null;
+    receivables?: DashboardKpi | null;
+    payables?: DashboardKpi | null;
+    net_income_ytd?: DashboardKpi | null;
   };
-  revenue_vs_budget: {
+  revenue_vs_budget?: {
     has_budget: boolean;
     budget_name: string | null;
     revenue: BudgetLineMetric;
     expense: BudgetLineMetric;
     net: { actual: ReportMoney; delta_pct: number | null };
   } | null;
-  ar_aging: {
+  ar_aging?: {
     buckets: { key: string; pct: number; amount: ReportMoney }[];
     total: ReportMoney;
   } | null;
   /** A series the reader may not read is `null`, never a row of zeros. */
-  trend: { labels: string[]; issued: number[] | null; collected: number[] | null } | null;
-  top_overdue: {
+  trend?: { labels: string[]; issued: number[] | null; collected: number[] | null } | null;
+  top_overdue?: {
     customer: string;
     customer_code: string;
     reference: string;
     amount: ReportMoney;
     days_overdue: number;
   }[] | null;
-  vendor_due: {
+  vendor_due?: {
     vendor: string;
     reference: string;
     due_date: string;
     amount: ReportMoney;
     days_until: number;
   }[] | null;
-  approvals: { items: { label: string; count: number }[]; total: number } | null;
-  close_progress: {
+  approvals?: { items: { label: string; count: number }[]; total: number } | null;
+  close_progress?: {
     period: string;
     /** The month being closed in words ("September 2026"). */
     period_label: string;
@@ -449,7 +453,7 @@ export interface FinanceDashboard {
     total: number;
     checks: { name: string; passed: boolean; blocking: boolean }[];
   } | null;
-  recent_journals: {
+  recent_journals?: {
     document_number: string;
     date: string;
     source: string;
@@ -475,12 +479,12 @@ export interface ReceivablesDashboard {
   narrowed: boolean;
   window: DashboardWindow;
   windows: { key: string; label: string; name: string }[];
-  collections: FinanceDashboard["collections"];
+  collections?: FinanceDashboard["collections"];
   /** Median days from invoice to its final payment, over the window's settled invoices. */
-  days_to_pay: number | null;
-  receivables_summary: FinanceDashboard["receivables_summary"];
+  days_to_pay?: number | null;
+  receivables_summary?: FinanceDashboard["receivables_summary"];
   /** Money payers hold with the school that no invoice has used yet. */
-  credit: {
+  credit?: {
     total: ReportMoney;
     unapplied_receipts: number;
     unapplied_receipts_amount: ReportMoney;
@@ -494,7 +498,7 @@ export interface ReceivablesDashboard {
    * is the last comparable window over its whole length; `projection_pct` carries
    * this window forward along its shape, null when there is none.
    */
-  curve: {
+  curve?: {
     weeks: number;
     week_now: number;
     current: number[];
@@ -504,7 +508,7 @@ export interface ReceivablesDashboard {
     projection_pct: number | null;
     vs_previous_pts: number | null;
   } | null;
-  plans: {
+  plans?: {
     active: number;
     on_track: number;
     on_track_amount: ReportMoney;
@@ -513,11 +517,11 @@ export interface ReceivablesDashboard {
     next: { date: string; plans: number; amount: ReportMoney }[];
   } | null;
   /** Collection per payer group the books' owner defines (a school's classes). */
-  groups: {
+  groups?: {
     label: string;
     items: { name: string; billed: ReportMoney; collected: ReportMoney; rate_pct: number | null }[];
   } | null;
-  dunning: {
+  dunning?: {
     level: number;
     stage: string;
     min_days_overdue: number | null;
@@ -525,14 +529,14 @@ export interface ReceivablesDashboard {
     paid_within_days: number;
     paid_pct: number | null;
   }[] | null;
-  concessions: {
+  concessions?: {
     total: ReportMoney;
     payers: number;
     share_of_billed_pct: number | null;
     items: { kind: string; label: string; amount: ReportMoney; payers: number }[];
   } | null;
-  adjustments: { key: string; label: string; count: number; pending: number; amount: ReportMoney }[];
-  largest: {
+  adjustments?: { key: string; label: string; count: number; pending: number; amount: ReportMoney }[];
+  largest?: {
     customer_id: number;
     name: string;
     code: string;
@@ -569,8 +573,8 @@ export interface SpendDashboard {
   window: DashboardWindow;
   windows: { key: string; label: string; name: string }[];
   /** Months of cash at the recent monthly outflow; `months` is null without enough history. */
-  runway: { months: number | null; monthly_outflow: ReportMoney | null; cash: ReportMoney; based_on_days: number } | null;
-  cash_movement: {
+  runway?: { months: number | null; monthly_outflow: ReportMoney | null; cash: ReportMoney; based_on_days: number } | null;
+  cash_movement?: {
     start: string;
     end: string;
     opening: ReportMoney;
@@ -579,30 +583,30 @@ export interface SpendDashboard {
     steps: { key: CashFlowKey; amount: ReportMoney }[];
   } | null;
   /** Posted expense in the window, against the same point of the window before. */
-  spend: {
+  spend?: {
     amount: ReportMoney;
     previous: ReportMoney | null;
     delta_pct: number | null;
     payroll: ReportMoney;
     payroll_share_pct: number | null;
   } | null;
-  spending: {
+  spending?: {
     basis: "cost_centre" | "account";
     total: ReportMoney;
     items: { name: string; amount: ReportMoney; share_pct: number | null }[];
   } | null;
-  reconciliation: {
+  reconciliation?: {
     id: number;
     name: string;
-    bank_name: string;
+    bank_name?: string;
     lines: number;
     matched: number;
     unmatched: number;
     unmatched_amount: ReportMoney;
     last_reconciled: string | null;
   }[] | null;
-  unmatched: { lines: number; amount: ReportMoney } | null;
-  budgets: {
+  unmatched?: { lines: number; amount: ReportMoney } | null;
+  budgets?: {
     year_elapsed_pct: number;
     /** `branch` is null on a plan measured against every branch. `plan`, `used`
      *  and `pct` are null on such a plan for a branch-bound reader. */
@@ -616,7 +620,7 @@ export interface SpendDashboard {
       pct: number | null;
     }[];
   } | null;
-  payroll: {
+  payroll?: {
     label: string;
     pay_date: string;
     status: "DRAFT" | "POSTED" | "PAID" | "CANCELLED";
@@ -627,13 +631,13 @@ export interface SpendDashboard {
     pension: ReportMoney;
     other: ReportMoney;
   } | null;
-  claims: {
+  claims?: {
     submitted: { count: number; amount: ReportMoney };
     approved: { count: number; amount: ReportMoney };
     paid: { count: number; amount: ReportMoney };
     oldest: { id: number; claimant: string; title: string; days: number; amount: ReportMoney }[];
   } | null;
-  petty_cash: {
+  petty_cash?: {
     threshold_pct: number;
     funds: {
       id: number;
@@ -645,11 +649,11 @@ export interface SpendDashboard {
       last_topped_up: string | null;
     }[];
   } | null;
-  tax_owed: {
+  tax_owed?: {
     amount: ReportMoney;
     next: { name: string; due_date: string; days: number; amount: ReportMoney } | null;
   } | null;
-  tax_calendar: {
+  tax_calendar?: {
     id: number;
     name: string;
     code: string;
@@ -660,7 +664,7 @@ export interface SpendDashboard {
     /** `nil`: nothing owed, but the return must still be filed. */
     state: "paid" | "filed" | "prepared" | "nil";
   }[] | null;
-  assets: {
+  assets?: {
     net_book_value: ReportMoney;
     depreciation: ReportMoney;
     categories: {
