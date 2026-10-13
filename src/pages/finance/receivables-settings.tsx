@@ -23,13 +23,13 @@
  */
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
-  PolicyBadge, SettingsAuditHistory, SettingsConsumer, SettingsPanel, SettingsRow, SettingsSectionHeader,
+  SettingsAuditHistory, SettingsConsumer, SettingsPanel, SettingsRow, SettingsSectionHeader,
 } from "@/components/settings/settings-layout";
 import { usePermissions } from "@/hooks/use-permissions";
 import { AccessField, MoneyInput, fieldWriteErrors, useFieldAccess, type FieldErrors } from "@/components/finance-ui";
@@ -77,6 +77,7 @@ export function ReceivablesSettings({ entityCode }: { entityCode: string | null 
   const { canView, canUpdate, branchBound } = useReceivablesSettingsAccess();
   const docs = useGetFinanceDocumentSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
   const policy = useGetReceivablesSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
+  if (!canView) return null;
 
   return (
     <div className="space-y-5">
@@ -84,9 +85,7 @@ export function ReceivablesSettings({ entityCode }: { entityCode: string | null 
         title="Receivables"
         description="How credit, concessions, fees billed ahead, doubtful debts, deposits and payments from a payer are handled. These apply to every branch."
       />
-      {!canView ? (
-        <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read the receivables policy." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel>
-      ) : !entityCode ? (
+      {!entityCode ? (
         <SettingsPanel><SettingsRow label="Select an entity" description="Choose an entity to read its receivables policy." /></SettingsPanel>
       ) : (
         <>

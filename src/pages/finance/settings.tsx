@@ -4,11 +4,9 @@ import {
   BookOpenCheck,
   Building2,
   CalendarRange,
-  CheckCircle2,
   CircleDollarSign,
   FileCog,
   GitBranch,
-  ListChecks,
   ListTree,
   Network,
   Percent,
@@ -18,7 +16,6 @@ import {
   Settings2,
   CalendarClock,
   Wallet,
-  ShieldCheck,
   Workflow,
 } from "lucide-react";
 import { useState } from "react";
@@ -55,7 +52,7 @@ import {
 import { InfoHint, useActiveEntity, useFieldAccess } from "@/components/finance-ui";
 import { BANK_ACCOUNT, bankOptionLabel } from "./bank-account-access";
 import { DEFAULT_FINANCE_SETTINGS_SECTION, type FinanceSettingsSection } from "./console-sections";
-import { FeeDuePolicyPanel, financeSettingsSections, setupSections } from "@xvs/finance/host";
+import { FeeDuePolicyPanel, financeSettingsSections, setupSections, useFinanceSettingsSectionAccess } from "@xvs/finance/host";
 import { FinanceShell } from "./finance-shell";
 import { EntitiesTab } from "./setup/entities-tab";
 import { OnlinePaymentsPanel } from "./online-payments";
@@ -64,6 +61,7 @@ import { PayrollSettingsPanel } from "./payroll-settings";
 import { CalendarRulePanel, RecordKeepingPanel } from "./settings-records";
 import { useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
 import { FINANCE_HELP } from "./screen-help";
+import { visibleFinanceSettingsSections, visibleSetupSections } from "./settings-access";
 
 const F = routesPath.PROTECTED.FINANCE;
 
@@ -122,11 +120,18 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
   // that 404ed - and the permission then decides whether a mounted section is
   // shown to this caller.
   const { hasPermission } = usePermissions();
-  const sections = SECTIONS
-    .filter((item) => financeSettingsSections.includes(item.key))
-    .filter((item) => item.key !== "entities" || hasPermission(P.FIN_CREATE_ENTITY));
+  const hostAllows = useFinanceSettingsSectionAccess();
+  const visibleKeys = visibleFinanceSettingsSections({
+    mounted: financeSettingsSections,
+    mountedSetup: setupSections,
+    can: hasPermission,
+    hostAllows,
+  });
+  const sections = SECTIONS.filter((item) => visibleKeys.includes(item.key));
   const activeSection = sections.some((item) => item.key === section) ? section : "overview";
   const active = useActiveEntity();
+
+  if (sections.length === 0) return null;
 
   return (
     <FinanceShell>
@@ -245,11 +250,6 @@ function FiscalCalendar({ entity, entityCode }: { entity: ReturnType<typeof useA
       />
       <CalendarRulePanel entityCode={entityCode} />
       <RecordKeepingPanel entityCode={entityCode} />
-      <SettingsPanel title="Current scope">
-        <SettingsRow icon={Building2} label="Entity" description="The calendar belongs to one set of books and cannot be shared across entities." value={entity ? `${entity.code} · ${entity.name}` : "Not selected"} />
-        <SettingsRow icon={CalendarRange} label="Period control" description="Open periods accept postings. Closed and locked periods are protected by the backend posting guard." badge={<PolicyBadge kind="enforced" />} />
-        <SettingsRow icon={ShieldCheck} label="Year-end close" description="Year-end closes income and expense accounts into retained earnings before the final period can be locked." badge={<PolicyBadge kind="enforced" />} />
-      </SettingsPanel>
     </div>
   );
 }
@@ -280,10 +280,7 @@ function AccountingDefaults({ entityCode }: { entityCode: string | null }) {
         description="Map stable posting roles to active accounts in this entity. Posting services use these mappings immediately after a successful save."
         action={<div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link to={`${F.SETUP}/accounts`}>Open chart</Link></Button>{canUpdate ? <Button onClick={save} disabled={!hasChanges || updateState.isLoading}><Save className="mr-2 size-4" />{updateState.isLoading ? "Saving" : "Save changes"}</Button> : null}</div>}
       />
-      {!canView ? (
-        <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read these mappings." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel>
-      ) : (
-        <SettingsPanel title="Posting account map" description="Each choice is type-checked, entity-scoped, active and postable. Resetting a role returns it to the displayed starter-chart default.">
+      <SettingsPanel title="Posting account map" description="Each choice is type-checked, entity-scoped, active and postable. Resetting a role returns it to the displayed starter-chart default.">
           {!entityCode ? <SettingsRow label="Select an entity" description="Choose an entity to resolve its current account map." /> : query.isLoading ? <SettingsRow label="Loading account mappings" description="Resolving the active entity's posting roles." /> : (payload?.mappings ?? []).map((mapping) => {
             const changed = Object.prototype.hasOwnProperty.call(changes, mapping.key);
             const selected = changed ? (changes[mapping.key] ?? "") : (mapping.source === "OVERRIDE" ? String(mapping.account?.id ?? "") : "");
@@ -305,8 +302,7 @@ function AccountingDefaults({ entityCode }: { entityCode: string | null }) {
               </div>
             );
           })}
-        </SettingsPanel>
-      )}
+      </SettingsPanel>
       {canView && readOnlyNote ? <p className="font-mont text-xs text-gray-05">{readOnlyNote}</p> : null}
       {canView && payload ? <SettingsAuditHistory rows={payload.history} /> : null}
     </div>
@@ -324,12 +320,13 @@ function DocumentSettings({ entityCode }: { entityCode: string | null }) {
   return (
     <div className="space-y-5">
       <SettingsSectionHeader title="Documents and collections" description="Configuration that shapes customer-facing documents, collections and follow-up behavior." />
-      {!canView ? <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read document policy." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading document policy" description="Reading the selected entity's billing defaults." /></SettingsPanel> : <FinanceDocumentForm key={`${entityCode}-${payload.settings.updated_at}-${payload.settings.primary_collection_bank_account?.id ?? "auto"}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
-      <SettingsPanel title="Related controls">
-        <SettingsRow icon={ReceiptText} label="Document numbering" description="Numbers use the concurrency-safe tenant sequence. Entity reporting codes do not change the live sequence." badge={<PolicyBadge kind="enforced" />} />
-        <SettingsRow icon={CircleDollarSign} label="Fee structures" description="Maintain reusable fee definitions and generate customer invoices from them." value={<Link className="text-primary hover:underline" to={`${F.RECEIVABLES}/fee-structures`}>Open</Link>} />
-        <SettingsRow icon={BadgePercent} label="Dunning policies" description="Configure reminder stages, overdue days and communication channels." value={<Link className="text-primary hover:underline" to={`${F.RECEIVABLES}/dunning`}>Open</Link>} />
-      </SettingsPanel>
+      {query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading document policy" description="Reading the selected entity's billing defaults." /></SettingsPanel> : <FinanceDocumentForm key={`${entityCode}-${payload.settings.updated_at}-${payload.settings.primary_collection_bank_account?.id ?? "auto"}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
+      {hasPermission(P.FIN_VIEW_FEE_STRUCTURES) || hasPermission(P.FIN_VIEW_DUNNING) ? (
+        <SettingsPanel title="Related settings">
+          {hasPermission(P.FIN_VIEW_FEE_STRUCTURES) ? <SettingsRow icon={CircleDollarSign} label="Fee structures" description="Maintain reusable fee definitions and generate customer invoices from them." value={<Link className="text-primary hover:underline" to={`${F.RECEIVABLES}/fee-structures`}>Open</Link>} /> : null}
+          {hasPermission(P.FIN_VIEW_DUNNING) ? <SettingsRow icon={BadgePercent} label="Dunning policies" description="Configure reminder stages, overdue days and communication channels." value={<Link className="text-primary hover:underline" to={`${F.RECEIVABLES}/dunning`}>Open</Link>} /> : null}
+        </SettingsPanel>
+      ) : null}
     </div>
   );
 }
@@ -402,15 +399,10 @@ function BankingCashPolicy({ entityCode }: { entityCode: string | null }) {
   const payload = query.data?.data;
   return (
     <div className="space-y-5">
-      <SettingsSectionHeader title="Banking and cash policy" description="Set reconciliation, receipt allocation and petty-cash alert defaults for the selected entity." />
-      {!canView ? <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read banking policy." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading banking policy" description="Reading the selected entity's reconciliation and allocation defaults." /></SettingsPanel> : <BankingCashForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
+      <SettingsSectionHeader title="Banking and cash policy" description={canView ? "Set reconciliation, receipt allocation, petty-cash and online-payment defaults for the selected entity." : "Manage the online-payment settings available to your role."} />
+      {canView ? (query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading banking policy" description="Reading the selected entity's reconciliation and allocation defaults." /></SettingsPanel> : <BankingCashForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />) : null}
       {/* Read under its own payments key, so it stands apart from the finance policy above. */}
       <OnlinePaymentsPanel entityCode={entityCode} />
-      <SettingsPanel title="How defaults are applied">
-        <SettingsRow icon={RotateCcw} label="Explicit workbench choices win" description="A user-supplied reconciliation window, grouping choice, or receipt strategy overrides these defaults for that operation." badge={<PolicyBadge kind="enforced">Override allowed</PolicyBadge>} />
-        <SettingsRow icon={ShieldCheck} label="Matching does not post new money" description="Automatic reconciliation links existing statement and ledger evidence. It does not create an adjusting journal unless a separate authorized action does so." badge={<PolicyBadge kind="enforced" />} />
-        <SettingsRow icon={CircleDollarSign} label="Petty cash remains GL-backed" description="The replenishment alert compares the saved threshold with live cash on hand from the ledger, not a manually edited balance." badge={<PolicyBadge kind="enforced" />} />
-      </SettingsPanel>
     </div>
   );
 }
@@ -470,8 +462,10 @@ function ReferenceData() {
     ["dimensions", GitBranch, "Dimensions", "Additional reporting axes and allowed values."],
     ["currencies", Banknote, "Currencies and FX", "Supported currencies and dated exchange rates."],
   ] as const;
+  const { hasPermission } = usePermissions();
+  const visibleSections = visibleSetupSections(setupSections, hasPermission);
   const cards = all
-    .filter(([section]) => setupSections.includes(section))
+    .filter(([section]) => visibleSections.includes(section))
     .map(([section, icon, title, description]) =>
       [icon, title, description, `${F.SETUP}/${section}`] as const);
   return (
@@ -485,17 +479,9 @@ function ReferenceData() {
 }
 
 function Approvals() {
-  const { hasPermission } = usePermissions();
-  const canView = hasPermission(P.VIEW_WORKFLOW_TEMPLATES);
   return (
     <div className="space-y-5">
-      <SettingsSectionHeader title="Finance approvals" description="Finance uses the shared workflow engine, while the final posting remains protected by the ledger and period guards." action={canView ? <Button asChild><Link to={routesPath.PROTECTED.WORKFLOW.TEMPLATES}>Manage workflows</Link></Button> : undefined} />
-      <SettingsPanel title="Approval-capable documents">
-        <SettingsRow icon={BookOpenCheck} label="Journal entries" description="A published finance.journal template routes journals before they post." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
-        <SettingsRow icon={CircleDollarSign} label="Refunds" description="Approved refunds post only after the workflow reaches its final decision." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
-        <SettingsRow icon={ListChecks} label="Write-offs" description="Write-off requests can use a separate approval ladder and value threshold." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
-        <SettingsRow icon={CheckCircle2} label="Posting protection" description="Approval never bypasses balance, chronology, account-state or fiscal-period validation." badge={<PolicyBadge kind="enforced" />} />
-      </SettingsPanel>
+      <SettingsSectionHeader title="Finance approvals" description="Manage the approval paths used by Finance documents." action={<Button asChild><Link to={routesPath.PROTECTED.WORKFLOW.TEMPLATES}>Manage workflows</Link></Button>} />
     </div>
   );
 }

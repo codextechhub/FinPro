@@ -223,7 +223,7 @@ describe("record keeping", () => {
     expect(mocks.updateRecords).toHaveBeenCalledWith({ entity: "BRIGHTSTAR", retention_years: null });
   });
 
-  it("is read-only for a branch-only bursar, and protected without the view key", async () => {
+  it("is read-only for a branch-only bursar, and absent without the view key", async () => {
     mocks.wholeSchool = false;
     await render(<RecordKeepingPanel entityCode="BRIGHTSTAR" />);
     expect(button("Save record keeping")).toBeUndefined();
@@ -231,6 +231,6 @@ describe("record keeping", () => {
 
     mocks.denied = new Set([P.FIN_VIEW_SETTINGS]);
     await render(<RecordKeepingPanel entityCode="BRIGHTSTAR" />);
-    expect(container.textContent).toContain("Finance settings are protected");
+    expect(container.textContent).toBe("");
   });
 });

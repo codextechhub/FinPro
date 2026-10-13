@@ -82,18 +82,12 @@ export function validRetentionYears(text: string, floor: number): boolean {
   return Number.isInteger(value) && value >= floor && value <= 100;
 }
 
-const ProtectedRow = ({ what }: { what: string }) => (
-  <SettingsPanel>
-    <SettingsRow icon={ShieldCheck} label="Finance settings are protected" description={`You need Finance settings view permission to read ${what}.`} badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} />
-  </SettingsPanel>
-);
-
 export function CalendarRulePanel({ entityCode }: { entityCode: string | null }) {
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.FIN_VIEW_SETTINGS);
   const query = useGetFinanceCalendarSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
   const payload = query.data?.data;
-  if (!canView) return <ProtectedRow what="the fiscal calendar rule" />;
+  if (!canView) return null;
   if (!entityCode) return <SettingsPanel><SettingsRow label="Select an entity" description="Choose an entity to read its fiscal calendar rule." /></SettingsPanel>;
   if (query.isLoading || !payload) return <SettingsPanel><SettingsRow label="Loading the calendar rule" description="Reading how the next fiscal year is opened." /></SettingsPanel>;
   return <CalendarRuleForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode} payload={payload} />;
@@ -233,7 +227,7 @@ export function RecordKeepingPanel({ entityCode }: { entityCode: string | null }
   const canView = hasPermission(P.FIN_VIEW_SETTINGS);
   const query = useGetRecordRetentionSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
   const payload = query.data?.data;
-  if (!canView) return <ProtectedRow what="the record-keeping settings" />;
+  if (!canView) return null;
   if (!entityCode) return <SettingsPanel><SettingsRow label="Select an entity" description="Choose an entity to read how long its records are kept." /></SettingsPanel>;
   if (query.isLoading || !payload) return <SettingsPanel><SettingsRow label="Loading record keeping" description="Reading how long the books are kept." /></SettingsPanel>;
   return <RecordKeepingForm key={`${entityCode}-${payload.retention_years}-${payload.archive_min_age_years}`} entityCode={entityCode} payload={payload} />;

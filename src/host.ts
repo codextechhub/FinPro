@@ -279,6 +279,12 @@ export interface HostContract {
    *  cannot be advertised without being routable. */
   financeSettingsSections: readonly FinanceSettingsSection[];
   setupSections: readonly SetupSection[];
+  /** Whether the current reader may use a host-owned settings section.
+   *
+   *  Package-owned sections still apply their package permission gates. This
+   *  hook covers sections such as a school's fee due policy, whose permission
+   *  key exists only in the consuming application. */
+  useFinanceSettingsSectionAccess(): (section: FinanceSettingsSection) => boolean;
   /** When this school's fee bills fall due, for the "fees" settings section.
    *
    *  School-only: the endpoint is the FAL's, and the console does not bill
@@ -350,7 +356,7 @@ export const {
   useBranches, useDirectory, useRoles, usePositions, useCanUseOrganogram, useReaderReach, AppLogo,
   QuickExportButton, UserAvatar,
   useDashboardTitle, PlatformLedgerInventory, useLogRecentOpen,
-  financeSettingsSections, setupSections, FeeDuePolicyPanel, createsWorkflowTemplates,
+  financeSettingsSections, setupSections, useFinanceSettingsSectionAccess, FeeDuePolicyPanel, createsWorkflowTemplates,
   platformName,
 } = host;
 

@@ -18,7 +18,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { Save, ShieldCheck } from "lucide-react";
+import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
-  PolicyBadge, SettingsAuditHistory, SettingsConsumer, SettingsPanel, SettingsRow, SettingsSectionHeader,
+  SettingsAuditHistory, SettingsConsumer, SettingsPanel, SettingsRow, SettingsSectionHeader,
 } from "@/components/settings/settings-layout";
 import { AccountPicker, toArray } from "@/components/finance-ui";
 import { P } from "../../permissions";
@@ -70,12 +70,11 @@ export function PayrollSettingsPanel({ entityCode }: { entityCode: string | null
   const canUpdate = canWholeSchool(P.FIN_UPDATE_SETTINGS);
   const query = useGetFinancePayrollSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
   const payload = query.data?.data;
+  if (!canView) return null;
   return (
     <div className="space-y-5">
       <SettingsSectionHeader title="Payroll" description="How PAYE and the statutory deductions are worked out, how payslips reach staff, and how earlier pay is handled." />
-      {!canView ? (
-        <SettingsPanel><SettingsRow icon={ShieldCheck} label="Finance settings are protected" description="You need Finance settings view permission to read the payroll policy." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /></SettingsPanel>
-      ) : query.isLoading || !payload ? (
+      {query.isLoading || !payload ? (
         <SettingsPanel><SettingsRow label="Loading the payroll policy" description="Reading the selected entity's payroll settings." /></SettingsPanel>
       ) : (
         <PayrollSettingsForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers}
