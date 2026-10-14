@@ -50,7 +50,16 @@ type Act = { id: number; entity: string };
 export const procurementExtApi = baseApi.injectEndpoints({
   endpoints: (b) => ({
     // Approvals - entity-safe adapters over the shared vs_workflow engine.
-    getProcurementApprovals: b.query<PaginatedEnvelope<ProcurementApprovalRow>, { entity: string; page?: number; search?: string; document_type?: string }>({
+    getProcurementApprovals: b.query<PaginatedEnvelope<ProcurementApprovalRow>, {
+      entity: string;
+      page?: number;
+      search?: string;
+      document_type?: string;
+      view?: "history";
+      outcome?: "APPROVED" | "REJECTED" | "RETURNED";
+      decided_from?: string;
+      decided_to?: string;
+    }>({
       query: (p) => ({ url: `/procurement/approvals/${qs(p)}`, method: "GET" }),
       providesTags: ["WorkflowPending"],
     }),

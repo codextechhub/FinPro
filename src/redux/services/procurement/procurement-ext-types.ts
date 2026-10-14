@@ -14,19 +14,27 @@ export type ProcurementApprovalAction = "APPROVED" | "REJECTED" | "RETURNED";
 
 export interface ProcurementApprovalRow {
   id: string;
+  /** Present on a completed-decision row; one workflow may have several actions. */
+  action_id?: string;
   document_type: string;
   document_type_label: string;
-  document_id: number;
-  reference: string;
-  title: string;
-  requester: string;
-  amount: number;
-  currency: string;
-  submitted_at: string | null;
-  awaiting_since: string | null;
-  stage: string;
-  status: string;
-  on_behalf_of: string | null;
+  document_id?: number;
+  reference?: string;
+  title?: string;
+  requester?: string;
+  amount?: number;
+  currency?: string;
+  submitted_at?: string | null;
+  awaiting_since?: string | null;
+  stage?: string;
+  status?: string;
+  on_behalf_of?: string | null;
+  /** Completed-decision fields, absent from the live queue. */
+  decision?: ProcurementApprovalAction;
+  decided_at?: string;
+  reversed_at?: string | null;
+  /** True after current branch reach no longer includes the source document. */
+  receipt_only?: boolean;
 }
 
 export interface ProcurementApprovalStageAction {
@@ -57,6 +65,16 @@ export interface ProcurementApprovalStage {
 }
 
 export interface ProcurementApprovalDetail extends ProcurementApprovalRow {
+  document_id: number;
+  reference: string;
+  title: string;
+  requester: string;
+  amount: number;
+  currency: string;
+  submitted_at: string;
+  awaiting_since: string;
+  stage: string;
+  status: string;
   document_status: string;
   approval_state: string;
   next_stage: { label: string | null; is_final: boolean } | null;

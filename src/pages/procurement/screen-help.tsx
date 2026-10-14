@@ -7,7 +7,7 @@ export const PROCUREMENT_HELP = {
   goodsReceipts: "Records what vendors delivered, including accepted, rejected, and inspected quantities.",
   vendorInvoices: "Supplier bills are matched, approved, and posted before they become payable.",
   vendorPayments: "Settles approved supplier bills and records the payment in Finance.",
-  approvals: "Lists Procurement documents currently waiting for an approval action from you.",
+  approvals: "Lists Procurement documents waiting for your decision and keeps a filterable record of decisions you made before.",
   vendors: "Maintains supplier identity, eligibility, terms, contacts, and purchasing history.",
   categories: "Organises vendors and catalog items for purchasing controls and spend reporting.",
   catalog: "Maintains the goods and services buyers can select on purchasing documents.",

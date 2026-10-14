@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import {
   Check, ChevronRight, Clock3, FileText, History,
   RotateCcw, Search, ShieldCheck, SkipForward, X,
@@ -32,6 +32,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 import { isForbidden } from "../../lib/api-errors";
+import { routesPath as workflowRoutes } from "../workflow/paths";
 
 const DOCUMENT_TYPES = [
   ["", "All document types"],
@@ -39,6 +40,7 @@ const DOCUMENT_TYPES = [
   ["procurement.purchase_order", "Purchase Orders"],
   ["procurement.vendor_invoice", "Vendor Invoices"],
   ["procurement.vendor_payment", "Vendor Payments"],
+  ["procurement.vendor_credit_note", "Vendor Credit Notes"],
 ] as const;
 
 /** Drawer sections for the tab strip, built once so the sliding bar re-measures only when the active tab changes. */
@@ -46,6 +48,18 @@ const DETAIL_TABS: TabStripItem<"overview" | "activity">[] = [
   { value: "overview", label: <><FileText className="size-3.5" />Overview</> },
   { value: "activity", label: <><History className="size-3.5" />Activity</> },
 ];
+
+const LIST_TABS: TabStripItem<"pending" | "history">[] = [
+  { value: "pending", label: "Waiting for me" },
+  { value: "history", label: "My decisions" },
+];
+
+const OUTCOMES = [
+  ["", "All decisions"],
+  ["APPROVED", "Approved"],
+  ["REJECTED", "Rejected"],
+  ["RETURNED", "Returned"],
+] as const;
 
 function age(value?: string | null) {
   if (!value) return "-";
@@ -57,12 +71,17 @@ function age(value?: string | null) {
 
 export default function ProcurementApprovalsPage() {
   const dates = useDates();
+  const navigate = useNavigate();
   const { code: entity, currency } = useActiveEntity();
   const [params, setParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [documentType, setDocumentType] = useState("");
+  const [view, setView] = useState<"pending" | "history">("pending");
+  const [outcome, setOutcome] = useState<"" | ProcurementApprovalAction>("");
+  const [decidedFrom, setDecidedFrom] = useState("");
+  const [decidedTo, setDecidedTo] = useState("");
   const selectedId = params.get("approval");
 
   useEffect(() => {
@@ -71,7 +90,7 @@ export default function ProcurementApprovalsPage() {
   }, [search]);
 
   // Reset to page 1 when the server-side filters change (render-phase, not an effect).
-  const filterKey = `${debouncedSearch} ${documentType} ${entity}`;
+  const filterKey = `${view} ${debouncedSearch} ${documentType} ${outcome} ${decidedFrom} ${decidedTo} ${entity}`;
   const [pagedFor, setPagedFor] = useState(filterKey);
   if (pagedFor !== filterKey) { setPagedFor(filterKey); setPage(1); }
 
@@ -80,24 +99,54 @@ export default function ProcurementApprovalsPage() {
       entity: entity!, page,
       ...(debouncedSearch ? { search: debouncedSearch } : {}),
       ...(documentType ? { document_type: documentType } : {}),
+      ...(view === "history" ? { view: "history" as const } : {}),
+      ...(outcome ? { outcome } : {}),
+      ...(decidedFrom ? { decided_from: decidedFrom } : {}),
+      ...(decidedTo ? { decided_to: decidedTo } : {}),
     },
     { skip: !entity, refetchOnMountOrArgChange: true },
   );
 
   const rows = Array.isArray(data?.data) ? data.data : [];
-  const columns: Column<ProcurementApprovalRow>[] = [
+  const pendingColumns: Column<ProcurementApprovalRow>[] = [
     {
       header: "Document",
       cell: (row) => <div className="min-w-36"><p className="font-semibold text-primary">{row.reference}</p><p className="mt-0.5 max-w-48 truncate text-[11px] text-gray-05">{row.title}</p></div>,
     },
     { header: "Type", cell: (row) => row.document_type_label },
     { header: "Submitted By", cell: (row) => <div><p>{row.requester}</p>{row.on_behalf_of && <p className="mt-0.5 text-[11px] text-teal-600">On behalf of {row.on_behalf_of}</p>}</div> },
-    { header: "Amount", align: "right", cell: (row) => <span className="font-semibold tabular-nums">{formatMoney(row.amount, currency ?? row.currency)}</span> },
+    { header: "Amount", align: "right", cell: (row) => <span className="font-semibold tabular-nums">{formatMoney(row.amount ?? 0, currency ?? row.currency)}</span> },
     { header: "Submitted", cell: (row) => dates.day(row.submitted_at) },
     { header: "Age", cell: (row) => age(row.awaiting_since) },
     { header: "Status", cell: () => <StatusPill status="PENDING_APPROVAL" /> },
     { header: "", align: "right", cell: () => <ChevronRight className="ml-auto size-4 text-gray-05" /> },
   ];
+  const hasHistoryField = (field: keyof ProcurementApprovalRow) => rows.some(
+    (row) => Object.prototype.hasOwnProperty.call(row, field),
+  );
+  const historyColumns: Column<ProcurementApprovalRow>[] = [
+    {
+      header: "Document",
+      cell: (row) => <div className="min-w-36"><p className="font-semibold text-primary">{row.reference ?? "Decision receipt"}</p>{row.title && <p className="mt-0.5 max-w-48 truncate text-[11px] text-gray-05">{row.title}</p>}</div>,
+    },
+    { header: "Type", cell: (row) => row.document_type_label },
+    ...(hasHistoryField("decision") ? [{ header: "Decision", cell: (row) => row.decision ? <StatusPill status={row.decision} /> : null }] satisfies Column<ProcurementApprovalRow>[] : []),
+    ...(hasHistoryField("stage") ? [{ header: "Stage", cell: (row) => row.stage }] satisfies Column<ProcurementApprovalRow>[] : []),
+    ...(hasHistoryField("decided_at") ? [{ header: "Decided", cell: (row) => row.decided_at ? dates.dateTime(row.decided_at) : null }] satisfies Column<ProcurementApprovalRow>[] : []),
+    ...(hasHistoryField("on_behalf_of") ? [{ header: "Acting as", cell: (row) => row.on_behalf_of ? `For ${row.on_behalf_of}` : "Myself" }] satisfies Column<ProcurementApprovalRow>[] : []),
+    ...(hasHistoryField("reversed_at") ? [{ header: "Reversed", cell: (row) => row.reversed_at ? dates.dateTime(row.reversed_at) : null }] satisfies Column<ProcurementApprovalRow>[] : []),
+    {
+      header: "",
+      align: "right",
+      cell: (row) => row.receipt_only
+        ? <span className="text-[11px] text-gray-05">Receipt only</span>
+        : <button type="button" onClick={() => navigate(workflowRoutes.PROTECTED.WORKFLOW.APPROVAL_DETAIL(row.id))}
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/5">
+          View <ChevronRight className="size-4" />
+        </button>,
+    },
+  ];
+  const columns = view === "pending" ? pendingColumns : historyColumns;
 
   const closeDrawer = () => {
     const next = new URLSearchParams(params);
@@ -114,34 +163,50 @@ export default function ProcurementApprovalsPage() {
     <PageShell className="space-y-5 text-black-01">
       <header>
         <ProcurementPageTitle screen="approvals">Approvals</ProcurementPageTitle>
-        <p className="mt-0.5 font-mont text-xs text-gray-05">Documents awaiting your decision, routed through the shared approval workflow.</p>
+        <p className="mt-0.5 font-mont text-xs text-gray-05">Review what needs your decision and the decisions you recorded before.</p>
       </header>
 
       {!entity ? <NoEntityState message="Choose an entity to view its Procurement approval queue." /> : <>
+        <TabStrip items={LIST_TABS} value={view} onChange={setView} variant="segmented" ariaLabel="Approval views" />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <label className="relative w-full sm:max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search document or requester"
+              <input value={search} onChange={(event) => setSearch(event.target.value)}
+                placeholder={view === "history" ? "Search document reference" : "Search document or requester"}
                 className="h-9 w-full rounded-md border border-white-02 bg-white pl-9 pr-3 font-mont text-sm outline-none focus:border-primary" />
             </label>
             <select value={documentType} onChange={(event) => setDocumentType(event.target.value)}
               className="h-9 max-w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01 outline-none focus:border-primary">
               {DOCUMENT_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
+            {view === "history" && <>
+              <select value={outcome} onChange={(event) => setOutcome(event.target.value as "" | ProcurementApprovalAction)}
+                className="h-9 max-w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01 outline-none focus:border-primary">
+                {OUTCOMES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <label className="flex min-w-0 items-center gap-2 font-mont text-xs text-gray-05">
+                From <input type="date" value={decidedFrom} onChange={(event) => setDecidedFrom(event.target.value)}
+                  className="h-9 min-w-0 rounded-md border border-white-02 bg-white px-2 text-sm text-gray-01 outline-none focus:border-primary" />
+              </label>
+              <label className="flex min-w-0 items-center gap-2 font-mont text-xs text-gray-05">
+                To <input type="date" value={decidedTo} onChange={(event) => setDecidedTo(event.target.value)}
+                  className="h-9 min-w-0 rounded-md border border-white-02 bg-white px-2 text-sm text-gray-01 outline-none focus:border-primary" />
+              </label>
+            </>}
           </div>
-          <p className="shrink-0 font-mont text-xs text-gray-05">{data?.pagination?.totalItems ?? 0} awaiting action</p>
+          <p className="shrink-0 font-mont text-xs text-gray-05">{data?.pagination?.totalItems ?? 0} {view === "pending" ? "awaiting action" : "decisions"}</p>
         </div>
 
-        <DataTable columns={columns} rows={rows} rowKey={(row) => row.id}
+        <DataTable columns={columns} rows={rows} rowKey={(row) => row.action_id ?? row.id}
           loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch}
-          onRowClick={selectRow} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages}
-          onPageChange={setPage} emptyTitle="You’re all caught up" emptyMessage={debouncedSearch || documentType
-            ? "No pending approvals match these filters."
-            : "No Procurement documents in these books are awaiting your decision."} />
+          onRowClick={view === "pending" ? selectRow : undefined} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages}
+          onPageChange={setPage} emptyTitle={view === "pending" ? "You’re all caught up" : "No decisions yet"} emptyMessage={view === "history"
+            ? (debouncedSearch || documentType || outcome || decidedFrom || decidedTo ? "No past decisions match these filters." : "Your Procurement decisions will appear here after you act.")
+            : (debouncedSearch || documentType ? "No pending approvals match these filters." : "No Procurement documents in these books are awaiting your decision.")} />
       </>}
     </PageShell>
-    {entity && <ApprovalDrawer id={selectedId} entity={entity} currency={currency} onClose={closeDrawer} />}
+    {entity && view === "pending" && <ApprovalDrawer id={selectedId} entity={entity} currency={currency} onClose={closeDrawer} />}
   </ProcurementShell>;
 }
 
