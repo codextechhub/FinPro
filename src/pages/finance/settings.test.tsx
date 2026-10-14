@@ -60,7 +60,7 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); container.remove(); });
 
 const mount = (values = VALUES) => act(() => root.render(
-  <MemoryRouter><FinanceDocumentForm entityCode="HOLYCROSS" values={values} consumers={{}} history={[]} canUpdate readOnlyNote={null} /></MemoryRouter>,
+  <MemoryRouter><FinanceDocumentForm entityCode="HOLYCROSS" values={values} consumers={{}} canUpdate readOnlyNote={null} /></MemoryRouter>,
 ));
 const picker = () => container.querySelector("select") as HTMLSelectElement;
 const dueDays = () => container.querySelector('input[type="number"]') as HTMLInputElement;
