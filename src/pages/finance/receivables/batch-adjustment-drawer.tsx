@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
+import { BAD_DEBT_RECAP_NAME, useDefaultWriteOffAccount, writeOffAccountHint, writeOffRecapCode } from "./write-off-account";
 import { gatedBatchRows, isBatchGateRefusal } from "./adjustment-approval";
 import { CUSTOMER_CREDIT_HIDDEN_NOTE, CUSTOMER_RESOURCE, customerCreditReadable } from "./customer-credit-access";
 import { useAdjustmentGate } from "./use-adjustment-gate";
@@ -82,6 +83,7 @@ export function BatchAdjustmentDrawer({
   currency?: string | null;
 }) {
   const { can } = useCan();
+  const defaultAccount = useDefaultWriteOffAccount(open ? entity : null);
   const dates = useDates();
   const canCreateRefund = can(P.FIN_CREATE_REFUND);
   const canCreateWriteOff = can(P.FIN_CREATE_WRITE_OFF);
@@ -186,13 +188,13 @@ export function BatchAdjustmentDrawer({
 
   const recap = useMemo<{ dr: RecapRow[]; cr: RecapRow[] }>(() => writeOff
     ? {
-        dr: [{ code: writeOffAccount || "5300", name: "Bad debt expense", amount: total }],
+        dr: [{ code: writeOffRecapCode(writeOffAccount, defaultAccount), name: BAD_DEBT_RECAP_NAME, amount: total }],
         cr: [{ code: "AR", name: "Accounts Receivable (control)", amount: total }],
       }
     : {
         dr: [{ code: "2140", name: "Customer credit", amount: total }],
         cr: [{ code: "Bank", name: "cash out", amount: total }],
-      }, [writeOff, writeOffAccount, total]);
+      }, [writeOff, writeOffAccount, defaultAccount, total]);
 
   const defaultAction = (nextKind: ArAdjustmentBatchKind): ArAdjustmentBatchAction => {
     const isWriteOff = nextKind === "WRITEOFF";
@@ -342,7 +344,7 @@ export function BatchAdjustmentDrawer({
                 onChange={setWriteOffAccount}
                 accountType="EXPENSE"
                 postableOnly
-                placeholder="Defaults to bad debt (5300)"
+                placeholder={writeOffAccountHint(defaultAccount)}
               />
             </FormField>
           ) : (

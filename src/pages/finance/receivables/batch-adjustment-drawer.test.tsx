@@ -9,11 +9,13 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ fieldAccess: {} as Record<string, unknown>, skipped: [] as boolean[] }));
+const mocks = vi.hoisted(() => ({
+  fieldAccess: {} as Record<string, unknown>, skipped: [] as boolean[], mappings: [] as unknown[], held: true,
+}));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
-    hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true,
+    hasPermission: (code: string) => mocks.held || code !== "203201", hasAnyPermission: () => true, hasAllPermissions: () => true,
     hasModuleAccess: () => true, fieldAccess: mocks.fieldAccess,
   }),
 }));
@@ -23,7 +25,12 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   PostingDateField: ({ onChange }: { onChange: (v: string) => void }) => <button type="button" onClick={() => onChange("2026-10-01")}>Pick date</button>,
   BankAccountPicker: () => null,
-  AccountPicker: () => null,
+  AccountPicker: ({ placeholder }: { placeholder?: string }) => <input aria-label="write-off account" placeholder={placeholder} readOnly />,
+}));
+vi.mock("@/redux/services/finance/setup-api", () => ({
+  useGetFinanceAccountSettingsQuery: (_args: unknown, options?: { skip?: boolean }) => ({
+    data: options?.skip ? undefined : { data: { mappings: mocks.mappings } },
+  }),
 }));
 vi.mock("@/redux/services/finance/ar-api", () => ({
   useCreateArAdjustmentBatchMutation: () => [vi.fn(), { isLoading: false }],
@@ -43,6 +50,8 @@ let root: Root;
 beforeEach(() => {
   mocks.fieldAccess = {};
   mocks.skipped = [];
+  mocks.held = true;
+  mocks.mappings = [{ key: "BAD_DEBT_EXPENSE", account: { id: 9, code: "5350", name: "Bad debts" } }];
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -70,5 +79,25 @@ describe("the batch refunds drawer", () => {
     await open();
     expect(document.body.querySelector("[data-testid=refund-credit-hidden]")?.textContent).toContain("cannot see customer balances");
     expect(mocks.skipped.every((skipped) => skipped)).toBe(true);
+  });
+});
+
+describe("the batch write-offs drawer", () => {
+  const openWriteOffs = async () => {
+    await open();
+    await act(async () => { [...document.body.querySelectorAll("button")].find((b) => b.textContent === "Write-offs")!.click(); });
+  };
+  const hint = () => document.body.querySelector<HTMLInputElement>("input[aria-label='write-off account']")?.placeholder;
+
+  it("names the account from the school's Bad debt expense mapping", async () => {
+    await openWriteOffs();
+    expect(hint()).toBe("Defaults to Bad debts (5350)");
+    expect(document.body.textContent).not.toContain("5300");
+  });
+
+  it("words the hint without a code when the reader may not open Finance Settings", async () => {
+    mocks.held = false;
+    await openWriteOffs();
+    expect(hint()).toBe("Defaults to the school's bad debts account");
   });
 });

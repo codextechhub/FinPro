@@ -15,6 +15,7 @@ import type { ArAdjustment } from "@/redux/services/finance/ar-types";
 const mocks = vi.hoisted(() => ({
   held: new Set<string>(), detail: undefined as unknown, uid: 4, request: undefined as unknown, resume: vi.fn(), availability: undefined as unknown, fieldAccess: {} as Record<string, unknown>, availabilityAsked: [] as unknown[],
   createRefund: vi.fn(), postRefund: vi.fn(), tie: vi.fn(),
+  mappings: [] as unknown[], mappingsSkipped: [] as boolean[],
 }));
 
 vi.mock("@/redux/services/finance/approval-request-api", () => ({
@@ -48,7 +49,13 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   PostingDateField: ({ onChange }: { onChange: (v: string) => void }) => <button type="button" onClick={() => onChange("2026-09-05")}>Pick date</button>,
   CustomerPicker: () => null,
   BankAccountPicker: () => null,
-  AccountPicker: () => null,
+  AccountPicker: ({ placeholder }: { placeholder?: string }) => <input aria-label="expense account" placeholder={placeholder} readOnly />,
+}));
+vi.mock("@/redux/services/finance/setup-api", () => ({
+  useGetFinanceAccountSettingsQuery: (_args: unknown, options?: { skip?: boolean }) => (
+    mocks.mappingsSkipped.push(options?.skip === true),
+    { data: options?.skip ? undefined : { data: { mappings: mocks.mappings } } }
+  ),
 }));
 vi.mock("../../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverPrompt: () => ({ promptIfParked: vi.fn(), noApproverDialog: null }) }));
@@ -106,6 +113,8 @@ beforeEach(() => {
   mocks.resume.mockReset();
   mocks.fieldAccess = {};
   mocks.availabilityAsked = [];
+  mocks.mappings = [{ key: "BAD_DEBT_EXPENSE", account: { id: 9, code: "5350", name: "Bad debts" } }];
+  mocks.mappingsSkipped = [];
   mocks.createRefund.mockReset();
   mocks.createRefund.mockReturnValue({ unwrap: async () => ({ data: { id: 21, approval_required: false } }) });
   mocks.postRefund.mockReset();
@@ -214,6 +223,37 @@ describe("a refund returned through the payment provider", () => {
   it("is a bank refund while the online choice is not made", async () => {
     await fillForm();
     expect(button("Process refund")!.disabled).toBe(true);
+  });
+});
+
+describe("the account a write-off defaults to", () => {
+  const openWriteOff = async () => {
+    mocks.availability = { data: [], pagination: { currentPage: 1, totalPages: 1 } };
+    act(() => root.render(<NewActionDrawer open onClose={vi.fn()} entity="BSS" currency="NGN" />));
+    await act(async () => { button("Write off to expense")!.click(); });
+  };
+  const hint = () => document.body.querySelector<HTMLInputElement>("input[aria-label='expense account']")?.placeholder;
+
+  it("is named from the school's own Bad debt expense mapping, not from a code in the screen", async () => {
+    mocks.held = new Set([P.FIN_CREATE_WRITE_OFF, P.FIN_VIEW_SETTINGS]);
+    await openWriteOff();
+    expect(hint()).toBe("Defaults to Bad debts (5350)");
+    expect(document.body.textContent).not.toContain("5300");
+  });
+
+  it("follows a mapping the school has pointed at another account", async () => {
+    mocks.held = new Set([P.FIN_CREATE_WRITE_OFF, P.FIN_VIEW_SETTINGS]);
+    mocks.mappings = [{ key: "BAD_DEBT_EXPENSE", account: { id: 12, code: "5361", name: "Impairment of fees" } }];
+    await openWriteOff();
+    expect(hint()).toBe("Defaults to Impairment of fees (5361)");
+  });
+
+  it("is worded without a code, and the mapping not asked for, when the reader may not open Finance Settings", async () => {
+    mocks.held = new Set([P.FIN_CREATE_WRITE_OFF]);
+    await openWriteOff();
+    expect(hint()).toBe("Defaults to the school's bad debts account");
+    expect(mocks.mappingsSkipped.every((skipped) => skipped)).toBe(true);
+    expect(document.body.textContent).not.toMatch(/\b5[0-9]{3}\b/);
   });
 });
 

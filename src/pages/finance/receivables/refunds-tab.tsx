@@ -37,6 +37,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../../permissions";
+import { BAD_DEBT_RECAP_NAME, useDefaultWriteOffAccount, writeOffAccountHint, writeOffRecapCode } from "./write-off-account";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { RETURNED_HINT, SENT_BACK_FILTER, SENT_BACK_STATUS, SENT_BACK_WORD, isSentBack, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { useGetDocumentApprovalRequestQuery } from "@/redux/services/finance/approval-request-api";
@@ -249,6 +250,7 @@ export function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
 }) {
   const dates = useDates();
   const { can } = useCan();
+  const defaultAccount = useDefaultWriteOffAccount(row ? entity : null);
   const [post, { isLoading: posting }] = usePostRefundMutation();
   const [submitRefund, { isLoading: submittingRefund }] = useSubmitRefundMutation();
   const [postWriteOff, { isLoading: postingWriteOff }] = usePostWriteOffRequestMutation();
@@ -277,7 +279,7 @@ export function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
   // assumed, because a tenant that switched its own ladder off posts directly.
   const gated = row.approval_required === true;
   const recap = wo
-    ? { dr: [{ code: "5300", name: "Bad debt expense", amount: row.amount }], cr: [{ code: "AR", name: "Accounts Receivable (control)", amount: row.amount }] }
+    ? { dr: [{ code: writeOffRecapCode("", defaultAccount), name: BAD_DEBT_RECAP_NAME, amount: row.amount }], cr: [{ code: "AR", name: "Accounts Receivable (control)", amount: row.amount }] }
     : { dr: [{ code: "2140", name: "Customer credit", amount: row.amount }], cr: [{ code: "Bank", name: "cash out", amount: row.amount }] };
   const helper = wo
     ? "Recaps the bad-debt journal - expense recognised, the receivable cleared."
@@ -397,6 +399,7 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
   open: boolean; onClose: () => void; entity: string; currency?: string | null;
 }) {
   const { can } = useCan();
+  const defaultAccount = useDefaultWriteOffAccount(open ? entity : null);
   const dates = useDates();
   const [mode, setMode] = useState<Mode>("REFUND");
   const [date, setDate] = useState("");
@@ -500,7 +503,7 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
   const recap = useMemo<{ dr: RecapRow[]; cr: RecapRow[] }>(() => {
     if (wo) {
       return {
-        dr: [{ code: expenseAccount || "5300", name: "Bad debt expense", amount }],
+        dr: [{ code: writeOffRecapCode(expenseAccount, defaultAccount), name: BAD_DEBT_RECAP_NAME, amount }],
         cr: [{ code: "AR", name: "Accounts Receivable (control)", amount }],
       };
     }
@@ -510,7 +513,7 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
         ? [{ code: "", name: GATEWAY_CLEARING_NAME, amount }]
         : [{ code: "Bank", name: "cash out", amount }],
     };
-  }, [wo, expenseAccount, amount, onlineChoice.online]);
+  }, [wo, expenseAccount, defaultAccount, amount, onlineChoice.online]);
 
   const canSubmit = wo
     ? !!customer && !!invoice && amount > 0 && !!date
@@ -708,7 +711,7 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
           {wo ? (
             <FormField label="Write-off expense account">
               <AccountPicker entity={entity} value={expenseAccount} onChange={setExpenseAccount} accountType="EXPENSE" postableOnly
-                placeholder="Defaults to bad debt (5300)" />
+                placeholder={writeOffAccountHint(defaultAccount)} />
             </FormField>
           ) : null}
         </div>
