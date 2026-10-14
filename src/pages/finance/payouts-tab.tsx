@@ -35,6 +35,7 @@ import { useGetVendorQuery, useGetVendorsQuery } from "@/redux/services/procurem
 import { useGetAccountsQuery } from "@/redux/services/finance/setup-api";
 import type { PayoutInstruction } from "@/redux/services/payments/payments-types";
 import { useDates } from "../../lib/display-prefs";
+import { PAYOUT_SAVED_MESSAGE } from "./payout-batch-words";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 /** Field Access resource for a payout instruction. */
@@ -144,7 +145,7 @@ export function PayoutsTab({ entity, currency }: { entity: string; currency?: st
       <DataTable columns={columns} rows={rows} rowKey={(p) => p.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(p) => setSelectedId(p.id)}
         page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
-        emptyTitle="No payouts" emptyMessage="Send a payout to disburse money via the gateway." />
+        emptyTitle="No payouts" emptyMessage="Add a payout to pay a vendor through the gateway. It is sent once it is approved." />
 
       <PayoutDrawer payoutId={selectedId} payouts={rows} currency={currency} onClose={() => setSelectedId(null)} />
       <NewPayoutDrawer open={creating} onClose={() => setCreating(false)} entity={entity} currency={currency} />
@@ -273,7 +274,7 @@ export function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boo
         }, { creating: true }),
         provider, source_account: sourceAccount || undefined, narration: narration.trim() || undefined,
       }).unwrap();
-      toast.success("Payout sent to the provider.");
+      toast.success(PAYOUT_SAVED_MESSAGE);
       close();
     } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
@@ -286,7 +287,7 @@ export function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boo
       title="New payout" description="Pay a vendor - money out to a recipient account." widthClass="sm:max-w-2xl"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
-        <Button disabled={isLoading || !valid} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Sending…" : "Send payout"}</Button>
+        <Button disabled={isLoading || !valid} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Saving…" : "Save payout"}</Button>
       </>}>
       <div className="space-y-4">
         <FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={setVendor} own /></FormField>

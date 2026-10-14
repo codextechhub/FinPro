@@ -55,3 +55,13 @@ export function payoutBatchWord(batch: BatchFacts): string {
   if (status === SENT_BACK_STATUS) return SENT_BACK_WORD;
   return PAYOUT_BATCH_WORDS[status] ?? status;
 }
+
+/**
+ * What the screen says once a payout is saved. A payout is created and sent to
+ * its approvers in one request, and nothing reaches the provider until the
+ * last approver agrees, so the words never claim it has been sent.
+ */
+export const PAYOUT_SAVED_MESSAGE = "Payout saved. It is sent once it is approved.";
+
+/** The same promise for a batch saved with "Submit batch". */
+export const PAYOUT_BATCH_SAVED_MESSAGE = "Batch saved. It is sent once it is approved.";

@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   fieldAccess: {} as Record<string, unknown>,
   initiate: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -62,7 +63,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   ),
 }));
 
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: mocks.toastSuccess, error: vi.fn() } }));
 
 import { NewPayoutDrawer } from "./payouts-tab";
 
@@ -80,6 +81,7 @@ let root: Root;
 
 beforeEach(() => {
   mocks.initiate.mockReset();
+  mocks.toastSuccess.mockReset();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -116,13 +118,25 @@ describe("NewPayoutDrawer under Field Access", () => {
     expect(field("beneficiary_bank_code")).toBeNull();
 
     act(() => type(document.body.querySelector<HTMLInputElement>("input[aria-label=amount]")!, "500000"));
-    await act(async () => { button("Send payout").click(); });
+    await act(async () => { button("Save payout").click(); });
 
     const body = mocks.initiate.mock.calls[0][0];
     expect(body).toMatchObject({ entity: "COD", vendor: "ADE", amount: 500000 });
     expect(body).not.toHaveProperty("beneficiary_name");
     expect(body).not.toHaveProperty("beneficiary_account_number");
     expect(body).not.toHaveProperty("beneficiary_bank_code");
+  });
+
+  it("says the payout is saved and waits for approval, never that it was sent", async () => {
+    mocks.fieldAccess = { "payments.payout": PAYOUT_READ_ONLY };
+    mocks.initiate.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Payout queued for approval." }) });
+    act(() => root.render(<NewPayoutDrawer open onClose={() => undefined} entity="COD" />));
+    act(() => button("Pick Ade").click());
+    act(() => type(document.body.querySelector<HTMLInputElement>("input[aria-label=amount]")!, "500000"));
+    await act(async () => { button("Save payout").click(); });
+
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Payout saved. It is sent once it is approved.");
+    expect(document.body.textContent).not.toContain("Send payout");
   });
 
   it("leaves out a beneficiary field the user cannot read", () => {

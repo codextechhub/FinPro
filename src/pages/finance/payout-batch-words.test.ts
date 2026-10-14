@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import type { PayoutBatchSummary } from "@/redux/services/payments/payments-types";
 import { statusFilterArgs } from "@/components/finance-ui/returned-correction";
-import { PAYOUT_BATCH_FILTERS, payoutBatchStatus, payoutBatchWord } from "./payout-batch-words";
+import { PAYOUT_BATCH_FILTERS, PAYOUT_BATCH_SAVED_MESSAGE, PAYOUT_SAVED_MESSAGE, payoutBatchStatus, payoutBatchWord } from "./payout-batch-words";
 
 type Facts = Pick<PayoutBatchSummary, "status" | "display_status" | "approval_state" | "approval_returned">;
 const batch = (over: Partial<Facts>): Facts => ({ status: "DRAFT", approval_state: "NOT_SUBMITTED", approval_returned: false, ...over });
@@ -39,5 +39,12 @@ describe("the batch filter", () => {
     expect(PAYOUT_BATCH_FILTERS.at(-1)).toEqual(["SENT_BACK", "Sent back"]);
     expect(statusFilterArgs("SENT_BACK")).toEqual({ approval: "returned" });
     expect(statusFilterArgs("PENDING_APPROVAL")).toEqual({ status: "PENDING_APPROVAL" });
+  });
+});
+
+describe("what the screen says after a save", () => {
+  it("promises sending only once approved, for a payout and for a batch", () => {
+    expect(PAYOUT_SAVED_MESSAGE).toBe("Payout saved. It is sent once it is approved.");
+    expect(PAYOUT_BATCH_SAVED_MESSAGE).toBe("Batch saved. It is sent once it is approved.");
   });
 });

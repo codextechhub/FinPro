@@ -39,7 +39,7 @@ import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
 import { useDates } from "../../lib/display-prefs";
 import { showBlobPreview } from "../../components/finance-ui/file-preview-dialog";
 import { RETURNED_HINT, SENT_BACK_STATUS, SENT_BACK_WORD, statusFilterArgs } from "@/components/finance-ui/returned-correction";
-import { PAYOUT_BATCH_FILTERS, PAYOUT_BATCH_WORDS, payoutBatchStatus, payoutBatchWord } from "./payout-batch-words";
+import { PAYOUT_BATCH_FILTERS, PAYOUT_BATCH_SAVED_MESSAGE, PAYOUT_BATCH_WORDS, payoutBatchStatus, payoutBatchWord } from "./payout-batch-words";
 import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/finance-ui/returned-note";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
@@ -203,10 +203,8 @@ function BuildBatchDrawer({ open, onClose, entity, currency }: { open: boolean; 
     if (!validItems.length) return;
     try {
       const r = await create({ entity, title: title.trim() || undefined, provider, source_account: sourceAccount || undefined, narration: narration.trim() || undefined, submit: dispatch, items: validItems }).unwrap();
-      // When the batch is approval-gated the backend ignores submit and leaves it DRAFT -
-      // don't claim it dispatched; surface the backend's "submit it for approval" message.
-      const dispatched = dispatch && r.data?.status && r.data.status !== "DRAFT";
-      toast.success(dispatched ? "Batch submitted to the provider." : (r.message || (dispatch ? "Batch created - submit it for approval." : "Draft batch saved.")));
+      // Submitting routes the batch to its approvers; the provider is reached only on final approval.
+      toast.success(dispatch ? PAYOUT_BATCH_SAVED_MESSAGE : (r.message || "Draft batch saved."));
       close();
     } catch { /* central */ }
   };
