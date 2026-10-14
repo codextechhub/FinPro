@@ -95,6 +95,8 @@ export const PAYMENTS_SECTIONS = [
   // Platform only: the daily held-ledger check and the provider account settings.
   // A school app leaves it unmounted.
   "held-reconciliations",
+  // Platform only: the platform recording money it adds to its own provider balance.
+  "provider-top-ups",
 ] as const;
 export type PaymentsSection = (typeof PAYMENTS_SECTIONS)[number];
 export const DEFAULT_PAYMENTS_SECTION: PaymentsSection = "payouts";

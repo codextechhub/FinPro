@@ -9,7 +9,9 @@
  * - The daily checks (`payments.platform_settlement.view`): one row per
  *   provider, currency and day, saying whether the provider's balance and the
  *   books agree within the tolerance, and the incident a disagreement opened.
- *   "Disagreements" narrows to the rows that did not.
+ *   "Disagreements" narrows to the rows that did not. "Top-ups" is what the
+ *   platform has paid into the provider balance from its own bank (Paystack
+ *   Top-ups): the money is owed to no school, so the check sets it aside.
  * - "Paystack balance swept automatically" (`payments.platform_provider.view`
  *   to read, `.update` to change). When the provider settles the platform's
  *   balance to its bank on its own, the check counts each sweep once and takes
@@ -74,6 +76,7 @@ function ChecksList() {
     { header: "Provider", cell: (r) => `${providerInfo(r.provider).label} · ${r.currency}` },
     { header: "Provider says", align: "right", cell: (r) => <span className="tabular-nums">{money(r.provider_balance, r.currency)}</span> },
     { header: "Books say", align: "right", cell: (r) => <span className="tabular-nums">{money(r.books_balance, r.currency)}</span> },
+    { header: "Top-ups", align: "right", cell: (r) => <span className="tabular-nums">{money(r.topped_up, r.currency)}</span> },
     { header: "Difference", align: "right", cell: (r) => <span className={cn("tabular-nums", !r.agrees && "text-destructive")}>{money(r.difference, r.currency)}</span> },
     { header: "Result", cell: (r) => <AgreePill row={r} /> },
   ];
@@ -128,6 +131,7 @@ function CheckDrawer({ row, onClose }: { row: HeldReconciliation | null; onClose
           <p className="mb-1.5 font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">What the books say</p>
           <div className="divide-y divide-gray-02">
             <Field label="Provider balance account">{money(row.provider_account, c)}</Field>
+            <Field label="Of which the platform's own top-ups">{money(row.topped_up, c)}</Field>
             <Field label="Platform's own payments not yet settled">{money(row.own_in_transit, c)}</Field>
             {row.balance_swept ? (
               <>

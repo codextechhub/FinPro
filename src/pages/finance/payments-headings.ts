@@ -19,5 +19,6 @@ export function paymentsHeadings(product: string): Record<PaymentsSection, { lab
     terminals: { label: "Branch Terminals", subtitle: "Each branch's payment terminal, and the WhatsApp numbers it notifies." },
     "terminal-payments": { label: "Terminal Payments", subtitle: "Payments made at a branch terminal, and the pupil or family each belongs to." },
     "held-reconciliations": { label: "Held Reconciliations", subtitle: "The daily check of held money against the payment provider." },
+    "provider-top-ups": { label: "Paystack Top-ups", subtitle: "Money the platform adds to its Paystack balance from its own bank." },
   };
 }

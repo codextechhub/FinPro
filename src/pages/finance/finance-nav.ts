@@ -114,6 +114,7 @@ export const financeNav: ConsoleNavGroup[] = [
     { ...branch("Platform Controls", [
       { title: "Held Settlements", url: `${F.PAYMENTS}/held-settlements`, permissions: [P.PAY_VIEW_PAYMENT_REPORTS, P.PAY_VIEW_PLATFORM_SETTLEMENTS], resources: ["payments.platform_settlement"] },
       { title: "Held Reconciliations", url: `${F.PAYMENTS}/held-reconciliations`, permissions: [P.PAY_VIEW_PLATFORM_SETTLEMENTS, P.PAY_VIEW_PLATFORM_PROVIDER, P.PAY_UPDATE_PLATFORM_PROVIDER], resources: ["payments.platform_provider"] },
+      { title: "Paystack Top-ups", url: `${F.PAYMENTS}/provider-top-ups`, permissions: [P.PAY_VIEW_PLATFORM_TOPUPS], resources: ["payments.platform_topup"] },
     ]), icon: ShieldCheck },
     { ...branch("Monitoring", [
       { title: "Transactions Log", url: `${F.PAYMENTS}/transactions`, permissions: [P.PAY_VIEW_PAYMENT_REPORTS] },

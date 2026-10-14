@@ -27,7 +27,7 @@ const CHECK = (id: number, agrees: boolean) => ({
   id, checked_on: `2026-10-0${id}`, provider: "PAYSTACK", currency: "NGN",
   provider_balance: 500_000_000, books_balance: agrees ? 500_000_000 : 480_000_000,
   provider_account: 480_000_000, held_total: 450_000_000, own_in_transit: 20_000_000,
-  balance_swept: false, swept_total: 0, own_swept_settled: 0,
+  balance_swept: false, swept_total: 0, own_swept_settled: 0, topped_up: agrees ? 0 : 15_000_000,
   difference: agrees ? 0 : 20_000_000, tolerance: 0, agrees, error: null,
   incident_code: agrees ? null : "payments.held-ledger-mismatch",
 });
@@ -84,6 +84,15 @@ describe("Held reconciliations", () => {
     expect(rows.some((t) => t.includes("Agrees"))).toBe(true);
     expect(rows.some((t) => t.includes("Disagrees"))).toBe(true);
     expect(container.textContent).not.toContain("Paystack balance swept automatically");
+  });
+
+  it("shows what the platform topped up the provider balance with, as a Top-ups column", () => {
+    mocks.held = new Set(["801001"]);
+    act(() => root.render(<HeldReconciliationsTab />));
+    const headers = [...container.querySelectorAll("thead th")].map((th) => th.textContent);
+    expect(headers).toContain("Top-ups");
+    const rows = [...container.querySelectorAll("tbody tr")].map((tr) => tr.textContent ?? "");
+    expect(rows.find((t) => t.includes("Disagrees"))).toContain("150,000.00");
   });
 
   it("lists the counted sweeps to a reader of the checks who holds no provider key", () => {

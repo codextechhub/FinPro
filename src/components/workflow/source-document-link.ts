@@ -27,6 +27,7 @@ const SOURCE_DOCUMENT_ROUTES: Record<
   "finance.payroll_run": { route: F.PAYROLL, lookup: "id" },
   "finance.inter_branch_transfer": { route: `${F.INDEX}/inter-branch/transfers`, lookup: "id" },
   "payments.payout_batch": { route: `${F.PAYMENTS}/batches`, lookup: "id" },
+  "payments.provider_topup": { route: `${F.PAYMENTS}/provider-top-ups`, lookup: "id" },
   "procurement.requisition": { route: P.REQUISITIONS, lookup: "id" },
   "procurement.purchase_order": { route: P.PURCHASE_ORDERS, lookup: "id" },
   "procurement.vendor_invoice": { route: P.VENDOR_INVOICES, lookup: "id" },

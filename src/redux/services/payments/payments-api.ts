@@ -11,6 +11,7 @@
  *   POST /payments/settlements/              payments.settlement.create
  *   GET  /payments/held-settlements/         payments.report.view, narrowed to the reader's branches
  *   /payments/platform/...                   platform staff only, with no `entity`
+ *   /payments/platform/provider-topups/      payments.platform_topup.view / .create / .submit (platform)
  */
 
 import { generateQueryString } from "@/utils/helpers";
@@ -36,6 +37,11 @@ import type {
   PayoutInstruction,
   PayoutSummary,
   PlatformHeldSettlement,
+  ProviderTopUp,
+  ProviderTopUpDetail,
+  ProviderTopUpPayload,
+  ProviderTopUpStatus,
+  ProviderTopUpSubmitted,
   ProviderRefund,
   ProviderSettings,
   ProviderSweep,
@@ -186,8 +192,8 @@ export const paymentsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/payments/payouts/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["PaymentsPayouts"],
     }),
-    // Initiate a single payout to a vendor; the provider transfer is requested
-    // immediately (PROCESSING) and the ledger entry books on confirmation.
+    // Create a single payout to a vendor and send it to its approvers. The provider
+    // transfer is requested only on final approval and the ledger entry books on confirmation.
     initiatePayout: builder.mutation<ApiEnvelope<PayoutInstruction>, InitiatePayoutPayload>({
       query: ({ entity, ...body }) => ({
         url: `/payments/payouts/${qs({ entity })}`,
@@ -293,6 +299,28 @@ export const paymentsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/payments/platform/provider-sweeps/${qs(p)}`, method: "GET" }),
       providesTags: ["PaymentsHeldChecks"],
     }),
+    // The platform's top-ups of its own provider balance from its bank. The list is
+    // a plain array of at most `limit` rows, newest first.
+    getPlatformProviderTopups: builder.query<ApiEnvelope<ProviderTopUp[]>, { status?: ProviderTopUpStatus; limit?: number }>({
+      query: (p) => ({ url: `/payments/platform/provider-topups/${qs(p)}`, method: "GET" }),
+      providesTags: ["PaymentsProviderTopups"],
+    }),
+    getPlatformProviderTopup: builder.query<ApiEnvelope<ProviderTopUpDetail>, { id: number }>({
+      query: ({ id }) => ({ url: `/payments/platform/provider-topups/${id}/`, method: "GET" }),
+      providesTags: ["PaymentsProviderTopups"],
+    }),
+    createPlatformProviderTopup: builder.mutation<ApiEnvelope<ProviderTopUpDetail>, ProviderTopUpPayload>({
+      query: (body) => ({ url: `/payments/platform/provider-topups/`, method: "POST", body }),
+      invalidatesTags: ["PaymentsProviderTopups"],
+    }),
+    updatePlatformProviderTopup: builder.mutation<ApiEnvelope<ProviderTopUpDetail>, { id: number } & ProviderTopUpPayload>({
+      query: ({ id, ...body }) => ({ url: `/payments/platform/provider-topups/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["PaymentsProviderTopups"],
+    }),
+    submitPlatformProviderTopup: builder.mutation<ApiEnvelope<ProviderTopUpSubmitted>, { id: number }>({
+      query: ({ id }) => ({ url: `/payments/platform/provider-topups/${id}/submit/`, method: "POST" }),
+      invalidatesTags: ["PaymentsProviderTopups", "WorkflowPending", "WorkflowSubmissions"],
+    }),
     // Append-only gateway action log (PaymentEvent), paginated.
     getTransactionsLog: builder.query<PaginatedEnvelope<TransactionLogEntry>, { entity: string; page?: number; action?: string; provider?: string; succeeded?: string }>({
       query: (p) => ({ url: `/payments/transactions/${qs(p)}`, method: "GET" }),
@@ -390,6 +418,11 @@ export const {
   useGetPlatformProviderSettingsQuery,
   useUpdatePlatformProviderSettingsMutation,
   useGetPlatformProviderSweepsQuery,
+  useGetPlatformProviderTopupsQuery,
+  useGetPlatformProviderTopupQuery,
+  useCreatePlatformProviderTopupMutation,
+  useUpdatePlatformProviderTopupMutation,
+  useSubmitPlatformProviderTopupMutation,
   useGetTransactionsLogQuery,
   useGetWebhookEventsQuery,
   useGetWebhookSummaryQuery,

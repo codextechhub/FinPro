@@ -56,6 +56,7 @@ export const FINANCE_TAG_TYPES = [
   "PaymentsHeldSettlements",
   "PaymentsPayoutBatches",
   "PaymentsPayouts",
+  "PaymentsProviderTopups",
   "PaymentsRefunds",
   "PaymentsTerminalPayments",
   "PaymentsTerminals",

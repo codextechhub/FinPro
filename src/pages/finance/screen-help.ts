@@ -44,6 +44,7 @@ export const FINANCE_HELP = {
   settlement: "Match provider payouts with the bank and record the corresponding settlement entries.",
   "held-settlements": "Track online payments held by the platform before they are paid to each branch.",
   "held-reconciliations": "Compare held-money records with the payment provider's records each day.",
+  "provider-top-ups": "Record money the platform pays from its own bank into its Paystack balance, for two other people to approve.",
   transactions: "Review every collection, payout and transfer that moved money.",
   "provider-activity": "Review every request sent to the payment provider, including refused and failed requests.",
   terminals: "See each branch's payment terminal, whether it is open, and the WhatsApp numbers it notifies.",

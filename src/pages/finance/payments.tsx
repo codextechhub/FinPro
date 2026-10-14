@@ -1,7 +1,7 @@
 // Payments (§6.Payments) - single payouts, payout batches, settlement
 // reconciliation (gateway vs bank), the gateway transactions log, held
 // settlements, each branch's payment terminal with the payments made on it, and
-// the platform's held-money checks.
+// the platform's held-money checks and its top-ups of the provider balance.
 // Beneficiary details follow Field Access on payments.payout in each tab.
 import { DEFAULT_PAYMENTS_SECTION, type PaymentsSection } from "./console-sections";
 import { paymentsHeadings } from "./payments-headings";
@@ -14,6 +14,7 @@ import { ProviderActivityTab } from "./provider-activity-tab";
 import { WebhooksTab } from "./webhooks-tab";
 import { HeldSettlementsTab, PlatformHeldSettlementsTab } from "./held-settlements-tab";
 import { HeldReconciliationsTab } from "./held-reconciliations";
+import { ProviderTopUpsTab } from "./provider-topups-tab";
 import { HeldCustodyScreen } from "./online-payments";
 import { TerminalsTab } from "./terminals-tab";
 import { TerminalPaymentsTab } from "./terminal-payments-tab";
@@ -32,7 +33,8 @@ import { platformName } from "../../host";
  *
  * The platform's screens read every school at once and take no ledger entity:
  * Held Reconciliations always, and Held Settlements for a reader holding the
- * platform settlement key. A school's Held Settlements is its own list and
+ * platform settlement key. Paystack Top-ups lists without an entity too, and
+ * takes the active one only to offer the platform's bank accounts on its form. A school's Held Settlements is its own list and
  * needs its books like every other tab. Payouts and Batches pay out of money
  * the platform holds, so at a school whose custody is DIRECT they show a notice
  * instead (see HeldCustodyScreen).
@@ -45,7 +47,7 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
   const headings = paymentsHeadings(platformName);
   const { label, subtitle } = headings[section] ?? headings.payouts;
   const platformHeld = section === "held-settlements" && can(P.PAY_VIEW_PLATFORM_SETTLEMENTS);
-  const needsEntity = section !== "held-reconciliations" && !platformHeld;
+  const needsEntity = section !== "held-reconciliations" && section !== "provider-top-ups" && !platformHeld;
 
   return (
     <FinanceShell>
@@ -59,6 +61,10 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
         </div>
         {section === "held-reconciliations" ? (
           <HeldReconciliationsTab />
+        ) : section === "provider-top-ups" ? (
+          can(P.PAY_VIEW_PLATFORM_TOPUPS)
+            ? <ProviderTopUpsTab entity={entity ?? null} currency={currency} />
+            : <EmptyState title="No top-ups access" message={noAccessMessage("view the Paystack top-ups")} />
         ) : platformHeld ? (
           <PlatformHeldSettlementsTab currency={currency} />
         ) : needsEntity && !entity ? (

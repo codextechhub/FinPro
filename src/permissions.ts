@@ -40,8 +40,9 @@
  *   05 payout_batch, 06 webhook, 07 unattributed_webhook, 08 settings
  *   (custody), 09 settlement, 10 platform_settlement, 11 platform_provider,
  *   12 refund (returned through the provider), 13 terminal (a branch's payment
- *   terminal), 14 terminal_payment (money paid at a terminal); a terminal
- *   payment's `match` is action 31, as a vendor bill's match is.
+ *   terminal), 14 terminal_payment (money paid at a terminal), 15
+ *   platform_topup (the platform topping up its own provider balance); a
+ *   terminal payment's `match` is action 31, as a vendor bill's match is.
  *
  *   Workflow (60): 01 template, 02 instance, 03 action, 04 group, 05 approvers.
  *   Most workflow codes are declared by each host, which gates its own menus on
@@ -244,6 +245,9 @@ export const P = {
   PAY_CREATE_SETTLEMENT: "800902",  // book a bank line as the settlement of online payments
   PAY_VIEW_PLATFORM_SETTLEMENTS: "801001",  // every school's held settlements and the daily checks (platform)
   PAY_SUBMIT_PLATFORM_SETTLEMENT: "801030",  // put a held settlement forward for approval (platform)
+  PAY_VIEW_PLATFORM_TOPUPS: "801501",  // the platform's top-ups of its provider balance (platform)
+  PAY_CREATE_PLATFORM_TOPUP: "801502",  // record one as a draft and correct it (platform)
+  PAY_SUBMIT_PLATFORM_TOPUP: "801530",  // put one forward for approval (platform)
   PAY_VIEW_PLATFORM_PROVIDER: "801101",  // the platform's own provider account settings
   PAY_UPDATE_PLATFORM_PROVIDER: "801103",  // change them, with a reason (platform)
   PAY_VIEW_REFUNDS: "801201",  // read refunds returned through the payment provider
@@ -601,6 +605,9 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "800902": "payments.settlement.create",
   "801001": "payments.platform_settlement.view",
   "801030": "payments.platform_settlement.submit",
+  "801501": "payments.platform_topup.view",
+  "801502": "payments.platform_topup.create",
+  "801530": "payments.platform_topup.submit",
   "801101": "payments.platform_provider.view",
   "801103": "payments.platform_provider.update",
   "801201": "payments.refund.view",

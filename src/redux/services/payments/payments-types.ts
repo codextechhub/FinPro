@@ -4,6 +4,8 @@
 // detail response lists the present ones they cannot change in
 // `_read_only_fields`. Read them through `useFieldAccess`.
 
+import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
+
 /** DESK: a member of staff at a branch desk started it for the payer to pay on their own phone. */
 export type CollectionOrigin = "STANDARD" | "DESK";
 
@@ -550,6 +552,8 @@ export interface HeldReconciliation {
   swept_total: number;
   /** The platform's own takings matched to a bank line after sweeping began, added back. */
   own_swept_settled: number;
+  /** Top-ups of the provider balance the platform has booked, which the check sets aside. */
+  topped_up?: number;
   /** Provider less books; null when the provider could not be read. */
   difference: number | null;
   tolerance: number;
@@ -710,4 +714,62 @@ export interface TerminalPayment {
   created_at?: string;
   /** Up to five; absent when Field Access hides them. */
   suggestions?: TerminalSuggestion[];
+}
+
+/** Where a top-up of the platform's provider balance stands. */
+export type ProviderTopUpStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "REJECTED";
+
+/**
+ * One top-up of the platform's provider balance, paid from its own bank.
+ *
+ * Every business field is a Field Access switch of `payments.platform_topup`
+ * and is absent from a response when the reader may not read it: `amount` with
+ * `amount_naira`, `bank_account` with `bank_account_name`, `status` with the
+ * two approval fields, the three journal fields, and `created_by` with its name.
+ */
+export interface ProviderTopUp {
+  id: number;
+  currency?: string;
+  provider?: string;
+  amount?: number;
+  amount_naira?: string;
+  topped_up_on?: string;
+  bank_account?: number;
+  bank_account_name?: string;
+  reference?: string;
+  note?: string;
+  status?: ProviderTopUpStatus;
+  approval_state?: "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
+  approval_returned?: boolean;
+  journal_id?: number | null;
+  journal_number?: string | null;
+  posted_at?: string | null;
+  created_by?: number | null;
+  created_by_name?: string | null;
+  /** The branch of the bank account the money left. */
+  branch?: number | null;
+  branch_name?: string | null;
+  created_at?: string;
+}
+
+/** A top-up read on its own: its latest approval request, and what the reader may not change. */
+export interface ProviderTopUpDetail extends ProviderTopUp {
+  workflow_instance_id?: string | number | null;
+  _read_only_fields?: string[];
+}
+
+/** What a submission answers beside the top-up: where its approval stands. */
+export interface ProviderTopUpSubmitted extends ProviderTopUpDetail {
+  approval?: ApprovalParkState & { instance_id?: string | number };
+}
+
+/** The body that records a top-up as a draft, or corrects one. */
+export interface ProviderTopUpPayload {
+  /** Kobo, more than nothing. */
+  amount?: number;
+  bank_account?: number;
+  topped_up_on?: string;
+  provider?: string;
+  reference?: string;
+  note?: string;
 }
