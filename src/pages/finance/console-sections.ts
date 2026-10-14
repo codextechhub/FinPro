@@ -132,6 +132,7 @@ export const FINANCE_SETTINGS_SECTIONS = [
   // The receivables policy: credit applied to new bills, the concession limit,
   // deferred income, the provision bands, deposits and payer payments.
   "receivables",
+  "recent-changes",
 ] as const;
 export type FinanceSettingsSection = (typeof FINANCE_SETTINGS_SECTIONS)[number];
 export const DEFAULT_FINANCE_SETTINGS_SECTION: FinanceSettingsSection = "overview";

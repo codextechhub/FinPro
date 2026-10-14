@@ -7,6 +7,7 @@ import {
   CircleDollarSign,
   FileCog,
   GitBranch,
+  History,
   ListTree,
   Network,
   Percent,
@@ -32,11 +33,12 @@ import {
   useGetFinanceAccountSettingsQuery,
   useGetFinanceBankingSettingsQuery,
   useGetFinanceDocumentSettingsQuery,
+  useGetFinanceSettingsHistoryQuery,
   useUpdateFinanceAccountSettingsMutation,
   useUpdateFinanceBankingSettingsMutation,
   useUpdateFinanceDocumentSettingsMutation,
 } from "@/redux/services/finance/setup-api";
-import type { FinanceAuditLog, FinanceBankingSettingsValues, FinanceDocumentSettingsValues, SettingConsumer } from "@/redux/services/finance/setup-types";
+import type { FinanceBankingSettingsValues, FinanceDocumentSettingsValues, SettingConsumer } from "@/redux/services/finance/setup-types";
 import {
   ConsoleSettingsLayout,
   PolicyBadge,
@@ -83,6 +85,7 @@ const SECTIONS: (ConsoleSettingsSection & { key: FinanceSettingsSection })[] = [
   { key: "receivables", title: "Receivables", description: "Credit, deferred income, deposits", icon: ReceiptText, group: "billing" },
   { key: "payroll", title: "Payroll", description: "PAYE, deductions and payslips", icon: Wallet },
   { key: "approvals", title: "Approvals", description: "Finance workflows", icon: Workflow },
+  { key: "recent-changes", title: "Recent changes", description: "All settings activity", icon: History },
 ];
 
 const GROUPS: ConsoleSettingsGroup[] = [
@@ -159,6 +162,7 @@ export default function FinanceSettings({ section = DEFAULT_FINANCE_SETTINGS_SEC
         {activeSection === "fees" ? <FeeDuePolicyPanel /> : null}
         {activeSection === "receivables" ? <ReceivablesSettings key={active.code ?? "no-entity"} entityCode={active.code} /> : null}
         {activeSection === "payroll" ? <PayrollSettingsPanel key={active.code ?? "no-entity"} entityCode={active.code} /> : null}
+        {activeSection === "recent-changes" ? <RecentChanges entityCode={active.code} /> : null}
       </ConsoleSettingsLayout>
     </FinanceShell>
   );
@@ -184,6 +188,7 @@ const OVERVIEW_CARDS: Record<Exclude<FinanceSettingsSection, "overview">, {
   fees: { description: "Choose when fee bills fall due once they are raised.", status: "Configurable", tone: "ready" },
   receivables: { description: "Credit on new bills, the concession limit, fees billed ahead, doubtful debts, deposits and payer payments.", status: "Configurable", tone: "ready" },
   payroll: { description: "Choose how PAYE is worked out, which deductions apply, how payslips reach staff and how earlier pay is handled.", status: "Configurable", tone: "ready" },
+  "recent-changes": { description: "Review the newest saved changes from every Finance settings section in one place.", status: "Combined", tone: "ready" },
 };
 
 function Overview({ entity, sections }: {
@@ -304,7 +309,31 @@ function AccountingDefaults({ entityCode }: { entityCode: string | null }) {
           })}
       </SettingsPanel>
       {canView && readOnlyNote ? <p className="font-mont text-xs text-gray-05">{readOnlyNote}</p> : null}
-      {canView && payload ? <SettingsAuditHistory rows={payload.history} /> : null}
+    </div>
+  );
+}
+
+function RecentChanges({ entityCode }: { entityCode: string | null }) {
+  const { hasPermission } = usePermissions();
+  const canView = hasPermission(P.FIN_VIEW_SETTINGS);
+  const query = useGetFinanceSettingsHistoryQuery(
+    { entity: entityCode! }, { skip: !entityCode || !canView },
+  );
+  return (
+    <div data-guide="finance-settings.recent-changes" className="space-y-5">
+      <SettingsSectionHeader
+        title="Recent changes"
+        description="Review saved changes from every Finance settings section for the active entity."
+      />
+      {!entityCode ? (
+        <SettingsPanel><SettingsRow icon={Building2} label="No active entity selected" description="Choose an entity from the header to review its settings changes." /></SettingsPanel>
+      ) : query.isError ? (
+        <SettingsPanel><SettingsRow icon={History} label="Recent changes could not be loaded" description="Check your connection or try the request again." value={<Button variant="outline" size="sm" onClick={() => query.refetch()}>Try again</Button>} /></SettingsPanel>
+      ) : query.isLoading || !query.data ? (
+        <SettingsPanel><SettingsRow label="Loading recent changes" description="Reading settings activity for the selected entity." /></SettingsPanel>
+      ) : (
+        <SettingsAuditHistory rows={query.data.data.history} />
+      )}
     </div>
   );
 }
@@ -320,7 +349,7 @@ function DocumentSettings({ entityCode }: { entityCode: string | null }) {
   return (
     <div className="space-y-5">
       <SettingsSectionHeader title="Documents and collections" description="Configuration that shapes customer-facing documents, collections and follow-up behavior." />
-      {query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading document policy" description="Reading the selected entity's billing defaults." /></SettingsPanel> : <FinanceDocumentForm key={`${entityCode}-${payload.settings.updated_at}-${payload.settings.primary_collection_bank_account?.id ?? "auto"}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
+      {query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading document policy" description="Reading the selected entity's billing defaults." /></SettingsPanel> : <FinanceDocumentForm key={`${entityCode}-${payload.settings.updated_at}-${payload.settings.primary_collection_bank_account?.id ?? "auto"}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
       {hasPermission(P.FIN_VIEW_FEE_STRUCTURES) || hasPermission(P.FIN_VIEW_DUNNING) ? (
         <SettingsPanel title="Related settings">
           {hasPermission(P.FIN_VIEW_FEE_STRUCTURES) ? <SettingsRow icon={CircleDollarSign} label="Fee structures" description="Maintain reusable fee definitions and generate customer invoices from them." value={<Link className="text-primary hover:underline" to={`${F.RECEIVABLES}/fee-structures`}>Open</Link>} /> : null}
@@ -337,7 +366,7 @@ function DocumentSettings({ entityCode }: { entityCode: string | null }) {
  * for that flag: greyed and left out of the saved body when the role may not
  * change it.
  */
-export function FinanceDocumentForm({ entityCode, values, consumers, history, canUpdate, readOnlyNote }: { entityCode: string; values: FinanceDocumentSettingsValues; consumers: Record<string, SettingConsumer>; history: FinanceAuditLog[]; canUpdate: boolean; readOnlyNote: string | null }) {
+export function FinanceDocumentForm({ entityCode, values, consumers, canUpdate, readOnlyNote }: { entityCode: string; values: FinanceDocumentSettingsValues; consumers: Record<string, SettingConsumer>; canUpdate: boolean; readOnlyNote: string | null }) {
   const [dueDays, setDueDays] = useState(String(values.default_invoice_due_days));
   const [narration, setNarration] = useState(values.default_invoice_narration);
   const [autoPost, setAutoPost] = useState(values.auto_post_manual_invoices);
@@ -385,7 +414,6 @@ export function FinanceDocumentForm({ entityCode, values, consumers, history, ca
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Allow customer opening balances</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, customer creation and edits reject non-zero opening balances.</p><SettingsConsumer consumer={consumers.allow_customer_opening_balances} /></div><Switch checked={openingBalances} onCheckedChange={setOpeningBalances} disabled={!canUpdate} aria-label="Allow customer opening balances" /></div>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? (targetValid ? "Use a whole number from 0 to 365 days." : "Use a whole-number target from 1 to 100.") : readOnlyNote ?? "Only changed values are written to audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save document policy"}</Button> : null}</div>
     </SettingsPanel>
-    <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;
 }
 
@@ -400,14 +428,14 @@ function BankingCashPolicy({ entityCode }: { entityCode: string | null }) {
   return (
     <div className="space-y-5">
       <SettingsSectionHeader title="Banking and cash policy" description={canView ? "Set reconciliation, receipt allocation, petty-cash and online-payment defaults for the selected entity." : "Manage the online-payment settings available to your role."} />
-      {canView ? (query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading banking policy" description="Reading the selected entity's reconciliation and allocation defaults." /></SettingsPanel> : <BankingCashForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} history={payload.history} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />) : null}
+      {canView ? (query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading banking policy" description="Reading the selected entity's reconciliation and allocation defaults." /></SettingsPanel> : <BankingCashForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />) : null}
       {/* Read under its own payments key, so it stands apart from the finance policy above. */}
       <OnlinePaymentsPanel entityCode={entityCode} />
     </div>
   );
 }
 
-function BankingCashForm({ entityCode, values, consumers, history, canUpdate, readOnlyNote }: { entityCode: string; values: FinanceBankingSettingsValues; consumers: Record<string, SettingConsumer>; history: FinanceAuditLog[]; canUpdate: boolean; readOnlyNote: string | null }) {
+function BankingCashForm({ entityCode, values, consumers, canUpdate, readOnlyNote }: { entityCode: string; values: FinanceBankingSettingsValues; consumers: Record<string, SettingConsumer>; canUpdate: boolean; readOnlyNote: string | null }) {
   const [toleranceDays, setToleranceDays] = useState(String(values.default_bank_reconciliation_tolerance_days));
   const [groupMatches, setGroupMatches] = useState(values.default_group_reconciliation_matches);
   const [allocationStrategy, setAllocationStrategy] = useState(values.default_receipt_allocation_strategy);
@@ -446,7 +474,6 @@ function BankingCashForm({ entityCode, values, consumers, history, canUpdate, re
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Allow grouped automatic matches</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">Lets one bank statement line match a uniquely determined group of ledger lines with the same total.</p><SettingsConsumer consumer={consumers.default_group_reconciliation_matches} /></div><Switch checked={groupMatches} onCheckedChange={setGroupMatches} disabled={!canUpdate} aria-label="Allow grouped automatic matches" /></div>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use 0 to 30 days and a threshold from 0 to 100%." : readOnlyNote ?? "Only effective changes are written to audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save banking policy"}</Button> : null}</div>
     </SettingsPanel>
-    <div className="mt-5"><SettingsAuditHistory rows={history} /></div>
   </>;
 }
 

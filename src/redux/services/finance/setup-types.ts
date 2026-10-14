@@ -285,6 +285,10 @@ export interface FinanceAuditLog {
   changes?: FinanceSettingChange[];
 }
 
+export interface SettingsHistoryPayload {
+  history: FinanceAuditLog[];
+}
+
 export interface FinanceSettingChange {
   field: string;
   label: string;

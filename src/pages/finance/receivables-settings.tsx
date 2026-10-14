@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
-  SettingsAuditHistory, SettingsConsumer, SettingsPanel, SettingsRow, SettingsSectionHeader,
+  SettingsConsumer, SettingsPanel, SettingsRow, SettingsSectionHeader,
 } from "@/components/settings/settings-layout";
 import { usePermissions } from "@/hooks/use-permissions";
 import { AccessField, MoneyInput, fieldWriteErrors, useFieldAccess, type FieldErrors } from "@/components/finance-ui";
@@ -308,7 +308,6 @@ function PolicyForm({ entityCode, payload, canUpdate }: { entityCode: string; pa
           {lastPanel === "payer" ? footer : null}
         </SettingsPanel>
       ) : null}
-      <SettingsAuditHistory rows={payload.history} />
     </>
   );
 }

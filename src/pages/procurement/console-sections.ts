@@ -44,6 +44,7 @@ export const PROCUREMENT_SETTINGS_SECTIONS = [
   "accounting",
   "approvals",
   "reference-data",
+  "recent-changes",
 ] as const;
 export type ProcurementSettingsSection = (typeof PROCUREMENT_SETTINGS_SECTIONS)[number];
 export const DEFAULT_PROCUREMENT_SETTINGS_SECTION: ProcurementSettingsSection = "overview";

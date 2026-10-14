@@ -8,6 +8,7 @@
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
 import type { ApiEnvelope, PaginatedEnvelope } from "../finance/api-types";
+import type { SettingsHistoryPayload } from "../finance/setup-types";
 import type {
   CatalogItem,
   CatalogItemInsights,
@@ -53,6 +54,10 @@ export const procurementApi = baseApi.injectEndpoints({
   endpoints: (b) => ({
     getProcurementSettings: b.query<ApiEnvelope<ProcurementSettingsPayload>, { entity: string }>({
       query: ({ entity }) => ({ url: `/procurement/settings/${qs({ entity })}`, method: "GET" }),
+      providesTags: ["ProcSettings"],
+    }),
+    getProcurementSettingsHistory: b.query<ApiEnvelope<SettingsHistoryPayload>, { entity: string }>({
+      query: ({ entity }) => ({ url: `/procurement/settings/history/${qs({ entity })}`, method: "GET" }),
       providesTags: ["ProcSettings"],
     }),
     updateProcurementSettings: b.mutation<ApiEnvelope<ProcurementSettingsPayload>, { entity: string; default_payment_terms?: string; default_delivery_address?: string; quantity_tolerance_bps?: number; price_tolerance_bps?: number; allow_non_po_invoices?: boolean; vendor_purchase_kyc_requirement?: "PENDING_OR_VERIFIED" | "VERIFIED_ONLY"; require_purchase_order_for_receipts?: boolean; default_requisition_lead_days?: number; contract_renewal_notice_days?: number; default_rfq_response_days?: number; rfq_closing_soon_days?: number; minimum_rfq_invited_vendors?: number; minimum_submitted_quotations_before_award?: number; non_po_spend_limit_pct?: number }>({
@@ -372,6 +377,7 @@ export const procurementApi = baseApi.injectEndpoints({
 
 export const {
   useGetProcurementSettingsQuery,
+  useGetProcurementSettingsHistoryQuery,
   useUpdateProcurementSettingsMutation,
   useGetVendorsQuery,
   useGetVendorQuery,

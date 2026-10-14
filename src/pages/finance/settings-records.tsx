@@ -32,7 +32,6 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
   PolicyBadge,
-  SettingsAuditHistory,
   SettingsConsumer,
   SettingsPanel,
   SettingsRow,
@@ -170,7 +169,6 @@ function CalendarRuleForm({ entityCode, payload }: { entityCode: string; payload
         </div>
       </SettingsPanel>
       <div className="mt-5"><CloseOrderPanel entityCode={entityCode} payload={payload} /></div>
-      <div className="mt-5"><SettingsAuditHistory rows={payload.history} /></div>
     </>
   );
 }
@@ -326,7 +324,6 @@ function RecordKeepingForm({ entityCode, payload }: { entityCode: string; payloa
           ) : null}
         </div>
       </SettingsPanel>
-      <div className="mt-5"><SettingsAuditHistory rows={payload.history} /></div>
     </>
   );
 }

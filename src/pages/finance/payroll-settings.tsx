@@ -26,7 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
-  SettingsAuditHistory, SettingsConsumer, SettingsPanel, SettingsRow, SettingsSectionHeader,
+  SettingsConsumer, SettingsPanel, SettingsRow, SettingsSectionHeader,
 } from "@/components/settings/settings-layout";
 import { AccountPicker, toArray } from "@/components/finance-ui";
 import { P } from "../../permissions";
@@ -86,7 +86,6 @@ export function PayrollSettingsPanel({ entityCode }: { entityCode: string | null
           canUpdate={canUpdate} readOnlyReason={heldWithoutReach(P.FIN_UPDATE_SETTINGS) ? "The payroll policy binds every branch, so only someone who covers the whole school may change it." : null} />
       ) : null}
       {canView && entityCode ? <DeductionTypesPanel entityCode={entityCode} /> : null}
-      {payload ? <SettingsAuditHistory rows={payload.history} /> : null}
     </div>
   );
 }
