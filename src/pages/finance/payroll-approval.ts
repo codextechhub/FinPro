@@ -16,9 +16,9 @@
  * - `approved`: ready to be posted.
  * - `settled`: posted, paid or cancelled, past approval.
  *
- * A run posted before payroll approvals existed has no approval at all
- * (`NOT_SUBMITTED` once posted). It can still be paid from the bank, but never
- * through the provider; {@link postedWithoutApproval} marks it.
+ * A run posted before payroll approvals existed has no approval at all. It can
+ * still be paid from the bank, but never through the provider; the run's
+ * payment progress says so with `approved`.
  *
  * A reader whose role may not read the approval status gets runs without
  * `approval_state`; the document's own `status` still tells draft, with
@@ -47,15 +47,6 @@ export function runApprovalPhase(run: RunFacts): RunApprovalPhase {
 /** Whether the last request on a draft ended with an approver's rejection. */
 export function wasRejected(run: Pick<RunFacts, "approval_state">): boolean {
   return run.approval_state === "REJECTED";
-}
-
-/**
- * Whether a posted run was posted before approvals existed, or without any:
- * the server knows it is not approved, and says so when asked to pay it through
- * the provider. Unknown (false) for a reader who cannot read the approval status.
- */
-export function postedWithoutApproval(run: Pick<RunFacts, "run_status" | "approval_state">): boolean {
-  return run.run_status === "POSTED" && run.approval_state === "NOT_SUBMITTED";
 }
 
 /** What may be offered on a run, before the reader's keys are asked. */

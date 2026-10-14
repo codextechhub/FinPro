@@ -8,7 +8,10 @@
  *   POST  payroll-runs/{id}/payments/retry/                   finance.payrollrun.pay
  *   POST  payroll-runs/{id}/payments/record-paid-from-bank/   finance.payrollrun.pay
  *   GET   staff-bank-accounts/ , /banks/ , /{employee}/       finance.staff_bank.view
- *   PUT   staff-bank-accounts/{employee}/ , POST .../verify/  finance.staff_bank.update
+ *   GET   staff-bank-accounts/missing/                        finance.staff_bank.update (staff with no account)
+ *   POST  staff-bank-accounts/{employee}/                     finance.staff_bank.update (adds; 409 when one exists)
+ *   PUT   staff-bank-accounts/{employee}/                     finance.staff_bank.update (edits; 404 when none)
+ *   POST  staff-bank-accounts/{employee}/verify/              finance.staff_bank.update
  *   POST  staff-bank-accounts/{employee}/confirm/             finance.staff_bank.confirm
  *
  * Paying a run through the provider uses the run's ordinary pay route
@@ -26,6 +29,7 @@ import type {
   ProviderBank,
   StaffBankAccount,
   StaffBankAccountBody,
+  StaffWithoutBankAccount,
 } from "./payroll-paystack-types";
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
@@ -66,6 +70,14 @@ export const payrollPaystackApi = baseApi.injectEndpoints({
     getStaffBankBanks: b.query<ApiEnvelope<ProviderBank[]>, { entity: string }>({
       query: (p) => ({ url: `/finance/staff-bank-accounts/banks/${qs(p)}`, method: "GET" }),
     }),
+    getStaffWithoutBankAccount: b.query<PaginatedEnvelope<StaffWithoutBankAccount>, { entity: string; page?: number; page_size?: number; search?: string }>({
+      query: (p) => ({ url: `/finance/staff-bank-accounts/missing/${qs(p)}`, method: "GET" }),
+      providesTags: ["FinanceStaffBank"],
+    }),
+    addStaffBankAccount: b.mutation<ApiEnvelope<StaffBankAccount>, { entity: string; employee: number } & StaffBankAccountBody>({
+      query: ({ entity, employee, ...body }) => ({ url: `/finance/staff-bank-accounts/${employee}/${qs({ entity })}`, method: "POST", body }),
+      invalidatesTags: ["FinanceStaffBank"],
+    }),
     saveStaffBankAccount: b.mutation<ApiEnvelope<StaffBankAccount>, { entity: string; employee: number } & StaffBankAccountBody>({
       query: ({ entity, employee, ...body }) => ({ url: `/finance/staff-bank-accounts/${employee}/${qs({ entity })}`, method: "PUT", body }),
       invalidatesTags: ["FinanceStaffBank"],
@@ -89,6 +101,8 @@ export const {
   useRecordPayrollLinesPaidFromBankMutation,
   useGetStaffBankAccountsQuery,
   useGetStaffBankBanksQuery,
+  useGetStaffWithoutBankAccountQuery,
+  useAddStaffBankAccountMutation,
   useSaveStaffBankAccountMutation,
   useVerifyStaffBankAccountMutation,
   useConfirmStaffBankAccountMutation,

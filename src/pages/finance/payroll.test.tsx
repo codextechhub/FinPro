@@ -702,7 +702,7 @@ describe("Paying a posted run", () => {
   afterEach(() => { mocks.run = null; });
   const POSTED = (over: Partial<PayrollRun> = {}) => JANUARY({ run_status: "POSTED", status: "POSTED", approval_state: "APPROVED", ...over });
   const PAYMENTS = (over: Record<string, unknown> = {}) => ({
-    run_id: 9, run_status: "POSTED", payment_route: "PAYSTACK", branches: [], lines: [],
+    run_id: 9, run_status: "POSTED", payment_route: "PAYSTACK", approved: true, branches: [], lines: [],
     counts: { not_sent: 0, needs_bank_details: 0, waiting_for_funds: 0, sent: 0, paid: 0, failed: 0 }, ...over,
   });
 
@@ -724,11 +724,17 @@ describe("Paying a posted run", () => {
   });
 
   it("says a run posted before approvals existed must be approved first, or paid from the bank", () => {
-    mocks.payments = PAYMENTS();
-    openRun(POSTED({ approval_state: "NOT_SUBMITTED" }));
+    mocks.payments = PAYMENTS({ approved: false });
+    openRun(POSTED({ approval_state: undefined }));
     expect(buttonLabels().some((l) => l.includes("Pay through Paystack"))).toBe(false);
     const note = document.body.querySelector("[data-testid=payroll-legacy-note]")!;
     expect(note.textContent).toContain("Approve this run before paying through Paystack, or record it as paid from the bank.");
+  });
+
+  it("says nothing about approval, and leaves the server to refuse, where the payment status is hidden", () => {
+    mocks.payments = PAYMENTS({ approved: undefined, counts: undefined });
+    openRun(POSTED({ approval_state: "NOT_SUBMITTED" }));
+    expect(document.body.querySelector("[data-testid=payroll-legacy-note]")).toBeNull();
   });
 
   it("offers to send the rest once some staff have gone, and stops when every line is settled", () => {

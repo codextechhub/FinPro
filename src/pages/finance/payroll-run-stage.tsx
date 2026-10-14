@@ -38,7 +38,7 @@ import type { PayrollPaymentRoute } from "@/redux/services/finance/payroll-payst
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
 import { P } from "../../permissions";
 import { providerInfo } from "./payment-providers";
-import { approvalNote, postedWithoutApproval, runApprovalPhase, runOffers, wasRejected } from "./payroll-approval";
+import { approvalNote, runApprovalPhase, runOffers, wasRejected } from "./payroll-approval";
 import { hasLinesToSend, someLinesGone } from "./payroll-payments-model";
 import { useRunPayments } from "./payroll-payments-panel";
 
@@ -86,7 +86,8 @@ export function usePayrollRunStage({ run, entity, currency, partOnly }: {
   const offers = runOffers(run, standing === "sender");
   const approvalShown = run.approval_state !== undefined;
   const provider = providerInfo("PAYSTACK").label;
-  const legacy = route === "PAYSTACK" && postedWithoutApproval(run);
+  // The server says whether the run was approved, under the payment status switch.
+  const legacy = route === "PAYSTACK" && run.run_status === "POSTED" && payments?.approved === false;
   const payOffered = route === "PAYSTACK" && run.run_status === "POSTED" && !partOnly && !legacy
     && can(P.FIN_PAY_PAYROLL) && hasLinesToSend(payments);
   const gone = someLinesGone(payments?.lines ?? []);

@@ -15,7 +15,8 @@
  * account cannot be pointed somewhere else and still be paid. Bola, the
  * bursar, types her cousin's number for Tunde Adeyemi: the bank names Bola
  * Okafor, the account needs a second person, and Mr Eze confirms it after
- * asking Tunde. Bola cannot confirm it herself, and nor can Tunde.
+ * asking Tunde. The server tells each reader whether they may confirm
+ * (`can_confirm`): Bola may not, and nor may Tunde.
  */
 
 import type { StaffBankAccount, StaffBankState } from "@/redux/services/finance/payroll-paystack-types";
@@ -60,19 +61,6 @@ export function offersCheckAgain(account: Pick<StaffBankAccount, "verification_s
   return account.verification_state === "UNVERIFIED" || account.verification_state === "FAILED";
 }
 
-/** Who is reading, for the rule that nobody confirms their own change. */
-export interface Reader {
-  id: number | string | null | undefined;
-  /** The name the server shows for the reader: first and last name, else the email. */
-  name: string;
-}
-
-/** The reader's display name the way the server words it. */
-export function readerName(user: { first_name?: string; last_name?: string; email?: string } | null | undefined): string {
-  const full = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
-  return full || user?.email || "";
-}
-
 export interface ConfirmOffer {
   /** Show the Confirm button. */
   offered: boolean;
@@ -81,22 +69,20 @@ export interface ConfirmOffer {
 }
 
 /**
- * Whether Confirm is offered. It needs `finance.staff_bank.confirm`, an account
- * waiting for a second person, and a reader who is neither the staff member nor
- * the person who made the last change. The server refuses those two (403) in its
- * own words; the screen does not offer what it knows will be refused. The last
- * change is known by the name the server shows, so a reader whose name matches
- * it is treated as the person who made it.
+ * Whether Confirm is offered: only when the server says the reader may confirm
+ * this account now (`can_confirm`). The server judges it with the check the
+ * confirm action itself uses: an account waiting for a second person, the
+ * confirm key, and a reader who is neither the staff member nor the person who
+ * made the last change. A holder of the key who is refused is told why in
+ * plain words; a reader without the key is told nothing. An account whose check
+ * status is hidden carries no `can_confirm` and is never offered Confirm.
  */
-export function confirmOffer(account: StaffBankAccount, reader: Reader, mayConfirm: boolean): ConfirmOffer {
-  if (!mayConfirm || account.verification_state !== "NEEDS_CONFIRMATION") return { offered: false, hint: null };
-  if (reader.id != null && String(account.employee_id) === String(reader.id)) {
-    return { offered: false, hint: "This is your own bank account. A second person confirms it." };
+export function confirmOffer(account: StaffBankAccount, mayConfirm: boolean): ConfirmOffer {
+  if (account.can_confirm === true) return { offered: true, hint: null };
+  if (mayConfirm && account.verification_state === "NEEDS_CONFIRMATION" && account.can_confirm === false) {
+    return { offered: false, hint: "A second person confirms this account. It cannot be the person who made the last change, or the staff member." };
   }
-  if (reader.name && account.changed_by_name && account.changed_by_name.trim().toLowerCase() === reader.name.trim().toLowerCase()) {
-    return { offered: false, hint: "You made the last change to this account, so a second person confirms it." };
-  }
-  return { offered: true, hint: null };
+  return { offered: false, hint: null };
 }
 
 /** An account number as ten digits with spaces removed; null when it is not ten digits. */

@@ -1,11 +1,11 @@
 /**
  * Tunde Adeyemi's bank account. Bola, the bursar, saves her cousin's number for
  * him; Paystack names Bola Okafor, so the account needs a second person. Mr Eze
- * confirms it after asking Tunde. Bola cannot, and nor can Tunde.
+ * confirms it after asking Tunde. The server says who may: not Bola, and not Tunde.
  */
 import { describe, expect, it } from "vitest";
 import {
-  bankChanges, bankFormOf, bankFormProblem, cleanAccountNumber, confirmOffer, offersCheckAgain, readerName, staffBankWord,
+  bankChanges, bankFormOf, bankFormProblem, cleanAccountNumber, confirmOffer, offersCheckAgain, staffBankWord,
 } from "./staff-bank-model";
 
 const account = (over: Record<string, unknown> = {}) => ({
@@ -38,37 +38,26 @@ describe("an account in plain words", () => {
 });
 
 describe("who may confirm", () => {
-  const eze = { id: 7, name: "Chidi Eze" };
-
-  it("offers Confirm to a holder of the key who is neither the staff member nor the one who changed it", () => {
-    expect(confirmOffer(account(), eze, true)).toEqual({ offered: true, hint: null });
+  it("offers Confirm when the server says the reader may confirm", () => {
+    expect(confirmOffer(account({ can_confirm: true }), true)).toEqual({ offered: true, hint: null });
   });
 
-  it("does not offer it to someone without the key", () => {
-    expect(confirmOffer(account(), eze, false)).toEqual({ offered: false, hint: null });
-  });
-
-  it("does not offer it to the person who made the last change", () => {
-    const bola = { id: 8, name: "bola okafor" };
-    const offer = confirmOffer(account(), bola, true);
+  it("explains, to a holder of the key the server refuses, who may confirm", () => {
+    const offer = confirmOffer(account({ can_confirm: false }), true);
     expect(offer.offered).toBe(false);
-    expect(offer.hint).toContain("You made the last change");
+    expect(offer.hint).toContain("cannot be the person who made the last change");
   });
 
-  it("does not offer it to the staff member themselves", () => {
-    const offer = confirmOffer(account(), { id: 40, name: "Tunde Adeyemi" }, true);
-    expect(offer.offered).toBe(false);
-    expect(offer.hint).toContain("your own bank account");
+  it("tells a reader without the key nothing", () => {
+    expect(confirmOffer(account({ can_confirm: false }), false)).toEqual({ offered: false, hint: null });
   });
 
-  it("offers it only to an account waiting for a second person", () => {
-    expect(confirmOffer(account({ verification_state: "VERIFIED" }), eze, true).offered).toBe(false);
+  it("never offers it where the check status is hidden, so there is no answer", () => {
+    expect(confirmOffer(account({ can_confirm: undefined, verification_state: undefined }), true)).toEqual({ offered: false, hint: null });
   });
 
-  it("words the reader's name as the server does", () => {
-    expect(readerName({ first_name: "Chidi", last_name: "Eze", email: "c@x.test" })).toBe("Chidi Eze");
-    expect(readerName({ email: "c@x.test" })).toBe("c@x.test");
-    expect(readerName(null)).toBe("");
+  it("says nothing on an account that is not waiting for a second person", () => {
+    expect(confirmOffer(account({ verification_state: "VERIFIED", can_confirm: false }), true)).toEqual({ offered: false, hint: null });
   });
 });
 

@@ -1,9 +1,9 @@
 /**
  * Bank accounts at Bright Star. Bola, the bursar, saves her cousin's number for
  * Tunde Adeyemi; Paystack names Bola Okafor, so the account needs a second
- * person. Mr Eze, who holds the confirm key and did not make the change,
- * confirms it. Bola holds the same key and is not offered it for her own change,
- * and Tunde is not offered it for his own account. Ngozi's account could not be
+ * person. Mr Eze, whom the server marks able to confirm it, confirms it. Bola
+ * holds the same key and is not offered it for her own change, and Tunde is not
+ * offered it for his own account. Ngozi's account could not be
  * found; Mrs Adeyemi checks it again after Paystack comes back.
  */
 
@@ -17,11 +17,13 @@ const mocks = vi.hoisted(() => ({
   fieldAccess: {} as Record<string, unknown>,
   rows: [] as unknown[],
   asked: [] as unknown[],
-  user: { id: 7, first_name: "Chidi", last_name: "Eze", email: "eze@bss.test" } as Record<string, unknown>,
+  missing: [] as unknown[],
+  missingAsked: [] as unknown[],
+  several: false,
+  add: vi.fn(),
   save: vi.fn(),
   verify: vi.fn(),
   confirm: vi.fn(),
-  roster: [] as unknown[],
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -33,22 +35,21 @@ vi.mock("@/hooks/use-permissions", () => ({
     fieldAccess: mocks.fieldAccess,
   }),
 }));
-vi.mock("@/redux/store", () => ({
-  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { user: mocks.user } }),
-  useAppDispatch: () => vi.fn(),
-}));
+vi.mock("./payment-branches", () => ({ usePaymentBranchColumn: () => ({ show: mocks.several, name: () => "" }) }));
 vi.mock("@/redux/services/finance/payroll-paystack-api", () => ({
   useGetStaffBankAccountsQuery: (args: unknown) => {
     mocks.asked.push(args);
     return { data: { data: mocks.rows, pagination: { currentPage: 1, totalPages: 1 } }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() };
   },
   useGetStaffBankBanksQuery: () => ({ data: { data: [{ code: "058", name: "GTBank" }, { code: "044", name: "Access Bank" }] }, isLoading: false }),
+  useGetStaffWithoutBankAccountQuery: (args: unknown) => {
+    mocks.missingAsked.push(args);
+    return { data: { data: mocks.missing }, isLoading: false };
+  },
+  useAddStaffBankAccountMutation: () => [mocks.add, { isLoading: false }],
   useSaveStaffBankAccountMutation: () => [mocks.save, { isLoading: false }],
   useVerifyStaffBankAccountMutation: () => [mocks.verify, { isLoading: false }],
   useConfirmStaffBankAccountMutation: () => [mocks.confirm, { isLoading: false }],
-}));
-vi.mock("@/redux/services/finance/ops-api", () => ({
-  useGetEmployeeSalariesQuery: () => ({ data: { data: mocks.roster }, isLoading: false }),
 }));
 vi.mock("@/components/custom/search-select", () => ({
   SearchSelect: (props: { options: { value: string; label: string }[]; value?: string; onChange?: (e: { target: { value: string } }) => void; placeholder?: string }) => (
@@ -76,19 +77,21 @@ const account = (over: Record<string, unknown>) => ({
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
-  mocks.held = new Set([P.FIN_VIEW_STAFF_BANK, P.FIN_UPDATE_STAFF_BANK, P.FIN_CONFIRM_STAFF_BANK, P.FIN_VIEW_SALARIES]);
+  mocks.held = new Set([P.FIN_VIEW_STAFF_BANK, P.FIN_UPDATE_STAFF_BANK, P.FIN_CONFIRM_STAFF_BANK]);
   mocks.fieldAccess = {};
   mocks.asked = [];
-  mocks.user = { id: 7, first_name: "Chidi", last_name: "Eze", email: "eze@bss.test" };
+  mocks.missingAsked = [];
+  mocks.several = false;
   mocks.rows = [
-    account({}),
-    account({ id: 2, employee_id: 41, employee_name: "Aisha Bello", account_number: "2222222222", resolved_account_name: "BELLO AISHA", verification_state: "VERIFIED", verification_note: "", changed_by_name: "Bola Okafor" }),
-    account({ id: 3, employee_id: 42, employee_name: "Ngozi Okafor", account_number: "3333333333", resolved_account_name: "", verification_state: "FAILED", verification_note: "The provider could not find this account: x" }),
+    account({ can_confirm: true }),
+    account({ id: 2, employee_id: 41, employee_name: "Aisha Bello", account_number: "2222222222", resolved_account_name: "BELLO AISHA", verification_state: "VERIFIED", verification_note: "", changed_by_name: "Bola Okafor", can_confirm: false }),
+    account({ id: 3, employee_id: 42, employee_name: "Ngozi Okafor", account_number: "3333333333", resolved_account_name: "", verification_state: "FAILED", verification_note: "The provider could not find this account: x", can_confirm: false }),
   ];
-  mocks.roster = [
-    { id: 1, name: "Tunde Adeyemi", employee_id: 40 }, { id: 2, name: "Femi Ojo", employee_id: 50 }, { id: 3, name: "Contractor", employee_id: null },
+  mocks.missing = [
+    { employee_id: 50, employee_name: "Femi Ojo", branch_id: 1, branch_name: "Ikeja" },
+    { employee_id: 51, employee_name: "Kemi Ade", branch_id: 2, branch_name: "Lekki" },
   ];
-  for (const fn of [mocks.save, mocks.verify, mocks.confirm]) {
+  for (const fn of [mocks.add, mocks.save, mocks.verify, mocks.confirm]) {
     fn.mockReset();
     fn.mockReturnValue({ unwrap: async () => ({ message: "Done.", data: account({ verification_state: "VERIFIED" }) }) });
   }
@@ -137,7 +140,9 @@ describe("the staff bank accounts", () => {
 });
 
 describe("confirming an account that needs a second person", () => {
-  it("offers Confirm to Mr Eze, who did not make the change, and confirms", async () => {
+  const rowWith = (over: Record<string, unknown>) => { mocks.rows = [account(over)]; };
+
+  it("offers Confirm to Mr Eze, whom the server marks able to confirm, and confirms", async () => {
     render();
     openRow("Tunde Adeyemi");
     expect(document.body.querySelector("[data-testid=staff-bank-state]")?.textContent).toContain("Needs a second person");
@@ -147,24 +152,32 @@ describe("confirming an account that needs a second person", () => {
     expect(mocks.confirm).toHaveBeenCalledWith({ entity: "BSS", employee: 40 });
   });
 
-  it("does not offer it to Bola, who made the change, and says why", () => {
-    mocks.user = { id: 8, first_name: "Bola", last_name: "Okafor", email: "bola@bss.test" };
+  it("does not offer it to Bola or to Tunde, whom the server marks unable, and says who may", () => {
+    rowWith({ can_confirm: false });
     render();
     openRow("Tunde Adeyemi");
     expect(button("Confirm")).toBeUndefined();
-    expect(document.body.querySelector("[data-testid=staff-bank-confirm-hint]")?.textContent).toContain("You made the last change");
+    expect(document.body.querySelector("[data-testid=staff-bank-confirm-hint]")?.textContent).toContain("cannot be the person who made the last change");
   });
 
-  it("does not offer it to Tunde for his own account", () => {
-    mocks.user = { id: 40, first_name: "Tunde", last_name: "Adeyemi", email: "tunde@bss.test" };
+  it("does not guess from names: a reader sharing the changer's name is still offered it when the server says so", () => {
+    rowWith({ can_confirm: true, changed_by_name: "Chidi Eze" });
     render();
     openRow("Tunde Adeyemi");
-    expect(button("Confirm")).toBeUndefined();
-    expect(document.body.querySelector("[data-testid=staff-bank-confirm-hint]")?.textContent).toContain("your own bank account");
+    expect(button("Confirm")).toBeDefined();
   });
 
-  it("does not offer it without the confirm key", () => {
+  it("does not offer it, or a hint, to a reader without the confirm key", () => {
     mocks.held = new Set([P.FIN_VIEW_STAFF_BANK, P.FIN_UPDATE_STAFF_BANK]);
+    rowWith({ can_confirm: false });
+    render();
+    openRow("Tunde Adeyemi");
+    expect(button("Confirm")).toBeUndefined();
+    expect(document.body.querySelector("[data-testid=staff-bank-confirm-hint]")).toBeNull();
+  });
+
+  it("does not offer it where the check status is hidden and the answer is absent", () => {
+    rowWith({ can_confirm: undefined, verification_state: undefined, verification_state_label: undefined });
     render();
     openRow("Tunde Adeyemi");
     expect(button("Confirm")).toBeUndefined();
@@ -199,6 +212,7 @@ describe("checking and changing an account", () => {
     setValue(number, "2222222223");
     await act(async () => { button("Save and check")!.click(); });
     expect(mocks.save).toHaveBeenCalledWith({ entity: "BSS", employee: 41, account_number: "2222222223" });
+    expect(mocks.add).not.toHaveBeenCalled();
   });
 
   it("refuses an account number that is not ten digits before sending anything", () => {
@@ -228,21 +242,50 @@ describe("checking and changing an account", () => {
 });
 
 describe("adding an account for staff who have none", () => {
-  it("chooses from the roster, leaving out staff with an account and people with no sign-in", async () => {
+  const openAdd = () => act(() => button("Add a staff account")!.click());
+  const picker = () => document.body.querySelector("select[aria-label='Search staff with no account']") as HTMLSelectElement;
+
+  it("chooses from the server's list, adds with a POST, and sends the whole account", async () => {
     render();
-    act(() => button("Add a staff account")!.click());
-    const options = [...document.body.querySelectorAll("select[aria-label='Search the payroll roster'] option")].map((o) => o.textContent);
-    expect(options).toEqual(["-", "Femi Ojo"]);
-    setValue(document.body.querySelector("select[aria-label='Search the payroll roster']") as HTMLSelectElement, "50");
+    openAdd();
+    expect([...picker().querySelectorAll("option")].map((o) => o.textContent)).toEqual(["-", "Femi Ojo", "Kemi Ade"]);
+    setValue(picker(), "50");
     act(() => button("Continue")!.click());
     setValue(document.body.querySelector("select[aria-label='Choose the bank']") as HTMLSelectElement, "044");
     setValue(document.body.querySelector<HTMLInputElement>('input[aria-label="Account number"]')!, "0123 456 789");
     await act(async () => { button("Save and check")!.click(); });
-    expect(mocks.save).toHaveBeenCalledWith({ entity: "BSS", employee: 50, bank_code: "044", bank_name: "Access Bank", account_number: "0123456789" });
+    expect(mocks.add).toHaveBeenCalledWith({ entity: "BSS", employee: 50, bank_code: "044", bank_name: "Access Bank", account_number: "0123456789" });
+    expect(mocks.save).not.toHaveBeenCalled();
   });
 
-  it("is not offered without the roster key", () => {
+  it("names a person's branch only at a school with several", () => {
+    render();
+    openAdd();
+    expect([...picker().querySelectorAll("option")].map((o) => o.textContent)).not.toContain("Femi Ojo · Ikeja");
+    act(() => root.unmount());
+    root = createRoot(container);
+    document.body.innerHTML = "";
+    document.body.appendChild(container);
+    mocks.several = true;
+    render();
+    openAdd();
+    expect([...picker().querySelectorAll("option")].map((o) => o.textContent)).toEqual(["-", "Femi Ojo · Ikeja", "Kemi Ade · Lekki"]);
+  });
+
+  it("asks the server, with the name typed, and reads no payroll roster", () => {
+    render();
+    openAdd();
+    expect(mocks.missingAsked[0]).toEqual({ entity: "BSS", page_size: 50 });
+  });
+
+  it("is offered with the update key alone", () => {
     mocks.held = new Set([P.FIN_VIEW_STAFF_BANK, P.FIN_UPDATE_STAFF_BANK]);
+    render();
+    expect(button("Add a staff account")).toBeDefined();
+  });
+
+  it("is not offered without the update key", () => {
+    mocks.held = new Set([P.FIN_VIEW_STAFF_BANK]);
     render();
     expect(button("Add a staff account")).toBeUndefined();
   });

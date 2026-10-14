@@ -3,12 +3,11 @@
  * run and sends it for approval, Mr Eze approves it, and she posts it. February's
  * run is sent back by Mr Eze: Mrs Bello, who sent it, corrects its period label
  * and resumes it, while her colleague Mrs Adeyemi, who also raises runs, can do
- * neither. A run posted before approvals existed is told apart so it is never
- * offered for payment through Paystack.
+ * neither.
  */
 import { describe, expect, it } from "vitest";
 import {
-  approvalNote, postedWithoutApproval, runApprovalPhase, runOffers, runStatusKey, wasRejected,
+  approvalNote, runApprovalPhase, runOffers, runStatusKey, wasRejected,
 } from "./payroll-approval";
 
 const run = (over: Record<string, unknown> = {}) => ({
@@ -63,15 +62,6 @@ describe("the phase of a run's approval", () => {
     expect(wasRejected(rejected)).toBe(true);
     expect(runOffers(rejected, false).submit).toBe(true);
     expect(approvalNote("draft", true)).toContain("rejected");
-  });
-});
-
-describe("a run posted before approvals existed", () => {
-  it("is marked, so it is never offered for payment through Paystack", () => {
-    expect(postedWithoutApproval({ run_status: "POSTED", approval_state: "NOT_SUBMITTED" })).toBe(true);
-    expect(postedWithoutApproval({ run_status: "POSTED", approval_state: "APPROVED" })).toBe(false);
-    expect(postedWithoutApproval({ run_status: "POSTED", approval_state: undefined })).toBe(false);
-    expect(postedWithoutApproval({ run_status: "DRAFT", approval_state: "NOT_SUBMITTED" })).toBe(false);
   });
 });
 

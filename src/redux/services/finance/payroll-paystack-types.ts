@@ -73,6 +73,8 @@ export interface PayrollPayments {
   branches: PayrollPaymentBranch[];
   lines: PayrollPaymentLine[];
   counts?: PayrollPaymentCounts; // Field Access: finance.payrollrun pay_state
+  /** Whether the run has an approved request, which paying through the provider needs. */
+  approved?: boolean; // Field Access: finance.payrollrun pay_state
 }
 
 /** Whether a staff member's bank account may be paid. */
@@ -93,6 +95,8 @@ export interface StaffBankAccount {
   verification_note?: string;
   verified_at?: string | null;
   is_payable?: boolean;
+  /** True when the reader may confirm this account now; absent when the check status is hidden. */
+  can_confirm?: boolean; // Field Access: finance.staff_bank verification_state
   changed_by_name?: string | null; // Field Access: finance.staff_bank changed_by
   confirmed_by_name?: string | null; // Field Access: finance.staff_bank confirmation
   confirmed_at?: string | null;
@@ -111,4 +115,12 @@ export interface StaffBankAccountBody {
   bank_code?: string;
   bank_name?: string;
   account_number?: string;
+}
+
+/** A member of payroll staff who has no bank account yet. */
+export interface StaffWithoutBankAccount {
+  employee_id: number;
+  employee_name?: string; // Field Access: finance.staff_bank employee
+  branch_id: number | null;
+  branch_name: string | null;
 }

@@ -11,18 +11,21 @@
  * an account it could not reach or find.
  *
  * A section of Payroll, so it is reached with `finance.payrollrun.view` and
- * shown to a holder of `finance.staff_bank.view`. Keys: `finance.staff_bank.view` to read, `.update` to save an account or check
- * it again, `.confirm` to confirm one. The server refuses a confirmation by the
- * person who made the change, in its own words, which the central handler shows.
- * Staff who have no account are added from the payroll roster, which needs
- * `finance.salary.view`.
+ * shown to a holder of `finance.staff_bank.view`. Keys: `finance.staff_bank.view`
+ * to read, `.update` to add or edit an account or check it again, `.confirm` to
+ * confirm one. Confirm is shown only where the server's `can_confirm` says the
+ * reader may confirm that account now. Adding is a POST that the server refuses
+ * (409) when the person already has an account, and editing a PUT that it refuses
+ * when there is none, so an add never replaces an account. The staff offered to
+ * add are the server's list of people on the payroll with no account, which
+ * needs `.update` alone.
  *
  * Field Access (`finance.staff_bank`): the staff name, the bank, the account
  * number, the holder's name, the check status, and who changed and confirmed an
  * account are separate switches. A hidden one has no column, no line in the
- * drawer and no control; a read-only one is greyed and never sent. The roster of
- * staff is read through the branches the reader reaches, so another branch's
- * staff never appear.
+ * drawer and no control; a read-only one is greyed and never sent. Staff are
+ * listed through the branches the reader reaches, so another branch's staff
+ * never appear.
  */
 
 import { useMemo, useState } from "react";
@@ -37,34 +40,29 @@ import { useCan } from "@/components/finance-ui/can";
 import { SearchSelect } from "@/components/custom/search-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAppSelector } from "@/redux/store";
-import { useGetEmployeeSalariesQuery } from "@/redux/services/finance/ops-api";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
   useConfirmStaffBankAccountMutation,
   useGetStaffBankAccountsQuery,
   useGetStaffBankBanksQuery,
+  useAddStaffBankAccountMutation,
+  useGetStaffWithoutBankAccountQuery,
   useSaveStaffBankAccountMutation,
   useVerifyStaffBankAccountMutation,
 } from "@/redux/services/finance/payroll-paystack-api";
 import type { StaffBankAccount } from "@/redux/services/finance/payroll-paystack-types";
 import { cn } from "@/lib/utils";
 import { P } from "../../permissions";
+import { usePaymentBranchColumn } from "./payment-branches";
 import { useDates } from "../../lib/display-prefs";
 import { fieldRefusals } from "./payroll-refusals";
 import {
-  STAFF_BANK_FILTERS, bankChanges, bankFormOf, bankFormProblem, confirmOffer, offersCheckAgain, readerName, staffBankWord,
-  type BankForm, type Reader,
+  STAFF_BANK_FILTERS, bankChanges, bankFormOf, bankFormProblem, confirmOffer, offersCheckAgain, staffBankWord,
+  type BankForm,
 } from "./staff-bank-model";
 
 const RESOURCE = "finance.staff_bank";
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
-
-/** The signed-in reader, as the server names the person who made a change. */
-function useReader(): Reader {
-  const user = useAppSelector((state) => state.auth.user) as unknown as
-    { id?: number | string | null; first_name?: string; last_name?: string; email?: string } | null;
-  return { id: user?.id ?? null, name: readerName(user) };
-}
 
 function StatePill({ state }: { state: StaffBankAccount["verification_state"] }) {
   const word = staffBankWord(state);
@@ -105,7 +103,7 @@ export function StaffBankAccountsTab({ entity }: { entity: string }) {
             {STAFF_BANK_FILTERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         ) : <span />}
-        {mayUpdate && can(P.FIN_VIEW_SALARIES) ? (
+        {mayUpdate ? (
           <Button onClick={() => setAdding(true)} className="gap-1.5"><Plus className="size-4" /> Add a staff account</Button>
         ) : null}
       </div>
@@ -119,7 +117,7 @@ export function StaffBankAccountsTab({ entity }: { entity: string }) {
       <AccountDrawer account={open} entity={entity} onClose={() => setOpenId(null)}
         onEdit={(account) => { setOpenId(null); setEditing({ employeeId: account.employee_id, name: account.employee_name ?? "", account }); }} />
       {editing ? <AccountFormDrawer entity={entity} employeeId={editing.employeeId} name={editing.name} account={editing.account} onClose={() => setEditing(null)} /> : null}
-      {adding ? <AddAccountDrawer entity={entity} existing={rows} onClose={() => setAdding(false)}
+      {adding ? <AddAccountDrawer entity={entity} onClose={() => setAdding(false)}
         onPick={(employeeId, name) => { setAdding(false); setEditing({ employeeId, name, account: null }); }} /> : null}
     </div>
   );
@@ -140,7 +138,6 @@ export function AccountDrawer({ account, entity, onClose, onEdit }: {
 }) {
   const dates = useDates();
   const { can } = useCan();
-  const reader = useReader();
   const access = useFieldAccess(RESOURCE, account);
   const [verify, { isLoading: checking }] = useVerifyStaffBankAccountMutation();
   const [confirm, { isLoading: confirming }] = useConfirmStaffBankAccountMutation();
@@ -148,7 +145,7 @@ export function AccountDrawer({ account, entity, onClose, onEdit }: {
   if (!account) return null;
 
   const word = staffBankWord(account.verification_state);
-  const offer = confirmOffer(account, reader, can(P.FIN_CONFIRM_STAFF_BANK));
+  const offer = confirmOffer(account, can(P.FIN_CONFIRM_STAFF_BANK));
   const mayUpdate = can(P.FIN_UPDATE_STAFF_BANK);
   const bankWritable = !access.isReadOnly("bank_code") || !access.isReadOnly("account_number");
 
@@ -218,7 +215,9 @@ export function AccountFormDrawer({ entity, employeeId, name, account, onClose }
   const [form, setForm] = useState<BankForm>(bankFormOf(account));
   const [errors, setErrors] = useState<FieldErrors | null>(null);
   const banks = useGetStaffBankBanksQuery({ entity });
-  const [save, { isLoading }] = useSaveStaffBankAccountMutation();
+  const [add, adding] = useAddStaffBankAccountMutation();
+  const [save, saving] = useSaveStaffBankAccountMutation();
+  const isLoading = adding.isLoading || saving.isLoading;
   const options = toArray(banks.data?.data).map((bank) => ({ value: bank.code, label: bank.name }));
   const creating = account === null;
   const problem = bankFormProblem(form);
@@ -229,7 +228,7 @@ export function AccountFormDrawer({ entity, employeeId, name, account, onClose }
     if (problem || nothingToSave) return;
     setErrors(null);
     try {
-      const res = await save({ entity, employee: employeeId, ...changes }).unwrap();
+      const res = await (creating ? add : save)({ entity, employee: employeeId, ...changes }).unwrap();
       toast.success(res.message || "Bank account saved.");
       if (res.data?.verification_state === "NEEDS_CONFIRMATION") {
         toast.warning("Paystack named a different holder. A second person must confirm this account before staff are paid into it.");
@@ -267,31 +266,33 @@ export function AccountFormDrawer({ entity, employeeId, name, account, onClose }
   );
 }
 
-/** Staff on the payroll roster who have no account yet. */
-function AddAccountDrawer({ entity, existing, onClose, onPick }: {
-  entity: string; existing: StaffBankAccount[]; onClose: () => void; onPick: (employeeId: number, name: string) => void;
+/** Staff on the payroll who have no account yet, as the server lists them, searched by name. */
+function AddAccountDrawer({ entity, onClose, onPick }: {
+  entity: string; onClose: () => void; onPick: (employeeId: number, name: string) => void;
 }) {
+  const branchColumn = usePaymentBranchColumn();
   const [search, setSearch] = useState("");
   const [picked, setPicked] = useState("");
-  const roster = useGetEmployeeSalariesQuery({ entity, is_active: "true" });
-  const withAccount = new Set(existing.map((row) => row.employee_id));
-  const staff = toArray(roster.data?.data).filter((row) => row.employee_id != null && !withAccount.has(row.employee_id));
-  const options = staff
-    .filter((row) => !search.trim() || row.name.toLowerCase().includes(search.trim().toLowerCase()))
-    .map((row) => ({ value: String(row.employee_id), label: row.name }));
+  const term = useDebounce(search.trim(), 300);
+  const missing = useGetStaffWithoutBankAccountQuery({ entity, page_size: 50, ...(term ? { search: term } : {}) });
+  const staff = toArray(missing.data?.data);
+  const options = staff.map((row) => ({
+    value: String(row.employee_id),
+    label: [row.employee_name ?? `Staff ${row.employee_id}`, branchColumn.show ? row.branch_name : null].filter(Boolean).join(" · "),
+  }));
   const chosen = staff.find((row) => String(row.employee_id) === picked);
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())} title="Add a staff account"
       description="Choose the member of staff, then their bank and account number." widthClass="sm:max-w-md"
       footer={<>
         <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button disabled={!chosen} onClick={() => chosen && onPick(chosen.employee_id!, chosen.name)}>Continue</Button>
+        <Button disabled={!chosen} onClick={() => chosen && onPick(chosen.employee_id, chosen.employee_name ?? "")}>Continue</Button>
       </>}>
       <FormField label="Staff member" required>
-        <SearchSelect options={options} value={picked} loading={roster.isLoading} placeholder="Search the payroll roster"
+        <SearchSelect options={options} value={picked} loading={missing.isLoading} placeholder="Search staff with no account"
           onChange={(e) => setPicked(e.target.value)} onSearchChange={setSearch} />
       </FormField>
-      {!roster.isLoading && staff.length === 0 ? <p className="mt-3 font-mont text-xs text-gray-05">Every member of staff on the roster who has a sign-in already has an account saved.</p> : null}
+      {!missing.isLoading && staff.length === 0 && !term ? <p className="mt-3 font-mont text-xs text-gray-05">Everyone on the payroll already has an account saved.</p> : null}
     </DetailDrawer>
   );
 }
