@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
   payFromBank: vi.fn(),
   linksAsked: [] as unknown[],
+  collectionsAsked: [] as unknown[],
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -42,15 +43,13 @@ vi.mock("@/redux/services/payments/payments-api", () => ({
     mocks.linksAsked.push({ args, skip: options?.skip === true });
     return { data: options?.skip ? undefined : { data: mocks.links }, isLoading: false };
   },
-  useGetCollectionsQuery: (_args: unknown, options?: { skip?: boolean }) => ({
-    data: options?.skip ? undefined : { data: mocks.collections }, isFetching: false,
-  }),
+  useGetCollectionsQuery: (args: unknown, options?: { skip?: boolean }) => {
+    mocks.collectionsAsked.push({ args, skip: options?.skip === true });
+    return { data: options?.skip ? undefined : { data: mocks.collections }, isFetching: false };
+  },
   useLinkProviderRefundMutation: () => [mocks.link, { isLoading: false }],
   useVerifyProviderRefundMutation: () => [mocks.verify, { isLoading: false }],
   usePayProviderRefundFromBankMutation: () => [mocks.payFromBank, { isLoading: false }],
-}));
-vi.mock("@/redux/services/finance/ar-api", () => ({
-  useGetRefundQuery: () => ({ data: { data: { id: 12, method: mocks.method } }, isLoading: false }),
 }));
 
 vi.mock("../../../lib/display-prefs", () => ({
@@ -91,6 +90,7 @@ beforeEach(() => {
   mocks.method = "ONLINE";
   mocks.collections = [PAYMENT(), PAYMENT({ id: 6, reference: "COL-6", customer_code: "C-009" })];
   mocks.linksAsked = [];
+  mocks.collectionsAsked = [];
   for (const fn of [mocks.link, mocks.verify, mocks.payFromBank]) {
     fn.mockReset();
     fn.mockReturnValue({ unwrap: async () => ({ message: "Done.", data: LINK }) });
@@ -104,7 +104,7 @@ afterEach(() => { act(() => root.unmount()); container.remove(); });
 const button = (label: string) => [...document.body.querySelectorAll("button")].find((b) => b.textContent?.includes(label)) as HTMLButtonElement | undefined;
 const panel = (onSend = vi.fn().mockResolvedValue(undefined)) => {
   act(() => root.render(
-    <ProviderRefundPanel refundId={12} refundStatus="DRAFT" customerCode="C-001" entity="BSS" currency="NGN" amount={10_000_000} onSend={onSend} />,
+    <ProviderRefundPanel refundId={12} refundStatus="DRAFT" method={mocks.method} customerCode="C-001" entity="BSS" currency="NGN" amount={10_000_000} onSend={onSend} />,
   ));
   return onSend;
 };
@@ -250,6 +250,15 @@ describe("the online choice on a new refund", () => {
     expect(container.textContent).toContain("Original payment");
     act(() => root.render(<OnlineRefundFields entity="BSS" currency="NGN" customerCode="C-001" branch={2} amount={18_000_001} value={{ online: true, collection: "5", payment: picked as never }} onChange={vi.fn()} />));
     expect(container.textContent).toContain("The refund is more than the payment it returns.");
+  });
+
+  it("asks the server for this customer's paid payments only", () => {
+    fields();
+    act(() => button("Back through Paystack")!.click());
+    fields({ online: true, collection: "", payment: null });
+    expect(mocks.collectionsAsked).toContainEqual({
+      args: { entity: "BSS", group: "PAID", customer: "C-001", page_size: 100 }, skip: false,
+    });
   });
 
   it("switches between the bank and the provider", () => {

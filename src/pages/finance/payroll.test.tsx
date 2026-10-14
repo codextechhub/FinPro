@@ -31,11 +31,19 @@ const mocks = vi.hoisted(() => ({
   branchIds: null as number[] | null,
   run: null as unknown,
   openPayslip: vi.fn(),
+  held: null as Set<string> | null,
+  payments: undefined as unknown,
+  standing: null as string | null,
+  submit: vi.fn(),
+  correct: vi.fn(),
+  post: vi.fn(),
+  retry: vi.fn(),
+  record: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
-    hasPermission: () => true,
+    hasPermission: (code: string) => mocks.held === null || mocks.held.has(code),
     hasAnyPermission: () => true,
     hasAllPermissions: () => true,
     hasModuleAccess: () => true,
@@ -49,7 +57,7 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useUpdateEmployeeSalaryMutation: () => [mocks.update, { isLoading: false }],
   usePayPayrollRunMutation: () => [mocks.pay, { isLoading: false }],
   useGetPayrollRunQuery: () => ({ data: mocks.run ? { data: mocks.run } : undefined }),
-  usePostPayrollRunMutation: () => [vi.fn(), { isLoading: false }],
+  usePostPayrollRunMutation: () => [mocks.post, { isLoading: false }],
   useCancelPayrollRunMutation: () => [vi.fn(), { isLoading: false }],
   useGetEmployeeSalariesQuery: () => ({ data: { data: [] } }),
   useGeneratePayrollRunMutation: () => [vi.fn(), { isLoading: false }],
@@ -63,6 +71,19 @@ vi.mock("@/redux/services/finance/payroll-api", () => ({
   useGetPensionFundAdministratorsQuery: () => ({ data: { data: [{ id: 9, code: "STANBIC", name: "Stanbic IBTC Pension", is_active: true }] } }),
   useGetPayslipContentQuery: () => ({ data: undefined, isLoading: false }),
   useGetPreviousPayMissingQuery: () => ({ data: undefined }),
+}));
+vi.mock("@/redux/services/finance/payroll-paystack-api", () => ({
+  useSubmitPayrollRunMutation: () => [mocks.submit, { isLoading: false }],
+  useCorrectPayrollRunMutation: () => [mocks.correct, { isLoading: false }],
+  useGetPayrollRunPaymentsQuery: () => ({ data: mocks.payments ? { data: mocks.payments } : undefined, refetch: vi.fn(), isFetching: false }),
+  useRetryPayrollPaymentsMutation: () => [mocks.retry, { isLoading: false }],
+  useRecordPayrollLinesPaidFromBankMutation: () => [mocks.record, { isLoading: false }],
+}));
+vi.mock("./payment-branches", () => ({ usePaymentBranchColumn: () => ({ show: false, name: () => "" }) }));
+vi.mock("@/components/finance-ui/returned-note", () => ({
+  useFinanceReturned: () => ({ standing: mocks.standing, request: undefined, workflowId: "55", requestNamed: true }),
+  ReturnedNote: (props: { standing: string }) => <p data-testid="returned-note">{props.standing}</p>,
+  ResumeButton: () => <button type="button">Resume</button>,
 }));
 vi.mock("../../utils/payroll-documents", () => ({ openLinePayslip: mocks.openPayslip }));
 vi.mock("../../components/workflow/person-picker", () => ({
@@ -96,6 +117,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
+import { P } from "../../permissions";
 import { EmployeeDrawer, GeneratedRunNotice, NewRunDrawer, PayDrawer, PreviousPayMissingBanner, RunDrawer, canPrintPayslip, offeredStructures, salaryChanges, statutoryTotals, withSequences } from "./payroll";
 import { resolveFieldAccess } from "@/components/finance-ui";
 import type { EmployeeSalary, PayrollRun } from "@/redux/services/finance/ops-types";
@@ -123,6 +145,13 @@ let root: Root;
 beforeEach(() => {
   mocks.fieldAccess = CLERK;
   mocks.update.mockReset();
+  mocks.held = null;
+  mocks.payments = undefined;
+  mocks.standing = null;
+  for (const fn of [mocks.submit, mocks.correct, mocks.post, mocks.retry, mocks.record]) {
+    fn.mockReset();
+    fn.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Done.", data: {} }) });
+  }
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -549,5 +578,170 @@ describe("a run's lines", () => {
   it("offers a payslip only to a role that reads every figure on it", () => {
     expect(canPrintPayslip(resolveFieldAccess({}, "finance.payrollrun"))).toBe(true);
     expect(canPrintPayslip(resolveFieldAccess({ "finance.payrollrun": { hidden: ["components"] } }, "finance.payrollrun"))).toBe(false);
+  });
+});
+
+
+/**
+ * January's payroll at Bright Star. Mrs Bello prepares it as a draft and sends
+ * it for approval; Mr Eze approves it; she posts it, and pays it either from
+ * the branch's bank or, at a school that pays through Paystack, through
+ * Paystack. A run Mr Eze sends back is corrected by Mrs Bello, who sent it.
+ */
+const JANUARY = (over: Partial<PayrollRun> = {}): PayrollRun => ({
+  ...SEPT, id: 9, document_number: "PR-9", period_label: "January 2027", run_status: "DRAFT", status: "DRAFT",
+  approval_state: "NOT_SUBMITTED", approval_returned: false, workflow_instance_id: null, branch_shares: [], ...over,
+});
+const openRun = (run: PayrollRun) => {
+  mocks.run = run;
+  act(() => root.render(<RunDrawer runId={run.id} entity="BSS" onClose={() => undefined} />));
+};
+const press = async (label: string) => {
+  const target = [...document.body.querySelectorAll("button")].find((b) => b.textContent?.includes(label)) as HTMLButtonElement;
+  await act(async () => { target.click(); });
+};
+
+describe("A payroll run going through approval", () => {
+  afterEach(() => { mocks.run = null; });
+
+  it("offers a draft nobody has sent for approval, and not posting", () => {
+    openRun(JANUARY());
+    const labels = buttonLabels();
+    expect(labels.some((l) => l.includes("Submit for approval"))).toBe(true);
+    expect(labels.some((l) => l.includes("Calculate & post"))).toBe(false);
+    expect(labels.some((l) => l.includes("Edit"))).toBe(true);
+    expect(document.body.textContent).toContain("A second person approves each run before it is posted.");
+  });
+
+  it("sends it for approval after a confirmation, and says nothing more when somebody can approve", async () => {
+    mocks.submit.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Sent.", data: { approval: { parked: false, instance_id: "i" } } }) });
+    openRun(JANUARY());
+    await press("Submit for approval");
+    await press("Send for approval");
+    expect(mocks.submit).toHaveBeenCalledWith({ id: 9, entity: "BSS" });
+    expect(document.body.querySelector("[data-testid=payroll-parked]")).toBeNull();
+  });
+
+  it("warns, without offering to go on, when nobody except the preparer could approve it", async () => {
+    mocks.submit.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Sent.", data: { approval: { parked: true, instance_id: "i", requirement: "Members of the finance-payroll-approver group can approve this." } } }) });
+    openRun(JANUARY());
+    await press("Submit for approval");
+    await press("Send for approval");
+    const warning = document.body.querySelector("[data-testid=payroll-parked]")!;
+    expect(warning.textContent).toContain("Nobody can approve this run yet.");
+    expect(warning.textContent).toContain("finance-payroll-approver");
+    expect(buttonLabels().some((l) => l.includes("Continue without"))).toBe(false);
+  });
+
+  it("tells a reader who may not send runs that a second person's approval is needed", () => {
+    mocks.held = new Set([P.FIN_VIEW_PAYROLL, P.FIN_CREATE_PAYROLL]);
+    openRun(JANUARY());
+    expect(buttonLabels().some((l) => l.includes("Submit for approval"))).toBe(false);
+    expect(document.body.textContent).toContain("needs a second person's approval");
+  });
+
+  it("holds a run with its approvers: nothing to change, post or cancel", () => {
+    openRun(JANUARY({ status: "PENDING_APPROVAL", approval_state: "PENDING" }));
+    const labels = buttonLabels();
+    for (const action of ["Submit for approval", "Calculate & post", "Edit", "Cancel run", "Resume"]) {
+      expect(labels.some((l) => l.includes(action))).toBe(false);
+    }
+    expect(document.body.textContent).toContain("With the approvers.");
+    expect(document.body.textContent).toContain("Awaiting approval");
+  });
+
+  it("lets the person who sent a returned run correct its period and narration, and resume it", async () => {
+    mocks.standing = "sender";
+    openRun(JANUARY({ approval_state: "PENDING", approval_returned: true, workflow_instance_id: 55 }));
+    expect(document.body.querySelector("[data-testid=returned-note]")?.textContent).toBe("sender");
+    expect(buttonLabels().some((l) => l.includes("Resume"))).toBe(true);
+    expect(buttonLabels().some((l) => l.includes("Submit for approval"))).toBe(false);
+    await press("Edit");
+    const period = document.body.querySelector<HTMLInputElement>('input[aria-label="Period"]')!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    act(() => { setter.call(period, "January 2027 (corrected)"); period.dispatchEvent(new Event("input", { bubbles: true })); });
+    await press("Save changes");
+    expect(mocks.correct).toHaveBeenCalledWith({ id: 9, entity: "BSS", period_label: "January 2027 (corrected)" });
+  });
+
+  it("offers a colleague who did not send a returned run neither Edit nor Resume", () => {
+    mocks.standing = "returned";
+    openRun(JANUARY({ approval_state: "PENDING", approval_returned: true, workflow_instance_id: 55 }));
+    expect(document.body.querySelector("[data-testid=returned-note]")?.textContent).toBe("returned");
+    const labels = buttonLabels();
+    expect(labels.some((l) => l.includes("Resume"))).toBe(false);
+    expect(labels.some((l) => l.includes("Edit"))).toBe(false);
+  });
+
+  it("offers posting once the run is approved, and only then", async () => {
+    openRun(JANUARY({ status: "APPROVED", approval_state: "APPROVED" }));
+    expect(buttonLabels().some((l) => l.includes("Calculate & post"))).toBe(true);
+    expect(buttonLabels().some((l) => l.includes("Submit for approval"))).toBe(false);
+    expect(document.body.textContent).toContain("Approved. Post it");
+    await press("Calculate & post");
+    expect(mocks.post).toHaveBeenCalledWith({ id: 9, entity: "BSS" });
+  });
+
+  it("shows a draft as a draft to a reader whose role may not read the approval status", () => {
+    openRun(JANUARY({ status: "PENDING_APPROVAL", approval_state: undefined, approval_returned: undefined }));
+    expect(document.body.textContent).not.toContain("With the approvers.");
+    expect(document.body.textContent).not.toContain("Awaiting approval");
+  });
+
+  it("offers a bursar bound to Lekki nothing on Ikeja's part of a whole-school draft", () => {
+    mocks.wholeSchool = false;
+    mocks.branchIds = [20];
+    openRun(JANUARY({ ...SEPT_LEKKI_PART, id: 9, run_status: "DRAFT", status: "DRAFT", approval_state: "NOT_SUBMITTED", approval_returned: false }));
+    expect(buttonLabels().some((l) => l.includes("Submit for approval"))).toBe(false);
+    mocks.wholeSchool = true;
+    mocks.branchIds = null;
+  });
+});
+
+describe("Paying a posted run", () => {
+  afterEach(() => { mocks.run = null; });
+  const POSTED = (over: Partial<PayrollRun> = {}) => JANUARY({ run_status: "POSTED", status: "POSTED", approval_state: "APPROVED", ...over });
+  const PAYMENTS = (over: Record<string, unknown> = {}) => ({
+    run_id: 9, run_status: "POSTED", payment_route: "PAYSTACK", branches: [], lines: [],
+    counts: { not_sent: 0, needs_bank_details: 0, waiting_for_funds: 0, sent: 0, paid: 0, failed: 0 }, ...over,
+  });
+
+  it("pays from the branch's bank as before at a school that pays that way", () => {
+    mocks.payments = PAYMENTS({ payment_route: "OWN_BANK" });
+    openRun(POSTED());
+    expect(buttonLabels().some((l) => l.includes("Pay net"))).toBe(true);
+    expect(buttonLabels().some((l) => l.includes("Pay through Paystack"))).toBe(false);
+  });
+
+  it("sends the run through Paystack, with no bank account to choose", async () => {
+    mocks.payments = PAYMENTS({ lines: [{ id: 1, line_no: 1, employee_id: 5, employee_name: "Aisha Bello", net_amount: 100, branch_id: 1, branch_name: "Ikeja", pay_state: "" }] });
+    mocks.pay.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Sent for payment." }) });
+    openRun(POSTED());
+    expect(buttonLabels().some((l) => l.includes("Pay net"))).toBe(false);
+    await press("Pay through Paystack");
+    await press("Pay staff");
+    expect(mocks.pay).toHaveBeenCalledWith({ id: 9, entity: "BSS" });
+  });
+
+  it("says a run posted before approvals existed must be approved first, or paid from the bank", () => {
+    mocks.payments = PAYMENTS();
+    openRun(POSTED({ approval_state: "NOT_SUBMITTED" }));
+    expect(buttonLabels().some((l) => l.includes("Pay through Paystack"))).toBe(false);
+    const note = document.body.querySelector("[data-testid=payroll-legacy-note]")!;
+    expect(note.textContent).toContain("Approve this run before paying through Paystack, or record it as paid from the bank.");
+  });
+
+  it("offers to send the rest once some staff have gone, and stops when every line is settled", () => {
+    mocks.payments = PAYMENTS({ lines: [
+      { id: 1, line_no: 1, employee_id: 5, employee_name: "A", net_amount: 1, branch_id: 1, branch_name: "Ikeja", pay_state: "PAID" },
+      { id: 2, line_no: 2, employee_id: 6, employee_name: "B", net_amount: 1, branch_id: 1, branch_name: "Ikeja", pay_state: "NEEDS_BANK_DETAILS" },
+    ] });
+    openRun(POSTED());
+    expect(buttonLabels().some((l) => l.includes("Send the rest through Paystack"))).toBe(true);
+    act(() => root.unmount());
+    root = createRoot(container);
+    mocks.payments = PAYMENTS({ lines: [{ id: 1, line_no: 1, employee_id: 5, employee_name: "A", net_amount: 1, branch_id: 1, branch_name: "Ikeja", pay_state: "SENT" }] });
+    openRun(POSTED());
+    expect(buttonLabels().some((l) => l.includes("through Paystack"))).toBe(false);
   });
 });

@@ -63,7 +63,7 @@ const verifiedCollectionUrl = (id: number, entity: string) =>
 
 export const paymentsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getCollections: builder.query<PaginatedEnvelope<Collection>, { entity: string; page?: number; page_size?: number; group?: string; status?: string; provider?: string; origin?: string; virtual_account?: number }>({
+    getCollections: builder.query<PaginatedEnvelope<Collection>, { entity: string; page?: number; page_size?: number; group?: string; status?: string; provider?: string; origin?: string; virtual_account?: number; customer?: string | number }>({
       query: (p) => ({ url: `/payments/collections/${qs(p)}`, method: "GET" }),
       providesTags: ["PaymentsCollections"],
     }),

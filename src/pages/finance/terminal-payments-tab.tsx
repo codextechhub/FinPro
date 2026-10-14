@@ -6,10 +6,11 @@
  * paid, the payer's email and the sender's name, the branch (only at a school
  * with several), and why a waiting payment did not match by itself. Opening one
  * shows up to five suggested customers, each with the reason it was suggested
- * and a Match button, and a picker for anybody else; the picker offers only
- * customers of the payment's own branch (and those every branch shares),
- * because the server refuses any other and says why, in words shown beside the
- * picker. A matched payment shows who matched it and when, and can be
+ * and a Match button, and a picker for anybody else; the picker asks the server
+ * for the customers of the payment's own branch (and those every branch
+ * shares), so a long list is narrowed before its first page, and drops any other
+ * that arrives, because the server refuses it and says why, in words shown
+ * beside the picker. A matched payment shows who matched it and when, and can be
  * unmatched, which voids the receipt that applied it.
  *
  * Keys: `payments.terminal_payment.view` to read, `.match` to match,
@@ -177,7 +178,7 @@ export function TerminalPaymentDrawer({ payment, entity, currency, showBranch, o
   const mayReverse = can(P.PAY_REVERSE_TERMINAL_PAYMENT);
   const term = useDebounce(customerSearch.trim(), 300);
   const customersQ = useGetCustomersQuery(
-    { entity, page_size: 50, ...(term ? { search: term } : {}), ...(!customerAccess.isHidden("is_active") ? { is_active: "true" } : {}) },
+    { entity, page_size: 50, ...(payment.branch != null ? { branch: payment.branch } : {}), ...(term ? { search: term } : {}), ...(!customerAccess.isHidden("is_active") ? { is_active: "true" } : {}) },
     { skip: !waiting || !mayMatch },
   );
   const choices = useMemo(

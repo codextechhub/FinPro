@@ -6,6 +6,7 @@
 
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
 import type { PayeSource, PayeWorking, PayrollLineItem } from "./payroll-types";
+import type { PayrollApprovalState, PayrollLinePayState } from "./payroll-paystack-types";
 import type { BranchCloseState } from "./setup-types";
 
 // ── Banking ──────────────────────────────────────────────────────────────────
@@ -399,6 +400,13 @@ export interface PayrollLine {
   pfa_name?: string | null;
   tax_id?: string;
   pension_pin?: string;
+  // Payment through the provider (Field Access: finance.payrollrun, own switches).
+  pay_state?: PayrollLinePayState;
+  pay_state_label?: string;
+  paid_via?: "" | "PAYSTACK" | "OWN_BANK";
+  paid_via_label?: string;
+  pay_note?: string;
+  payout_reference?: string;
   _read_only_fields?: string[];
 }
 
@@ -529,6 +537,12 @@ export interface PayrollRun {
   // branches, is sent only those branches' lines, shares and totals. Absent from
   // older servers, which never send such a part.
   partial_view?: boolean;
+  /** Where the run stands with its approval route; absent when Field Access hides it. */
+  approval_state?: PayrollApprovalState;
+  /** True while an approver has handed the run back to whoever sent it. */
+  approval_returned?: boolean;
+  /** The run's latest approval request on a single run's read; null before it is first sent. */
+  workflow_instance_id?: string | number | null;
 }
 
 // ── Budgets ──────────────────────────────────────────────────────────────────

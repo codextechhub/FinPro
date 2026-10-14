@@ -25,7 +25,9 @@
  *   data the platform maintains); 41 credittransfer, 42 deferredincome,
  *   43 provision, 44 deposit, 45 banktransaction, 46 banktransfer; 49 seal;
  *   55 interbranch (transfers between a school's branches, with its own
- *   actions 52 request, 53 transfer, 54 confirm and 55 recharge).
+ *   actions 52 request, 53 transfer, 54 confirm and 55 recharge); 56
+ *   staff_bank (a member of staff's bank account for payroll paid through the
+ *   payment provider; `confirm` is action 54, as an inter-branch transfer's is).
  *
  *   Procurement (70): 01 category, 02 vendor, 03 catalog_item, 04 contract,
  *   05 requisition, 06 rfq, 07 quotation, 08 purchase_order, 09 goods_receipt,
@@ -134,6 +136,7 @@ export const P = {
   FIN_UPDATE_PETTY_CASH: "202003",
   FIN_UPDATE_TAX: "202103",
   FIN_PAY_PAYROLL: "202216",
+  FIN_SUBMIT_PAYROLL: "202230",  // send a draft run for approval
   FIN_PAY_TAX: "202116",
   FIN_POST_CONCESSION: "200813",
   FIN_POST_DIRECT_ENTRY: "201113",
@@ -191,6 +194,9 @@ export const P = {
   FIN_VIEW_PAYMENTS: "202801",
   FIN_VIEW_PAYMENT_PLANS: "200901",
   FIN_VIEW_PAYROLL: "202201",
+  FIN_VIEW_STAFF_BANK: "205601",  // staff bank accounts for payroll paid through the provider
+  FIN_UPDATE_STAFF_BANK: "205603",  // save an account, or check it again
+  FIN_CONFIRM_STAFF_BANK: "205654",  // the second person's confirmation of a name that did not match
   FIN_VIEW_PERIODS: "203501",
   FIN_VIEW_PETTY_CASH: "202001",
   FIN_VIEW_PETTY_CASH_VOUCHER: "202901",
@@ -421,6 +427,10 @@ export const FINANCE_PERMISSION_REGISTRY: Record<string, string> = {
   "202202": "finance.payrollrun.create",
   "202213": "finance.payrollrun.post",
   "202216": "finance.payrollrun.pay",
+  "202230": "finance.payrollrun.submit",
+  "205601": "finance.staff_bank.view",
+  "205603": "finance.staff_bank.update",
+  "205654": "finance.staff_bank.confirm",
   "202302": "finance.budget.create",
   "202304": "finance.budget.delete",
   "202305": "finance.budget.approve",

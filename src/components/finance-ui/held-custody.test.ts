@@ -42,9 +42,11 @@ describe("custody reading", () => {
     expect(custodyReading(false, "HELD")).toBe("UNKNOWN");
   });
 
-  it("may be read with the payment settings key or the payouts key", () => {
+  it("may be read with the payment settings, payouts, refunds or desk collection key", () => {
     expect(mayReadCustody(holder("payments.settings.view").can)).toBe(true);
     expect(mayReadCustody(holder("payments.payout.view").can)).toBe(true);
+    expect(mayReadCustody(holder("payments.refund.view").can)).toBe(true);
+    expect(mayReadCustody(holder("payments.collection.create").can)).toBe(true);
     expect(mayReadCustody(holder("payments.report.view").can)).toBe(false);
   });
 });

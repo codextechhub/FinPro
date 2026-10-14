@@ -5,7 +5,7 @@ vi.mock("@/routes/routes-path", () => ({
     PROTECTED: {
       FINANCE: {
         LEDGER: "/finance/ledger", RECEIVABLES: "/finance/receivables", EXPENSES: "/finance/expenses",
-        PAYMENTS: "/finance/payments", BANKING: "/finance/banking",
+        PAYMENTS: "/finance/payments", BANKING: "/finance/banking", PAYROLL: "/finance/payroll",
       },
       PROCUREMENT: {
         REQUISITIONS: "/procurement/requisitions", PURCHASE_ORDERS: "/procurement/purchase-orders",
@@ -31,6 +31,13 @@ describe("sourceDocumentLink", () => {
   it("opens a bank transaction and a transfer in the bank documents of Bank Accounts", () => {
     expect(sourceDocumentLink(instance("finance.bank_transaction"))).toBe("/finance/banking?bank_document=transaction&document=41");
     expect(sourceDocumentLink(instance("finance.bank_transfer"))).toBe("/finance/banking?bank_document=transfer&document=41");
+  });
+
+  it("opens a payroll run on the Payroll screen, from the run's own id", () => {
+    expect(sourceDocumentLink(instance("finance.payroll_run"))).toBe("/finance/payroll?document=41");
+    expect(sourceDocumentLink(instance("finance.payroll_run", {
+      source_document_link: "/finance/payroll?document=41&entity=BSS",
+    }))).toBe("/finance/payroll?document=41&entity=BSS");
   });
 
   it("keeps a document with no section on its screen", () => {

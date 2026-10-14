@@ -11,8 +11,8 @@
  * Only a school whose online money the platform holds (custody HELD) can refund
  * this way: at DIRECT the money is already in the branch's bank, so the option
  * is not shown there. A reader who cannot read the custody mode (it opens to
- * the payment settings and payouts keys) is not offered it either, rather than
- * offered something the server may refuse.
+ * the payment settings, payouts, refunds and desk collection keys) is not
+ * offered it either, rather than offered something the server may refuse.
  */
 
 import type { CustodyReading } from "@/components/finance-ui/held-custody";

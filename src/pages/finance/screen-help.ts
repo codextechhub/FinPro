@@ -28,7 +28,7 @@ export const FINANCE_HELP = {
   "bank-reconciliation": "Match bank statement lines with entries in the ledger and explain differences.",
   claims: "Review and reimburse approved spending paid personally by staff.",
   "petty-cash": "Manage petty-cash funds, vouchers, replenishments and returns.",
-  payroll: "Calculate, post and pay staff salaries and statutory deductions.",
+  payroll: "Prepare payroll runs, send them for approval, post and pay them, and keep the bank accounts staff are paid into.",
   budgets: "Compare planned income and spending with actual results.",
   assets: "Track asset purchases, depreciation, disposals and current book values.",
   tax: "Prepare, file and pay tax obligations.",

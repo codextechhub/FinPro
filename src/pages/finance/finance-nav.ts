@@ -78,7 +78,7 @@ export const financeNav: ConsoleNavGroup[] = [
     { ...branch("Spending", [
       { title: "Expense Claims", url: `${F.EXPENSES}/claims`, aliases: [F.EXPENSES], permissions: [P.FIN_VIEW_EXPENSE_CLAIMS] },
       { title: "Petty Cash", url: `${F.EXPENSES}/petty-cash`, permissions: [P.FIN_VIEW_PETTY_CASH], resources: ["finance.pettycashvoucher"] },
-      { title: "Payroll", url: F.PAYROLL, permissions: [P.FIN_VIEW_PAYROLL], resources: ["finance.salary"] },
+      { title: "Payroll", url: F.PAYROLL, permissions: [P.FIN_VIEW_PAYROLL], resources: ["finance.salary", "finance.staff_bank"] },
     ]), icon: Coins },
     { ...branch("Planning & Compliance", [
       { title: "Budgets & Forecasts", url: `${F.BUDGETS}/budgets`, aliases: [F.BUDGETS], permissions: [P.FIN_VIEW_BUDGETS] },

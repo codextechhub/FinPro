@@ -42,6 +42,7 @@ export const FINANCE_TAG_TYPES = [
   "FinanceReports",
   "FinanceSettings",
   "FinanceSetup",
+  "FinanceStaffBank",
   "FinanceStatementLines",
   "FinanceStatutory",
   "FinanceTax",

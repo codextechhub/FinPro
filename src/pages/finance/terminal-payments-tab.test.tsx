@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   total: 0,
   asked: [] as Record<string, unknown>[],
   customers: [] as unknown[],
+  customersAsked: [] as unknown[],
   match: vi.fn(),
   unmatch: vi.fn(),
   applies: true,
@@ -49,7 +50,7 @@ vi.mock("@/redux/services/payments/payments-api", () => ({
   useUnmatchTerminalPaymentMutation: () => [mocks.unmatch, { isLoading: false }],
 }));
 vi.mock("@/redux/services/finance/ar-api", () => ({
-  useGetCustomersQuery: () => ({ data: { data: mocks.customers }, isFetching: false }),
+  useGetCustomersQuery: (args: unknown) => { mocks.customersAsked.push(args); return { data: { data: mocks.customers }, isFetching: false }; },
 }));
 
 vi.mock("../../host", () => ({
@@ -108,6 +109,7 @@ beforeEach(() => {
   mocks.applies = true;
   mocks.pinned = null;
   mocks.customers = [customer(1, 1), customer(2, 2), customer(3, null)];
+  mocks.customersAsked = [];
   mocks.match.mockReset();
   mocks.match.mockReturnValue({ unwrap: async () => ({ message: "Terminal payment matched.", data: MATCHED }) });
   mocks.unmatch.mockReset();
@@ -213,6 +215,12 @@ describe("matching a waiting payment", () => {
     openRow();
     const options = [...document.body.querySelectorAll("select[aria-label=customer] option")].map((o) => o.textContent);
     expect(options).toEqual(["-", "C-02 - Family 2", "C-03 - Family 3"]);
+  });
+
+  it("asks the server for the customers of the payment's own branch", () => {
+    render();
+    openRow();
+    expect(mocks.customersAsked).toContainEqual(expect.objectContaining({ entity: "BSS", branch: 2 }));
   });
 
   it("matches to a customer picked from the list", async () => {

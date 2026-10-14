@@ -37,6 +37,7 @@ import {
 } from "@/redux/services/finance/payroll-api";
 import type { FinancePayrollSettingsBody, FinancePayrollSettingsValues, PayeMethod } from "@/redux/services/finance/payroll-types";
 import type { SettingConsumer } from "@/redux/services/finance/setup-types";
+import { PayrollPaymentRouteSection } from "./payroll-payment-route";
 
 /** The statutory items, each a switch and a rate. */
 export const STATUTORY_ITEMS = [
@@ -80,6 +81,10 @@ export function PayrollSettingsPanel({ entityCode }: { entityCode: string | null
         <PayrollSettingsForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers}
           canUpdate={canUpdate} readOnlyReason={heldWithoutReach(P.FIN_UPDATE_SETTINGS) ? "The payroll policy binds every branch, so only someone who covers the whole school may change it." : null} />
       )}
+      {payload ? (
+        <PayrollPaymentRouteSection key={`route-${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings}
+          canUpdate={canUpdate} readOnlyReason={heldWithoutReach(P.FIN_UPDATE_SETTINGS) ? "The payroll policy binds every branch, so only someone who covers the whole school may change it." : null} />
+      ) : null}
       {canView && entityCode ? <DeductionTypesPanel entityCode={entityCode} /> : null}
       {payload ? <SettingsAuditHistory rows={payload.history} /> : null}
     </div>

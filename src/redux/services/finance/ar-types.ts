@@ -224,6 +224,8 @@ export interface ArAdjustment {
   status: string;
   refund_id: number | null;
   write_off_id?: number | null;
+  /** How a refund is paid (`ONLINE` through the payment provider, else a bank method); absent on a write-off. */
+  method?: string;
   /**
    * Whether this document must go through approval instead of posting directly.
    *

@@ -31,7 +31,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
-import { useGetRefundQuery } from "@/redux/services/finance/ar-api";
 import {
   useGetCollectionsQuery,
   useGetProviderRefundsQuery,
@@ -88,7 +87,7 @@ function OriginalPaymentPicker({ entity, currency, customerCode, branch, amount,
   const dates = useDates();
   const { can } = useCan();
   const mayList = can(P.PAY_VIEW_COLLECTIONS) && !!customerCode;
-  const query = useGetCollectionsQuery({ entity, group: "PAID", page_size: 100 }, { skip: !mayList });
+  const query = useGetCollectionsQuery({ entity, group: "PAID", customer: customerCode, page_size: 100 }, { skip: !mayList });
   const payments = useMemo(
     () => returnablePayments(Array.isArray(query.data?.data) ? query.data.data : [], { customerCode, branch }),
     [query.data, customerCode, branch],
@@ -219,9 +218,11 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
  * refund goes through. Renders nothing for a refund with no online side or for
  * a reader without `payments.refund.view`.
  */
-export function ProviderRefundPanel({ refundId, refundStatus, customerCode, entity, currency, amount, onSend, sending }: {
+export function ProviderRefundPanel({ refundId, refundStatus, method, customerCode, entity, currency, amount, onSend, sending }: {
   refundId: number | null;
   refundStatus: string;
+  /** How the refund is paid, from its list row (`ONLINE` through the provider); undefined while an older server omits it. */
+  method: string | undefined;
   customerCode: string;
   entity: string;
   currency?: string | null;
@@ -234,7 +235,6 @@ export function ProviderRefundPanel({ refundId, refundStatus, customerCode, enti
   const mayView = can(P.PAY_VIEW_REFUNDS) && refundId != null;
   const mayChange = can(P.PAY_CREATE_REFUND);
   const links = useGetProviderRefundsQuery({ entity, refund: refundId ?? 0, page_size: 20 }, { skip: !mayView });
-  const detail = useGetRefundQuery({ id: refundId ?? 0, entity }, { skip: !mayView });
   const [verify, { isLoading: verifying }] = useVerifyProviderRefundMutation();
   const [relink, { isLoading: relinking }] = useLinkProviderRefundMutation();
   const [payFromBank, { isLoading: paying }] = usePayProviderRefundFromBankMutation();
@@ -243,11 +243,10 @@ export function ProviderRefundPanel({ refundId, refundStatus, customerCode, enti
   const [bank, setBank] = useState("");
   const link = currentProviderRefund(Array.isArray(links.data?.data) ? links.data.data : undefined);
   const access = useFieldAccess(RESOURCE, link);
-  const method = detail.data?.data.method;
   // A part the role may not read is absent from the row; the switch map agrees.
   const statusShown = !!link && link.status !== undefined && !access.isHidden("status");
 
-  if (!mayView || links.isLoading || detail.isLoading) return null;
+  if (!mayView || links.isLoading) return null;
   const online = method === "ONLINE";
   if (!online && !(link && link.status === "FAILED")) return null;
 

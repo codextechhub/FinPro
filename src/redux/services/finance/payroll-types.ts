@@ -10,6 +10,7 @@
  */
 
 import type { PayrollRun } from "./ops-types";
+import type { PayrollPaymentRoute } from "./payroll-paystack-types";
 import type { ChoiceOption, FinanceAuditLog, SettingConsumer } from "./setup-types";
 
 /** Where a person's PAYE figure on a line came from. */
@@ -384,6 +385,14 @@ export interface FinancePayrollSettingsValues {
   previous_pay_required: boolean;
   /** `YYYY-MM-DD`, or null when payroll has always run here. */
   payroll_moved_here_on: string | null;
+  /** How posted runs are paid: from the branch's own bank, or through the payment provider. Absent from older servers. */
+  payment_route?: PayrollPaymentRoute;
+  payment_route_label?: string;
+  payment_route_options?: ChoiceOption<PayrollPaymentRoute>[];
+  /** False while the school's online money is not held for it, so staff cannot be paid through the provider. */
+  paystack_route_available?: boolean;
+  /** The server's reason the provider route is closed; null when it is open. */
+  paystack_route_unavailable_reason?: string | null;
   updated_at: string | null;
   updated_by: string | null;
 }
@@ -395,7 +404,9 @@ export interface FinancePayrollSettingsPayload {
 }
 
 /** A partial payroll settings write. */
-export type FinancePayrollSettingsBody = Partial<Omit<FinancePayrollSettingsValues, "paye_method_label" | "paye_method_options" | "updated_at" | "updated_by">>;
+export type FinancePayrollSettingsBody = Partial<Omit<FinancePayrollSettingsValues,
+  "paye_method_label" | "paye_method_options" | "payment_route_label" | "payment_route_options"
+  | "paystack_route_available" | "paystack_route_unavailable_reason" | "updated_at" | "updated_by">>;
 
 /** The statutory details a salary record's create and edit accept. A state or
  *  PFA is named by id or code; `null` or "" clears it. */

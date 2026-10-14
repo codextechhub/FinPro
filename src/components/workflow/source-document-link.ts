@@ -24,6 +24,7 @@ const SOURCE_DOCUMENT_ROUTES: Record<
   "finance.concession": { route: `${F.RECEIVABLES}/concessions`, lookup: "reference" },
   "finance.credit_note": { route: `${F.RECEIVABLES}/credit-notes`, lookup: "reference" },
   "finance.expense_claim": { route: `${F.EXPENSES}/claims`, lookup: "id" },
+  "finance.payroll_run": { route: F.PAYROLL, lookup: "id" },
   "finance.inter_branch_transfer": { route: `${F.INDEX}/inter-branch/transfers`, lookup: "id" },
   "payments.payout_batch": { route: `${F.PAYMENTS}/batches`, lookup: "id" },
   "procurement.requisition": { route: P.REQUISITIONS, lookup: "id" },

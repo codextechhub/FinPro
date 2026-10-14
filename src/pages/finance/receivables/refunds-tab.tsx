@@ -372,7 +372,7 @@ export function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
         <Field label="Reason"><span className="font-normal">{row.reason || "-"}</span></Field>
         {!wo && row.refund_id ? (
           <ProviderRefundPanel
-            refundId={row.refund_id} refundStatus={row.status} customerCode={row.customer_code}
+            refundId={row.refund_id} refundStatus={row.status} method={row.method} customerCode={row.customer_code}
             entity={entity} currency={currency} amount={row.amount}
             onSend={sendDraft} sending={posting || submittingRefund}
           />

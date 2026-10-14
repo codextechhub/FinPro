@@ -14,9 +14,11 @@
  *
  * The mode is read from the custody settings. A holder of
  * `payments.settings.view` gets the whole panel's answer; a holder of
- * `payments.payout.view` alone gets the short answer, the mode and nothing
- * else, which is all a menu needs. So Mr Okafor, a bursar at Bright Star who
- * pays suppliers but does not manage payment settings, still sees Payouts.
+ * `payments.payout.view`, `payments.refund.view` or `payments.collection.create`
+ * alone gets the short answer, the mode and nothing else, which is all a menu or
+ * a refund form needs. So Mr Okafor, a bursar at Bright Star who pays suppliers
+ * but does not manage payment settings, still sees Payouts, and Mrs Eze, who
+ * raises refunds, is offered the online refund.
  * A reader with neither key, or a read still in flight, gives UNKNOWN, and a
  * gated menu treats UNKNOWN like DIRECT: a screen is never offered where it
  * may not work.
@@ -33,7 +35,7 @@ export type CustodyReading = CustodyMode | "UNKNOWN";
 
 /** Whether a reader holding these codes may read the custody mode at all. */
 export function mayReadCustody(can: (code: PermissionCode) => boolean): boolean {
-  return can(P.PAY_VIEW_PAYMENT_SETTINGS) || can(P.PAY_VIEW_PAYOUTS);
+  return can(P.PAY_VIEW_PAYMENT_SETTINGS) || can(P.PAY_VIEW_PAYOUTS) || can(P.PAY_VIEW_REFUNDS) || can(P.PAY_CREATE_COLLECTION);
 }
 
 /** The pure rule, for tests: the mode in force when it could be read. */

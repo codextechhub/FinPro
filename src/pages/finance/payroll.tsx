@@ -35,17 +35,18 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
+import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { Link } from "react-router";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
-import { Plus, Trash2, Search, Sparkles, Banknote, Printer, Pencil, FileText, Users, Layers3, ScrollText, Landmark, ArrowUpRight, Ban } from "lucide-react";
+import { Plus, Trash2, Search, Sparkles, Banknote, Printer, Pencil, FileText, Users, Layers3, ScrollText, Landmark, ArrowUpRight, Ban, Building2 } from "lucide-react";
 import { routesPath } from "@/routes/routes-path";
 import { useGetTrialBalanceQuery } from "@/redux/services/finance/reports-api";
 import { useGetBranchOptionsQuery, type BranchOption } from "@/redux/services/tenants-api";
 import { FinanceShell } from "./finance-shell";
 import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, CostCenterPicker, Segmented, InfoHint, ConfirmActionModal, TabStrip, useActiveEntity, useFieldAccess, fieldWriteErrors, toArray, type Column, type FieldAccess, type FieldErrors, type ReadOnlyOptions, type TabStripItem, PostingDateField, BankAccountPicker, RaisingBranchChoiceField, useRaisingBranchChoice, useReaderBranchLens,} from "@/components/finance-ui";
 import { useReaderReach } from "../../host";
-import { isBranchPartOfWholeSchoolRun, isPartlyPaid, mayCancelRun, sharesOf, singleJournalBranch, unassignedStaffRefusal, unpaidShares } from "./payroll-shares";
+import { isBranchPartOfWholeSchoolRun, mayCancelRun, sharesOf, singleJournalBranch, unassignedStaffRefusal, unpaidShares } from "./payroll-shares";
 import { EmptyState } from "@/components/finance-ui/states";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
@@ -62,6 +63,10 @@ import { fieldRefusals } from "./payroll-refusals";
 import { SalaryRecordDrawer } from "./payroll-record";
 import { LineItems, PayeWorkingView } from "./payroll-working";
 import { PayslipContentView } from "./payslip-view";
+import { StaffBankAccountsTab } from "./staff-bank-accounts-tab";
+import { runApprovalPhase, runStatusKey } from "./payroll-approval";
+import { PayrollPaymentsPanel } from "./payroll-payments-panel";
+import { usePayrollRunStage } from "./payroll-run-stage";
 import {
   useGetPayrollTaxStatesQuery, useGetPensionFundAdministratorsQuery, useGetPayslipContentQuery, useGetPreviousPayMissingQuery,
 } from "@/redux/services/finance/payroll-api";
@@ -86,6 +91,9 @@ const tdCls = "border-t border-white-02 px-3 py-2 font-mont text-xs text-black-0
 
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
   DRAFT: { label: "Draft", cls: "bg-gray-03/60 text-gray-05" },
+  PENDING_APPROVAL: { label: "Awaiting approval", cls: "bg-amber-50 text-amber-800" },
+  SENT_BACK: { label: "Sent back", cls: "bg-amber-50 text-amber-800" },
+  APPROVED: { label: "Approved", cls: "bg-green-01/10 text-green-01" },
   POSTED: { label: "Calculated", cls: "bg-blue-50 text-blue-700" },
   PAID: { label: "Paid", cls: "bg-green-01/10 text-green-01" },
   PART_PAID: { label: "Partly paid", cls: "bg-amber-50 text-amber-800" },
@@ -157,23 +165,31 @@ const TABS = [
   { key: "structures", label: "Salary structures", icon: Layers3 },
   { key: "payslips", label: "Payslips", icon: ScrollText },
   { key: "statutory", label: "Statutory returns", icon: Landmark },
+  { key: "bank-accounts", label: "Bank accounts", icon: Building2 },
 ] as const;
 
+type TabKey = (typeof TABS)[number]["key"];
+
 /** Payroll sections for the tab strip, built once so the sliding bar re-measures only when the active tab changes. */
-const TAB_ITEMS: TabStripItem<(typeof TABS)[number]["key"]>[] = TABS.map((t) => ({
+const tabItems = (keys: readonly TabKey[]): TabStripItem<TabKey>[] => TABS.filter((t) => keys.includes(t.key)).map((t) => ({
   value: t.key,
   label: <><t.icon className="size-3.5" /> {t.label}</>,
 }));
+const PAYROLL_KEYS: readonly TabKey[] = ["runs", "employees", "structures", "payslips", "statutory"];
+const TAB_ITEMS = tabItems(PAYROLL_KEYS);
+const TAB_ITEMS_WITH_BANK = tabItems([...PAYROLL_KEYS, "bank-accounts"]);
 
 export default function PayrollPage() {
   const { code: entity, currency } = useActiveEntity();
-  const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("runs");
+  const [tab, setTab] = useState<TabKey>("runs");
   // Every payroll key is restricted, because a payroll run carries what each
   // named person is paid. Plenty of finance users legitimately hold none of
   // them, and the tabs below fetch on mount, so without this the screen opened
   // on a pair of 403s and a red toast rather than saying what it needs.
   const { can } = useCan();
   const canPayroll = can(P.FIN_VIEW_PAYROLL);
+  // Staff bank accounts have their own key, on top of the payroll one that opens this screen.
+  const canStaffBank = can(P.FIN_VIEW_STAFF_BANK);
   if (!entity) return <FinanceShell><PageShell><NoEntityState /></PageShell></FinanceShell>;
   if (!canPayroll) return <FinanceShell><PageShell><EmptyState title="No payroll access" message={`${noAccessMessage("view payroll")} Payroll is granted on its own because a run shows what each person is paid.`} /></PageShell></FinanceShell>;
 
@@ -189,7 +205,7 @@ export default function PayrollPage() {
         </div>
 
         <TabStrip
-          items={TAB_ITEMS}
+          items={canStaffBank ? TAB_ITEMS_WITH_BANK : TAB_ITEMS}
           value={tab}
           onChange={setTab}
           variant="underline"
@@ -203,6 +219,7 @@ export default function PayrollPage() {
           : tab === "employees" ? <EmployeesTab entity={entity} currency={currency} />
           : tab === "structures" ? <StructuresTab entity={entity} currency={currency} />
           : tab === "payslips" ? <PayslipsTab entity={entity} currency={currency} />
+          : tab === "bank-accounts" ? <StaffBankAccountsTab entity={entity} />
           : <StatutoryTab entity={entity} currency={currency} />}
       </PageShell>
     </FinanceShell>
@@ -217,6 +234,8 @@ function RunsTab({ entity, currency, onShowRoster }: { entity: string; currency?
   const [generated, setGenerated] = useState<GeneratedPayrollRun | null>(null);
   const { can } = useCan();
   useActionParam("new", can(P.FIN_CREATE_PAYROLL), () => setCreating(true));
+  // An approval's "open the source document" link lands on the run.
+  useSourceDocumentParam(setSelectedId);
   const [page, setPage] = useState(1);
   const { data, isLoading, isFetching, isError, refetch } = useGetPayrollRunsQuery({ entity, page });
   const rows = useMemo(() => toArray(data?.data), [data]);
@@ -247,7 +266,7 @@ function RunsTab({ entity, currency, onShowRoster }: { entity: string; currency?
     { header: "Total gross", align: "right", cell: (r) => <Money kobo={r.gross_total} currency={currency} align="right" /> },
     { header: "Deductions", align: "right", cell: (r) => <Money kobo={r.paye_total + r.pension_total + (r.other_deductions_total ?? 0)} currency={currency} align="right" /> },
     { header: "Net pay", align: "right", cell: (r) => <Money kobo={r.net_total} currency={currency} align="right" /> },
-    { header: "Status", cell: (r) => <RunPill status={isPartlyPaid(r) ? "PART_PAID" : r.run_status} /> },
+    { header: "Status", cell: (r) => <RunPill status={runStatusKey(r)} /> },
   ];
 
   return (
@@ -339,10 +358,12 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
   const access = useFieldAccess(PAYROLL_LINE);
   const { wholeSchool, branchIds } = useReaderReach();
   const r = data?.data;
+  const partOnly = !!r && isBranchPartOfWholeSchoolRun(r, wholeSchool);
+  const stage = usePayrollRunStage({ run: r, entity, currency, partOnly });
   if (runId == null || !r) return null;
-  const partOnly = isBranchPartOfWholeSchoolRun(r, wholeSchool);
   const shares = sharesOf(r);
-  const status = isPartlyPaid(r) ? "PART_PAID" : r.run_status;
+  const status = runStatusKey(r);
+  const approvalPhase = runApprovalPhase(r);
   const refusal = unassigned?.runId === r.id ? unassigned : null;
   // Only when the lines name more than one branch; a branch run's all read the same.
   const showLineBranch = new Set(r.lines.map((l) => l.branch_name ?? null)).size > 1;
@@ -367,7 +388,7 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
     }
   };
   // Undo a run raised in error; see mayCancelRun for when it is still possible.
-  const canCancel = !partOnly && mayCancelRun(r);
+  const canCancel = !partOnly && mayCancelRun(r) && approvalPhase !== "with-approvers" && approvalPhase !== "returned";
   const isPosted = r.run_status === "POSTED";
   const doCancel = async () => { try { const res = await cancelRun({ id: r.id, entity }).unwrap(); toast.success(res.message || "Run cancelled."); setCancelOpen(false); } catch { /* central */ } };
 
@@ -382,8 +403,9 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
             <RunPill status={status} />
             <div className="flex-1" />
             {canCancel ? <Can permission={P.FIN_POST_PAYROLL}><Button variant="outline" disabled={cancelling} onClick={() => setCancelOpen(true)} className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/5"><Ban className="size-4" />{isPosted ? "Void run" : "Cancel run"}</Button></Can> : null}
-            {r.run_status === "DRAFT" && !partOnly ? <Can permission={P.FIN_POST_PAYROLL}><Button disabled={posting} onClick={doPost} className="gap-1.5"><Banknote className="size-4" />{posting ? "Posting…" : "Calculate & post"}</Button></Can> : null}
-            {r.run_status === "POSTED" && !partOnly ? <Can permission={P.FIN_PAY_PAYROLL}><Button onClick={() => setPaying(true)} className="gap-1.5"><Banknote className="size-4" /> Pay net</Button></Can> : null}
+            {stage.actions}
+            {approvalPhase === "approved" && !partOnly ? <Can permission={P.FIN_POST_PAYROLL}><Button disabled={posting} onClick={doPost} className="gap-1.5"><Banknote className="size-4" />{posting ? "Posting…" : "Calculate & post"}</Button></Can> : null}
+            {r.run_status === "POSTED" && !partOnly && stage.route !== "PAYSTACK" ? <Can permission={P.FIN_PAY_PAYROLL}><Button onClick={() => setPaying(true)} className="gap-1.5"><Banknote className="size-4" /> Pay net</Button></Can> : null}
           </>
         }>
         <div className="space-y-5">
@@ -407,6 +429,8 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
           ) : null}
           {statutory.length ? <StatutoryTotals totals={statutory} currency={currency} /> : null}
 
+          {stage.notes}
+
           {refusal ? (
             <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
               <p className="font-mont text-xs font-semibold text-amber-900">This run was not posted: some staff have no branch</p>
@@ -423,6 +447,7 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
           {!partOnly && r.run_status === "POSTED" && shares.some((share) => share.status === "PAID") ? (
             <p className="font-mont text-[11px] text-gray-05">A branch&rsquo;s share has been paid, so this run can no longer be voided.</p>
           ) : null}
+          <PayrollPaymentsPanel run={r} entity={entity} currency={currency} canAct={!partOnly} />
 
           {showName || figures.length ? (
             <div>
@@ -460,6 +485,7 @@ export function RunDrawer({ runId, entity, currency, onClose }: { runId: number 
       </DetailDrawer>
 
       {paying ? <PayDrawer run={r} entity={entity} currency={currency} onClose={() => setPaying(false)} /> : null}
+      {stage.dialogs}
       <ConfirmActionModal
         open={cancelOpen}
         onOpenChange={setCancelOpen}
