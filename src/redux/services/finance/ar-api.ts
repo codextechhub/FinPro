@@ -37,6 +37,11 @@ import type {
 } from "./ar-types";
 
 /** `approval: "returned"` keeps only documents an approver sent back to whoever sent them. */
+/** The write-offs list, with the account a write-off lands in when none is chosen (only for a holder of the create key). */
+export type WriteOffList = PaginatedEnvelope<WriteOffRequest> & {
+  default_write_off_account?: { id: number; code: string; name: string } | null;
+};
+
 type EntityList = { entity: string; page?: number; status?: string; customer?: string; approval?: "returned" };
 type FeeLineInput = { code?: string; description: string; revenue_account: string; amount: number; tax_code?: string; is_optional?: boolean; kind?: "CHARGE" | "DEPOSIT" };
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
@@ -185,7 +190,7 @@ export const arApi = baseApi.injectEndpoints({
       invalidatesTags: ["FinanceRefunds", "WorkflowPending", "WorkflowSubmissions"],
     }),
     // First-class bad-debt write-off requests.
-    getWriteOffRequests: builder.query<PaginatedEnvelope<WriteOffRequest>, EntityList & { invoice?: string | number }>({
+    getWriteOffRequests: builder.query<WriteOffList, EntityList & { invoice?: string | number }>({
       query: (params) => ({ url: `/finance/write-offs/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceWriteOffs"],
     }),

@@ -16,8 +16,9 @@
  * Every business field is a Field Access switch of `payments.platform_topup`.
  * A hidden field has no column, no line in the drawer and no control on the
  * form, and a read-only one is greyed and never sent. The bank account picker
- * lists the accounts of the active ledger entity, which for platform staff is
- * the platform's own books.
+ * lists the platform's own active bank accounts from the top-up routes, so it
+ * does not depend on which ledger entity the operator has open. A role that may
+ * not read the bank account field is not asked for the list.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -27,9 +28,10 @@ import { Pencil, Plus, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  AccessField, BankAccountPicker, ConfirmActionModal, DataTable, DetailDrawer, Money, MoneyInput, PostingDateField,
+  AccessField, ConfirmActionModal, DataTable, DetailDrawer, Money, MoneyInput,
   StatusPill, errorsBesideFollowed, fieldWriteErrors, isReadOnlyFollowing, useFieldAccess, writableOnlyFollowing,
   type Column, type FieldErrors,
 } from "@/components/finance-ui";
@@ -42,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import {
   useCreatePlatformProviderTopupMutation,
+  useGetPlatformProviderTopupBankAccountsQuery,
   useGetPlatformProviderTopupQuery,
   useGetPlatformProviderTopupsQuery,
   useSubmitPlatformProviderTopupMutation,
@@ -82,7 +85,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** The platform's top-ups, newest first, with the form that records one and the drawer that opens one. */
-export function ProviderTopUpsTab({ entity, currency }: { entity: string | null; currency?: string | null }) {
+export function ProviderTopUpsTab({ currency }: { currency?: string | null }) {
   const dates = useDates();
   const { can } = useCan();
   const access = useFieldAccess(TOPUP_RESOURCE);
@@ -92,7 +95,7 @@ export function ProviderTopUpsTab({ entity, currency }: { entity: string | null;
   const [openId, setOpenId] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   useSourceDocumentParam(setOpenId);
-  useActionParam("new", canCreate && !!entity, () => setRecording(true));
+  useActionParam("new", canCreate, () => setRecording(true));
   const { data, isLoading, isFetching, isError, refetch } = useGetPlatformProviderTopupsQuery({
     limit: 200, ...(status ? { status: status as ProviderTopUpStatus } : {}),
   });
@@ -115,24 +118,21 @@ export function ProviderTopUpsTab({ entity, currency }: { entity: string | null;
           <option value="">All top-ups</option>
           {TOPUP_FILTERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        {canCreate && entity ? (
+        {canCreate ? (
           <Button className="gap-1.5" onClick={() => setRecording(true)}><Plus className="size-4" /> New top-up</Button>
         ) : null}
       </div>
       <p className="font-mont text-[11px] leading-5 text-gray-05">
         {topUpPurpose(platformName)} Two other {platformName} people approve each one in Workflow, Approvals; whoever puts it forward cannot approve it.
       </p>
-      {canCreate && !entity ? (
-        <p className="font-mont text-[11px] leading-5 text-gray-05">Choose {platformName}&rsquo;s ledger entity at the top of the page to record a top-up.</p>
-      ) : null}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id}
         loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(r) => setOpenId(r.id)}
         emptyTitle={status ? "No top-ups with this status" : "No top-ups yet"}
         emptyMessage={`A top-up appears here once ${platformName} records money it paid into its Paystack balance.`} />
       {openId !== null ? (
-        <TopUpDrawer id={openId} listRow={rows.find((r) => r.id === openId)} entity={entity} currency={currency} onClose={() => setOpenId(null)} />
+        <TopUpDrawer id={openId} listRow={rows.find((r) => r.id === openId)} currency={currency} onClose={() => setOpenId(null)} />
       ) : null}
-      {recording && entity ? <TopUpForm entity={entity} currency={currency} onClose={() => setRecording(false)} onRecorded={(id) => { setRecording(false); setOpenId(id); }} /> : null}
+      {recording ? <TopUpForm currency={currency} onClose={() => setRecording(false)} onRecorded={(id) => { setRecording(false); setOpenId(id); }} /> : null}
     </div>
   );
 }
@@ -143,8 +143,8 @@ function withoutBlanks<T extends object>(body: T): T {
 }
 
 /** One top-up open: its figures, where its approval stands, and what the reader may do next. */
-function TopUpDrawer({ id, listRow, entity, currency, onClose }: {
-  id: number; listRow?: ProviderTopUp; entity: string | null; currency?: string | null; onClose: () => void;
+function TopUpDrawer({ id, listRow, currency, onClose }: {
+  id: number; listRow?: ProviderTopUp; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
   const { can } = useCan();
@@ -167,7 +167,7 @@ function TopUpDrawer({ id, listRow, entity, currency, onClose }: {
   }
 
   const approvalLine = access.isHidden("status") ? null : topUpApprovalLine(row);
-  const canCorrect = can(P.PAY_CREATE_PLATFORM_TOPUP) && !!entity && !!detail && topUpCanBeCorrected(row);
+  const canCorrect = can(P.PAY_CREATE_PLATFORM_TOPUP) && !!detail && topUpCanBeCorrected(row);
   const canPutForward = can(P.PAY_SUBMIT_PLATFORM_TOPUP) && !!detail && topUpCanBePutForward(row);
   const heading = row.amount !== undefined && !access.isHidden("amount") ? formatMoney(row.amount, cur) : "Top-up";
 
@@ -243,21 +243,22 @@ function TopUpDrawer({ id, listRow, entity, currency, onClose }: {
           </p>
         </ConfirmActionModal>
       ) : null}
-      {correcting && entity && detail ? <TopUpForm entity={entity} currency={currency} existing={detail} onClose={() => setCorrecting(false)} /> : null}
+      {correcting && detail ? <TopUpForm currency={currency} existing={detail} onClose={() => setCorrecting(false)} /> : null}
     </>
   );
 }
 
 /** Records a top-up as a draft, or with `existing` corrects a draft, sending only what changed. */
-function TopUpForm({ entity, currency, existing, onClose, onRecorded }: {
-  entity: string; currency?: string | null; existing?: ProviderTopUpDetail; onClose: () => void; onRecorded?: (id: number) => void;
+function TopUpForm({ currency, existing, onClose, onRecorded }: {
+  currency?: string | null; existing?: ProviderTopUpDetail; onClose: () => void; onRecorded?: (id: number) => void;
 }) {
+  const dates = useDates();
   const access = useFieldAccess(TOPUP_RESOURCE, existing);
   const [denied, setDenied] = useState<FieldErrors | null>(null);
   const beside = errorsBesideFollowed(denied, TOPUP_BODY_FOLLOWS);
   const [amount, setAmount] = useState(existing?.amount ?? 0);
   const [bank, setBank] = useState(existing?.bank_account != null ? String(existing.bank_account) : "");
-  const [date, setDate] = useState(existing?.topped_up_on ?? "");
+  const [date, setDate] = useState(existing?.topped_up_on ?? dates.today());
   const [provider, setProvider] = useState(existing?.provider ?? "");
   const [reference, setReference] = useState(existing?.reference ?? "");
   const [note, setNote] = useState(existing?.note ?? "");
@@ -266,6 +267,10 @@ function TopUpForm({ entity, currency, existing, onClose, onRecorded }: {
   const isLoading = creating || updating;
   const options = { creating: !existing };
   const offerProvider = PROVIDER_CHOICES.length > 1;
+  const branchColumn = usePaymentBranchColumn();
+  const readBank = !access.isHidden("bank_account_name");
+  const { data: bankRows, isLoading: loadingBanks } = useGetPlatformProviderTopupBankAccountsQuery(undefined, { skip: !readBank });
+  const banks = Array.isArray(bankRows?.data) ? bankRows.data : [];
 
   const draft = { amount, bank_account: Number(bank), topped_up_on: date, provider, reference: reference.trim(), note: note.trim() };
   const writableDraft = writableOnlyFollowing(access, draft, TOPUP_BODY_FOLLOWS, options);
@@ -306,11 +311,22 @@ function TopUpForm({ entity, currency, existing, onClose, onRecorded }: {
             <MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} />
           </AccessField>
           <AccessField access={access} name="topped_up_on" creating={!existing} errors={beside}>
-            <PostingDateField label="Date the money left the bank" entity={entity} value={date} onChange={setDate} hint="Not in the future." />
+            <label className="block space-y-1">
+              <span className="font-mont text-xs text-gray-05">Date the money left the bank *</span>
+              <DatePickerInput value={date} onChange={(e) => setDate(e.target.value)} max={dates.today()} required className="bg-white" />
+              <span className="block font-mont text-[11px] leading-5 text-gray-05">Not in the future. The top-up books on this day.</span>
+            </label>
           </AccessField>
         </div>
         <AccessField access={access} name="bank_account_name" label="Paid from" required creating={!existing} errors={beside}>
-          <BankAccountPicker entity={entity} value={bank} onChange={setBank} placeholder="Select the bank account" />
+          <select value={bank} onChange={(e) => setBank(e.target.value)} disabled={loadingBanks} className={cn(SELECT, "w-full")} aria-label="Paid from">
+            <option value="">{loadingBanks ? "Loading the bank accounts" : banks.length ? "Select the bank account" : "No bank account available"}</option>
+            {banks.map((b) => (
+              <option key={b.id} value={String(b.id)}>
+                {[b.name, b.bank_name, branchColumn.show ? b.branch_name : null].filter(Boolean).join(" · ")}
+              </option>
+            ))}
+          </select>
         </AccessField>
         {offerProvider ? (
           <AccessField access={access} name="provider" label="Provider" creating={!existing} errors={beside}>

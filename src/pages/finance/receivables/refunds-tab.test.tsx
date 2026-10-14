@@ -15,7 +15,7 @@ import type { ArAdjustment } from "@/redux/services/finance/ar-types";
 const mocks = vi.hoisted(() => ({
   held: new Set<string>(), detail: undefined as unknown, uid: 4, request: undefined as unknown, resume: vi.fn(), availability: undefined as unknown, fieldAccess: {} as Record<string, unknown>, availabilityAsked: [] as unknown[],
   createRefund: vi.fn(), postRefund: vi.fn(), tie: vi.fn(),
-  mappings: [] as unknown[], mappingsSkipped: [] as boolean[],
+  defaultAccount: null as unknown, listAsked: [] as boolean[],
 }));
 
 vi.mock("@/redux/services/finance/approval-request-api", () => ({
@@ -51,12 +51,6 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   BankAccountPicker: () => null,
   AccountPicker: ({ placeholder }: { placeholder?: string }) => <input aria-label="expense account" placeholder={placeholder} readOnly />,
 }));
-vi.mock("@/redux/services/finance/setup-api", () => ({
-  useGetFinanceAccountSettingsQuery: (_args: unknown, options?: { skip?: boolean }) => (
-    mocks.mappingsSkipped.push(options?.skip === true),
-    { data: options?.skip ? undefined : { data: { mappings: mocks.mappings } } }
-  ),
-}));
 vi.mock("../../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverPrompt: () => ({ promptIfParked: vi.fn(), noApproverDialog: null }) }));
 vi.mock("./document-void-action", () => ({ DocumentVoidAction: () => null }));
@@ -83,6 +77,10 @@ vi.mock("@/redux/services/finance/ar-api", () => {
   const mutation = () => [() => ({ unwrap: async () => ({ data: {} }) }), { isLoading: false }];
   const query = () => ({ data: undefined, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() });
   return {
+    useGetWriteOffRequestsQuery: (_args: unknown, options?: { skip?: boolean }) => (
+      mocks.listAsked.push(options?.skip === true),
+      { data: options?.skip ? undefined : { data: [], default_write_off_account: mocks.defaultAccount } }
+    ),
     useGetArAdjustmentsQuery: query, useGetInvoicesQuery: query, useGetRefundAvailabilityQuery: (_args: unknown, options?: { skip?: boolean }) => (mocks.availabilityAsked.push(options?.skip === true), { data: options?.skip ? undefined : mocks.availability, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
     useCreateRefundMutation: () => [mocks.createRefund, { isLoading: false }], usePostRefundMutation: () => [mocks.postRefund, { isLoading: false }], useSubmitRefundMutation: mutation,
     useCreateWriteOffRequestMutation: mutation, usePostWriteOffRequestMutation: mutation, useSubmitWriteOffRequestMutation: mutation,
@@ -113,8 +111,8 @@ beforeEach(() => {
   mocks.resume.mockReset();
   mocks.fieldAccess = {};
   mocks.availabilityAsked = [];
-  mocks.mappings = [{ key: "BAD_DEBT_EXPENSE", account: { id: 9, code: "5350", name: "Bad debts" } }];
-  mocks.mappingsSkipped = [];
+  mocks.defaultAccount = { id: 9, code: "5350", name: "Bad debts" };
+  mocks.listAsked = [];
   mocks.createRefund.mockReset();
   mocks.createRefund.mockReturnValue({ unwrap: async () => ({ data: { id: 21, approval_required: false } }) });
   mocks.postRefund.mockReset();
@@ -234,25 +232,32 @@ describe("the account a write-off defaults to", () => {
   };
   const hint = () => document.body.querySelector<HTMLInputElement>("input[aria-label='expense account']")?.placeholder;
 
-  it("is named from the school's own Bad debt expense mapping, not from a code in the screen", async () => {
-    mocks.held = new Set([P.FIN_CREATE_WRITE_OFF, P.FIN_VIEW_SETTINGS]);
+  it("is named from the account the write-offs list sends, not from a code in the screen", async () => {
+    mocks.held = new Set([P.FIN_CREATE_WRITE_OFF]);
     await openWriteOff();
     expect(hint()).toBe("Defaults to Bad debts (5350)");
     expect(document.body.textContent).not.toContain("5300");
   });
 
-  it("follows a mapping the school has pointed at another account", async () => {
-    mocks.held = new Set([P.FIN_CREATE_WRITE_OFF, P.FIN_VIEW_SETTINGS]);
-    mocks.mappings = [{ key: "BAD_DEBT_EXPENSE", account: { id: 12, code: "5361", name: "Impairment of fees" } }];
+  it("follows the account the school has pointed its bad debts at", async () => {
+    mocks.held = new Set([P.FIN_CREATE_WRITE_OFF]);
+    mocks.defaultAccount = { id: 12, code: "5361", name: "Impairment of fees" };
     await openWriteOff();
     expect(hint()).toBe("Defaults to Impairment of fees (5361)");
   });
 
-  it("is worded without a code, and the mapping not asked for, when the reader may not open Finance Settings", async () => {
+  it("is worded without a code when the school has no usable bad debts account", async () => {
     mocks.held = new Set([P.FIN_CREATE_WRITE_OFF]);
+    mocks.defaultAccount = null;
     await openWriteOff();
     expect(hint()).toBe("Defaults to the school's bad debts account");
-    expect(mocks.mappingsSkipped.every((skipped) => skipped)).toBe(true);
+  });
+
+  it("is worded without a code, and the list not asked for, when the reader holds only the key to write off an invoice", async () => {
+    mocks.held = new Set([P.FIN_WRITE_OFF_INVOICE]);
+    await openWriteOff();
+    expect(hint()).toBe("Defaults to the school's bad debts account");
+    expect(mocks.listAsked.every((skipped) => skipped)).toBe(true);
     expect(document.body.textContent).not.toMatch(/\b5[0-9]{3}\b/);
   });
 });

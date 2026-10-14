@@ -29,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   uid: 4,
   request: undefined as unknown,
   toastWarning: vi.fn(),
+  banks: [] as unknown[],
+  banksSkipped: [] as boolean[],
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -45,6 +47,10 @@ vi.mock("@/redux/services/payments/payments-api", () => ({
   useGetPlatformProviderTopupsQuery: (args: unknown) => (mocks.listArgs(args), {
     data: { data: mocks.rows }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
   }),
+  useGetPlatformProviderTopupBankAccountsQuery: (_: unknown, options?: { skip?: boolean }) => (
+    mocks.banksSkipped.push(options?.skip === true),
+    { data: options?.skip ? undefined : { data: mocks.banks }, isLoading: false }
+  ),
   useGetPlatformProviderTopupQuery: () => ({ data: mocks.detail ? { data: mocks.detail } : undefined, isError: false }),
   useCreatePlatformProviderTopupMutation: () => [mocks.create, { isLoading: false }],
   useUpdatePlatformProviderTopupMutation: () => [mocks.update, { isLoading: false }],
@@ -76,9 +82,10 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   DetailDrawer: ({ open, title, children, footer }: { open: boolean; title: string; children?: React.ReactNode; footer?: React.ReactNode }) =>
     open ? <section aria-label={title}><h2>{title}</h2>{children}<footer>{footer}</footer></section> : null,
-  BankAccountPicker: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => <input aria-label="bank account" value={value} onChange={(e) => onChange(e.target.value)} />,
   MoneyInput: ({ valueKobo, onChangeKobo }: { valueKobo: number; onChangeKobo: (v: number) => void }) => <input aria-label="amount" value={valueKobo} onChange={(e) => onChangeKobo(Number(e.target.value))} />,
-  PostingDateField: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => <input aria-label="date" value={value} onChange={(e) => onChange(e.target.value)} />,
+}));
+vi.mock("@/components/ui/date-picker-input", () => ({
+  DatePickerInput: ({ value, onChange, max }: { value: string; onChange: React.ChangeEventHandler<HTMLInputElement>; max?: string }) => <input aria-label="date" data-max={max} value={value} onChange={onChange} />,
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: mocks.toastWarning } }));
 
@@ -104,6 +111,11 @@ beforeEach(() => {
   mocks.detail = { ...topup(), workflow_instance_id: null, _read_only_fields: [] };
   mocks.request = undefined;
   mocks.uid = 4;
+  mocks.banks = [
+    { id: 7, name: "Zenith main", bank_name: "Zenith Bank", branch_id: 1, branch_name: "Head office", currency: "NGN" },
+    { id: 8, name: "GTB float", bank_name: null, branch_id: 1, branch_name: "Head office", currency: "NGN" },
+  ];
+  mocks.banksSkipped = [];
   for (const fn of [mocks.listArgs, mocks.create, mocks.update, mocks.submit, mocks.resume, mocks.toastWarning]) fn.mockReset();
   mocks.create.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Provider balance top-up recorded.", data: { id: 9 } }) });
   mocks.update.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Updated." }) });
@@ -119,11 +131,15 @@ afterEach(() => {
   container.remove();
 });
 
-const show = (entity: string | null = "CX", at = "/") =>
-  act(() => root.render(<MemoryRouter initialEntries={[at]}><ProviderTopUpsTab entity={entity} /></MemoryRouter>));
+const show = (at = "/") =>
+  act(() => root.render(<MemoryRouter initialEntries={[at]}><ProviderTopUpsTab /></MemoryRouter>));
 const headers = () => [...container.querySelectorAll("thead th")].map((th) => th.textContent);
 const button = (label: string) => [...document.body.querySelectorAll("button")].find((b) => b.textContent?.trim() === label);
 const drawer = (title: string) => document.body.querySelector(`section[aria-label="${title}"]`);
+const pickBank = (id: string) => {
+  const select = document.body.querySelector<HTMLSelectElement>("select[aria-label='Paid from']")!;
+  act(() => { select.value = id; select.dispatchEvent(new Event("change", { bubbles: true })); });
+};
 const type = (input: HTMLInputElement | HTMLTextAreaElement, value: string) => {
   const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(input, value);
@@ -164,20 +180,15 @@ describe("the list", () => {
     expect(headers()).toEqual(["Date", "Amount", "Provider"]);
   });
 
-  it("offers New top-up only with the create key and a ledger entity", () => {
+  it("offers New top-up only with the create key, whichever ledger entity is open", () => {
     show();
     expect(button("New top-up")).toBeTruthy();
+    expect(container.textContent).not.toContain("ledger entity");
     act(() => root.unmount());
     root = createRoot(container);
     mocks.held = new Set([P.PAY_VIEW_PLATFORM_TOPUPS]);
     show();
     expect(button("New top-up")).toBeUndefined();
-    act(() => root.unmount());
-    root = createRoot(container);
-    mocks.held = new Set([P.PAY_VIEW_PLATFORM_TOPUPS, P.PAY_CREATE_PLATFORM_TOPUP]);
-    show(null);
-    expect(button("New top-up")).toBeUndefined();
-    expect(container.textContent).toContain("Choose CodeX");
   });
 });
 
@@ -185,7 +196,7 @@ describe("recording a top-up", () => {
   const fill = () => {
     act(() => button("New top-up")!.click());
     act(() => type(document.body.querySelector<HTMLInputElement>("input[aria-label=amount]")!, "200000000"));
-    act(() => type(document.body.querySelector<HTMLInputElement>("input[aria-label='bank account']")!, "7"));
+    pickBank("7");
     act(() => type(document.body.querySelector<HTMLInputElement>("input[aria-label=date]")!, "2026-10-12"));
   };
 
@@ -195,6 +206,30 @@ describe("recording a top-up", () => {
     expect((button("Save top-up") as HTMLButtonElement).disabled).toBe(true);
     fill();
     expect((button("Save top-up") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("offers the platform's own bank accounts from the top-up route, and starts on today's date", () => {
+    show();
+    act(() => button("New top-up")!.click());
+    const select = document.body.querySelector<HTMLSelectElement>("select[aria-label='Paid from']")!;
+    expect([...select.options].map((o) => o.text)).toEqual(["Select the bank account", "Zenith main \u00b7 Zenith Bank", "GTB float"]);
+    const date = document.body.querySelector<HTMLInputElement>("input[aria-label=date]")!;
+    expect(date.value).toBe("2026-10-14");
+    expect(date.dataset.max).toBe("2026-10-14");
+  });
+
+  it("does not ask for the bank accounts of a role that may not read the field", () => {
+    mocks.fieldAccess = { "payments.platform_topup": { hidden: ["bank_account", "bank_account_name"] } };
+    show();
+    act(() => button("New top-up")!.click());
+    expect(mocks.banksSkipped.every((skipped) => skipped)).toBe(true);
+  });
+
+  it("says so when the platform has no bank account to pay from", () => {
+    mocks.banks = [];
+    show();
+    act(() => button("New top-up")!.click());
+    expect(document.body.querySelector<HTMLSelectElement>("select[aria-label='Paid from']")!.options[0].text).toBe("No bank account available");
   });
 
   it("sends the draft, leaving out an empty reference and note, then opens it", async () => {
@@ -222,7 +257,7 @@ describe("recording a top-up", () => {
     expect(field("note")).toBeNull();
     expect(field("reference")!.disabled).toBe(true);
     act(() => type(document.body.querySelector<HTMLInputElement>("input[aria-label=amount]")!, "200000000"));
-    act(() => type(document.body.querySelector<HTMLInputElement>("input[aria-label='bank account']")!, "7"));
+    pickBank("7");
     act(() => type(document.body.querySelector<HTMLInputElement>("input[aria-label=date]")!, "2026-10-12"));
     await act(async () => { button("Save top-up")!.click(); });
     const body = mocks.create.mock.calls[0][0];
@@ -231,12 +266,12 @@ describe("recording a top-up", () => {
   });
 
   it("opens from the palette's ?action=new link for a holder of the create key and not for anyone else", () => {
-    show("CX", "/?action=new");
+    show("/?action=new");
     expect(drawer("New top-up")).not.toBeNull();
     act(() => root.unmount());
     root = createRoot(container);
     mocks.held = new Set([P.PAY_VIEW_PLATFORM_TOPUPS]);
-    show("CX", "/?action=new");
+    show("/?action=new");
     expect(drawer("New top-up")).toBeNull();
   });
 });
@@ -244,7 +279,7 @@ describe("recording a top-up", () => {
 describe("opening a top-up", () => {
   it("opens the one the approval card names by ?document=<id>", () => {
     mocks.rows = [];
-    show("CX", "/?document=5");
+    show("/?document=5");
     expect(document.body.textContent).toContain("Zenith main");
     expect(document.body.textContent).toContain("Float for payouts");
     expect(document.body.textContent).toContain("Not put forward yet");
@@ -252,7 +287,7 @@ describe("opening a top-up", () => {
 
   it("puts a draft forward after asking, and warns when nobody can approve it yet", async () => {
     mocks.submit.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Top-up submitted for approval.", data: { approval: { parked: true, requirement: "Give two people the settlement approver role." } } }) });
-    show("CX", "/?document=5");
+    show("/?document=5");
     act(() => button("Submit for approval")!.click());
     expect(document.body.textContent).toContain("Two other CodeX people must approve it before it is booked");
     expect(mocks.submit).not.toHaveBeenCalled();
@@ -263,14 +298,14 @@ describe("opening a top-up", () => {
 
   it("offers Submit only to a holder of the submit key, and Edit only to a holder of the create key", () => {
     mocks.held = new Set([P.PAY_VIEW_PLATFORM_TOPUPS]);
-    show("CX", "/?document=5");
+    show("/?document=5");
     expect(button("Submit for approval")).toBeUndefined();
     expect(button("Edit")).toBeUndefined();
   });
 
   it("offers neither once it is with the approvers, and says so", () => {
     mocks.detail = { ...topup({ status: "PENDING_APPROVAL", approval_state: "PENDING" }), workflow_instance_id: 31, _read_only_fields: [] };
-    show("CX", "/?document=5");
+    show("/?document=5");
     expect(button("Submit for approval")).toBeUndefined();
     expect(button("Edit")).toBeUndefined();
     expect(document.body.textContent).toContain("Waiting for two approvers");
@@ -281,7 +316,7 @@ describe("opening a top-up", () => {
       ...topup({ status: "POSTED", approval_state: "APPROVED", journal_id: 88, journal_number: "JV-0088", posted_at: "2026-10-13T10:00:00Z" }),
       workflow_instance_id: 31, _read_only_fields: [],
     };
-    show("CX", "/?document=5");
+    show("/?document=5");
     const link = [...document.body.querySelectorAll("a")].find((a) => a.textContent === "JV-0088") as HTMLAnchorElement;
     expect(link.getAttribute("href")).toContain("document=88");
     expect(button("Edit")).toBeUndefined();
@@ -292,7 +327,7 @@ describe("opening a top-up", () => {
       ...topup({ approval_state: "PENDING", approval_returned: true }), workflow_instance_id: 31, _read_only_fields: [],
     };
     mocks.request = { status: "RETURNED", requested_by: 4, stage_instances: [] };
-    show("CX", "/?document=5");
+    show("/?document=5");
     expect(button("Resume")).toBeTruthy();
     expect(button("Edit")).toBeTruthy();
     expect(button("Submit for approval")).toBeUndefined();
@@ -301,7 +336,7 @@ describe("opening a top-up", () => {
   });
 
   it("corrects a draft by sending only what changed", async () => {
-    show("CX", "/?document=5");
+    show("/?document=5");
     act(() => button("Edit")!.click());
     act(() => type(document.body.querySelector<HTMLInputElement>("input[aria-label=amount]")!, "250000000"));
     await act(async () => { button("Save changes")!.click(); });
@@ -311,7 +346,7 @@ describe("opening a top-up", () => {
   it("leaves out every line of a field her roles may not read", () => {
     mocks.fieldAccess = { "payments.platform_topup": { hidden: ["journal_id", "journal_number", "posted_at", "created_by", "created_by_name"] } };
     mocks.detail = { id: 5, currency: "NGN", provider: "PAYSTACK", amount: 200_000_000, topped_up_on: "2026-10-12", status: "POSTED", approval_state: "APPROVED", approval_returned: false, workflow_instance_id: 31, _read_only_fields: [] };
-    show("CX", "/?document=5");
+    show("/?document=5");
     expect(document.body.textContent).not.toContain("Journal");
     expect(document.body.textContent).not.toContain("Recorded by");
     expect(document.body.textContent).not.toContain("Booking");

@@ -38,6 +38,7 @@ import type {
   PayoutSummary,
   PlatformHeldSettlement,
   ProviderTopUp,
+  ProviderTopUpBankAccount,
   ProviderTopUpDetail,
   ProviderTopUpPayload,
   ProviderTopUpStatus,
@@ -305,6 +306,12 @@ export const paymentsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/payments/platform/provider-topups/${qs(p)}`, method: "GET" }),
       providesTags: ["PaymentsProviderTopups"],
     }),
+    // The platform's own active bank accounts, whichever ledger entity is open. Refused (403)
+    // to a role that may not read the top-up's bank account field.
+    getPlatformProviderTopupBankAccounts: builder.query<ApiEnvelope<ProviderTopUpBankAccount[]>, void>({
+      query: () => ({ url: `/payments/platform/provider-topups/bank-accounts/`, method: "GET" }),
+      providesTags: ["PaymentsProviderTopups"],
+    }),
     getPlatformProviderTopup: builder.query<ApiEnvelope<ProviderTopUpDetail>, { id: number }>({
       query: ({ id }) => ({ url: `/payments/platform/provider-topups/${id}/`, method: "GET" }),
       providesTags: ["PaymentsProviderTopups"],
@@ -420,6 +427,7 @@ export const {
   useGetPlatformProviderSweepsQuery,
   useGetPlatformProviderTopupsQuery,
   useGetPlatformProviderTopupQuery,
+  useGetPlatformProviderTopupBankAccountsQuery,
   useCreatePlatformProviderTopupMutation,
   useUpdatePlatformProviderTopupMutation,
   useSubmitPlatformProviderTopupMutation,

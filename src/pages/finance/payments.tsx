@@ -34,7 +34,7 @@ import { platformName } from "../../host";
  * The platform's screens read every school at once and take no ledger entity:
  * Held Reconciliations always, and Held Settlements for a reader holding the
  * platform settlement key. Paystack Top-ups lists without an entity too, and
- * takes the active one only to offer the platform's bank accounts on its form. A school's Held Settlements is its own list and
+ * takes none: its bank accounts come from its own routes. A school's Held Settlements is its own list and
  * needs its books like every other tab. Payouts and Batches pay out of money
  * the platform holds, so at a school whose custody is DIRECT they show a notice
  * instead (see HeldCustodyScreen).
@@ -63,7 +63,7 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
           <HeldReconciliationsTab />
         ) : section === "provider-top-ups" ? (
           can(P.PAY_VIEW_PLATFORM_TOPUPS)
-            ? <ProviderTopUpsTab entity={entity ?? null} currency={currency} />
+            ? <ProviderTopUpsTab currency={currency} />
             : <EmptyState title="No top-ups access" message={noAccessMessage("view the Paystack top-ups")} />
         ) : platformHeld ? (
           <PlatformHeldSettlementsTab currency={currency} />

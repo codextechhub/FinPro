@@ -752,6 +752,16 @@ export interface ProviderTopUp {
   created_at?: string;
 }
 
+/** A bank account a top-up can be paid from: the values of the top-up's bank account field. */
+export interface ProviderTopUpBankAccount {
+  id: number;
+  name: string;
+  bank_name: string | null;
+  branch_id: number | null;
+  branch_name: string | null;
+  currency: string;
+}
+
 /** A top-up read on its own: its latest approval request, and what the reader may not change. */
 export interface ProviderTopUpDetail extends ProviderTopUp {
   workflow_instance_id?: string | number | null;
