@@ -17,6 +17,30 @@ APPS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONSOLE="$APPS_DIR/console-fe"
 SCHOOL="$APPS_DIR/school-fe"
 
+# Run npm for an application under the processor its build tools were
+# installed for. On Apple silicon the two apps need not agree: when one was
+# installed under an Intel Node (Rosetta), an npm run by the native Node swaps
+# its rollup and esbuild binaries for arm64 ones, and that app's Intel dev
+# server stops starting. Which binaries are present now is the answer, so the
+# install keeps them. X64_NODE names the Intel Node to use.
+X64_NODE="${X64_NODE:-/usr/local/bin/node}"
+app_npm() {
+  local app="$1"; shift
+  if [[ "$(uname -m)" == arm64 && -d "$app/node_modules/@rollup/rollup-darwin-x64" \
+        && ! -d "$app/node_modules/@rollup/rollup-darwin-arm64" ]]; then
+    local cli
+    cli="$(dirname "$X64_NODE")/../lib/node_modules/npm/bin/npm-cli.js"
+    if [[ "$(file -b "$X64_NODE" 2>/dev/null)" != *x86_64* || ! -f "$cli" ]]; then
+      echo "$(basename "$app") is installed for Intel, but no Intel Node with npm is at $X64_NODE." >&2
+      echo "Set X64_NODE to one, or reinstall $(basename "$app") for arm64." >&2
+      return 1
+    fi
+    arch -x86_64 "$X64_NODE" "$cli" "$@"
+  else
+    npm "$@"
+  fi
+}
+
 if [[ -z "$VERSION" || -z "$MESSAGE" ]]; then
   echo "usage: ./release.sh <version> <message>" >&2
   echo "   eg: ./release.sh v0.2.0 \"bank reconciliation screen\"" >&2
@@ -63,13 +87,13 @@ git push -q origin "$VERSION"
 for app in "$SCHOOL" "$CONSOLE"; do
   [[ -d "$app" ]] || { echo "skipping $(basename "$app"): not found"; continue; }
   echo "==> $(basename "$app"): installing $VERSION"
-  ( cd "$app" && npm install --prefer-online "$REPO#$VERSION" )
+  ( cd "$app" && app_npm "$app" install --prefer-online "$REPO#$VERSION" )
 done
 
 # Step 4. The install above just overwrote the console's symlink.
 if [[ -d "$CONSOLE" ]]; then
   echo "==> console-fe: restoring the npm link"
-  ( cd "$CONSOLE" && npm link @xvs/finance >/dev/null )
+  ( cd "$CONSOLE" && app_npm "$CONSOLE" link @xvs/finance >/dev/null )
   echo "    node_modules/@xvs/finance -> $(readlink "$CONSOLE/node_modules/@xvs/finance" || echo '?')"
 fi
 
