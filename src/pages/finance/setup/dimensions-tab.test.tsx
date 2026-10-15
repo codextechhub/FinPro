@@ -21,8 +21,7 @@ vi.mock("@/hooks/use-permissions", () => ({
   }),
 }));
 vi.mock("@/hooks/use-action-param", () => ({ useActionParam: () => undefined }));
-vi.mock("../../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.wholeSchool ? null : [2], covers: () => mocks.wholeSchool }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

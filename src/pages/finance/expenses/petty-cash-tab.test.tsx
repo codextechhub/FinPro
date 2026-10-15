@@ -83,8 +83,7 @@ vi.mock("@/hooks/use-permissions", () => ({
   }),
 }));
 
-vi.mock("../../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   hostBranchLens: () => mocks.lens,
   useBranches: () => ({ data: mocks.lens.choices, isLoading: false, isError: false }),
 }));

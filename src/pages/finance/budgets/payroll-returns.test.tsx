@@ -23,8 +23,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({ hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true, hasModuleAccess: () => true, fieldAccess: mocks.fieldAccess }),
 }));
-vi.mock("../../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.wholeSchool ? null : [20], covers: () => true }),
 }));
 vi.mock("@/redux/services/finance/payroll-api", () => ({

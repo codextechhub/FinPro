@@ -46,8 +46,7 @@ vi.mock("@/redux/store", () => ({
   useAppSelector: (select: (state: unknown) => unknown) => select(mocks.state),
   useAppDispatch: () => vi.fn(),
 }));
-vi.mock("../../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   useBranches: () => ({ data: [ANNEX, MAIN], isLoading: false, isError: false }),
   hostBranchLens: undefined,
 }));

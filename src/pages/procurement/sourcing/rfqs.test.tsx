@@ -35,8 +35,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasModuleAccess: () => true, fieldAccess: mocks.fieldAccess,
   }),
 }));
-vi.mock("../../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: true, branchIds: null, covers: () => true }),
 }));
 vi.mock("../../../lib/display-prefs", () => ({

@@ -96,8 +96,7 @@ vi.mock("@/components/ui/date-picker-input", () => ({
 }));
 vi.mock("@/redux/services/finance/reports-api", () => ({}));
 vi.mock("@/redux/services/tenants-api", () => ({ useGetBranchOptionsQuery: () => ({ data: { data: [] } }) }));
-vi.mock("../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.branchIds, covers: () => true }),
   hostBranchLens: undefined,
 }));

@@ -15,8 +15,7 @@ const mocks = vi.hoisted(() => ({ update: vi.fn(), wholeSchool: true }));
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({ hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true, hasModuleAccess: () => true, fieldAccess: {} }),
 }));
-vi.mock("../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.wholeSchool ? null : [20], covers: () => mocks.wholeSchool }),
 }));
 vi.mock("@/redux/services/finance/payroll-api", () => ({

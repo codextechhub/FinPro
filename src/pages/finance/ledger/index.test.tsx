@@ -39,8 +39,7 @@ vi.mock("@/components/finance-ui/archived-years", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ShowArchivedToggle: () => null,
 }));
-vi.mock("../../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   QuickExportButton: (props: { params?: Record<string, unknown> }) => { mocks.exported(props.params); return null; },
   UserAvatar: ({ name, className }: { name?: string; className?: string }) => <span data-avatar={name} className={className} />,
 }));

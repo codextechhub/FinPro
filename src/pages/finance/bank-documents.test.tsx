@@ -51,8 +51,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     fieldAccess: mocks.fieldAccess,
   }),
 }));
-vi.mock("../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: false, branchIds: [2], covers: (ids: number[]) => ids.length > 0 && ids.every((id) => id === 2) }),
 }));
 vi.mock("../../lib/display-prefs", () => ({ useDates: () => ({ day: (v: string) => v, today: () => "2026-10-05" }) }));

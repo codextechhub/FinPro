@@ -72,8 +72,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 }));
 vi.mock("./procurement-shell", () => ({ ProcurementShell: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/components/layout/page-shell", () => ({ PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
-vi.mock("../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
   QuickExportButton: (props: { params?: unknown }) => { mocks.state.exported = props.params; return null; },
 }));
 vi.mock("@/lib/source-document-route", async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), useSourceDocumentParam: () => undefined }));

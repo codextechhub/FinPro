@@ -36,8 +36,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     fieldAccess: mocks.access,
   }),
 }));
-vi.mock("../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.wholeSchool ? null : [2], covers: () => mocks.wholeSchool }),
 }));
 vi.mock("@/redux/services/finance/setup-api", async (importOriginal) => ({

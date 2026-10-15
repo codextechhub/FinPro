@@ -38,8 +38,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
     <label>{label}<input aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} /></label>
   ),
 }));
-vi.mock("../../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: true, branchIds: null, covers: () => true }),
   useBranches: () => ({ data: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false, isError: false }),
   hostBranchLens: () => ({ applies: true, pinnedBranch: null, branch: "all", choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false }),

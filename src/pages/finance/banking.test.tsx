@@ -78,8 +78,7 @@ vi.mock("./online-payments", () => ({ CollectionSubaccountBlock: () => null }));
 vi.mock("./inter-branch/use-inter-branch", () => ({
   useInterBranchReader: () => ({ applies: false, reach: { wholeSchool: false }, keys: {}, branches: [] }),
 }));
-vi.mock("../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
   useBranches: () => ({ data: [{ id: 1, name: "Ikeja" }], isLoading: false, isError: false }),
   hostBranchLens: () => ({ applies: false, pinnedBranch: 1, branch: 1, choices: [{ id: 1, name: "Ikeja" }], isLoading: false }),
 }));

@@ -20,8 +20,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     fieldAccess: {},
   }),
 }));
-vi.mock("../../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.wholeSchool ? null : [2], covers: () => mocks.wholeSchool }),
 }));
 vi.mock("@/components/layout/page-shell", () => ({

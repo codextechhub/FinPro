@@ -74,8 +74,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 vi.mock("@/redux/services/finance/setup-api", () => mocks.api({}));
 vi.mock("./procurement-shell", () => ({ ProcurementShell: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/components/layout/page-shell", () => ({ PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
-vi.mock("../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
   QuickExportButton: (props: { params?: unknown }) => { mocks.state.exported = props.params; return null; },
 }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverPrompt: () => ({ promptIfParked: () => undefined, noApproverDialog: null }) }));

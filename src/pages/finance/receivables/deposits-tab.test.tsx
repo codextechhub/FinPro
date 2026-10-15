@@ -40,8 +40,7 @@ vi.mock("@/redux/store", () => ({
   useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {} } }),
   useAppDispatch: () => vi.fn(),
 }));
-vi.mock("../../../host", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   useBranches: () => ({ data: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false, isError: false }),
   useReaderReach: () => ({ wholeSchool: true, branchIds: null, covers: () => true }),
   hostBranchLens: () => ({ applies: true, pinnedBranch: null, branch: "all", choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false }),
