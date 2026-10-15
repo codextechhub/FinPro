@@ -27,6 +27,7 @@ import type {
   TemplateStatus,
   UpdateTemplatePayload,
 } from "@/redux/services/dashboard/import-types";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 const FILE_FORMATS: FileFormat[] = ["csv", "xlsx", "xls"];
 const TEMPLATE_STATUSES: TemplateStatus[] = ["draft", "active", "retired"];
@@ -169,7 +170,7 @@ export default function EditTemplate() {
   if (fetching) {
     return (
       <>
-        <div className="flex h-96 items-center justify-center"><div className="loader" /></div>
+        <div className="flex h-96 items-center justify-center"><LoadingMark className="size-12" /></div>
       </>
     );
   }

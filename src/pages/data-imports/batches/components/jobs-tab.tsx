@@ -21,6 +21,7 @@ import {
 import type { BatchStatus, ImportJobListItem } from "@/redux/services/dashboard/import-types";
 import { IN_FLIGHT, JOB_STATUS_BADGE } from "./batch-status";
 import { canRollBackBatch } from "./batch-utils";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 export function JobsTab({
   batchId,
@@ -58,7 +59,7 @@ export function JobsTab({
     } catch { /* interceptor shows the toast */ }
   };
 
-  if (isLoading) return <div className="flex h-32 items-center justify-center"><div className="loader" /></div>;
+  if (isLoading) return <div className="flex h-32 items-center justify-center"><LoadingMark className="size-10" /></div>;
   if (isError) return (
     <div className="flex h-32 flex-col items-center justify-center gap-2">
       <p className="text-sm text-destructive">Failed to load jobs.</p>

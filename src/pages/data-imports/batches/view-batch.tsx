@@ -35,6 +35,7 @@ import { AuditLogsTab } from "./components/audit-logs-tab";
 import { NotificationsTab } from "./components/notifications-tab";
 import { PageShell } from "@/components/layout/page-shell";
 import { useDates } from "../../../lib/display-prefs";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
@@ -122,7 +123,7 @@ export default function ViewBatch() {
   if (isLoading) {
     return (
       <>
-        <div className="flex h-96 items-center justify-center"><div className="loader" /></div>
+        <div className="flex h-96 items-center justify-center"><LoadingMark className="size-12" /></div>
       </>
     );
   }

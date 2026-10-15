@@ -13,6 +13,7 @@ import {
 import type { ValidationIssueListItem, ValidationSeverity } from "@/redux/services/dashboard/import-types";
 import { SEVERITY_BADGE } from "./batch-status";
 import { triggerBlobPreview } from "./batch-utils";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 export function IssuesTab({ batchId }: { batchId: number }) {
   const [sev, setSev] = useState<"all" | ValidationSeverity>("all");
@@ -35,7 +36,7 @@ export function IssuesTab({ batchId }: { batchId: number }) {
   if (isLoading) {
     return (
       <div className="flex h-48 items-center justify-center">
-        <div className="loader" />
+        <LoadingMark className="size-10" />
       </div>
     );
   }

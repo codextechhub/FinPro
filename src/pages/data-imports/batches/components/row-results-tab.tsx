@@ -5,6 +5,7 @@ import {
   Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxEmpty,
 } from "@/components/ui/combobox";
 import { useGetImportJobQuery } from "@/redux/services/dashboard/import-api";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 export function RowResultsTab({ batchId, latestJobId }: { batchId: number; latestJobId: number | null }) {
   const { data: job, isLoading, isError, refetch } = useGetImportJobQuery(
@@ -22,7 +23,7 @@ export function RowResultsTab({ batchId, latestJobId }: { batchId: number; lates
     );
   }
 
-  if (isLoading) return <div className="flex h-32 items-center justify-center"><div className="loader" /></div>;
+  if (isLoading) return <div className="flex h-32 items-center justify-center"><LoadingMark className="size-10" /></div>;
   if (isError) return (
     <div className="flex h-32 flex-col items-center justify-center gap-2">
       <p className="text-sm text-destructive">Failed to load row results.</p>

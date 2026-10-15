@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { useDates } from "../../../lib/display-prefs";
 import { showBlobPreview } from "../../../components/finance-ui/file-preview-dialog";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 const STATUS_BADGE: Record<TemplateStatus, "active" | "pending" | "inactive"> = {
   active: "active",
@@ -86,7 +87,7 @@ export default function ViewTemplate() {
   if (isLoading) {
     return (
       <>
-        <div className="flex h-96 items-center justify-center"><div className="loader" /></div>
+        <div className="flex h-96 items-center justify-center"><LoadingMark className="size-12" /></div>
       </>
     );
   }
