@@ -30,6 +30,7 @@ import type {
   DatasetType,
   ImportBatchListItem,
 } from "@/redux/services/dashboard/import-types";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 // ── Status configuration ─────────────────────────────────────────────────────
 
@@ -253,7 +254,7 @@ export default function ImportBatchesList() {
           </div>
           <div className="inline-flex items-center gap-3">
             <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshCw className={cn("size-4", isFetching && "animate-spin")} /> Refresh
+              <RefreshIcon spinning={isFetching} className="size-4" /> Refresh
             </Button>
             <PermissionGate permission={P.UPLOAD_IMPORT_BATCH}>
               <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.DATA_IMPORTS.BATCHES.NEW)}>

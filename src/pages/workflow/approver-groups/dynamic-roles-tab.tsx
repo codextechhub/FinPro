@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FlaskConical, Lock, Pencil, Plus, RefreshCw, Trash2, TriangleAlert, Workflow } from "lucide-react";
+import { FlaskConical, Lock, Pencil, Plus, Trash2, TriangleAlert, Workflow } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ import { DynamicRoleEditor } from "./dynamic-role-editor";
 import { draftFromDynamicRole, rulesPayload } from "./dynamic-role-form";
 import { DYNAMIC_ROLES_READ_ONLY } from "../workflow-reach";
 import { listEmptyText, listLoadedEmpty } from "../list-state";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 type EditorState = { role: DynamicRole | null } | null;
 
@@ -134,7 +135,7 @@ export default function DynamicRolesTab() {
           </p>
           <div className="inline-flex flex-wrap items-center gap-3.5">
             <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
+              <RefreshIcon spinning={isFetching} /> Refresh
             </Button>
             {canCreate && (
               <Button size="lg" onClick={() => setEditor({ role: null })}>

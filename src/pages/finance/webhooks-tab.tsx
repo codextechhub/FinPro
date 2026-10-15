@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { DataTable, KpiCard, TabStrip, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import {
 } from "@/redux/services/payments/payments-api";
 import type { WebhookEvent } from "@/redux/services/payments/payments-types";
 import { useDates } from "../../lib/display-prefs";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 
@@ -173,7 +174,7 @@ export function WebhooksTab({ entity, currency }: { entity: string; currency?: s
         />
         <div className="ml-auto">
           <Button variant="outline" onClick={() => refetch()} className="gap-1.5">
-            <RefreshCw className={cn("size-4", isFetching && "animate-spin")} /> Refresh
+            <RefreshIcon spinning={isFetching} className="size-4" /> Refresh
           </Button>
         </div>
       </div>

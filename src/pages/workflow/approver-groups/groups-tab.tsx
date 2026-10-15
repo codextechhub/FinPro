@@ -3,7 +3,6 @@ import {
   ChevronRight,
   Network,
   Plus,
-  RefreshCw,
   Search,
   Shield,
   TriangleAlert,
@@ -58,6 +57,7 @@ import AddMemberSheet from "./add-member-sheet";
 import { groupBranchIds, groupReadOnlySentence } from "../workflow-reach";
 import { listEmptyText, listLoadedEmpty } from "../list-state";
 import { exitedOutline } from "@/components/finance-ui/exited-person";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 const KIND_LABEL: Record<GroupMemberKind, string> = {
   USER: "Person",
@@ -239,7 +239,7 @@ export default function GroupsTab() {
           </p>
           <div className="inline-flex items-center gap-3.5">
             <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
+              <RefreshIcon spinning={isFetching} /> Refresh
             </Button>
             <PermissionGate permission={P.CREATE_APPROVER_GROUP}>
               <Button size="lg" onClick={() => setNewOpen(true)}>

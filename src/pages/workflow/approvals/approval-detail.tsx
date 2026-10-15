@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { Check, X, CornerUpLeft, ShieldAlert, Loader2, RefreshCw } from "lucide-react";
+import { Check, X, CornerUpLeft, ShieldAlert, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -27,6 +27,7 @@ import { DocumentPanel } from "@/pages/protected/workflow/components/document-pa
 import { StageTracker } from "@/pages/protected/workflow/components/stage-tracker";
 import { AuditTimeline } from "@/pages/protected/workflow/components/audit-timeline";
 import { PageShell } from "@/components/layout/page-shell";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 const VOTE_COPY: Record<VoteAction, { title: string; confirm: string; note: string }> = {
   APPROVED: {
@@ -186,7 +187,7 @@ export default function ApprovalDetail() {
       <PageShell className="text-black-01">
         {isLoading ? (
           <CenterState>
-            <Loader2 className="size-6 animate-spin text-primary" />
+            <LoadingMark className="size-12" />
           </CenterState>
         ) : isError || !instance ? (
           <CenterState>

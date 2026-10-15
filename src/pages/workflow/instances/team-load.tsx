@@ -1,10 +1,9 @@
 import { useMemo } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { useGetTeamLoadQuery } from "@/redux/services/dashboard/workflow-api";
 import { humanizeDocumentType } from "@/pages/protected/workflow/components/workflow-format";
 import { PageShell } from "@/components/layout/page-shell";
+import { LoadingMark, RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 export default function TeamLoad() {
   const { data, isLoading, isFetching, refetch } = useGetTeamLoadQuery(undefined, {
@@ -48,13 +47,13 @@ export default function TeamLoad() {
             onClick={() => refetch()}
             disabled={isFetching}
           >
-            <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
+            <RefreshIcon spinning={isFetching} /> Refresh
           </Button>
         </div>
 
         {isLoading ? (
           <div className="flex h-48 items-center justify-center">
-            <Loader2 className="size-6 animate-spin text-primary" />
+            <LoadingMark className="size-10" />
           </div>
         ) : grouped.length === 0 ? (
           <div className="rounded-lg border border-white-02 bg-white py-16 text-center text-sm text-gray-01">

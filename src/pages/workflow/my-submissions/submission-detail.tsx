@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router";
-import { Loader2, RefreshCw, RotateCcw, Undo2 } from "lucide-react";
+import { RefreshCw, RotateCcw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,6 +26,7 @@ import { StageTracker } from "@/pages/protected/workflow/components/stage-tracke
 import { AuditTimeline } from "@/pages/protected/workflow/components/audit-timeline";
 import { PageShell } from "@/components/layout/page-shell";
 import { withdrawDescription } from "./withdraw-words";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 export default function SubmissionDetail() {
   const { id = "" } = useParams();
@@ -73,7 +74,7 @@ export default function SubmissionDetail() {
       <PageShell className="text-black-01">
         {isLoading ? (
           <div className="flex h-64 items-center justify-center">
-            <Loader2 className="size-6 animate-spin text-primary" />
+            <LoadingMark className="size-12" />
           </div>
         ) : isError || !instance ? (
           <div className="flex h-64 flex-col items-center justify-center gap-3">

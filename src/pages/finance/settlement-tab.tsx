@@ -18,7 +18,7 @@
  */
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Eye, RefreshCw, ArrowDownLeft, ArrowUpRight, BookCheck } from "lucide-react";
+import { Eye, ArrowDownLeft, ArrowUpRight, BookCheck } from "lucide-react";
 import { DataTable, Money, KpiCard, DetailDrawer, TabStrip, toArray, useReaderBranchLens, type Column } from "@/components/finance-ui";
 import { NO_BRANCH_YET } from "../../lib/branch-labels";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import { BookSettlementModal, type BookSettlementTarget } from "./book-settlemen
 import { waitingPayments } from "./settlement-booking";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { useDates } from "../../lib/display-prefs";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const signed = (kobo: number, currency?: string | null) => `${kobo < 0 ? "−" : ""}${formatMoney(Math.abs(kobo), currency)}`;
@@ -206,7 +207,7 @@ export function SettlementTab({ entity, currency }: { entity: string; currency?:
               </Button>
             ))}
           </div>
-          <Button variant="outline" disabled={isFetching} onClick={() => refetch()} className="gap-1.5"><RefreshCw className={cn("size-4", isFetching && "animate-spin")} /> Re-run match</Button>
+          <Button variant="outline" disabled={isFetching} onClick={() => refetch()} className="gap-1.5"><RefreshIcon spinning={isFetching} className="size-4" /> Re-run match</Button>
         </div>
       </div>
 

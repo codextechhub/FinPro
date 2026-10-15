@@ -1,5 +1,5 @@
 import { useReducer, useState } from "react";
-import { History, Loader2, Pencil, RotateCcw, TriangleAlert, UserMinus } from "lucide-react";
+import { History, Pencil, RotateCcw, TriangleAlert, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ import {
   stagesInOrder,
   type EditorPerson,
 } from "./manage-approvals";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 const STATE_BADGE: Record<StageApprovers["state"], { label: string; variant: "inactive" | "pending" | "outline" }> = {
   DONE: { label: "Done", variant: "inactive" },
@@ -78,7 +79,7 @@ export function ApproversSection({ instanceId }: { instanceId: string }) {
     return (
       <SectionFrame>
         <div className="flex h-24 items-center justify-center">
-          <Loader2 className="size-5 animate-spin text-primary" />
+          <LoadingMark className="size-10" />
         </div>
       </SectionFrame>
     );

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ChevronDown, ChevronUp, GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,6 +60,7 @@ import { stageRulesPayload } from "./components/template-payload";
 import { TemplateReachChip, TemplateReachNotice } from "./components/template-reach";
 import { TEMPLATE_SHARED_NOTE, publishTarget, rowBranchIds } from "../workflow-reach";
 import { PageShell } from "@/components/layout/page-shell";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 const SOURCE_OPTIONS = [
   { value: "ROLE", label: "Role holders" },
@@ -657,7 +658,7 @@ export default function TemplateBuilder() {
     return (
       <>
         <div className="flex h-64 items-center justify-center">
-          <Loader2 className="size-6 animate-spin text-primary" />
+          <LoadingMark className="size-12" />
         </div>
       </>
     );

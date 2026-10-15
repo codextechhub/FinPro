@@ -13,6 +13,7 @@ import { ChevronLeft, ChevronRight, Download, FileText, Loader2 } from "lucide-r
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { LoadingMark } from "./loading-mark";
 
 export interface PreviewFile {
   id: string | number;
@@ -133,7 +134,7 @@ export function FilePreviewDialog({ files, index, onIndexChange, onClose }: {
       </div>
       <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-[#f4f7fb]">
         {error ? <p role="alert" className="p-5 text-center text-sm text-gray-05">{error}</p>
-          : loading ? <Loader2 className="size-6 animate-spin text-gray-05" aria-label="Loading file" />
+          : loading ? <LoadingMark className="size-12" label="Loading file" />
           : file && kind === "image" && preview?.id === file.id ? <img src={preview.url} alt={file.name} className="max-h-full max-w-full object-contain" />
           : file && kind === "pdf" && preview?.id === file.id ? <iframe src={preview.url} title={file.name} className="h-full w-full border-0" />
           : file && kind === "details" ? <div className="max-w-md p-6 text-center"><FileText className="mx-auto size-10 text-gray-05" /><p className="mt-3 break-words font-medium">{file.name}</p><p className="mt-1 text-sm text-gray-05">{sizeLabel(file.size)} · {file.contentType || "File"}</p><p className="mt-3 text-sm text-gray-05">Download this file to open it in its own application.</p></div>

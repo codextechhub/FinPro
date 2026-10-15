@@ -26,6 +26,15 @@ import type {
   FinanceSettingsSection, SetupSection,
 } from "./pages/finance/console-sections";
 
+/** What the package passes to the host's loading mark. */
+export interface HostLoadingMarkProps {
+  className?: string;
+  /** What a screen reader hears; `null` hides the mark from assistive tech. */
+  label?: string | null;
+  /** The mark sits inside a busy, and therefore faded, button. */
+  inButton?: boolean;
+}
+
 /** The minimum a branch must expose. Apps may return richer rows. */
 export interface HostBranch {
   id: string | number;
@@ -330,6 +339,14 @@ export interface HostContract {
   platformName: string;
   /** The application's own logo. */
   AppLogo: ComponentType<{ animate?: boolean; className?: string }>;
+  /** The application's own loading mark, shown while a section loads and in
+   *  place of the arrow on a Refresh button while it fetches.
+   *
+   *  Optional, because a loader carries the brand and each product has its
+   *  own. An app that omits it gets a plain spinner in the primary colour.
+   *  The mark sizes from `className`; `label: null` marks it decorative, for
+   *  a place where nearby text already says what is loading. */
+  LoadingMark?: ComponentType<HostLoadingMarkProps>;
   /** An extra section on Setup -> Entities, below the caller's own books.
    *
    *  The platform console shows a roll-call there: every tenant on the
@@ -364,3 +381,4 @@ export const {
 // leaves out is not an export of its module at all.
 export const FeeGenerationPanel = _satisfies.FeeGenerationPanel;
 export const hostBranchLens = _satisfies.useBranchLens;
+export const HostLoadingMark = _satisfies.LoadingMark;

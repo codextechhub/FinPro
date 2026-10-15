@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { RefreshCw, UserRoundCog } from "lucide-react";
+import { UserRoundCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuickExportButton } from "@xvs/finance/host";
-import { cn } from "@/lib/utils";
 import { formatRelativeDate } from "@/utils/helpers";
 import { usePermissions } from "@/hooks/use-permissions";
 import { P } from "@/permissions";
@@ -31,6 +30,7 @@ import {
   waitingOnLabel,
   type InstanceFilters,
 } from "./manage-approvals";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 /** The rows ticked for a bulk action, under the filters they were ticked with. */
 interface Selection {
@@ -182,7 +182,7 @@ export default function ManageApprovals() {
             onClick={() => refetch()}
             disabled={isFetching}
           >
-            <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
+            <RefreshIcon spinning={isFetching} /> Refresh
           </Button>
           <QuickExportButton
             screen="workflow.instances"

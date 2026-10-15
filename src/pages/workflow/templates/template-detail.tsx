@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowRight, GitBranch, Loader2, Pencil, RefreshCw, Undo2 } from "lucide-react";
+import { ArrowRight, GitBranch, Pencil, RefreshCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,7 @@ import { DynamicRoleRuleList } from "@/pages/protected/workflow/components/dynam
 import { PageShell } from "@/components/layout/page-shell";
 import { useRoles } from "@xvs/finance/host";
 import { TEMPLATE_RESET_READ_ONLY, rowBranchIds } from "../workflow-reach";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 export default function TemplateDetail() {
   const { id = "" } = useParams();
@@ -101,7 +102,7 @@ export default function TemplateDetail() {
       <PageShell className="text-black-01">
         {isLoading ? (
           <div className="flex h-64 items-center justify-center">
-            <Loader2 className="size-6 animate-spin text-primary" />
+            <LoadingMark className="size-12" />
           </div>
         ) : isError || !template ? (
           <div className="flex h-64 flex-col items-center justify-center gap-3">

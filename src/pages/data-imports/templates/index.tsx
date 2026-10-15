@@ -30,6 +30,7 @@ import type {
   TemplateStatus,
 } from "@/redux/services/dashboard/import-types";
 import { showBlobPreview } from "../../../components/finance-ui/file-preview-dialog";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -180,7 +181,7 @@ export default function ImportTemplatesList() {
           </div>
           <div className="inline-flex items-center gap-3">
             <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshCw className={cn("size-4", isFetching && "animate-spin")} /> Refresh
+              <RefreshIcon spinning={isFetching} className="size-4" /> Refresh
             </Button>
             <PermissionGate permission={P.CREATE_IMPORT_TEMPLATE}>
               <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.DATA_IMPORTS.TEMPLATES.NEW)}>

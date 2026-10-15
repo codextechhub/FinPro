@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { ChevronRight, Inbox, RefreshCw, Search, Users, FileText, Layers } from "lucide-react";
+import { ChevronRight, Inbox, Search, Users, FileText, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { useUserDirectory } from "@/pages/protected/workflow/components/use-user
 import { DocumentRef, InitialsAvatar } from "@/pages/protected/workflow/components/workflow-ui";
 import { humanizeDocumentType } from "@/pages/protected/workflow/components/workflow-format";
 import { PageShell } from "@/components/layout/page-shell";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 export default function PendingApprovals() {
   const navigate = useNavigate();
@@ -129,7 +130,7 @@ export default function PendingApprovals() {
                 onClick={() => refetch()}
                 disabled={isFetching}
               >
-                <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
+                <RefreshIcon spinning={isFetching} /> Refresh
               </Button>
             </div>
 

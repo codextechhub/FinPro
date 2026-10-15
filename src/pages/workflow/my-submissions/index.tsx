@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { RefreshCw } from "lucide-react";
 import CustomTable from "@/components/custom/custom-table";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,6 +12,7 @@ import { useUserDirectory } from "@/pages/protected/workflow/components/use-user
 import { DocumentRef, InstanceStatusBadge } from "@/pages/protected/workflow/components/workflow-ui";
 import { PageShell } from "@/components/layout/page-shell";
 import { listEmptyText } from "../list-state";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 const TABLE_HEADERS = ["Document", "Template", "Status", "Current Stage", "Updated"];
 
@@ -100,7 +100,7 @@ export default function MySubmissions() {
             onClick={() => refetch()}
             disabled={isFetching}
           >
-            <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
+            <RefreshIcon spinning={isFetching} /> Refresh
           </Button>
         </div>
 

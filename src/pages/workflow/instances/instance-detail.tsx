@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { Ban, Loader2, RefreshCw, Undo2 } from "lucide-react";
+import { Ban, RefreshCw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +28,7 @@ import { StageTracker } from "@/pages/protected/workflow/components/stage-tracke
 import { AuditTimeline } from "@/pages/protected/workflow/components/audit-timeline";
 import { PageShell } from "@/components/layout/page-shell";
 import { ApproversSection } from "./stage-approvers";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 const TERMINAL = ["APPROVED", "REJECTED", "WITHDRAWN", "CANCELLED"];
 
@@ -107,7 +108,7 @@ export default function InstanceDetail() {
       <PageShell className="text-black-01">
         {isLoading ? (
           <div className="flex h-64 items-center justify-center">
-            <Loader2 className="size-6 animate-spin text-primary" />
+            <LoadingMark className="size-12" />
           </div>
         ) : isError || !instance ? (
           <div className="flex h-64 flex-col items-center justify-center gap-3">

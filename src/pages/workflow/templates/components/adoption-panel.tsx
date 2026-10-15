@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GitCompare, Info, Loader2, Users } from "lucide-react";
+import { GitCompare, Info, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ import type {
 } from "@/redux/services/dashboard/workflow-types";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
+import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
 // The engine's stored values, in the words the rest of the console uses. A diff
 // is meant to be read by whoever owns the path, not by whoever wrote the enum.
@@ -110,7 +111,7 @@ function CompareSheet({
         <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
           {isFetching ? (
             <div className="flex h-40 items-center justify-center">
-              <Loader2 className="size-5 animate-spin text-primary" />
+              <LoadingMark className="size-10" />
             </div>
           ) : isError || !data ? (
             <p className="text-sm text-destructive">Could not load the comparison.</p>

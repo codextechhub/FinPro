@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, RefreshCw, Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { TabStrip, type TabStripItem } from "@/components/finance-ui/tab-strip";
-import { cn } from "@/lib/utils";
 import { zonedInstant } from "../../../utils/dates";
 import { useAppSelector } from "@/redux/store";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -44,6 +43,7 @@ import { useDates } from "../../../lib/display-prefs";
 import { listEmptyText } from "../list-state";
 import { PersonPicker } from "../../../components/workflow/person-picker";
 import { appliedToWaitingMessage } from "../instances/manage-approvals";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 type DelegationTab = "mine" | "tome" | "all";
 
@@ -157,7 +157,7 @@ export default function Delegations() {
             onClick={() => (tab === "all" ? everyone.refetch() : refetch())}
             disabled={tab === "all" ? everyone.isFetching : isFetching}
           >
-            <RefreshCw className={cn((tab === "all" ? everyone.isFetching : isFetching) && "animate-spin")} /> Refresh
+            <RefreshIcon spinning={tab === "all" ? everyone.isFetching : isFetching} /> Refresh
           </Button>
         </div>
 

@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react";
 import { createsWorkflowTemplates, platformName } from "@xvs/finance/host";
 import { useNavigate } from "react-router";
-import { Info, Plus, RefreshCw } from "lucide-react";
+import { Info, Plus } from "lucide-react";
 import CustomTable from "@/components/custom/custom-table";
 import { listEmptyText } from "../list-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PermissionGate from "@/components/custom/permission-gate";
 import { P } from "@/permissions";
-import { cn } from "@/lib/utils";
 import { formatRelativeDate } from "@/utils/helpers";
 import { routesPath } from "../paths";
 import { useAppSelector } from "@/redux/store";
@@ -17,6 +16,7 @@ import { useGetWorkflowTemplatesQuery } from "@/redux/services/dashboard/workflo
 import { humanizeDocumentType } from "@/pages/protected/workflow/components/workflow-format";
 import { pairTemplateVersions, versionLabel } from "./components/template-versions";
 import { PageShell } from "@/components/layout/page-shell";
+import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 const TABLE_HEADERS = ["Name", "Document Type", "Code", "Stages", "Running", "Updated"];
 
@@ -99,7 +99,7 @@ export default function WorkflowTemplates() {
             onClick={() => refetch()}
             disabled={isFetching}
           >
-            <RefreshCw className={cn(isFetching && "animate-spin")} /> Refresh
+            <RefreshIcon spinning={isFetching} /> Refresh
           </Button>
         </div>
 
