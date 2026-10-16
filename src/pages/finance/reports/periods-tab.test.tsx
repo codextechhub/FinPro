@@ -23,6 +23,12 @@
  * school's own state, refused before it is old enough, and an archived year is
  * unarchived before it can be re-opened. Under All branches each branch's own
  * month and year are listed, so a month held open by one branch says which.
+ *
+ * Under All branches the school's state reads Open while any branch is open,
+ * so each act is judged against each branch's own month and year: Bright
+ * Star's March reads Open because Lekki is open, yet Ikeja is closed, so it
+ * offers Re-open for Ikeja and Close for Lekki, and each dialog offers only
+ * the branch the act may be sent for.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -752,6 +758,169 @@ describe("each branch's state under All branches", () => {
 
     expect(yearReads().at(-1)).toEqual({ entity: "BRIGHTSTAR", branch: 2 });
     expect(container.textContent).not.toContain("Each branch's year:");
+  });
+});
+
+describe("under All branches, a month the branches stand apart on", () => {
+  beforeEach(atBrightStar);
+
+  const own = (ikeja: string, lekki: string) => [
+    { branch: 1, branch_name: "Ikeja", status: ikeja, closed_at: null },
+    { branch: 2, branch_name: "Lekki", status: lekki, closed_at: null },
+  ];
+
+  async function mountMonth(
+    month: ReturnType<typeof own>,
+    { school = "OPEN", year = own("OPEN", "OPEN"), finalPeriod = false } = {},
+  ) {
+    checklistWith([], school);
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <PeriodCloseDrawer
+            id={MARCH.id}
+            entity="BRIGHTSTAR"
+            finalPeriodOfOpenYear={false}
+            calendar={calendarBranchFor(mocks.lens, null)}
+            status={school as "OPEN"}
+            branchStates={month}
+            fiscalYear={{ year: 2026, status: "OPEN", branch_states: year }}
+            finalPeriod={finalPeriod}
+            onClose={() => undefined}
+          />
+        </MemoryRouter>,
+      );
+    });
+  }
+
+  const offered = () => Array.from(dialog()?.querySelector("select")?.options ?? []).map((o) => o.textContent);
+
+  it("offers Re-open while Ikeja is still closed, though the school's month reads Open", async () => {
+    await mountMonth(own("CLOSED", "OPEN"));
+
+    expect(button("Re-open")?.disabled).toBe(false);
+    await click(button("Re-open"));
+    expect(offered()).toEqual(["Select branch", "Ikeja"]);
+
+    await pick(dialog()?.querySelector("select") ?? null, "1");
+    await typeReason("An Ikeja bill dated in March arrived late");
+    await click(button("Re-open period"));
+
+    expect(mocks.reopen).toHaveBeenCalledWith({ id: 41, entity: "BRIGHTSTAR", branch: 1, reason: "An Ikeja bill dated in March arrived late" });
+  });
+
+  it("offers the close only for Lekki, the branch still open", async () => {
+    await mountMonth(own("CLOSED", "OPEN"));
+
+    await click(button("Run close steps"));
+    expect(offered()).toEqual(["Select branch", "Lekki"]);
+    await click(button("Cancel"));
+
+    await click(button("Soft close"));
+    expect(offered()).toEqual(["Select branch", "Lekki"]);
+  });
+
+  it("offers a soft close for nobody once neither branch is open", async () => {
+    await mountMonth(own("SOFT_CLOSED", "CLOSED"), { school: "SOFT_CLOSED" });
+
+    expect(button("Soft close")).toBeUndefined();
+    await click(button("Run close steps"));
+    expect(offered()).toEqual(["Select branch", "Ikeja"]);
+  });
+
+  it("offers neither Re-open nor Lock while every branch is open", async () => {
+    await mountMonth(own("OPEN", "OPEN"));
+
+    expect(button("Re-open")).toBeUndefined();
+    expect(button("Lock period")).toBeUndefined();
+    expect(button("Run close steps")).toBeTruthy();
+  });
+
+  it("leaves out a branch whose year is closed, and says why", async () => {
+    await mountMonth(own("CLOSED", "CLOSED"), { school: "CLOSED", year: own("CLOSED", "OPEN") });
+
+    await click(button("Re-open"));
+    expect(offered()).toEqual(["Select branch", "Lekki"]);
+    expect(dialog()?.textContent).toContain("Ikeja is not offered: FY 2026 is closed for it.");
+  });
+
+  it("holds Re-open with the reason beside it when every closed branch's year is closed", async () => {
+    await mountMonth(own("CLOSED", "OPEN"), { year: own("CLOSED", "OPEN") });
+
+    expect(button("Re-open")?.disabled).toBe(true);
+    expect(document.body.textContent).toContain("FY 2026 is closed for Ikeja, so its months stay shut.");
+  });
+
+  it("locks the final month only for a branch whose year has closed", async () => {
+    await mountMonth(own("CLOSED", "CLOSED"), { school: "CLOSED", year: own("CLOSED", "OPEN"), finalPeriod: true });
+
+    expect(button("Lock period")?.disabled).toBe(false);
+    await click(button("Lock period"));
+    expect(offered()).toEqual(["Select branch", "Ikeja"]);
+  });
+
+  it("judges by the school's state when the branch states are not sent", async () => {
+    checklistWith([], "OPEN");
+    await act(async () => {
+      root.render(
+        <PeriodCloseDrawer id={MARCH.id} entity="BRIGHTSTAR" finalPeriodOfOpenYear={false} calendar={calendarBranchFor(mocks.lens, null)} status="OPEN" onClose={() => undefined} />,
+      );
+    });
+
+    expect(button("Re-open")).toBeUndefined();
+    await click(button("Run close steps"));
+    expect(offered()).toEqual(["Select branch", "Ikeja", "Lekki"]);
+  });
+});
+
+describe("under All branches, a year the branches stand apart on", () => {
+  beforeEach(atBrightStar);
+
+  const own = (ikeja: string, lekki: string) => [
+    { branch: 1, branch_name: "Ikeja", status: ikeja, closed_at: null },
+    { branch: 2, branch_name: "Lekki", status: lekki, closed_at: null },
+  ];
+
+  it("offers Re-open year while Ikeja's year is closed, though the school's reads Open", async () => {
+    mocks.yearRows = [{ ...FY, status: "OPEN", branch_states: own("CLOSED", "OPEN") }];
+    mocks.periodRows = [{ ...H1, status: "OPEN", branch_states: own("CLOSED", "OPEN") }, { ...H2, status: "OPEN", branch_states: own("CLOSED", "OPEN") }];
+    await mountWorkbench("BRIGHTSTAR");
+
+    await click(button("Re-open year"));
+    expect(Array.from(dialog()?.querySelector("select")?.options ?? []).map((o) => o.textContent)).toEqual(["Select branch", "Ikeja"]);
+    await pick(dialog()?.querySelector("select") ?? null, "1");
+    await typeReason("A June bill for Ikeja arrived late");
+    await click(button("Re-open fiscal year", dialog()!));
+
+    expect(mocks.reopenYear).toHaveBeenCalledWith({ id: 7, entity: "BRIGHTSTAR", branch: 1, reason: "A June bill for Ikeja arrived late" });
+  });
+
+  it("does not offer Re-open year to a branch's own bursar", async () => {
+    mocks.yearRows = [{ ...FY, status: "OPEN", branch_states: own("CLOSED", "OPEN") }];
+    mocks.wholeSchool = false;
+    await mountWorkbench("BRIGHTSTAR");
+
+    expect(button("Re-open year")).toBeUndefined();
+  });
+
+  it("offers the year's close for Ikeja once its months are closed, though Lekki's are open", async () => {
+    mocks.yearRows = [{ ...FY, status: "OPEN", branch_states: own("OPEN", "OPEN") }];
+    mocks.periodRows = [{ ...H1, status: "OPEN", branch_states: own("CLOSED", "OPEN") }, { ...H2, status: "OPEN", branch_states: own("CLOSED", "OPEN") }];
+    await mountWorkbench("BRIGHTSTAR");
+
+    expect(container.textContent).toContain("Ready for year-end close for Ikeja");
+    expect(button("Close fiscal year", container)?.disabled).toBe(false);
+    await click(button("Close fiscal year", container));
+    expect(Array.from(dialog()?.querySelector("select")?.options ?? []).map((o) => o.textContent)).toEqual(["Select branch", "Ikeja"]);
+  });
+
+  it("holds the year's close while every branch still has an open month", async () => {
+    mocks.yearRows = [{ ...FY, status: "OPEN", branch_states: own("OPEN", "OPEN") }];
+    mocks.periodRows = [{ ...H1, status: "OPEN", branch_states: own("OPEN", "CLOSED") }, { ...H2, status: "OPEN", branch_states: own("CLOSED", "OPEN") }];
+    await mountWorkbench("BRIGHTSTAR");
+
+    expect(button("Close fiscal year", container)?.disabled).toBe(true);
+    expect(button("Re-open year")).toBeUndefined();
   });
 });
 
