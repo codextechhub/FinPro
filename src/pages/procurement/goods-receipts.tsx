@@ -4,7 +4,7 @@ import { ClipboardCheck, FilePenLine, FileText, PackageCheck, Plus, Printer, Sen
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
-import { ProcurementPageTitle } from "./screen-help";
+import { ProcurementPageHeader } from "./screen-help";
 import { PurchaseOrderPicker, VendorPicker } from "./pickers";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, InfoHint, LoadingState,
@@ -85,15 +85,17 @@ export default function GoodsReceiptsPage() {
   return (
     <ProcurementShell>
       <PageShell className="space-y-5 text-black-01">
-        <header data-guide="procurement-goods-receipts.heading" className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <ProcurementPageTitle screen="goodsReceipts">Goods Receipts</ProcurementPageTitle>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">Record deliveries against open purchase orders.</p>
-          </div>
-          <Can permission={P.PROC_CREATE_GOODS_RECEIPT}>
-            <Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Goods Receipt</Button>
-          </Can>
-        </header>
+        <ProcurementPageHeader
+          data-guide="procurement-goods-receipts.heading"
+          screen="goodsReceipts"
+          title="Goods Receipts"
+          description="Record deliveries against open purchase orders."
+          actions={
+            <Can permission={P.PROC_CREATE_GOODS_RECEIPT}>
+              <Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Goods Receipt</Button>
+            </Can>
+          }
+        />
 
         <section data-guide="procurement-goods-receipts.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
           <DataTable columns={columns} rows={rows} rowKey={(receipt) => receipt.id}

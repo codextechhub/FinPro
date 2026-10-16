@@ -14,6 +14,7 @@ import { FinanceShell } from "../finance-shell";
 import { InfoHint, useActiveEntity } from "@/components/finance-ui";
 import { EmptyState, LoadingState } from "@/components/finance-ui/states";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { BalancesTab } from "./balances-tab";
 import { CostRulesTab } from "./cost-rules-tab";
@@ -66,13 +67,11 @@ export default function InterBranchPage({ section = DEFAULT_INTER_BRANCH_SECTION
   return (
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01">
-        <div>
-          <div className="flex items-center gap-1.5">
-            <h1 className="font-mont text-lg font-semibold text-gray-01">{heading.title}</h1>
-            <InfoHint ariaLabel={`About ${heading.title.toLowerCase()}`}>{heading.hint}</InfoHint>
-          </div>
-          <p className="mt-0.5 font-mont text-xs text-gray-05">{heading.lead}</p>
-        </div>
+        <PageHeader
+          title={heading.title}
+          titleAside={<InfoHint ariaLabel={`About ${heading.title.toLowerCase()}`}>{heading.hint}</InfoHint>}
+          description={heading.lead}
+        />
         {!entity ? (
           <NoEntityState />
         ) : reader.isLoading && !reader.applies ? (

@@ -15,11 +15,20 @@ import { selectIsPlatformTenant } from "@/redux/features/auth/auth-slice";
 import { useGetWorkflowTemplatesQuery } from "@/redux/services/dashboard/workflow-api";
 import { humanizeDocumentType } from "@/pages/protected/workflow/components/workflow-format";
 import { pairTemplateVersions, versionLabel } from "./components/template-versions";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
 const TABLE_HEADERS = ["Name", "Document Type", "Code", "Stages", "Running", "Updated"];
 
+/**
+ * The list of approval paths this tenant runs.
+ *
+ * New Template answers two different questions. The host says whether this
+ * product authors approval paths at all; the permission says whether this
+ * reader may. A tenant answers no to the first however senior the reader is:
+ * its templates arrive published and are adjusted, not written from nothing.
+ */
 export default function WorkflowTemplates() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
@@ -68,28 +77,23 @@ export default function WorkflowTemplates() {
   return (
     <>
       <PageShell className="space-y-5 text-black-01">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-semibold font-mont text-gray-01">Workflow Templates</p>
-            <p className="text-xs text-gray-01 mt-0.5">
-              {isPlatformTenant
-                ? "The approval paths every school starts on. Editing one here changes it for every school still running it."
-                : `Your approval paths. Each starts as the ${platformName} version; adjust one and this school runs your version from then on.`}
-            </p>
-          </div>
-          {/* Two different questions. The host says whether this product
-              authors approval paths at all; the permission says whether this
-              reader may. A tenant answers no to the first however senior the
-              reader is: its templates arrive published and are adjusted, not
-              written from nothing. */}
-          {createsWorkflowTemplates && (
-            <PermissionGate permission={P.UPDATE_WORKFLOW_TEMPLATE}>
-              <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.WORKFLOW.TEMPLATE_NEW)}>
-                <Plus /> New Template
-              </Button>
-            </PermissionGate>
-          )}
-        </div>
+        <PageHeader
+          title="Workflow Templates"
+          description={
+            isPlatformTenant
+              ? "The approval paths every school starts on. Editing one here changes it for every school still running it."
+              : `Your approval paths. Each starts as the ${platformName} version; adjust one and this school runs your version from then on.`
+          }
+          actions={
+            createsWorkflowTemplates && (
+              <PermissionGate permission={P.UPDATE_WORKFLOW_TEMPLATE}>
+                <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.WORKFLOW.TEMPLATE_NEW)}>
+                  <Plus /> New Template
+                </Button>
+              </PermissionGate>
+            )
+          }
+        />
 
         <div className="flex justify-end">
           <Button

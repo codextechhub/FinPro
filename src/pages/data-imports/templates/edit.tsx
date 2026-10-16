@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { routesPath } from "@/routes/routes-path";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   useGetImportTemplateQuery,
@@ -258,16 +259,17 @@ export default function EditTemplate() {
   return (
     <>
       <PageShell className="text-black-01 space-y-5 max-w-4xl pb-32">
-        {/* Header */}
-        <div>
-          <h1 className="text-lg font-semibold font-mont text-black-01">Edit Import Template</h1>
-          <p className="text-xs text-gray-01 mt-0.5">
-            <span className="font-mono">{template.code}</span>
-            {" · "}
-            <span className="capitalize">{template.dataset_type}</span>
-            <span className="ml-1 italic">(code and dataset cannot be changed)</span>
-          </p>
-        </div>
+        <PageHeader
+          title="Edit Import Template"
+          description={
+            <>
+              <span className="font-mono">{template.code}</span>
+              {" · "}
+              <span className="capitalize">{template.dataset_type}</span>
+              <span className="ml-1 italic">(code and dataset cannot be changed)</span>
+            </>
+          }
+        />
 
         {/* Section 1: Identity */}
         <section className={cn(INFORMATION_CARD_SURFACE, "rounded-md p-5 space-y-4")}>

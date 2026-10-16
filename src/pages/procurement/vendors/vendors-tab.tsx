@@ -32,7 +32,7 @@ import type {
 } from "@/redux/services/procurement/procurement-types";
 import { formatMoney } from "@/utils/money";
 import { CategoryPicker } from "../pickers";
-import { ProcurementPageTitle } from "../screen-help";
+import { ProcurementPageHeader } from "../screen-help";
 import { buildVendorUpdatePayload, type VendorFormValues } from "./vendor-update-payload";
 import { VendorGovernanceFields } from "./vendor-governance-fields";
 import { VendorContactsEditor } from "./vendor-contacts-editor";
@@ -139,12 +139,12 @@ export function VendorsTab({ entity, currency }: { entity: string; currency?: st
   ];
 
   return <>
-    <header data-guide="procurement-vendors.heading" className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <ProcurementPageTitle screen="vendors">Vendors</ProcurementPageTitle>
-        <p className="mt-0.5 font-mont text-xs text-gray-05">Vendors, categories and the item catalog.</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
+    <ProcurementPageHeader
+      data-guide="procurement-vendors.heading"
+      screen="vendors"
+      title="Vendors"
+      description="Vendors, categories and the item catalog."
+      actions={<>
         {/* Forwards the SAME derived params the list query uses, so the file
             matches the tab that is open - the status tab expands to is_active
             and on_hold, and both cross into the export. */}
@@ -156,8 +156,8 @@ export function VendorsTab({ entity, currency }: { entity: string; currency?: st
           defaultName="Vendor master"
         />
         <Can permission={P.PROC_CREATE_VENDOR}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> Add Vendor</Button></Can>
-      </div>
-    </header>
+      </>}
+    />
 
     <div data-guide="procurement-vendors.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {summaryLoading ? <div className={cn(INFORMATION_CARD_SURFACE, "col-span-full rounded-md")}><LoadingState rows={2} /></div> : summary ? <>

@@ -9,7 +9,7 @@ import {
 import { toast } from "sonner";
 
 import { ProcurementShell } from "../procurement-shell";
-import { ProcurementPageTitle } from "../screen-help";
+import { ProcurementPageHeader } from "../screen-help";
 import { RfqPicker, VendorPicker } from "../pickers";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
@@ -102,16 +102,16 @@ export default function QuotationsPage() {
 
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
-      <header data-guide="procurement-quotations.heading" className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <ProcurementPageTitle screen="quotations">Quotations</ProcurementPageTitle>
-          <p className="mt-0.5 font-mont text-xs text-gray-05">Vendor bids against your RFQs. Compare them, then award the winner.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <ProcurementPageHeader
+        data-guide="procurement-quotations.heading"
+        screen="quotations"
+        title="Quotations"
+        description="Vendor bids against your RFQs. Compare them, then award the winner."
+        actions={<>
           <Button variant="outline" onClick={() => setComparing(true)}><GitCompareArrows className="size-4" /> Compare</Button>
           <Can permission={P.PROC_CREATE_QUOTATION}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Quotation</Button></Can>
-        </div>
-      </header>
+        </>}
+      />
 
       <section data-guide="procurement-quotations.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">

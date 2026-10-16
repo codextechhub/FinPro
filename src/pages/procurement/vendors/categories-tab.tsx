@@ -26,7 +26,7 @@ import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { P } from "../../../permissions";
 import { formatMoney } from "@/utils/money";
 import { isForbidden } from "../../../lib/api-errors";
-import { ProcurementPageTitle } from "../screen-help";
+import { ProcurementPageHeader } from "../screen-help";
 import {
   useCreateCategoryMutation,
   useGetCategoriesQuery,
@@ -166,13 +166,13 @@ export function CategoriesTab({ entity, currency }: { entity: string; currency?:
   ];
 
   return <>
-    <header data-guide="procurement-categories.heading" className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <ProcurementPageTitle screen="categories">Categories</ProcurementPageTitle>
-        <p className="mt-0.5 font-mont text-xs text-gray-05">Spend taxonomy and accounting defaults for vendor purchasing.</p>
-      </div>
-      {canCreate ? <Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Category</Button> : null}
-    </header>
+    <ProcurementPageHeader
+      data-guide="procurement-categories.heading"
+      screen="categories"
+      title="Categories"
+      description="Spend taxonomy and accounting defaults for vendor purchasing."
+      actions={canCreate ? <Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Category</Button> : null}
+    />
 
     <section data-guide="procurement-categories.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">

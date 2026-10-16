@@ -7,6 +7,7 @@ import { BudgetsTab } from "./budgets-tab";
 import { AssetsTab } from "./assets-tab";
 import { TaxTab } from "./tax-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { FINANCE_HELP } from "../screen-help";
 
@@ -26,13 +27,12 @@ export default function BudgetsAssetsTaxPage({ section = DEFAULT_BUDGETS_SECTION
   return (
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01" data-guide={`finance-${section}.workspace`}>
-        <div data-guide={`finance-${section}.heading`}>
-          <div className="flex items-center gap-1.5">
-            <h1 className="font-mont text-lg font-semibold text-gray-01">{meta.title}</h1>
-            <InfoHint ariaLabel={`About ${meta.title.toLowerCase()}`}>{FINANCE_HELP[section]}</InfoHint>
-          </div>
-          {meta.sub ? <p className="mt-0.5 font-mont text-xs text-gray-05">{meta.sub}</p> : null}
-        </div>
+        <PageHeader
+          data-guide={`finance-${section}.heading`}
+          title={meta.title}
+          titleAside={<InfoHint ariaLabel={`About ${meta.title.toLowerCase()}`}>{FINANCE_HELP[section]}</InfoHint>}
+          description={meta.sub || null}
+        />
         {!entity ? (
           <NoEntityState />
         ) : section === "assets" ? (

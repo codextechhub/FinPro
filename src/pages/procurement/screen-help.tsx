@@ -1,3 +1,5 @@
+import type { ComponentProps } from "react";
+import { PageHeader } from "@/components/layout/page-header";
 import { InfoHint } from "@/components/finance-ui";
 
 export const PROCUREMENT_HELP = {
@@ -50,14 +52,23 @@ export const PROCUREMENT_HELP_BY_NAV_TITLE: Record<string, ProcurementHelpKey> =
   Settings: "settings",
 };
 
-export function ProcurementPageTitle({ screen, children }: {
+/**
+ * A Procurement screen's heading: the host's `PageHeader`, with the screen's
+ * help text in an `InfoHint` on the title's line.
+ *
+ * The heading's size and colour belong to the host application, so nothing
+ * here sets them. Every other prop, `data-guide` included, lands on the
+ * heading's outer element.
+ */
+export function ProcurementPageHeader({ screen, title, ...props }: Omit<ComponentProps<typeof PageHeader>, "title" | "titleAside"> & {
   screen: ProcurementHelpKey;
-  children: React.ReactNode;
+  title: string;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <h1 className="font-mont text-lg font-semibold text-gray-01">{children}</h1>
-      <InfoHint ariaLabel={`About ${String(children)}`}>{PROCUREMENT_HELP[screen]}</InfoHint>
-    </div>
+    <PageHeader
+      {...props}
+      title={title}
+      titleAside={<InfoHint ariaLabel={`About ${title}`}>{PROCUREMENT_HELP[screen]}</InfoHint>}
+    />
   );
 }

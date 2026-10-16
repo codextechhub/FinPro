@@ -3,6 +3,7 @@ import Tabs from "@/pages/protected/workflow/components/tabs";
 import { useFilterParam } from "@/hooks/use-filter-param";
 import GroupsTab from "./groups-tab";
 import DynamicRolesTab from "./dynamic-roles-tab";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 
 type Tab = "groups" | "rules";
@@ -31,13 +32,10 @@ export default function WorkflowApprover() {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <div>
-        <p className="font-semibold font-mont text-gray-01">Approvers</p>
-        <p className="mt-0.5 text-xs text-gray-01">
-          Define who can approve. Roles, seats and rules resolve at the moment a step
-          activates, so an approval path stays correct as people move.
-        </p>
-      </div>
+      <PageHeader
+        title="Approvers"
+        description="Define who can approve. Roles, seats and rules resolve at the moment a step activates, so an approval path stays correct as people move."
+      />
 
       <Tabs
         tabs={TABS.map((t) => ({ value: t.key, label: t.label }))}

@@ -34,6 +34,7 @@ import { useDates, type DateFormatter } from "../../lib/display-prefs";
 import { daysUntil } from "./format";
 import { errorStatus } from "@/utils/api-errors";
 import { useFilePreview } from "./use-file-preview";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 
 const POLL_MS = 10_000;
@@ -189,15 +190,16 @@ export default function ExportFilesPage() {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <div className="flex flex-wrap items-center justify-between gap-3" data-guide="data-export-files.heading">
-        <div>
-          <p className="font-semibold font-mont text-gray-01">Files</p>
-          <p className="mt-0.5 text-xs text-gray-01">
+      <PageHeader
+        data-guide="data-export-files.heading"
+        title="Files"
+        description={
+          <>
             Every export run and what it produced. Files are kept for {retention} days after the run, then
             expire automatically - the run and its history stay.
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="grid gap-5 sm:grid-cols-3" data-guide="data-export-files.summary">
         <KpiCard label="Ready to view" value={readyNow} foot="On this page" />

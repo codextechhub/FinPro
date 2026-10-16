@@ -71,6 +71,8 @@ A host must provide:
 | `@/redux/store` | `useAppDispatch`, `useAppSelector` |
 | `@/hooks/use-permissions` | `usePermissions`, returning `fieldAccess` beside the permission checks: the `field_access` map from the login response and `/user/auth/me/`, stored as received (an empty object when the user has no restrictions) |
 | `@/components/custom/*` | `PermissionGate`, skeletons |
+| `@/components/layout/page-shell` | `PageShell`, every screen's `<main>`: the page padding, `min-w-0` and the grid guard that stops a wide table pushing the page off a phone screen |
+| `@/components/layout/page-header` | `PageHeader`, every screen's title and description (`title`, `titleAside`, `description`, `actions`, plus `div` props such as `data-guide`). The host decides the heading's size and colour; package screens set neither |
 | `@/routes/routes-path` | the route table, for nav URLs |
 | `@/utils/access-token` | `getAccessToken`, the in-memory access token that raw-fetch downloads send as a bearer |
 

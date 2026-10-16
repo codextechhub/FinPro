@@ -18,6 +18,7 @@ import { useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { Download, FileText } from "lucide-react";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { DataTable, DetailDrawer, Money, TabStrip, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
 import { Button } from "@/components/ui/button";
 import { useDates } from "../../lib/display-prefs";
@@ -37,10 +38,10 @@ export default function MyPayslipsPage() {
   const [section, setSection] = useState<Section>("payslips");
   return (
     <PageShell className="space-y-5 text-black-01">
-      <div>
-        <h1 className="font-mont text-lg font-semibold text-gray-01">My payslips</h1>
-        <p className="mt-0.5 font-mont text-xs text-gray-05">Your own payslips and your pay and tax for the year. Only you see these.</p>
-      </div>
+      <PageHeader
+        title="My payslips"
+        description="Your own payslips and your pay and tax for the year. Only you see these."
+      />
       <TabStrip items={SECTIONS} value={section} onChange={setSection} variant="underline" ariaLabel="My payslips sections" className="w-full gap-1" buttonClassName="px-3 py-2 font-semibold" />
       {section === "payslips" ? <MyPayslipList /> : <MyTaxSummary />}
     </PageShell>

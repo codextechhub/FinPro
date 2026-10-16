@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./procurement-shell", () => ({ ProcurementShell: ({ children }: { children: React.ReactNode }) => children }));
-vi.mock("./screen-help", () => ({ ProcurementPageTitle: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1> }));
+vi.mock("./screen-help", () => ({ ProcurementPageHeader: ({ title, description }: { title: string; description?: React.ReactNode }) => <div><h1>{title}</h1>{description}</div> }));
 vi.mock("@/components/layout/page-shell", () => ({ PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("../../lib/display-prefs", () => ({
   useDates: () => ({ day: String, dateTime: (value: string) => value, time: String, today: () => "2026-10-13" }),

@@ -38,6 +38,7 @@ import type { ApprovalDelegation } from "@/redux/services/dashboard/workflow-typ
 import { useUserDirectory } from "@/pages/protected/workflow/components/use-user-directory";
 import { InitialsAvatar } from "@/pages/protected/workflow/components/workflow-ui";
 import { humanizeDocumentType, sameId } from "@/pages/protected/workflow/components/workflow-format";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import { useDates } from "../../../lib/display-prefs";
 import { listEmptyText } from "../list-state";
@@ -129,17 +130,15 @@ export default function Delegations() {
   return (
     <>
       <PageShell className="space-y-5 text-black-01">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-semibold font-mont text-gray-01">Approval Delegations</p>
-            <p className="text-xs text-gray-01 mt-0.5">
-              Hand off your approval authority to another approver for a period.
-            </p>
-          </div>
-          <Button data-guide="workflow-delegations.new" size="lg" onClick={() => setNewOpen(true)}>
-            <Plus /> New Delegation
-          </Button>
-        </div>
+        <PageHeader
+          title="Approval Delegations"
+          description="Hand off your approval authority to another approver for a period."
+          actions={
+            <Button data-guide="workflow-delegations.new" size="lg" onClick={() => setNewOpen(true)}>
+              <Plus /> New Delegation
+            </Button>
+          }
+        />
 
         <div className="flex flex-wrap items-center gap-3">
           <TabStrip

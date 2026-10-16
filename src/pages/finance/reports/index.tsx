@@ -15,6 +15,7 @@ import { AnalyticsSliceReport } from "./analytics-slice-tab";
 import { PeriodsTab, PERIODS_DESCRIPTION } from "./periods-tab";
 import { SealsReport, SEALS_DESCRIPTION } from "./seals-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { ShowArchivedToggle } from "@/components/finance-ui/archived-years";
 import { FINANCE_HELP } from "../screen-help";
@@ -56,19 +57,18 @@ export default function ReportsPage({ section = DEFAULT_REPORTS_SECTION }: {
   return (
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01" data-guide={`finance-reports.${section}.workspace`}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-mont text-lg font-semibold text-gray-01">{LABELS[section] ?? "Reports & Month-End"}</h1>
-              <InfoHint ariaLabel={`About ${LABELS[section] ?? "financial reports"}`}>{FINANCE_HELP[section]}</InfoHint>
-            </div>
-            <p className="mt-0.5 max-w-2xl font-mont text-xs text-gray-05">{DESCRIPTIONS[section] ?? AREA_DESCRIPTION}</p>
-          </div>
-          {/* Section actions land on the title line; display:contents keeps the slot itself out of the layout. */}
-          {section === "periods" ? <div ref={setHeaderSlot} className="contents" /> : null}
-          {/* The statements pick their period from a list that leaves archived years out until asked. */}
-          {section !== "periods" && section !== "seals" ? <ShowArchivedToggle entity={entity} /> : null}
-        </div>
+        <PageHeader
+          title={LABELS[section] ?? "Reports & Month-End"}
+          titleAside={<InfoHint ariaLabel={`About ${LABELS[section] ?? "financial reports"}`}>{FINANCE_HELP[section]}</InfoHint>}
+          description={<p className="max-w-2xl">{DESCRIPTIONS[section] ?? AREA_DESCRIPTION}</p>}
+          actions={section === "periods" ? (
+            // Section actions portal into this slot; display:contents keeps the slot itself out of the layout.
+            <div ref={setHeaderSlot} className="contents" />
+          ) : section !== "seals" ? (
+            // Statements pick their period from a list that leaves archived years out until asked.
+            <ShowArchivedToggle entity={entity} />
+          ) : null}
+        />
         {!entity ? (
           <NoEntityState />
         ) : section === "income-statement" ? (

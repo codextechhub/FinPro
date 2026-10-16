@@ -31,6 +31,7 @@ import {
 } from "@/redux/services/finance/ops-api";
 import type { BankAccount, BankStatementLine } from "@/redux/services/finance/ops-types";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { FINANCE_HELP } from "./screen-help";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
@@ -65,22 +66,19 @@ export default function BankReconciliationPage() {
   return (
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01" data-guide="finance-bank-reconciliation.workspace">
-        <div className="flex flex-wrap items-end justify-between gap-3" data-guide="finance-bank-reconciliation.scope">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-mont text-lg font-semibold text-gray-01">Bank Reconciliation</h1>
-              <InfoHint ariaLabel="About bank reconciliation">{FINANCE_HELP["bank-reconciliation"]}</InfoHint>
-            </div>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">Match the bank statement to the ledger, account by account.</p>
-          </div>
-          {accounts.length > 0 ? (
+        <PageHeader
+          data-guide="finance-bank-reconciliation.scope"
+          title="Bank Reconciliation"
+          titleAside={<InfoHint ariaLabel="About bank reconciliation">{FINANCE_HELP["bank-reconciliation"]}</InfoHint>}
+          description="Match the bank statement to the ledger, account by account."
+          actions={accounts.length > 0 ? (
             <select
               value={account?.id ?? ""} onChange={(e) => setAccountId(Number(e.target.value))}
               className="h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01">
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.is_primary ? " · Primary" : ""}</option>)}
             </select>
           ) : null}
-        </div>
+        />
 
         {!account ? (
           <EmptyState title="No bank accounts" message="Add a bank account to reconcile." />

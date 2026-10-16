@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useGetTeamLoadQuery } from "@/redux/services/dashboard/workflow-api";
 import { humanizeDocumentType } from "@/pages/protected/workflow/components/workflow-format";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import { LoadingMark, RefreshIcon } from "@/components/finance-ui/loading-mark";
 
@@ -31,25 +32,27 @@ export default function TeamLoad() {
   return (
     <>
       <PageShell className="space-y-5 text-black-01">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="font-semibold font-mont text-gray-01">Active Approvals by Stage</p>
-            <p className="text-xs text-gray-01 mt-0.5">
+        <PageHeader
+          title="Active Approvals by Stage"
+          description={
+            <>
               Where the approval backlog is sitting right now -{" "}
               <span className="font-medium text-black-01">{total}</span> active stage
               {total === 1 ? "" : "s"} across the platform.
-            </p>
-          </div>
-          <Button
-            variant="white"
-            size="lg"
-            className="[&_svg]:size-5 font-medium font-mont shrink-0"
-            onClick={() => refetch()}
-            disabled={isFetching}
-          >
-            <RefreshIcon spinning={isFetching} /> Refresh
-          </Button>
-        </div>
+            </>
+          }
+          actions={
+            <Button
+              variant="white"
+              size="lg"
+              className="[&_svg]:size-5 font-medium font-mont shrink-0"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshIcon spinning={isFetching} /> Refresh
+            </Button>
+          }
+        />
 
         {isLoading ? (
           <div className="flex h-48 items-center justify-center">

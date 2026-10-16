@@ -81,6 +81,7 @@ import {
 } from "@/redux/services/finance/ops-api";
 import type { PayrollLine, PayrollRun, PayrollRunBranchShare, EmployeeSalary, SalaryStructure, SalaryComponent, PayslipComponent } from "@/redux/services/finance/ops-types";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { FINANCE_HELP } from "./screen-help";
 import { useDates } from "../../lib/display-prefs";
@@ -196,13 +197,12 @@ export default function PayrollPage() {
   return (
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01" data-guide="finance-payroll.workspace">
-        <div data-guide="finance-payroll.heading">
-          <div className="flex items-center gap-1.5">
-            <h1 className="font-mont text-lg font-semibold text-gray-01">Payroll</h1>
-            <InfoHint ariaLabel="About payroll runs">{FINANCE_HELP.payroll}</InfoHint>
-          </div>
-          <p className="mt-0.5 font-mont text-xs text-gray-05">Monthly salary runs and payslips, generated from the employee roster.</p>
-        </div>
+        <PageHeader
+          data-guide="finance-payroll.heading"
+          title="Payroll"
+          titleAside={<InfoHint ariaLabel="About payroll runs">{FINANCE_HELP.payroll}</InfoHint>}
+          description="Monthly salary runs and payslips, generated from the employee roster."
+        />
 
         <TabStrip
           items={canStaffBank ? TAB_ITEMS_WITH_BANK : TAB_ITEMS}

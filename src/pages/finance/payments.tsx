@@ -21,6 +21,7 @@ import { TerminalPaymentsTab } from "./terminal-payments-tab";
 import { InfoHint, useActiveEntity } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { EmptyState } from "@/components/finance-ui/states";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
@@ -52,13 +53,12 @@ export default function PaymentsPage({ section = DEFAULT_PAYMENTS_SECTION }: {
   return (
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01" data-guide={`finance-payments-${section}.workspace`}>
-        <div data-guide={`finance-payments-${section}.heading`}>
-          <div className="flex items-center gap-1.5">
-            <h1 className="font-mont text-lg font-semibold text-gray-01">{label}</h1>
-            <InfoHint ariaLabel={`About ${label.toLowerCase()}`}>{FINANCE_HELP[section]}</InfoHint>
-          </div>
-          <p className="mt-0.5 font-mont text-xs text-gray-05">{subtitle}</p>
-        </div>
+        <PageHeader
+          data-guide={`finance-payments-${section}.heading`}
+          title={label}
+          titleAside={<InfoHint ariaLabel={`About ${label.toLowerCase()}`}>{FINANCE_HELP[section]}</InfoHint>}
+          description={subtitle}
+        />
         {section === "held-reconciliations" ? (
           <HeldReconciliationsTab />
         ) : section === "provider-top-ups" ? (

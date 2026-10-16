@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { useGetAuditLogQuery, useGetAuditFacetsQuery } from "@/redux/services/finance/setup-api";
 import type { FinanceAuditLog } from "@/redux/services/finance/setup-types";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
 import { sinceDate } from "../../utils/date-presets";
@@ -247,19 +248,17 @@ export default function FinanceAuditPage() {
   return (
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-mont text-lg font-semibold text-gray-01">Audit Trail</h1>
-              <InfoHint ariaLabel="About the finance audit trail">{FINANCE_HELP.audit}</InfoHint>
-            </div>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">Every finance mutation, recorded immutably for this entity.</p>
-          </div>
-          <button type="button" disabled title="Audit export is not available yet"
-            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md border border-white-02 px-2.5 py-1.5 font-mont text-xs font-semibold text-gray-05 opacity-70">
-            <Download className="size-3.5" /> Export
-          </button>
-        </div>
+        <PageHeader
+          title="Audit Trail"
+          titleAside={<InfoHint ariaLabel="About the finance audit trail">{FINANCE_HELP.audit}</InfoHint>}
+          description="Every finance mutation, recorded immutably for this entity."
+          actions={
+            <button type="button" disabled title="Audit export is not available yet"
+              className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md border border-white-02 px-2.5 py-1.5 font-mont text-xs font-semibold text-gray-05 opacity-70">
+              <Download className="size-3.5" /> Export
+            </button>
+          }
+        />
 
         <div className="flex flex-wrap items-center gap-2">
           <SearchSelect size="sm" containerClass="w-52" options={actionOptions} value={action}

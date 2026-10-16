@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
-import { ProcurementPageTitle } from "./screen-help";
+import { ProcurementPageHeader } from "./screen-help";
 import {
   ConfirmActionModal, DataTable, DetailDrawer, EmptyState, ErrorState,
   LoadingState, StatusPill, TabStrip, useActiveEntity, type Column,
@@ -161,10 +161,11 @@ export default function ProcurementApprovalsPage() {
 
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
-      <header>
-        <ProcurementPageTitle screen="approvals">Approvals</ProcurementPageTitle>
-        <p className="mt-0.5 font-mont text-xs text-gray-05">Review what needs your decision and the decisions you recorded before.</p>
-      </header>
+      <ProcurementPageHeader
+        screen="approvals"
+        title="Approvals"
+        description="Review what needs your decision and the decisions you recorded before."
+      />
 
       {!entity ? <NoEntityState message="Choose an entity to view its Procurement approval queue." /> : <>
         <TabStrip items={LIST_TABS} value={view} onChange={setView} variant="segmented" ariaLabel="Approval views" />

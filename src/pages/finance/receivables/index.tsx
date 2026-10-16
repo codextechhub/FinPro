@@ -19,6 +19,7 @@ import { DeferredIncomeTab } from "./deferred-income-tab";
 import { ProvisionsTab } from "./provisions-tab";
 import { DepositsTab } from "./deposits-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { FINANCE_HELP } from "../screen-help";
 
@@ -53,13 +54,11 @@ export default function ReceivablesPage({ section = DEFAULT_RECEIVABLES_SECTION 
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01" data-guide={`finance-receivables.${section}.workspace`}>
         {(section !== "invoices" || !entity) && (
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-mont text-lg font-semibold text-gray-01">{LABELS[section] ?? "Receivables"}</h1>
-              <InfoHint ariaLabel={`About ${LABELS[section] ?? "Receivables"}`}>{FINANCE_HELP[section]}</InfoHint>
-            </div>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">{SUBTITLES[section] ?? "Accounts receivable for the selected entity."}</p>
-          </div>
+          <PageHeader
+            title={LABELS[section] ?? "Receivables"}
+            titleAside={<InfoHint ariaLabel={`About ${LABELS[section] ?? "Receivables"}`}>{FINANCE_HELP[section]}</InfoHint>}
+            description={SUBTITLES[section] ?? "Accounts receivable for the selected entity."}
+          />
         )}
         {!entity ? (
           <NoEntityState message="Choose a ledger entity to view receivables." />

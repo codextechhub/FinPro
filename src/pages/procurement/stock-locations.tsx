@@ -32,7 +32,7 @@ import type { StockBalance, StockLocation } from "@/redux/services/procurement/p
 import { noBranchLabel, useIsSchool } from "../../lib/reader-words";
 import { apiFieldError } from "@/utils/api-errors";
 import { ProcurementShell } from "./procurement-shell";
-import { ProcurementPageTitle } from "./screen-help";
+import { ProcurementPageHeader } from "./screen-help";
 import { EmptyPanel, Field } from "./sourcing/shared";
 import { isForbidden } from "./sourcing/helpers";
 import { PageShell } from "@/components/layout/page-shell";
@@ -111,13 +111,13 @@ export function LocationsSection({ entity, currency }: { entity: string; currenc
   return (
     <ProcurementShell>
       <PageShell className="space-y-5 text-black-01">
-        <header data-guide="procurement-stock-locations.heading" className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <ProcurementPageTitle screen="stockLocations">Stock Locations</ProcurementPageTitle>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">The stores stock is held in. Each holds its own quantity, value and average cost.</p>
-          </div>
-          <Can permission={P.PROC_CREATE_STOCK}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New location</Button></Can>
-        </header>
+        <ProcurementPageHeader
+          data-guide="procurement-stock-locations.heading"
+          screen="stockLocations"
+          title="Stock Locations"
+          description="The stores stock is held in. Each holds its own quantity, value and average cost."
+          actions={<Can permission={P.PROC_CREATE_STOCK}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New location</Button></Can>}
+        />
 
         {singleStore && (
           <section className="rounded-md border border-primary/20 bg-primary/5 p-4">

@@ -49,6 +49,7 @@ import { nowIn } from "../../../utils/dates";
 import { FormatOptions } from "./format-options";
 import { SummaryBar, SummaryRail } from "./summary-rail";
 import { type BuilderState, defaultsForDataset, useBuilderState, usePreview } from "./use-builder-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 
 const STEP_LABELS = ["Data", "Columns", "File", "Review"];
@@ -302,17 +303,17 @@ function BuilderForm({
         <ArrowLeft className="size-3.5" /> Exports
       </button>
 
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-3" data-guide="data-export-builder.heading">
-        <div className="min-w-0">
-          <h1 className="font-mont text-lg font-semibold text-black-01">
-            {isEdit ? "Edit export" : "New export"}
-          </h1>
-          <p className="mt-0.5 font-mont text-xs text-gray-01">
+      <PageHeader
+        data-guide="data-export-builder.heading"
+        className="mt-3"
+        title={isEdit ? "Edit export" : "New export"}
+        description={
+          <>
             {dataset ? `${dataset.module} · ${dataset.name}` : "Choose what to export, then how it should look."}
             {isEdit ? " · Editing changes future files only; files already produced are never altered." : ""}
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="mt-5" data-guide="data-export-builder.steps">
         <WizardStepper currentStep={step} labels={STEP_LABELS} />

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import { ProcurementShell } from "./procurement-shell";
-import { ProcurementPageTitle } from "./screen-help";
+import { ProcurementPageHeader } from "./screen-help";
 import {
   AccountPicker, CostCenterPicker, DataTable, DetailDrawer, EmptyState, ErrorState, FormDrawer, FormField,
   LoadingState, Money, MoneyInput, PostingRecap, Segmented, StatCard, StatusPill, TabStrip, toArray,
@@ -146,17 +146,15 @@ function ItemsSection({ entity, currency }: { entity: string; currency?: string 
   return (
     <ProcurementShell>
       <PageShell className="space-y-5 text-black-01">
-        <header data-guide="procurement-stock-items.heading" className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <ProcurementPageTitle screen="stockItems">Stock Items</ProcurementPageTitle>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">
-              {store
-                ? `On-hand inventory at ${locations.find((l) => String(l.id) === store)?.code ?? "this store"}, with its own reorder status and valuation.`
-                : "On-hand inventory with reorder thresholds and valuation."}
-            </p>
-          </div>
-          <Can permission={P.PROC_CREATE_STOCK}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New stock item</Button></Can>
-        </header>
+        <ProcurementPageHeader
+          data-guide="procurement-stock-items.heading"
+          screen="stockItems"
+          title="Stock Items"
+          description={store
+            ? `On-hand inventory at ${locations.find((l) => String(l.id) === store)?.code ?? "this store"}, with its own reorder status and valuation.`
+            : "On-hand inventory with reorder thresholds and valuation."}
+          actions={<Can permission={P.PROC_CREATE_STOCK}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New stock item</Button></Can>}
+        />
 
         <div data-guide="procurement-stock-items.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {summaryLoading || !summary ? <div className={cn(INFORMATION_CARD_SURFACE, "col-span-full rounded-md")}><LoadingState rows={2} /></div> : <>
@@ -677,10 +675,12 @@ function MovementsSection({ entity, currency }: { entity: string; currency?: str
   return (
     <ProcurementShell>
       <PageShell className="space-y-5 text-black-01">
-        <div data-guide="procurement-stock-movements.heading">
-          <ProcurementPageTitle screen="stockMovements">Stock Movements</ProcurementPageTitle>
-          <p className="mt-0.5 font-mont text-xs text-gray-05">Receipts, issues and adjustments.{multi ? " Balances shown are the running balance at each store." : ""}</p>
-        </div>
+        <ProcurementPageHeader
+          data-guide="procurement-stock-movements.heading"
+          screen="stockMovements"
+          title="Stock Movements"
+          description={`Receipts, issues and adjustments.${multi ? " Balances shown are the running balance at each store." : ""}`}
+        />
         <section data-guide="procurement-stock-movements.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">
             <TabStrip

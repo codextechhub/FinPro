@@ -22,7 +22,7 @@ import { Plus } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { ProcurementShell } from "./procurement-shell";
-import { ProcurementPageTitle } from "./screen-help";
+import { ProcurementPageHeader } from "./screen-help";
 import { Donut, ErrorState, LoadingState, TabStrip, useActiveEntity, type TabStripItem } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { cn } from "@/lib/utils";
@@ -428,32 +428,31 @@ export default function ProcurementDashboard() {
   return (
     <ProcurementShell>
       <PageShell className="space-y-5 text-black-01" data-guide="procurement-overview.page">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            {head?.reader_first_name && <p className="font-mont text-xs text-gray-05">{greeting()}, {head.reader_first_name}</p>}
-            <div className="mt-0.5"><ProcurementPageTitle screen="dashboard">Procurement overview</ProcurementPageTitle></div>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">
-              {head ? [head.window.name, `as of ${dates.day(head.as_of)}`, head.narrowed ? "your branches only" : null].filter(Boolean).join(" · ") : "-"}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {windowTabs.length > 1 && (
-              <TabStrip items={windowTabs} value={head?.window.key ?? windowTabs[0].value}
-                onChange={(w) => setPicked({ entity: entity!, window: w })} variant="pill-compact" ariaLabel="Figures for" />
-            )}
-            {can(P.PROC_CREATE_REQUISITION) && (
-              <button onClick={() => navigate(`${R.REQUISITIONS}?action=new`)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/30 bg-white px-3 font-mont text-xs font-semibold text-primary hover:bg-primary/5">
-                <Plus className="size-3.5" /> New requisition
-              </button>
-            )}
-            {can(P.PROC_CREATE_PURCHASE_ORDER) && (
-              <button onClick={() => navigate(`${R.PURCHASE_ORDERS}?action=new`)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 font-mont text-xs font-semibold text-white hover:bg-primary/90">
-                <Plus className="size-3.5" /> New purchase order
-              </button>
-            )}
-          </div>
+        <div>
+          {head?.reader_first_name && <p className="mb-0.5 font-mont text-xs text-gray-05">{greeting()}, {head.reader_first_name}</p>}
+          <ProcurementPageHeader
+            screen="dashboard"
+            title="Procurement overview"
+            description={head ? [head.window.name, `as of ${dates.day(head.as_of)}`, head.narrowed ? "your branches only" : null].filter(Boolean).join(" · ") : "-"}
+            actions={<>
+              {windowTabs.length > 1 && (
+                <TabStrip items={windowTabs} value={head?.window.key ?? windowTabs[0].value}
+                  onChange={(w) => setPicked({ entity: entity!, window: w })} variant="pill-compact" ariaLabel="Figures for" />
+              )}
+              {can(P.PROC_CREATE_REQUISITION) && (
+                <button onClick={() => navigate(`${R.REQUISITIONS}?action=new`)}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/30 bg-white px-3 font-mont text-xs font-semibold text-primary hover:bg-primary/5">
+                  <Plus className="size-3.5" /> New requisition
+                </button>
+              )}
+              {can(P.PROC_CREATE_PURCHASE_ORDER) && (
+                <button onClick={() => navigate(`${R.PURCHASE_ORDERS}?action=new`)}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 font-mont text-xs font-semibold text-white hover:bg-primary/90">
+                  <Plus className="size-3.5" /> New purchase order
+                </button>
+              )}
+            </>}
+          />
         </div>
 
         {viewTabs.length > 1 && (

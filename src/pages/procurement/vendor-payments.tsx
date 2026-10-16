@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
-import { ProcurementPageTitle } from "./screen-help";
+import { ProcurementPageHeader } from "./screen-help";
 import { VendorPicker } from "./pickers";
 import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
@@ -106,7 +106,13 @@ export default function VendorPaymentsPage() {
 
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
-      <header data-guide="procurement-vendor-payments.heading" className="flex flex-wrap items-start justify-between gap-3"><div><ProcurementPageTitle screen="vendorPayments">Vendor Payments</ProcurementPageTitle><p className="mt-0.5 font-mont text-xs text-gray-05">Disbursements against approved and posted vendor invoices.</p></div><Can permission={P.PROC_CREATE_VENDOR_PAYMENT}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Payment</Button></Can></header>
+      <ProcurementPageHeader
+        data-guide="procurement-vendor-payments.heading"
+        screen="vendorPayments"
+        title="Vendor Payments"
+        description="Disbursements against approved and posted vendor invoices."
+        actions={<Can permission={P.PROC_CREATE_VENDOR_PAYMENT}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New Payment</Button></Can>}
+      />
       <div className="flex flex-wrap items-center gap-2"><select value={approval} onChange={(event) => { setApproval(event.target.value); setPage(1); }} aria-label="Payment status" className="h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01"><option value="">All payments</option><option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option></select></div>
       <section data-guide="procurement-vendor-payments.list">{isForbidden(error) ? <EmptyState title="Access restricted" message="You do not have permission to view vendor payments." /> : <DataTable columns={columns} rows={rows} rowKey={(payment) => payment.id} loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(payment) => setSelectedId(payment.id)} page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage} emptyTitle="No vendor payments" emptyMessage="Approved supplier disbursements will appear here." />}</section>
     </PageShell>

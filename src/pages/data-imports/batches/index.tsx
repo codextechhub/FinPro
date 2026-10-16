@@ -20,6 +20,7 @@ import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { formatRelativeDate } from "@/utils/helpers";
 import { formatBytes } from "@/utils/format-bytes";
 import { routesPath } from "@/routes/routes-path";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   useGetImportBatchesQuery,
@@ -244,25 +245,23 @@ export default function ImportBatchesList() {
   return (
     <>
       <PageShell className="space-y-5 text-black-01" data-guide="data-import-batches.workspace">
-        {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-3" data-guide="data-import-batches.heading">
-          <div className="w-full sm:w-auto">
-            <p className="font-semibold font-mont text-gray-01">Import Batches</p>
-            <p className="text-xs text-gray-01 mt-0.5">
-              Monitor uploaded datasets through validation, import execution, and rollback.
-            </p>
-          </div>
-          <div className="inline-flex items-center gap-3">
-            <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshIcon spinning={isFetching} className="size-4" /> Refresh
-            </Button>
-            <PermissionGate permission={P.UPLOAD_IMPORT_BATCH}>
-              <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.DATA_IMPORTS.BATCHES.NEW)}>
-                <Upload className="size-4" /> New Import
+        <PageHeader
+          data-guide="data-import-batches.heading"
+          title="Import Batches"
+          description="Monitor uploaded datasets through validation, import execution, and rollback."
+          actions={
+            <>
+              <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
+                <RefreshIcon spinning={isFetching} className="size-4" /> Refresh
               </Button>
-            </PermissionGate>
-          </div>
-        </div>
+              <PermissionGate permission={P.UPLOAD_IMPORT_BATCH}>
+                <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.DATA_IMPORTS.BATCHES.NEW)}>
+                  <Upload className="size-4" /> New Import
+                </Button>
+              </PermissionGate>
+            </>
+          }
+        />
 
         {/* Polling indicator */}
         {hasInFlight && (

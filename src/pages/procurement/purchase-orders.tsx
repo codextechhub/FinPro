@@ -8,7 +8,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
-import { ProcurementPageTitle } from "./screen-help";
+import { ProcurementPageHeader } from "./screen-help";
 import { RequisitionPicker, VendorPicker, ContractPicker } from "./pickers";
 import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import {
@@ -140,12 +140,12 @@ export default function PurchaseOrdersPage() {
   return (
     <ProcurementShell>
       <PageShell className="space-y-5 text-black-01">
-        <header data-guide="procurement-purchase-orders.heading" className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <ProcurementPageTitle screen="purchaseOrders">Purchase Orders</ProcurementPageTitle>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">Track supplier commitments, delivery progress, and approval status.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        <ProcurementPageHeader
+          data-guide="procurement-purchase-orders.heading"
+          screen="purchaseOrders"
+          title="Purchase Orders"
+          description="Track supplier commitments, delivery progress, and approval status."
+          actions={<>
             <QuickExportButton
               screen="procurement.purchase_orders"
               params={{ ...statusFilterArgs(status), search: debouncedSearch }}
@@ -154,8 +154,8 @@ export default function PurchaseOrdersPage() {
               defaultName="Purchase orders"
             />
             <Can permission={P.PROC_CREATE_PURCHASE_ORDER}><Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New Purchase Order</Button></Can>
-          </div>
-        </header>
+          </>}
+        />
 
         <div data-guide="procurement-purchase-orders.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {summaryLoading || !summary ? <div className={cn(INFORMATION_CARD_SURFACE, "col-span-full rounded-md")}><LoadingState rows={2} /></div> : <>

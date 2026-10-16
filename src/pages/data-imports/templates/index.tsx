@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { formatRelativeDate } from "@/utils/helpers";
 import { routesPath } from "@/routes/routes-path";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   useGetImportTemplatesQuery,
@@ -169,27 +170,27 @@ export default function ImportTemplatesList() {
   return (
     <>
       <PageShell className="space-y-5 text-black-01" data-guide="data-import-templates.workspace">
-        {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-3" data-guide="data-import-templates.heading">
-          <div className="w-full sm:w-auto">
-            <p className="font-semibold font-mont text-gray-01">Import Templates</p>
-            <p className="text-xs text-gray-01 mt-0.5">
-              {canManageTemplates
-                ? "System-level templates defining column structure and validation for each dataset."
-                : "Available templates you can download and use for data uploads."}
-            </p>
-          </div>
-          <div className="inline-flex items-center gap-3">
-            <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshIcon spinning={isFetching} className="size-4" /> Refresh
-            </Button>
-            <PermissionGate permission={P.CREATE_IMPORT_TEMPLATE}>
-              <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.DATA_IMPORTS.TEMPLATES.NEW)}>
-                <Plus className="size-4" /> New Template
+        <PageHeader
+          data-guide="data-import-templates.heading"
+          title="Import Templates"
+          description={
+            canManageTemplates
+              ? "System-level templates defining column structure and validation for each dataset."
+              : "Available templates you can download and use for data uploads."
+          }
+          actions={
+            <>
+              <Button variant="white" size="lg" onClick={() => refetch()} disabled={isFetching}>
+                <RefreshIcon spinning={isFetching} className="size-4" /> Refresh
               </Button>
-            </PermissionGate>
-          </div>
-        </div>
+              <PermissionGate permission={P.CREATE_IMPORT_TEMPLATE}>
+                <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.DATA_IMPORTS.TEMPLATES.NEW)}>
+                  <Plus className="size-4" /> New Template
+                </Button>
+              </PermissionGate>
+            </>
+          }
+        />
 
         {/* Stat cards */}
         <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4" data-guide="data-import-templates.summary">

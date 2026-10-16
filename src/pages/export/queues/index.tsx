@@ -37,6 +37,7 @@ import { useGetMyTasksQuery, useGetMyTasksSummaryQuery } from "@/redux/services/
 import { errorStatus } from "@/utils/api-errors";
 import { displayStatus, exportOutcome } from "./job-outcome";
 import { useDates, type DateFormatter } from "../../../lib/display-prefs";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 
 const POLL_MS = 10_000;
@@ -231,25 +232,24 @@ export default function QueuesPage() {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      {/* Header row: title + (permission-gated) scope toggle */}
-      <div className="flex flex-wrap items-center justify-between gap-3" data-guide="data-export-queues.heading">
-        <div>
-          <p className="font-semibold font-mont text-gray-01">Queues</p>
-          <p className="text-xs text-gray-01 mt-0.5">
-            Background tasks - imports, exports and emails you started, live as they run.
-          </p>
-        </div>
-        {canViewAll && (
-          <Segmented
-            value={scope}
-            onChange={(v) => patchParams({ scope: v === "all" ? "all" : "" })}
-            options={[
-              ["mine", "My Queues"],
-              ["all", "All Queues"],
-            ] as const}
-          />
-        )}
-      </div>
+      {/* Title and the permission-gated scope toggle */}
+      <PageHeader
+        data-guide="data-export-queues.heading"
+        title="Queues"
+        description="Background tasks - imports, exports and emails you started, live as they run."
+        actions={
+          canViewAll && (
+            <Segmented
+              value={scope}
+              onChange={(v) => patchParams({ scope: v === "all" ? "all" : "" })}
+              options={[
+                ["mine", "My Queues"],
+                ["all", "All Queues"],
+              ] as const}
+            />
+          )
+        }
+      />
 
       {/* Status summary cards */}
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4" data-guide="data-export-queues.summary">

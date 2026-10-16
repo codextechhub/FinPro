@@ -16,6 +16,7 @@ import { DataTable, type Column } from "../../../components/finance-ui/data-tabl
 import { useReaderBranchLens } from "../../../components/finance-ui/raising-branch";
 import { noAccessMessage } from "../../../components/finance-ui/no-access";
 import { isForbidden } from "../../../lib/api-errors";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import { InstanceFilterBar } from "./instance-filters";
 import { ReplaceApproverSheet } from "./replace-approver-sheet";
@@ -166,32 +167,34 @@ export default function ManageApprovals() {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold font-mont text-gray-01">Manage Approvals</p>
-          <p className="mt-0.5 text-xs text-gray-01">
+      <PageHeader
+        title="Manage Approvals"
+        description={
+          <>
             Every approval request. Open one to see who approves each stage
             {canManage ? " and change it" : ""}, cancel it, or reverse a recorded vote.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="white"
-            size="lg"
-            className="font-medium font-mont [&_svg]:size-5"
-            onClick={() => refetch()}
-            disabled={isFetching}
-          >
-            <RefreshIcon spinning={isFetching} /> Refresh
-          </Button>
-          <QuickExportButton
-            screen="workflow.instances"
-            params={filterOnly}
-            defaultName="Approval requests"
-            className="h-11 px-6"
-          />
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            <Button
+              variant="white"
+              size="lg"
+              className="font-medium font-mont [&_svg]:size-5"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshIcon spinning={isFetching} /> Refresh
+            </Button>
+            <QuickExportButton
+              screen="workflow.instances"
+              params={filterOnly}
+              defaultName="Approval requests"
+              className="h-11 px-6"
+            />
+          </>
+        }
+      />
 
       <InstanceFilterBar
         filters={filters}

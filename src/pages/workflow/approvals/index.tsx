@@ -12,6 +12,7 @@ import { useFilterParam } from "@/hooks/use-filter-param";
 import { useUserDirectory } from "@/pages/protected/workflow/components/use-user-directory";
 import { DocumentRef, InitialsAvatar } from "@/pages/protected/workflow/components/workflow-ui";
 import { humanizeDocumentType } from "@/pages/protected/workflow/components/workflow-format";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import { RefreshIcon } from "@/components/finance-ui/loading-mark";
 
@@ -113,26 +114,22 @@ export default function PendingApprovals() {
 
           {/* ── List ────────────────────────────────────────────────────── */}
           <section data-guide="workflow-approvals.queue" className="space-y-4 min-w-0">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-semibold font-mont">Pending Approvals</h1>
-                  <Badge variant="pending">{filtered.length} awaiting action</Badge>
-                </div>
-                <p className="text-xs text-gray-01 mt-0.5">
-                  Documents waiting for your vote. Items you've already voted on are hidden.
-                </p>
-              </div>
-              <Button
-                variant="white"
-                size="lg"
-                className="[&_svg]:size-4 font-medium shrink-0"
-                onClick={() => refetch()}
-                disabled={isFetching}
-              >
-                <RefreshIcon spinning={isFetching} /> Refresh
-              </Button>
-            </div>
+            <PageHeader
+              title="Pending Approvals"
+              titleAside={<Badge variant="pending">{filtered.length} awaiting action</Badge>}
+              description="Documents waiting for your vote. Items you've already voted on are hidden."
+              actions={
+                <Button
+                  variant="white"
+                  size="lg"
+                  className="[&_svg]:size-4 font-medium shrink-0"
+                  onClick={() => refetch()}
+                  disabled={isFetching}
+                >
+                  <RefreshIcon spinning={isFetching} /> Refresh
+                </Button>
+              }
+            />
 
             <div className="relative max-w-[320px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-01" />

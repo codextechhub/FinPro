@@ -58,6 +58,7 @@ import { baseApi } from "@/redux/services/base-api";
 import { useAppDispatch } from "@/redux/store";
 import { routesPath } from "@/routes/routes-path";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { FINANCE_HELP } from "./screen-help";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
@@ -153,18 +154,16 @@ export default function BankingPage() {
   return (
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-mont text-lg font-semibold text-gray-01">Bank Accounts</h1>
-              <InfoHint ariaLabel="About bank accounts">{FINANCE_HELP.banking}</InfoHint>
-            </div>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">Bank accounts, statement import and reconciliation.</p>
-          </div>
-          <Can permission={P.FIN_CREATE_BANK_ACCOUNT}>
-            <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New bank account</Button>
-          </Can>
-        </div>
+        <PageHeader
+          title="Bank Accounts"
+          titleAside={<InfoHint ariaLabel="About bank accounts">{FINANCE_HELP.banking}</InfoHint>}
+          description="Bank accounts, statement import and reconciliation."
+          actions={
+            <Can permission={P.FIN_CREATE_BANK_ACCOUNT}>
+              <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New bank account</Button>
+            </Can>
+          }
+        />
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {shown.book ? <Kpi label="Total bank balance" value={formatMoney(kpis.total, currency)} hint="Across active accounts" /> : null}

@@ -9,6 +9,7 @@ import { useActiveEntity, InfoHint } from "@/components/finance-ui";
 import { ExpenseClaimsTab } from "./expense-claims-tab";
 import { PettyCashTab } from "./petty-cash-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { FINANCE_HELP } from "../screen-help";
 import { EmptyState } from "@/components/finance-ui/states";
@@ -28,15 +29,14 @@ export default function ExpensesPage({ section = DEFAULT_EXPENSES_SECTION }: {
   return (
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01" data-guide={isPettyCash ? "finance-petty-cash.workspace" : "finance-expense-claims.workspace"}>
-        <div data-guide={isPettyCash ? "finance-petty-cash.heading" : "finance-expense-claims.heading"}>
-          <div className="flex items-center gap-1.5">
-            <h1 className="font-mont text-lg font-semibold text-gray-01">{isPettyCash ? "Petty Cash" : "Expense Claims"}</h1>
-            {isPettyCash
-              ? <InfoHint ariaLabel="About petty-cash floats">{FINANCE_HELP["petty-cash"]}</InfoHint>
-              : <InfoHint ariaLabel="About expense claims">{FINANCE_HELP.claims}</InfoHint>}
-          </div>
-          <p className="mt-0.5 font-mont text-xs text-gray-05">{isPettyCash ? "Petty-cash floats, vouchers and returns to the bank." : "Out-of-pocket spending by staff that needs reimbursement."}</p>
-        </div>
+        <PageHeader
+          data-guide={isPettyCash ? "finance-petty-cash.heading" : "finance-expense-claims.heading"}
+          title={isPettyCash ? "Petty Cash" : "Expense Claims"}
+          titleAside={isPettyCash
+            ? <InfoHint ariaLabel="About petty-cash floats">{FINANCE_HELP["petty-cash"]}</InfoHint>
+            : <InfoHint ariaLabel="About expense claims">{FINANCE_HELP.claims}</InfoHint>}
+          description={isPettyCash ? "Petty-cash floats, vouchers and returns to the bank." : "Out-of-pocket spending by staff that needs reimbursement."}
+        />
         {!entity ? (
           <NoEntityState />
         ) : !canView ? (

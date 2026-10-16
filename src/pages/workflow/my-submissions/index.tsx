@@ -10,6 +10,7 @@ import type { WorkflowInstance, WorkflowInstanceStatus } from "@/redux/services/
 import { useFilterParam } from "@/hooks/use-filter-param";
 import { useUserDirectory } from "@/pages/protected/workflow/components/use-user-directory";
 import { DocumentRef, InstanceStatusBadge } from "@/pages/protected/workflow/components/workflow-ui";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import { listEmptyText } from "../list-state";
 import { RefreshIcon } from "@/components/finance-ui/loading-mark";
@@ -68,12 +69,10 @@ export default function MySubmissions() {
   return (
     <>
       <PageShell className="space-y-5 text-black-01">
-        <div>
-          <p className="font-semibold font-mont text-gray-01">My Submissions</p>
-          <p className="text-xs text-gray-01 mt-0.5">
-            Documents you've submitted for approval. Returned items can be amended and resubmitted.
-          </p>
-        </div>
+        <PageHeader
+          title="My Submissions"
+          description="Documents you've submitted for approval. Returned items can be amended and resubmitted."
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">

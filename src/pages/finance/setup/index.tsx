@@ -14,6 +14,7 @@ import { CostCentersTab } from "./cost-centers-tab";
 import { DimensionsTab } from "./dimensions-tab";
 import { TaxTablesTab } from "./tax-tables-tab";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { FINANCE_HELP } from "../screen-help";
 
@@ -51,17 +52,16 @@ export default function SetupPage({ section = DEFAULT_SETUP_SECTION }: {
   return (
     <FinanceShell>
       <PageShell className="space-y-5 text-black-01" data-guide="finance-setup.workspace">
-        <div data-guide="finance-setup.heading" className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-mont text-lg font-semibold text-gray-01">{LABELS[section] ?? "Setup & Entity"}</h1>
-              <InfoHint ariaLabel={`About ${LABELS[section] ?? "finance setup"}`}>{FINANCE_HELP[section]}</InfoHint>
-            </div>
-            <p className="mt-0.5 max-w-2xl font-mont text-xs text-gray-05">{DESCRIPTIONS[section] ?? AREA_DESCRIPTION}</p>
-          </div>
-          {/* Section actions land on the title line; display:contents keeps the slot itself out of the layout. */}
-          {section === "periods" ? <div ref={setHeaderSlot} className="contents" /> : null}
-        </div>
+        <PageHeader
+          data-guide="finance-setup.heading"
+          title={LABELS[section] ?? "Setup & Entity"}
+          titleAside={<InfoHint ariaLabel={`About ${LABELS[section] ?? "finance setup"}`}>{FINANCE_HELP[section]}</InfoHint>}
+          description={<p className="max-w-2xl">{DESCRIPTIONS[section] ?? AREA_DESCRIPTION}</p>}
+          actions={section === "periods" ? (
+            // Section actions portal into this slot; display:contents keeps the slot itself out of the layout.
+            <div ref={setHeaderSlot} className="contents" />
+          ) : null}
+        />
         {section === "accounts" ? needsEntity(<AccountsTab entity={entity!} />)
           : section === "periods" ? needsEntity(<PeriodsTab entity={entity!} headerSlot={headerSlot} />)
           : section === "currencies" ? <CurrenciesTab />

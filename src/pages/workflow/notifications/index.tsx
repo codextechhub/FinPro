@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { BellRing, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { cn } from "@/lib/utils";
@@ -63,13 +64,10 @@ export default function WorkflowNotifications() {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <div>
-        <p className="font-semibold font-mont text-gray-01">Notifications</p>
-        <p className="mt-0.5 text-xs text-gray-01">
-          Whether approvals tell people what is happening. One answer for the whole
-          school, rather than a question on every approval path.
-        </p>
-      </div>
+      <PageHeader
+        title="Notifications"
+        description="Whether approvals tell people what is happening. One answer for the whole school, rather than a question on every approval path."
+      />
 
       <div className={cn(INFORMATION_CARD_SURFACE, "max-w-2xl rounded-md p-5")}>
         <div className="flex flex-wrap items-start justify-between gap-4">

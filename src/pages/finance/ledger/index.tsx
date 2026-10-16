@@ -34,6 +34,7 @@ import { DirectEntryDrawer } from "./direct-entry-drawer";
 import { JournalDetailDrawer } from "./journal-detail-drawer";
 import { useSourceDocumentParam } from "../../../lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { useDates } from "../../../lib/display-prefs";
@@ -130,15 +131,12 @@ export default function GeneralLedgerPage() {
   return (
     <FinanceShell>
       <PageShell className="space-y-4 text-black-01" data-guide="finance-ledger.workspace">
-        <div data-guide="finance-ledger.header" className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-mont text-lg font-semibold text-gray-01">Journal Entries</h1>
-              <InfoHint ariaLabel="About journal entries">{FINANCE_HELP.ledger}</InfoHint>
-            </div>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">The general ledger - every financial mutation lands here as a balanced Dr/Cr posting.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        <PageHeader
+          data-guide="finance-ledger.header"
+          title="Journal Entries"
+          titleAside={<InfoHint ariaLabel="About journal entries">{FINANCE_HELP.ledger}</InfoHint>}
+          description="The general ledger - every financial mutation lands here as a balanced Dr/Cr posting."
+          actions={<>
             <ShowArchivedToggle entity={entity} />
             {/* The screen lists one row per ENTRY; the postings dataset produces
                 one row per LINE, so the row count in the drawer will exceed what
@@ -153,8 +151,8 @@ export default function GeneralLedgerPage() {
             <Can permission={P.FIN_POST_DIRECT_ENTRY}>
               <Button data-guide="finance-ledger.new-journal" onClick={() => setDirectOpen(true)} className="gap-1.5"><Plus className="size-4" /> New journal</Button>
             </Can>
-          </div>
-        </div>
+          </>}
+        />
 
         {/* The status strip sizes to its tabs, so the filters share its line on a
             wide screen and wrap under it when the row runs out of width. */}

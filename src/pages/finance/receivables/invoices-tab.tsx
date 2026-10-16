@@ -15,6 +15,7 @@ import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/layout/page-header";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
@@ -149,13 +150,11 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
 
   return (
     <div className="space-y-4">
-      <div>
-        <div className="flex items-center gap-1.5">
-          <h1 className="font-mont text-lg font-semibold text-gray-01">Customer Invoices</h1>
-          <InfoHint ariaLabel="About customer invoices">{FINANCE_HELP.invoices}</InfoHint>
-        </div>
-        <p className="mt-0.5 font-mont text-xs text-gray-05">Accounts receivable for the selected entity.</p>
-      </div>
+      <PageHeader
+        title="Customer Invoices"
+        titleAside={<InfoHint ariaLabel="About customer invoices">{FINANCE_HELP.invoices}</InfoHint>}
+        description="Accounts receivable for the selected entity."
+      />
 
       {/* KPI cards */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

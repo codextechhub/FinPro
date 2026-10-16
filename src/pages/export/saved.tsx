@@ -43,6 +43,7 @@ import type {
   ExportDefinitionListItem,
 } from "@/redux/services/dashboard/exports-types";
 import { useDates } from "../../lib/display-prefs";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 
 const NUM = "font-geist-mono tabular-nums";
@@ -238,20 +239,18 @@ export default function SavedExportsPage() {
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <div className="flex flex-wrap items-center justify-between gap-3" data-guide="data-exports.heading">
-        <div>
-          <p className="font-semibold font-mont text-gray-01">Exports</p>
-          <p className="mt-0.5 text-xs text-gray-01">
-            Reusable recipes. Editing one changes future files only - files already produced are never
-            altered.
-          </p>
-        </div>
-        {canCreate && (
-          <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.EXPORT.NEW)} className="gap-1.5">
-            <Plus className="size-4" /> New export
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        data-guide="data-exports.heading"
+        title="Exports"
+        description="Reusable recipes. Editing one changes future files only - files already produced are never altered."
+        actions={
+          canCreate && (
+            <Button size="lg" onClick={() => navigate(routesPath.PROTECTED.EXPORT.NEW)} className="gap-1.5">
+              <Plus className="size-4" /> New export
+            </Button>
+          )
+        }
+      />
 
       <div className="flex flex-wrap items-end gap-3">
         <Input

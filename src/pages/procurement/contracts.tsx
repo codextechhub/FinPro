@@ -9,7 +9,7 @@ import {
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
-import { ProcurementPageTitle } from "./screen-help";
+import { ProcurementPageHeader } from "./screen-help";
 import { VendorPicker } from "./pickers";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormDrawer, FormField, LoadingState,
@@ -110,13 +110,13 @@ export default function ContractsPage() {
 
   return <ProcurementShell>
     <PageShell className="space-y-5 text-black-01">
-      <header data-guide="procurement-contracts.heading" className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <ProcurementPageTitle screen="contracts">Contracts</ProcurementPageTitle>
-          <p className="mt-0.5 font-mont text-xs text-gray-05">Vendor agreements with milestones and a renewal radar.</p>
-        </div>
-        <Can permission={P.PROC_CREATE_CONTRACT}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New contract</Button></Can>
-      </header>
+      <ProcurementPageHeader
+        data-guide="procurement-contracts.heading"
+        screen="contracts"
+        title="Contracts"
+        description="Vendor agreements with milestones and a renewal radar."
+        actions={<Can permission={P.PROC_CREATE_CONTRACT}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> New contract</Button></Can>}
+      />
 
       <div data-guide="procurement-contracts.summary" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {summaryLoading || !summary ? <div className={cn(INFORMATION_CARD_SURFACE, "col-span-full rounded-md")}><LoadingState rows={2} /></div> : <>

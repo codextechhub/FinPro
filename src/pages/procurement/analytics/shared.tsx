@@ -7,7 +7,7 @@ import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { formatMoney } from "@/utils/money";
-import { ProcurementPageTitle, type ProcurementHelpKey } from "../screen-help";
+import { ProcurementPageHeader, type ProcurementHelpKey } from "../screen-help";
 
 export type PillTone = "green" | "amber" | "red" | "gray";
 
@@ -78,7 +78,11 @@ export function GradeBadge({ grade }: { grade: string }) {
   );
 }
 
-/** Page header: title + subtitle on the left, filter controls (children) right. */
+/**
+ * An analytics screen's heading: title and subtitle on the left, its filter
+ * controls (children) on the right. The filters align on their bottom edge
+ * because each one carries a label above its input.
+ */
 export function SectionHeader({ title, subtitle, screen, children }: {
   title: string;
   subtitle: string;
@@ -86,13 +90,12 @@ export function SectionHeader({ title, subtitle, screen, children }: {
   children?: React.ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-      <div className="min-w-0">
-        <ProcurementPageTitle screen={screen}>{title}</ProcurementPageTitle>
-        <p className="mt-0.5 font-mont text-xs text-gray-05">{subtitle}</p>
-      </div>
-      {children && <div className="flex flex-wrap items-end gap-3">{children}</div>}
-    </header>
+    <ProcurementPageHeader
+      screen={screen}
+      title={title}
+      description={subtitle}
+      actions={children ? <div className="flex flex-wrap items-end gap-3">{children}</div> : null}
+    />
   );
 }
 

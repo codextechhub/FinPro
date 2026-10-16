@@ -9,7 +9,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { ProcurementShell } from "./procurement-shell";
-import { ProcurementPageTitle } from "./screen-help";
+import { ProcurementPageHeader } from "./screen-help";
 import { useUserDirectory } from "../../components/workflow/use-user-directory";
 import { sameId } from "../../components/workflow/workflow-format";
 import { useServesPath } from "../../lib/host-routes";
@@ -184,12 +184,12 @@ export default function RequisitionsPage() {
   return (
     <ProcurementShell>
       <PageShell className="space-y-5 text-black-01">
-        <header data-guide="procurement-requisitions.heading" className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <ProcurementPageTitle screen="requisitions">Purchase Requisitions</ProcurementPageTitle>
-            <p className="mt-0.5 font-mont text-xs text-gray-05">Create, track, and approve internal purchase requests.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        <ProcurementPageHeader
+          data-guide="procurement-requisitions.heading"
+          screen="requisitions"
+          title="Purchase Requisitions"
+          description="Create, track, and approve internal purchase requests."
+          actions={<>
             <QuickExportButton
               screen="procurement.requisitions"
               params={{ ...statusFilterArgs(status), search: debouncedSearch }}
@@ -200,8 +200,8 @@ export default function RequisitionsPage() {
             <Can permission={P.PROC_CREATE_REQUISITION}>
               <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New Requisition</Button>
             </Can>
-          </div>
-        </header>
+          </>}
+        />
 
         <div data-guide="procurement-requisitions.summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {summaryLoading || !summary ? <div className={cn(INFORMATION_CARD_SURFACE, "col-span-full rounded-md")}><LoadingState rows={2} /></div> : <>

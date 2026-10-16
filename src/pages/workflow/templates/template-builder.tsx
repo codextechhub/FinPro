@@ -59,6 +59,7 @@ import {
 import { stageRulesPayload } from "./components/template-payload";
 import { TemplateReachChip, TemplateReachNotice } from "./components/template-reach";
 import { TEMPLATE_SHARED_NOTE, publishTarget, rowBranchIds } from "../workflow-reach";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import { LoadingMark } from "@/components/finance-ui/loading-mark";
 
@@ -664,27 +665,23 @@ export default function TemplateBuilder() {
     );
   }
 
-  // The read failed - almost always a template id that does not exist. Without
-  // this the builder fell through to an empty "Untitled · 1 stage" form, and
-  // publishing it would have created a template out of a bad URL rather than
-  // editing anything.
+  // An unknown id gets a not-found page, never a blank form that would publish.
   if (isEdit && (existingFailed || !existing)) {
     return (
       <PageShell>
-        <div className="mx-auto max-w-md rounded-lg border border-white-02 bg-white px-6 py-10 text-center">
-          <p className="font-mont font-semibold text-gray-01">Template not found</p>
-          <p className="mt-1.5 text-xs leading-5 text-gray-01">
-            This approval template does not exist, or it has been retired. It cannot be
-            edited from here.
-          </p>
-          <Button
-            variant="white"
-            className="mt-5"
-            onClick={() => navigate(routesPath.PROTECTED.WORKFLOW.TEMPLATES)}
-          >
-            Back to templates
-          </Button>
-        </div>
+        <PageHeader
+          title="Template not found"
+          description="This approval template does not exist, or it has been retired. It cannot be edited from here."
+          actions={
+            <Button
+              variant="white"
+              size="lg"
+              onClick={() => navigate(routesPath.PROTECTED.WORKFLOW.TEMPLATES)}
+            >
+              Back to templates
+            </Button>
+          }
+        />
       </PageShell>
     );
   }
@@ -692,45 +689,44 @@ export default function TemplateBuilder() {
   return (
     <>
       <PageShell className="space-y-5 text-black-01">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="font-semibold font-mont text-gray-01">
-              {willFork ? "Adjust template" : isEdit ? "Edit template" : "New template"}
-            </p>
-            <p className="mt-0.5 text-xs text-gray-01">
+        <PageHeader
+          title={willFork ? "Adjust template" : isEdit ? "Edit template" : "New template"}
+          description={
+            <>
               {name.trim() || "Untitled"} · {stages.length}{" "}
               {stages.length === 1 ? "stage" : "stages"}
-            </p>
-          </div>
-          <div className="inline-flex flex-wrap items-center gap-3.5">
-            {/* The reach sits next to the button that acts on it, so nobody
-                updates a shared path without seeing how far it goes. */}
-            {editingShared && isEdit && id ? <TemplateReachChip templateId={id} /> : null}
-            <Button variant="white" size="lg" onClick={() => navigate(-1)} disabled={isPublishing}>
-              Cancel
-            </Button>
-            <Button
-              size="lg"
-              onClick={handlePublish}
-              disabled={isPublishing || !hasChanges || mustPickBranch}
-              title={
-                mustPickBranch
-                  ? "Choose the branch these steps are for"
-                  : hasChanges ? undefined : "Nothing has changed yet"
-              }
-            >
-              {isPublishing
-                ? "Publishing…"
-                : savesBranchCopy
-                  ? "Save for this branch"
-                  : willFork
-                  ? "Save for this school"
-                  : isEdit
-                    ? "Update template"
-                    : "Publish template"}
-            </Button>
-          </div>
-        </div>
+            </>
+          }
+          actions={
+            <div className="inline-flex flex-wrap items-center gap-3.5">
+              {/* Reach beside the button, so a shared path is never updated blind. */}
+              {editingShared && isEdit && id ? <TemplateReachChip templateId={id} /> : null}
+              <Button variant="white" size="lg" onClick={() => navigate(-1)} disabled={isPublishing}>
+                Cancel
+              </Button>
+              <Button
+                size="lg"
+                onClick={handlePublish}
+                disabled={isPublishing || !hasChanges || mustPickBranch}
+                title={
+                  mustPickBranch
+                    ? "Choose the branch these steps are for"
+                    : hasChanges ? undefined : "Nothing has changed yet"
+                }
+              >
+                {isPublishing
+                  ? "Publishing…"
+                  : savesBranchCopy
+                    ? "Save for this branch"
+                    : willFork
+                    ? "Save for this school"
+                    : isEdit
+                      ? "Update template"
+                      : "Publish template"}
+              </Button>
+            </div>
+          }
+        />
 
         {/* The stages are the work, so they take the width. Everything you set
             once per template sits in a rail beside them on a wide screen, and
