@@ -35,10 +35,9 @@ import {
   useGetFinanceDocumentSettingsQuery,
   useGetFinanceSettingsHistoryQuery,
   useUpdateFinanceAccountSettingsMutation,
-  useUpdateFinanceBankingSettingsMutation,
   useUpdateFinanceDocumentSettingsMutation,
 } from "@/redux/services/finance/setup-api";
-import type { FinanceBankingSettingsValues, FinanceDocumentSettingsValues, SettingConsumer } from "@/redux/services/finance/setup-types";
+import type { FinanceDocumentSettingsValues, SettingConsumer } from "@/redux/services/finance/setup-types";
 import {
   ConsoleSettingsLayout,
   PolicyBadge,
@@ -59,6 +58,7 @@ import { FinanceShell } from "./finance-shell";
 import { EntitiesTab } from "./setup/entities-tab";
 import { OnlinePaymentsPanel } from "./online-payments";
 import { ReceivablesSettings } from "./receivables-settings";
+import { BankingCashForm } from "./banking-cash-settings";
 import { PayrollSettingsPanel } from "./payroll-settings";
 import { CalendarRulePanel, RecordKeepingPanel } from "./settings-records";
 import { useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
@@ -433,48 +433,6 @@ function BankingCashPolicy({ entityCode }: { entityCode: string | null }) {
       <OnlinePaymentsPanel entityCode={entityCode} />
     </div>
   );
-}
-
-function BankingCashForm({ entityCode, values, consumers, canUpdate, readOnlyNote }: { entityCode: string; values: FinanceBankingSettingsValues; consumers: Record<string, SettingConsumer>; canUpdate: boolean; readOnlyNote: string | null }) {
-  const [toleranceDays, setToleranceDays] = useState(String(values.default_bank_reconciliation_tolerance_days));
-  const [groupMatches, setGroupMatches] = useState(values.default_group_reconciliation_matches);
-  const [allocationStrategy, setAllocationStrategy] = useState(values.default_receipt_allocation_strategy);
-  const [pettyCashThreshold, setPettyCashThreshold] = useState(String(values.petty_cash_low_balance_threshold_bps / 100));
-  const [update, state] = useUpdateFinanceBankingSettingsMutation();
-  const toleranceValue = Number(toleranceDays);
-  const pettyCashThresholdBps = Math.round(Number(pettyCashThreshold) * 100);
-  const valid = toleranceDays.trim() !== "" && pettyCashThreshold.trim() !== ""
-    && Number.isInteger(toleranceValue) && toleranceValue >= 0 && toleranceValue <= 30
-    && Number.isFinite(pettyCashThresholdBps) && pettyCashThresholdBps >= 0 && pettyCashThresholdBps <= 10000;
-  const dirty = valid && (
-    toleranceValue !== values.default_bank_reconciliation_tolerance_days
-    || groupMatches !== values.default_group_reconciliation_matches
-    || allocationStrategy !== values.default_receipt_allocation_strategy
-    || pettyCashThresholdBps !== values.petty_cash_low_balance_threshold_bps
-  );
-  const save = async () => {
-    try {
-      const response = await update({
-        entity: entityCode,
-        default_bank_reconciliation_tolerance_days: toleranceValue,
-        default_group_reconciliation_matches: groupMatches,
-        default_receipt_allocation_strategy: allocationStrategy,
-        petty_cash_low_balance_threshold_bps: pettyCashThresholdBps,
-      }).unwrap();
-      toast.success(response.message || "Finance banking policy saved.");
-    } catch { /* Central API handling shows the actionable error. */ }
-  };
-  return <>
-    <SettingsPanel title="Banking and cash defaults" description="These values are used only when an operation or report does not supply its own choice.">
-      <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-3">
-        <label className="font-mont text-xs font-semibold text-gray-01">Reconciliation date tolerance (days)<Input className="mt-2 bg-white" type="number" min="0" max="30" step="1" value={toleranceDays} onChange={(event) => setToleranceDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Allows automatic matching when statement and journal dates are this many days apart.</span><SettingsConsumer consumer={consumers.default_bank_reconciliation_tolerance_days} /></label>
-        <label className="min-w-0 font-mont text-xs font-semibold text-gray-01">Default receipt allocation<select className="mt-2 h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={allocationStrategy} onChange={(event) => setAllocationStrategy(event.target.value as FinanceBankingSettingsValues["default_receipt_allocation_strategy"])} disabled={!canUpdate}>{values.default_receipt_allocation_strategy_options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><span className="mt-1 block font-normal leading-5 text-gray-05">Applied when a receipt is automatically allocated without a user-selected order.</span><SettingsConsumer consumer={consumers.default_receipt_allocation_strategy} /></label>
-        <label className="font-mont text-xs font-semibold text-gray-01">Petty cash low-balance threshold (%)<Input className="mt-2 bg-white" type="number" min="0" max="100" step="0.01" value={pettyCashThreshold} onChange={(event) => setPettyCashThreshold(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Flags a fund for replenishment when live cash on hand reaches or falls below this share of its imprest float.</span><SettingsConsumer consumer={consumers.petty_cash_low_balance_threshold_bps} /></label>
-      </div>
-      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Allow grouped automatic matches</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">Lets one bank statement line match a uniquely determined group of ledger lines with the same total.</p><SettingsConsumer consumer={consumers.default_group_reconciliation_matches} /></div><Switch checked={groupMatches} onCheckedChange={setGroupMatches} disabled={!canUpdate} aria-label="Allow grouped automatic matches" /></div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use 0 to 30 days and a threshold from 0 to 100%." : readOnlyNote ?? "Only effective changes are written to audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save banking policy"}</Button> : null}</div>
-    </SettingsPanel>
-  </>;
 }
 
 function ReferenceData() {

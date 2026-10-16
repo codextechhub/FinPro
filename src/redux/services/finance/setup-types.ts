@@ -358,15 +358,32 @@ export interface ChoiceOption<T extends string = string> {
   label: string;
 }
 
+/**
+ * The banking and cash defaults, each a `finance.settings` Field Access field
+ * with its own Read and Write switch: a value the role may not read is absent,
+ * and one it may read and not change is named in `_read_only_fields`.
+ */
 export interface FinanceBankingSettingsValues {
-  default_bank_reconciliation_tolerance_days: number;
-  default_group_reconciliation_matches: boolean;
-  default_receipt_allocation_strategy: "oldest" | "largest";
-  default_receipt_allocation_strategy_label: string;
-  default_receipt_allocation_strategy_options: ChoiceOption<"oldest" | "largest">[];
-  petty_cash_low_balance_threshold_bps: number;
+  default_bank_reconciliation_tolerance_days?: number;
+  default_group_reconciliation_matches?: boolean;
+  default_receipt_allocation_strategy?: "oldest" | "largest";
+  default_receipt_allocation_strategy_label?: string;
+  default_receipt_allocation_strategy_options?: ChoiceOption<"oldest" | "largest">[];
+  /** Whether a transfer into a family's account number settles their open bills as it is booked. */
+  apply_transfers_automatically?: boolean;
+  petty_cash_low_balance_threshold_bps?: number;
   updated_at: string | null;
   updated_by: string | null;
+  _read_only_fields?: string[];
+}
+
+/** A change to the banking and cash defaults: only the values that changed and may be written. */
+export interface FinanceBankingSettingsUpdate {
+  default_bank_reconciliation_tolerance_days?: number;
+  default_group_reconciliation_matches?: boolean;
+  default_receipt_allocation_strategy?: "oldest" | "largest";
+  apply_transfers_automatically?: boolean;
+  petty_cash_low_balance_threshold_bps?: number;
 }
 
 export interface FinanceBankingSettingsPayload {
