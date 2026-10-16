@@ -19,18 +19,24 @@ export interface RecordsMoney {
  */
 export type NextYearMode = "AUTO_OPEN" | "WARN_ONLY";
 
+/**
+ * The fiscal calendar rules. Each is a `finance.settings` field with its own
+ * Read and Write switch: absent when the role may not read it, named in
+ * `_read_only_fields` when it may read and not change it.
+ */
 export interface FinanceCalendarSettingsValues {
-  next_year_mode: NextYearMode;
-  next_year_mode_label: string;
-  next_year_mode_options: ChoiceOption<NextYearMode>[];
-  next_year_lead_days: number;
+  next_year_mode?: NextYearMode;
+  next_year_mode_label?: string;
+  next_year_mode_options?: ChoiceOption<NextYearMode>[];
+  next_year_lead_days?: number;
   /**
    * Months close in date order (on by default): a month closes once every
    * earlier month is closed, and reopens once every later month is open.
    */
-  periods_close_in_order: boolean;
+  periods_close_in_order?: boolean;
   updated_at: string | null;
   updated_by: string | null;
+  _read_only_fields?: string[];
 }
 
 export interface FinanceCalendarSettingsPayload {
@@ -45,13 +51,18 @@ export interface FinanceCalendarSettingsPayload {
  * floor); `effective_retention_years` is the longer of the two, the one in
  * force. `archive_min_age_years` is how long after its end a closed year may be
  * archived.
+ *
+ * The school's period and the archive age are `finance.settings` fields, each
+ * with a Read and a Write switch; the period in force travels with the
+ * school's period. The floor is CodeX's and carries no switch.
  */
 export interface RecordRetentionSettings {
   statutory_years: number;
-  retention_years: number | null;
-  effective_retention_years: number;
-  archive_min_age_years: number;
+  retention_years?: number | null;
+  effective_retention_years?: number;
+  archive_min_age_years?: number;
   history: FinanceAuditLog[];
+  _read_only_fields?: string[];
 }
 
 /** One account's balance at one branch that moved after it was sealed. */

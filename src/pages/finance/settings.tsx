@@ -50,7 +50,7 @@ import {
   type ConsoleSettingsGroup,
   type ConsoleSettingsSection,
 } from "@/components/settings/settings-layout";
-import { InfoHint, useActiveEntity, useFieldAccess } from "@/components/finance-ui";
+import { AccessField, InfoHint, fieldWriteErrors, useActiveEntity, useFieldAccess, type FieldErrors } from "@/components/finance-ui";
 import { BANK_ACCOUNT, bankOptionLabel } from "./bank-account-access";
 import { DEFAULT_FINANCE_SETTINGS_SECTION, type FinanceSettingsSection } from "./console-sections";
 import { FeeDuePolicyPanel, financeSettingsSections, setupSections, useFinanceSettingsSectionAccess } from "@xvs/finance/host";
@@ -259,23 +259,36 @@ function FiscalCalendar({ entity, entityCode }: { entity: ReturnType<typeof useA
   );
 }
 
-function AccountingDefaults({ entityCode }: { entityCode: string | null }) {
+/**
+ * The posting account map.
+ *
+ * Each role is a `finance.settings` Field Access field travelling under its
+ * key (`CASH_BANK`). A role the reader may not read never arrives, so it has
+ * no row; a role named in `read_only_keys` is shown greyed and never sent,
+ * because the server refuses a change to it before saving anything. A refusal
+ * that names a role is shown on that role's row.
+ */
+export function AccountingDefaults({ entityCode }: { entityCode: string | null }) {
   const { hasPermission } = usePermissions();
   const canView = hasPermission(P.FIN_VIEW_SETTINGS);
   const { canUpdate, readOnlyNote } = useSettingsWriteAccess(P.FIN_UPDATE_SETTINGS);
   const query = useGetFinanceAccountSettingsQuery({ entity: entityCode! }, { skip: !entityCode || !canView });
   const [update, updateState] = useUpdateFinanceAccountSettingsMutation();
   const [changes, setChanges] = useState<Record<string, string | null>>({});
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const payload = query.data?.data;
-  const hasChanges = Object.keys(changes).length > 0;
+  const readOnlyKeys = payload?.read_only_keys ?? [];
+  const writable = Object.fromEntries(Object.entries(changes).filter(([key]) => !readOnlyKeys.includes(key)));
+  const hasChanges = Object.keys(writable).length > 0;
 
   const save = async () => {
     if (!entityCode || !hasChanges) return;
     try {
-      const response = await update({ entity: entityCode, mappings: changes }).unwrap();
+      const response = await update({ entity: entityCode, mappings: writable }).unwrap();
       setChanges({});
+      setDenied(null);
       toast.success(response.message || "Finance account mappings saved.");
-    } catch { /* Central API handling shows the actionable error. */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
@@ -286,23 +299,28 @@ function AccountingDefaults({ entityCode }: { entityCode: string | null }) {
         action={<div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link to={`${F.SETUP}/accounts`}>Open chart</Link></Button>{canUpdate ? <Button onClick={save} disabled={!hasChanges || updateState.isLoading}><Save className="mr-2 size-4" />{updateState.isLoading ? "Saving" : "Save changes"}</Button> : null}</div>}
       />
       <SettingsPanel title="Posting account map" description="Each choice is type-checked, entity-scoped, active and postable. Resetting a role returns it to the displayed starter-chart default.">
-          {!entityCode ? <SettingsRow label="Select an entity" description="Choose an entity to resolve its current account map." /> : query.isLoading ? <SettingsRow label="Loading account mappings" description="Resolving the active entity's posting roles." /> : (payload?.mappings ?? []).map((mapping) => {
-            const changed = Object.prototype.hasOwnProperty.call(changes, mapping.key);
+          {!entityCode ? <SettingsRow label="Select an entity" description="Choose an entity to resolve its current account map." /> : query.isLoading ? <SettingsRow label="Loading account mappings" description="Resolving the active entity's posting roles." /> : (payload?.mappings ?? []).length === 0 ? <SettingsRow label="No posting roles to show" description="Your role cannot read any of this entity's account mappings." /> : (payload?.mappings ?? []).map((mapping) => {
+            const locked = readOnlyKeys.includes(mapping.key);
+            const changed = !locked && Object.prototype.hasOwnProperty.call(changes, mapping.key);
             const selected = changed ? (changes[mapping.key] ?? "") : (mapping.source === "OVERRIDE" ? String(mapping.account?.id ?? "") : "");
             const options = (payload?.account_options ?? []).filter((account) => account.account_type === mapping.expected_account_type);
+            const refusal = denied?.[mapping.key];
             return (
-              <div key={mapping.key} className="grid grid-cols-1 gap-3 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.9fr)] lg:items-center">
+              <div key={mapping.key} data-field={mapping.key} data-read-only={locked || undefined} className="grid grid-cols-1 gap-3 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.9fr)] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2"><p className="font-mont text-sm font-medium text-gray-01">{mapping.label}</p><PolicyBadge kind={changed || mapping.source === "OVERRIDE" ? "configured" : "default"}>{changed ? "Unsaved" : mapping.source === "OVERRIDE" ? "Custom" : `Default ${mapping.default_code}`}</PolicyBadge></div>
                   <p className="mt-1 font-mont text-xs leading-5 text-gray-05">{ACCOUNT_DESCRIPTIONS[mapping.key]}</p>
                   <SettingsConsumer consumer={payload?.consumers[mapping.key]} />
                 </div>
-                <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-                  <select aria-label={`${mapping.label} account`} className="h-10 min-w-0 flex-1 rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={selected} disabled={!canUpdate} onChange={(event) => setChanges((current) => ({ ...current, [mapping.key]: event.target.value || null }))}>
-                    <option value="">Use default {mapping.default_code}{mapping.source === "DEFAULT" && mapping.account ? ` · ${mapping.account.name}` : ""}</option>
-                    {options.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}
-                  </select>
-                  {changed ? <Button variant="ghost" size="icon" aria-label={`Undo ${mapping.label} change`} onClick={() => setChanges((current) => { const next = { ...current }; delete next[mapping.key]; return next; })}><RotateCcw className="size-4" /></Button> : null}
+                <div className="min-w-0">
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+                    <select aria-label={`${mapping.label} account`} className="h-10 min-w-0 flex-1 rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:cursor-not-allowed disabled:bg-gray-02" value={selected} disabled={!canUpdate || locked} onChange={(event) => setChanges((current) => ({ ...current, [mapping.key]: event.target.value || null }))}>
+                      <option value="">Use default {mapping.default_code}{mapping.source === "DEFAULT" && mapping.account ? ` · ${mapping.account.name}` : ""}</option>
+                      {options.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}
+                    </select>
+                    {changed ? <Button variant="ghost" size="icon" aria-label={`Undo ${mapping.label} change`} onClick={() => setChanges((current) => { const next = { ...current }; delete next[mapping.key]; return next; })}><RotateCcw className="size-4" /></Button> : null}
+                  </div>
+                  {refusal ? <p role="alert" className="mt-1 font-mont text-[11px] text-destructive">{refusal}</p> : null}
                 </div>
               </div>
             );
@@ -361,58 +379,92 @@ function DocumentSettings({ entityCode }: { entityCode: string | null }) {
 }
 
 /**
- * The document and collection policy form. The primary collection account choice
- * writes that account's collection flag, so it follows the bank account switch
- * for that flag: greyed and left out of the saved body when the role may not
- * change it.
+ * The document and collection policy form.
+ *
+ * Each default is a `finance.settings` Field Access field with its own Read
+ * and Write switch. A default the role may not read is absent from the payload
+ * and from the form, and the panel goes when every one of them is absent; one
+ * it may read and not change is greyed and left out of the saved body. Only
+ * values that changed are sent, so saving one never rewrites another the
+ * reader cannot see, and a refusal is shown under the field it names.
+ *
+ * The primary collection account choice writes that account's collection flag,
+ * so it follows the bank account switch for that flag instead: greyed and left
+ * out of the saved body when the role may not change it.
  */
 export function FinanceDocumentForm({ entityCode, values, consumers, canUpdate, readOnlyNote }: { entityCode: string; values: FinanceDocumentSettingsValues; consumers: Record<string, SettingConsumer>; canUpdate: boolean; readOnlyNote: string | null }) {
-  const [dueDays, setDueDays] = useState(String(values.default_invoice_due_days));
-  const [narration, setNarration] = useState(values.default_invoice_narration);
-  const [autoPost, setAutoPost] = useState(values.auto_post_manual_invoices);
-  const [openingBalances, setOpeningBalances] = useState(values.allow_customer_opening_balances);
+  const access = useFieldAccess("finance.settings", values);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
+  const [dueDays, setDueDays] = useState(String(values.default_invoice_due_days ?? ""));
+  const [narration, setNarration] = useState(values.default_invoice_narration ?? "");
+  const [autoPost, setAutoPost] = useState(values.auto_post_manual_invoices ?? false);
+  const [openingBalances, setOpeningBalances] = useState(values.allow_customer_opening_balances ?? false);
   const [bankAccount, setBankAccount] = useState(values.primary_collection_bank_account ? String(values.primary_collection_bank_account.id) : "");
   // Naming another collection account writes that account's collection flag.
   const bankWritable = !useFieldAccess(BANK_ACCOUNT).isReadOnly("is_primary_collection");
-  const [target, setTarget] = useState(String(values.term_collection_target_pct));
+  const [target, setTarget] = useState(String(values.term_collection_target_pct ?? ""));
   const [update, state] = useUpdateFinanceDocumentSettingsMutation();
+
+  const shown = (name: keyof FinanceDocumentSettingsValues) => !access.isHidden(name);
+  const editable = (name: keyof FinanceDocumentSettingsValues) => canUpdate && !access.isReadOnly(name);
+
   const dueDaysValue = Number(dueDays);
+  const dueDaysValid = dueDays.trim() !== "" && Number.isInteger(dueDaysValue) && dueDaysValue >= 0 && dueDaysValue <= 365;
   const targetValue = Number(target);
   const targetValid = target.trim() !== "" && Number.isInteger(targetValue) && targetValue >= 1 && targetValue <= 100;
-  const valid = dueDays.trim() !== "" && Number.isInteger(dueDaysValue) && dueDaysValue >= 0 && dueDaysValue <= 365 && targetValid;
-  const dirty = valid && (
-    dueDaysValue !== values.default_invoice_due_days
-    || narration.trim() !== values.default_invoice_narration
-    || autoPost !== values.auto_post_manual_invoices
-    || openingBalances !== values.allow_customer_opening_balances
-    || targetValue !== values.term_collection_target_pct
-    || (bankWritable && bankAccount !== (values.primary_collection_bank_account ? String(values.primary_collection_bank_account.id) : ""))
-  );
+  const dueDaysOk = !shown("default_invoice_due_days") || !editable("default_invoice_due_days") || dueDaysValid;
+  const targetOk = !shown("term_collection_target_pct") || !editable("term_collection_target_pct") || targetValid;
+  const valid = dueDaysOk && targetOk;
+
+  const savedBank = values.primary_collection_bank_account ? String(values.primary_collection_bank_account.id) : "";
+  const patch = {
+    ...access.writableOnly({
+      ...(shown("default_invoice_due_days") && dueDaysValid && dueDaysValue !== values.default_invoice_due_days
+        ? { default_invoice_due_days: dueDaysValue } : {}),
+      ...(shown("default_invoice_narration") && narration.trim() !== (values.default_invoice_narration ?? "")
+        ? { default_invoice_narration: narration } : {}),
+      ...(shown("auto_post_manual_invoices") && autoPost !== values.auto_post_manual_invoices
+        ? { auto_post_manual_invoices: autoPost } : {}),
+      ...(shown("allow_customer_opening_balances") && openingBalances !== values.allow_customer_opening_balances
+        ? { allow_customer_opening_balances: openingBalances } : {}),
+      ...(shown("term_collection_target_pct") && targetValid && targetValue !== values.term_collection_target_pct
+        ? { term_collection_target_pct: targetValue } : {}),
+    }),
+    ...(bankWritable && bankAccount !== savedBank ? { primary_collection_bank_account: bankAccount ? Number(bankAccount) : null } : {}),
+  };
+  const dirty = Object.keys(patch).length > 0;
+
   const save = async () => {
     try {
-      const response = await update({
-        entity: entityCode,
-        default_invoice_due_days: dueDaysValue,
-        default_invoice_narration: narration,
-        auto_post_manual_invoices: autoPost,
-        allow_customer_opening_balances: openingBalances,
-        term_collection_target_pct: targetValue,
-        ...(bankWritable ? { primary_collection_bank_account: bankAccount ? Number(bankAccount) : null } : {}),
-      }).unwrap();
+      const response = await update({ entity: entityCode, ...patch }).unwrap();
+      setDenied(null);
       toast.success(response.message || "Finance document policy saved.");
-    } catch { /* Central API handling shows the actionable error. */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
+
+  const fieldLabel = "font-mont text-xs font-semibold text-gray-01";
+  const fieldHint = "mt-1 block font-normal leading-5 text-gray-05";
   return <>
     <SettingsPanel title="Billing defaults" description="These defaults are applied by the backend when a user leaves the corresponding field blank.">
       <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
-        <label className="font-mont text-xs font-semibold text-gray-01">Default invoice due days<Input className="mt-2 bg-white" type="number" min="0" max="365" step="1" value={dueDays} onChange={(event) => setDueDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Used for manual and fee-generated invoices without a due date.</span><SettingsConsumer consumer={consumers.default_invoice_due_days} /></label>
-        <label className="font-mont text-xs font-semibold text-gray-01">Primary collection account<select className="mt-2 h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={bankAccount} onChange={(event) => setBankAccount(event.target.value)} disabled={!canUpdate || !bankWritable}><option value="">Automatic fallback</option>{values.bank_account_options.map((bank) => <option key={bank.id} value={bank.id}>{bankOptionLabel(bank)}</option>)}</select><span className="mt-1 block font-normal leading-5 text-gray-05">Printed as the payment destination on invoices and receipts.</span><SettingsConsumer consumer={consumers.primary_collection_bank_account} /></label>
-        <label className="font-mont text-xs font-semibold text-gray-01">Term collection target (%)<Input className="mt-2 bg-white" type="number" min="1" max="100" step="1" value={target} onChange={(event) => setTarget(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">The share of a term&rsquo;s fees you aim to have collected by the end of the term. Drawn as the target on the collection curve.</span><SettingsConsumer consumer={consumers.term_collection_target_pct} /></label>
-        <label className="font-mont text-xs font-semibold text-gray-01 lg:col-span-2">Default invoice narration<Textarea className="mt-2 min-h-20 bg-white font-mont text-sm" value={narration} onChange={(event) => setNarration(event.target.value)} disabled={!canUpdate} maxLength={255} placeholder="Optional text for new manual invoices" /><SettingsConsumer consumer={consumers.default_invoice_narration} /></label>
+        <AccessField access={access} name="default_invoice_due_days" errors={denied}>
+          <label className={fieldLabel}>Default invoice due days<Input className="mt-2 bg-white" type="number" min="0" max="365" step="1" value={dueDays} onChange={(event) => setDueDays(event.target.value)} disabled={!editable("default_invoice_due_days")} /><span className={fieldHint}>Used for manual and fee-generated invoices without a due date.</span><SettingsConsumer consumer={consumers.default_invoice_due_days} /></label>
+        </AccessField>
+        <label className={fieldLabel}>Primary collection account<select className="mt-2 h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={bankAccount} onChange={(event) => setBankAccount(event.target.value)} disabled={!canUpdate || !bankWritable}><option value="">Automatic fallback</option>{values.bank_account_options.map((bank) => <option key={bank.id} value={bank.id}>{bankOptionLabel(bank)}</option>)}</select><span className={fieldHint}>Printed as the payment destination on invoices and receipts.</span><SettingsConsumer consumer={consumers.primary_collection_bank_account} /></label>
+        <AccessField access={access} name="term_collection_target_pct" errors={denied}>
+          <label className={fieldLabel}>Term collection target (%)<Input className="mt-2 bg-white" type="number" min="1" max="100" step="1" value={target} onChange={(event) => setTarget(event.target.value)} disabled={!editable("term_collection_target_pct")} /><span className={fieldHint}>The share of a term&rsquo;s fees you aim to have collected by the end of the term. Drawn as the target on the collection curve.</span><SettingsConsumer consumer={consumers.term_collection_target_pct} /></label>
+        </AccessField>
+        <AccessField access={access} name="default_invoice_narration" errors={denied} className="lg:col-span-2">
+          <label className={fieldLabel}>Default invoice narration<Textarea className="mt-2 min-h-20 bg-white font-mont text-sm" value={narration} onChange={(event) => setNarration(event.target.value)} disabled={!editable("default_invoice_narration")} maxLength={255} placeholder="Optional text for new manual invoices" /><SettingsConsumer consumer={consumers.default_invoice_narration} /></label>
+        </AccessField>
       </div>
-      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Post manual invoices immediately</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, a manual invoice is priced and kept as a draft unless the user explicitly chooses to post.</p><SettingsConsumer consumer={consumers.auto_post_manual_invoices} /></div><Switch checked={autoPost} onCheckedChange={setAutoPost} disabled={!canUpdate} aria-label="Post manual invoices immediately" /></div>
-      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Allow customer opening balances</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, customer creation and edits reject non-zero opening balances.</p><SettingsConsumer consumer={consumers.allow_customer_opening_balances} /></div><Switch checked={openingBalances} onCheckedChange={setOpeningBalances} disabled={!canUpdate} aria-label="Allow customer opening balances" /></div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? (targetValid ? "Use a whole number from 0 to 365 days." : "Use a whole-number target from 1 to 100.") : readOnlyNote ?? "Only changed values are written to audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save document policy"}</Button> : null}</div>
+      <AccessField access={access} name="auto_post_manual_invoices" errors={denied}>
+        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Post manual invoices immediately</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, a manual invoice is priced and kept as a draft unless the user explicitly chooses to post.</p><SettingsConsumer consumer={consumers.auto_post_manual_invoices} /></div><Switch checked={autoPost} onCheckedChange={setAutoPost} disabled={!editable("auto_post_manual_invoices")} aria-label="Post manual invoices immediately" /></div>
+      </AccessField>
+      <AccessField access={access} name="allow_customer_opening_balances" errors={denied}>
+        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="font-mont text-sm font-medium text-gray-01">Allow customer opening balances</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, customer creation and edits reject non-zero opening balances.</p><SettingsConsumer consumer={consumers.allow_customer_opening_balances} /></div><Switch checked={openingBalances} onCheckedChange={setOpeningBalances} disabled={!editable("allow_customer_opening_balances")} aria-label="Allow customer opening balances" /></div>
+      </AccessField>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!dueDaysOk ? "Use a whole number from 0 to 365 days." : !targetOk ? "Use a whole-number target from 1 to 100." : readOnlyNote ?? "Only changed values are written to audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save document policy"}</Button> : null}</div>
     </SettingsPanel>
   </>;
 }

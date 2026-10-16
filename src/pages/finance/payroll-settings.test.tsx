@@ -4,16 +4,21 @@
  * says payroll moved here on 1 June 2026: the save carries exactly those four
  * changes. Mrs Adeyemi, who keeps Lekki's books only, reads the same policy
  * greyed and is told why.
+ *
+ * Every policy value is a `finance.settings` field with its own Read and Write
+ * switch, a deduction's on/off and rate being two. A hidden value leaves its
+ * row, a row or panel with nothing left goes, a read-only value is greyed and
+ * never sent, and a refusal shows under the value it names.
  */
 
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ update: vi.fn(), wholeSchool: true }));
+const mocks = vi.hoisted(() => ({ update: vi.fn(), wholeSchool: true, access: {} as Record<string, unknown> }));
 
 vi.mock("@/hooks/use-permissions", () => ({
-  usePermissions: () => ({ hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true, hasModuleAccess: () => true, fieldAccess: {} }),
+  usePermissions: () => ({ hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true, hasModuleAccess: () => true, fieldAccess: mocks.access }),
 }));
 vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.wholeSchool ? null : [20], covers: () => mocks.wholeSchool }),
@@ -67,6 +72,7 @@ let root: Root;
 beforeEach(() => {
   mocks.update.mockReset();
   mocks.wholeSchool = true;
+  mocks.access = {};
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -139,5 +145,74 @@ describe("rates and changes", () => {
 
   it("drops what matches the saved policy", () => {
     expect(payrollSettingsChanges(SAVED, { nhf_enabled: true, previous_pay_required: true, payroll_moved_here_on: null })).toEqual({ previous_pay_required: true });
+  });
+});
+
+const field = (name: string) => document.body.querySelector(`[data-field="${name}"]`);
+/** The policy as the server serves it to a role that may not read `names`. */
+const hiding = (...names: string[]) => {
+  mocks.access = { "finance.settings": { hidden: names } };
+  return Object.fromEntries(Object.entries(SAVED).filter(([key]) => !names.some((name) => key === name || key.startsWith(`${name}_`)))) as unknown as FinancePayrollSettingsValues;
+};
+const mount = (values: FinancePayrollSettingsValues) =>
+  act(() => root.render(<PayrollSettingsForm entityCode="BSS" values={values} consumers={{}} canUpdate readOnlyReason={null} />));
+
+describe("the payroll policy under Field Access", () => {
+  it("drops the PAYE panel, and the tax country with it, when the method is hidden", () => {
+    mount(hiding("paye_method"));
+    expect(document.body.textContent).not.toContain("Where PAYE comes from");
+    expect(field("paye_method")).toBeNull();
+  });
+
+  it("leaves the country out of the PAYE sentence when only the country is hidden", () => {
+    mount(hiding("tax_country"));
+    expect(document.body.textContent).toContain("A person's PAYE can still be set by hand");
+    expect(document.body.textContent).not.toContain("Tax tables for");
+  });
+
+  it("keeps a deduction's switch when its rate is hidden, and its rate when its switch is hidden", () => {
+    mount(hiding("nhf_rate_bps", "itf_enabled"));
+    expect(field("nhf_rate_bps")).toBeNull();
+    expect(field("nhf_enabled")).not.toBeNull();
+    expect(document.body.textContent).not.toContain("2.5% of basic pay");
+    expect(field("itf_enabled")).toBeNull();
+    expect(byLabel("ITF training levy rate").disabled).toBe(false);
+  });
+
+  it("drops a deduction row when both its values are hidden, and a panel with nothing left", () => {
+    mount(hiding("nhf_enabled", "nhf_rate_bps", "payslip_in_app", "payslip_email"));
+    expect(document.body.textContent).not.toContain("National Housing Fund (NHF)");
+    expect(document.body.textContent).not.toContain("Payslips");
+    expect(document.body.textContent).toContain("Employee pension");
+  });
+
+  it("offers nothing at all when every value is hidden", () => {
+    const names = Object.keys(SAVED).filter((key) => !["updated_at", "updated_by"].includes(key) && !key.endsWith("_label") && !key.endsWith("_options"));
+    mount(hiding(...names));
+    expect(document.body.textContent).toBe("");
+  });
+
+  it("greys a read-only value and never sends it", async () => {
+    mocks.update.mockReturnValue({ unwrap: () => Promise.resolve({ message: "Saved." }) });
+    mount({ ...SAVED, _read_only_fields: ["employer_pension_rate_bps", "payslip_email"] });
+    expect(field("employer_pension_rate_bps")?.getAttribute("data-read-only")).toBe("true");
+    expect(byLabel("Employer pension rate").disabled).toBe(true);
+    expect(byLabel("Email payslips").disabled).toBe(true);
+    act(() => byLabel("National Housing Fund (NHF)").click());
+    await act(async () => { saveButton().click(); });
+    expect(mocks.update.mock.calls[0][0]).toEqual({ entity: "BSS", nhf_enabled: false });
+  });
+
+  it("does not demand a valid rate the role cannot change", () => {
+    mount({ ...SAVED, itf_rate_bps: undefined, _read_only_fields: ["itf_rate_bps"] });
+    expect(document.body.textContent).not.toContain("Use a rate from 0 to 100%.");
+  });
+
+  it("shows a refusal under the value it names", async () => {
+    mocks.update.mockReturnValue({ unwrap: () => Promise.reject({ status: 403, data: { error: { code: "field_write_denied", detail: { nhf_enabled: ["You may not change whether NHF is withheld."] } } } }) });
+    mount(SAVED);
+    act(() => byLabel("National Housing Fund (NHF)").click());
+    await act(async () => { saveButton().click(); });
+    expect(field("nhf_enabled")?.querySelector("[role=alert]")?.textContent).toBe("You may not change whether NHF is withheld.");
   });
 });

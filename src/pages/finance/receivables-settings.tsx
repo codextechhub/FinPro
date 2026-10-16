@@ -18,8 +18,9 @@
  * the payload and from the screen, a panel whose values are all absent
  * disappears, and the Save row moves to the last panel still shown. A value the
  * role may read and not change is greyed and left out of the saved body. The
- * credit and concession panel belongs to the document settings, not to this
- * resource.
+ * credit and concession values are document settings under the same
+ * `finance.settings` resource, followed the same way: the panel goes when
+ * both are hidden.
  */
 import { useState } from "react";
 import { toast } from "sonner";
@@ -112,39 +113,49 @@ export function ReceivablesSettings({ entityCode }: { entityCode: string | null 
 
 function CreditForm({ entityCode, payload, canUpdate }: { entityCode: string; payload: FinanceDocumentSettingsPayload; canUpdate: boolean }) {
   const values = payload.settings;
+  const access = useFieldAccess("finance.settings", values);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
   const startCredit = values.auto_apply_customer_credit ?? true;
   const startLimit = values.concession_second_person_threshold ?? 0;
   const [autoCredit, setAutoCredit] = useState(startCredit);
   const [limit, setLimit] = useState(startLimit);
   const [update, state] = useUpdateFinanceDocumentSettingsMutation();
-  const dirty = autoCredit !== startCredit || limit !== startLimit;
+  const shown = (name: "auto_apply_customer_credit" | "concession_second_person_threshold") => !access.isHidden(name);
+  const editable = (name: "auto_apply_customer_credit" | "concession_second_person_threshold") => canUpdate && !access.isReadOnly(name);
+  const patch = access.writableOnly({
+    ...(shown("auto_apply_customer_credit") && autoCredit !== startCredit ? { auto_apply_customer_credit: autoCredit } : {}),
+    ...(shown("concession_second_person_threshold") && limit !== startLimit ? { concession_second_person_threshold: limit } : {}),
+  });
+  const dirty = Object.keys(patch).length > 0;
   const save = async () => {
     try {
-      const res = await update({
-        entity: entityCode,
-        ...(autoCredit !== startCredit ? { auto_apply_customer_credit: autoCredit } : {}),
-        ...(limit !== startLimit ? { concession_second_person_threshold: limit } : {}),
-      }).unwrap();
+      const res = await update({ entity: entityCode, ...patch }).unwrap();
+      setDenied(null);
       toast.success(res.message || "Settings saved.");
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
+  if (!access.anyVisible("auto_apply_customer_credit", "concession_second_person_threshold")) return null;
   return (
     <SettingsPanel title="Credit and concessions">
-      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div className="min-w-0">
-          <p className="font-mont text-sm font-medium text-gray-01">Apply customer credit to new bills automatically</p>
-          <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When on, a customer&apos;s unused credit settles each new bill of theirs as it posts. When off, the bill stays fully due and the credit waits.</p>
-          <SettingsConsumer consumer={payload.consumers.auto_apply_customer_credit} />
+      <AccessField access={access} name="auto_apply_customer_credit" errors={denied}>
+        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="min-w-0">
+            <p className="font-mont text-sm font-medium text-gray-01">Apply customer credit to new bills automatically</p>
+            <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When on, a customer&apos;s unused credit settles each new bill of theirs as it posts. When off, the bill stays fully due and the credit waits.</p>
+            <SettingsConsumer consumer={payload.consumers.auto_apply_customer_credit} />
+          </div>
+          <Switch checked={autoCredit} onCheckedChange={setAutoCredit} disabled={!editable("auto_apply_customer_credit")} aria-label="Apply customer credit to new bills automatically" />
         </div>
-        <Switch checked={autoCredit} onCheckedChange={setAutoCredit} disabled={!canUpdate} aria-label="Apply customer credit to new bills automatically" />
-      </div>
-      <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
-        <label className={label}>Concessions above this need a second person
-          <div className="mt-2"><MoneyInput valueKobo={limit} onChangeKobo={setLimit} disabled={!canUpdate} /></div>
-          <span className={hint}>Counted per bill: two {formatMoney(6_000_00)} discounts on one bill make {formatMoney(12_000_00)}. Above the limit the concession is submitted for approval.</span>
-          <SettingsConsumer consumer={payload.consumers.concession_second_person_threshold} />
-        </label>
-      </div>
+      </AccessField>
+      <AccessField access={access} name="concession_second_person_threshold" errors={denied}>
+        <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
+          <label className={label}>Concessions above this need a second person
+            <div className="mt-2"><MoneyInput valueKobo={limit} onChangeKobo={setLimit} disabled={!editable("concession_second_person_threshold")} /></div>
+            <span className={hint}>Counted per bill: two {formatMoney(6_000_00)} discounts on one bill make {formatMoney(12_000_00)}. Above the limit the concession is submitted for approval.</span>
+            <SettingsConsumer consumer={payload.consumers.concession_second_person_threshold} />
+          </label>
+        </div>
+      </AccessField>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
         <p className="font-mont text-xs text-gray-05">{canUpdate ? "Only changed values are written to audit history." : "Read only."}</p>
         <Button onClick={save} disabled={!canUpdate || !dirty || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save credit and concessions"}</Button>

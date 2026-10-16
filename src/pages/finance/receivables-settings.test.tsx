@@ -9,7 +9,9 @@
  * Field Access: each policy value is a `finance.settings` field with its own
  * Read and Write switch. A value the role may not read is absent and so is its
  * panel, with the Save row moving to the last panel still shown; a value it may
- * read and not change is greyed and left out of the saved body.
+ * read and not change is greyed and left out of the saved body. The credit and
+ * concession values are document settings under the same resource and follow
+ * their switches the same way.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -23,7 +25,7 @@ const mocks = vi.hoisted(() => ({
   hiddenKeys: [] as string[],
   readOnlyKeys: [] as string[],
   update: vi.fn(),
-  mutation: () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }],
+  updateDocs: vi.fn(),
 }));
 const holds = (code: PermissionCode) => mocks.held.has(FINANCE_PERMISSION_REGISTRY[code]);
 
@@ -41,11 +43,13 @@ vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
 }));
 vi.mock("@/redux/services/finance/setup-api", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useGetFinanceDocumentSettingsQuery: () => ({
-    isLoading: false,
-    data: { data: { settings: { auto_apply_customer_credit: true, concession_second_person_threshold: 10_000_00, updated_at: "x" }, consumers: {}, history: [] } },
-  }),
-  useUpdateFinanceDocumentSettingsMutation: mocks.mutation,
+  useGetFinanceDocumentSettingsQuery: () => {
+    const settings: Record<string, unknown> = { auto_apply_customer_credit: true, concession_second_person_threshold: 10_000_00, updated_at: "x" };
+    for (const key of mocks.hiddenKeys) delete settings[key];
+    if (mocks.readOnlyKeys.length) settings._read_only_fields = mocks.readOnlyKeys;
+    return { isLoading: false, data: { data: { settings, consumers: {}, history: [] } } };
+  },
+  useUpdateFinanceDocumentSettingsMutation: () => [mocks.updateDocs, { isLoading: false }],
 }));
 vi.mock("@/redux/services/finance/fees-api", () => ({
   useGetReceivablesSettingsQuery: () => {
@@ -77,6 +81,7 @@ beforeEach(() => {
   mocks.hiddenKeys = [];
   mocks.readOnlyKeys = [];
   mocks.update.mockReset().mockReturnValue({ unwrap: async () => ({ message: "Saved." }) });
+  mocks.updateDocs.mockReset().mockReturnValue({ unwrap: async () => ({ message: "Saved." }) });
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); });
 
@@ -227,5 +232,45 @@ describe("receivables settings under Field Access", () => {
     await save();
     expect(container.querySelector('[data-field="unclaimed_deposit_years"] [role=alert]')?.textContent).toContain("do not have permission");
     expect(container.querySelector('[data-field="provision_bands"] [role=alert]')).toBeNull();
+  });
+});
+
+describe("credit and concessions under Field Access", () => {
+  const creditSwitch = () => container.querySelector<HTMLButtonElement>('[aria-label="Apply customer credit to new bills automatically"]');
+  const saveCredit = () => [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Save credit and concessions")) as HTMLButtonElement;
+
+  it("sends only the value that changed", async () => {
+    render(true);
+    act(() => creditSwitch()!.click());
+    await act(async () => { saveCredit().click(); });
+    expect(mocks.updateDocs).toHaveBeenCalledWith({ entity: "BSS", auto_apply_customer_credit: false });
+  });
+
+  it("keeps the panel with one value hidden, and drops it when both are", () => {
+    restrict({ hidden: ["concession_second_person_threshold"] });
+    render(true);
+    expect(container.querySelector('[data-field="concession_second_person_threshold"]')).toBeNull();
+    expect(creditSwitch()).not.toBeNull();
+    act(() => root.unmount());
+    root = createRoot(container);
+    restrict({ hidden: ["auto_apply_customer_credit", "concession_second_person_threshold"] });
+    render(true);
+    expect(container.textContent).not.toContain("Credit and concessions");
+  });
+
+  it("greys a read-only value and never sends it", async () => {
+    restrict({ read_only: ["auto_apply_customer_credit"] });
+    render(true);
+    expect(creditSwitch()?.disabled).toBe(true);
+    expect(container.querySelector('[data-field="auto_apply_customer_credit"]')?.getAttribute("data-read-only")).toBe("true");
+    expect(saveCredit().disabled).toBe(true);
+  });
+
+  it("shows a refusal under the value it names", async () => {
+    mocks.updateDocs.mockReturnValue({ unwrap: async () => { throw { status: 403, data: { error: { code: "field_write_denied", detail: { auto_apply_customer_credit: ["You may not change how credit is applied."] } } } }; } });
+    render(true);
+    act(() => creditSwitch()!.click());
+    await act(async () => { saveCredit().click(); });
+    expect(container.querySelector('[data-field="auto_apply_customer_credit"] [role=alert]')?.textContent).toBe("You may not change how credit is applied.");
   });
 });

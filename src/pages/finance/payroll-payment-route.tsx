@@ -9,6 +9,9 @@
  * beside the option. The choice applies to the next payment of any posted run,
  * and binds every branch, so only somebody who covers the whole school changes
  * it.
+ *
+ * The route is a `finance.settings` Field Access field: a reader who may not
+ * see it gets no panel, and one who may not change it sees it greyed.
  */
 
 import { useState } from "react";
@@ -16,6 +19,7 @@ import { Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { AccessField, fieldWriteErrors, useFieldAccess, type FieldErrors } from "@/components/finance-ui";
 import { SettingsPanel } from "@/components/settings/settings-layout";
 import { useUpdateFinancePayrollSettingsMutation } from "@/redux/services/finance/payroll-api";
 import type { FinancePayrollSettingsValues } from "@/redux/services/finance/payroll-types";
@@ -55,7 +59,10 @@ export function PayrollPaymentRouteSection({ entityCode, values, canUpdate, read
   const saved: PayrollPaymentRoute | undefined = values.payment_route;
   const [route, setRoute] = useState<PayrollPaymentRoute>(saved ?? "OWN_BANK");
   const [update, state] = useUpdateFinancePayrollSettingsMutation();
-  if (!saved) return null;
+  const access = useFieldAccess("finance.settings", values);
+  const [denied, setDenied] = useState<FieldErrors | null>(null);
+  if (!saved || access.isHidden("payment_route")) return null;
+  const editable = canUpdate && !access.isReadOnly("payment_route");
 
   const provider = providerInfo("PAYSTACK").label;
   const available = values.paystack_route_available !== false;
@@ -65,13 +72,15 @@ export function PayrollPaymentRouteSection({ entityCode, values, canUpdate, read
   const save = async () => {
     try {
       const response = await update({ entity: entityCode, payment_route: route }).unwrap();
+      setDenied(null);
       toast.success(response.message || "How staff are paid is saved.");
-    } catch { /* central */ }
+    } catch (error) { setDenied(fieldWriteErrors(error)); }
   };
 
   return (
     <SettingsPanel title="How staff are paid" description="What happens when a posted payroll run is paid. It applies to the next payment of any posted run.">
-      <fieldset className="space-y-0" disabled={!canUpdate}>
+      <AccessField access={access} name="payment_route" errors={denied}>
+      <fieldset className="space-y-0" disabled={!editable}>
         <legend className="sr-only">How staff are paid</legend>
         {paymentRouteChoices(provider).map((choice) => {
           const selectable = routeSelectable(choice.value, saved, available);
@@ -80,7 +89,7 @@ export function PayrollPaymentRouteSection({ entityCode, values, canUpdate, read
             <label key={choice.value} className="flex cursor-pointer items-start gap-3 px-4 py-4 sm:px-5">
               <input
                 type="radio" name="payroll-payment-route" value={choice.value} checked={route === choice.value}
-                disabled={!canUpdate || !selectable} onChange={() => setRoute(choice.value)} className="mt-1"
+                disabled={!editable || !selectable} onChange={() => setRoute(choice.value)} className="mt-1"
               />
               <span className="min-w-0">
                 <span className="block font-mont text-sm font-medium text-gray-01">{choice.label}</span>
@@ -91,9 +100,10 @@ export function PayrollPaymentRouteSection({ entityCode, values, canUpdate, read
           );
         })}
       </fieldset>
+      </AccessField>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
         <p className="font-mont text-xs text-gray-05">{readOnlyReason ?? (canUpdate ? "" : "You have read-only access.")}</p>
-        <Button onClick={save} disabled={!canUpdate || !dirty || state.isLoading}>
+        <Button onClick={save} disabled={!editable || !dirty || state.isLoading}>
           <Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save how staff are paid"}
         </Button>
       </div>

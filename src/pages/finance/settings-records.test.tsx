@@ -10,6 +10,11 @@
  * Bello turns that off and only the switch is sent. Mrs Adeyemi, the bursar
  * for Lekki only, holds the update key and reads every panel without a Save,
  * because they bind every branch.
+ *
+ * Every value but the floor is a `finance.settings` field with its own Read
+ * and Write switch. A hidden value leaves its panel and a panel with nothing
+ * left goes; a read-only one is greyed and never sent; a refusal shows under
+ * the value it names.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -22,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   updateRecords: vi.fn(),
   wholeSchool: true,
   denied: new Set<string>(),
+  access: {} as Record<string, unknown>,
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
@@ -38,6 +44,7 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasAnyPermission: () => true,
     hasAllPermissions: () => true,
     hasModuleAccess: () => true,
+    fieldAccess: mocks.access,
   }),
 }));
 
@@ -69,6 +76,7 @@ beforeEach(() => {
   mocks.updateRecords.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Record retention settings saved." }) });
   mocks.wholeSchool = true;
   mocks.denied = new Set();
+  mocks.access = {};
 });
 
 afterEach(async () => {
@@ -231,5 +239,98 @@ describe("record keeping", () => {
     mocks.denied = new Set([P.FIN_VIEW_SETTINGS]);
     await render(<RecordKeepingPanel entityCode="BRIGHTSTAR" />);
     expect(container.textContent).toBe("");
+  });
+});
+
+const refusal = (detail: Record<string, string[]>) => ({ status: 403, data: { error: { code: "field_write_denied", detail } } });
+const field = (name: string) => container.querySelector(`[data-field="${name}"]`);
+type CalendarPayload = { settings: Record<string, unknown> };
+const hideCalendar = (...names: string[]) => {
+  mocks.access = { "finance.settings": { hidden: names } };
+  const settings = (mocks.calendar as CalendarPayload).settings;
+  for (const name of names) {
+    for (const key of Object.keys(settings)) if (key === name || key.startsWith(`${name}_`)) delete settings[key];
+  }
+};
+
+describe("the fiscal calendar under Field Access", () => {
+  it("drops the next-year panel when both of its rules are hidden, and keeps the close order", async () => {
+    hideCalendar("next_year_mode", "next_year_lead_days");
+    await render(<CalendarRulePanel entityCode="BRIGHTSTAR" />);
+    expect(container.textContent).not.toContain("Opening the next year");
+    expect(field("periods_close_in_order")).not.toBeNull();
+  });
+
+  it("keeps the lead days when only the mode is hidden, and sends only the lead", async () => {
+    hideCalendar("next_year_mode");
+    await render(<CalendarRulePanel entityCode="BRIGHTSTAR" />);
+    expect(field("next_year_mode")).toBeNull();
+    await type(field("next_year_lead_days")!.querySelector("input"), "90");
+    await act(async () => button("Save calendar rule")!.click());
+    expect(mocks.updateCalendar).toHaveBeenCalledWith({ entity: "BRIGHTSTAR", next_year_lead_days: 90 });
+  });
+
+  it("drops the close-order panel when its switch is hidden", async () => {
+    hideCalendar("periods_close_in_order");
+    await render(<CalendarRulePanel entityCode="BRIGHTSTAR" />);
+    expect(container.textContent).not.toContain("Closing months");
+    expect(container.textContent).toContain("Opening the next year");
+  });
+
+  it("greys a read-only rule and leaves it out of the save", async () => {
+    (mocks.calendar as CalendarPayload).settings._read_only_fields = ["next_year_lead_days", "periods_close_in_order"];
+    await render(<CalendarRulePanel entityCode="BRIGHTSTAR" />);
+    expect(field("next_year_lead_days")?.getAttribute("data-read-only")).toBe("true");
+    expect((field("next_year_lead_days")!.querySelector("input") as HTMLInputElement).disabled).toBe(true);
+    expect(button("Save close order")).toBeUndefined();
+    await act(async () => (container.querySelector("input[value='WARN_ONLY']") as HTMLInputElement).click());
+    await act(async () => button("Save calendar rule")!.click());
+    expect(mocks.updateCalendar).toHaveBeenCalledWith({ entity: "BRIGHTSTAR", next_year_mode: "WARN_ONLY" });
+  });
+
+  it("shows a refusal under the rule it names", async () => {
+    mocks.updateCalendar.mockReturnValue({ unwrap: () => Promise.reject(refusal({ next_year_lead_days: ["You may not change the days ahead."] })) });
+    await render(<CalendarRulePanel entityCode="BRIGHTSTAR" />);
+    await type(field("next_year_lead_days")!.querySelector("input"), "90");
+    await act(async () => button("Save calendar rule")!.click());
+    expect(field("next_year_lead_days")?.querySelector("[role=alert]")?.textContent).toBe("You may not change the days ahead.");
+  });
+});
+
+describe("record keeping under Field Access", () => {
+  it("hides the school's period and the period in force together, keeping the floor and the archive age", async () => {
+    mocks.access = { "finance.settings": { hidden: ["retention_years"] } };
+    mocks.records = { statutory_years: 6, archive_min_age_years: 2, history: [] };
+    await render(<RecordKeepingPanel entityCode="BRIGHTSTAR" />);
+    expect(container.textContent).toContain("Statutory floor");
+    expect(container.textContent).not.toContain("Period in force");
+    expect(field("retention_years")).toBeNull();
+    expect(field("archive_min_age_years")).not.toBeNull();
+  });
+
+  it("shows only the floor when both school values are hidden, with nothing to save", async () => {
+    mocks.access = { "finance.settings": { hidden: ["retention_years", "archive_min_age_years"] } };
+    mocks.records = { statutory_years: 6, history: [] };
+    await render(<RecordKeepingPanel entityCode="BRIGHTSTAR" />);
+    expect(container.textContent).toContain("Statutory floor");
+    expect(button("Save record keeping")).toBeUndefined();
+    expect(numberInputs()).toHaveLength(0);
+  });
+
+  it("greys a read-only value and sends only the other", async () => {
+    mocks.records = { ...(mocks.records as object), _read_only_fields: ["retention_years", "effective_retention_years"] };
+    await render(<RecordKeepingPanel entityCode="BRIGHTSTAR" />);
+    expect((field("retention_years")!.querySelector("input") as HTMLInputElement).disabled).toBe(true);
+    await type(field("archive_min_age_years")!.querySelector("input"), "3");
+    await act(async () => button("Save record keeping")!.click());
+    expect(mocks.updateRecords).toHaveBeenCalledWith({ entity: "BRIGHTSTAR", archive_min_age_years: 3 });
+  });
+
+  it("shows a refusal under the value it names", async () => {
+    mocks.updateRecords.mockReturnValue({ unwrap: () => Promise.reject(refusal({ retention_years: ["You may not change how long records are kept."] })) });
+    await render(<RecordKeepingPanel entityCode="BRIGHTSTAR" />);
+    await type(field("retention_years")!.querySelector("input"), "8");
+    await act(async () => button("Save record keeping")!.click());
+    expect(field("retention_years")?.querySelector("[role=alert]")?.textContent).toBe("You may not change how long records are kept.");
   });
 });

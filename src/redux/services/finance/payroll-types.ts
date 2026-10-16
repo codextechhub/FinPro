@@ -364,27 +364,35 @@ export interface AnnualPayeReturn {
   totals: { gross: number; taxable_pay: number; paye: number; pension: number; opening_gross: number; opening_paye: number };
 }
 
-/** The payroll policy of one set of books. Rates are basis points (800 is 8%). */
+/**
+ * The payroll policy of one set of books. Rates are basis points (800 is 8%).
+ *
+ * Each value is a `finance.settings` field with its own
+ * Read and Write switch: absent when the role may not read it, named in
+ * `_read_only_fields` when it may read and not change it. A choice's label and
+ * options travel with it. Whether the provider route is open is the books'
+ * state and carries no switch.
+ */
 export interface FinancePayrollSettingsValues {
-  paye_method: PayeMethod;
-  paye_method_label: string;
-  paye_method_options: ChoiceOption<PayeMethod>[];
-  tax_country: string;
-  employee_pension_enabled: boolean;
-  employee_pension_rate_bps: number;
-  employer_pension_enabled: boolean;
-  employer_pension_rate_bps: number;
-  nhf_enabled: boolean;
-  nhf_rate_bps: number;
-  nsitf_enabled: boolean;
-  nsitf_rate_bps: number;
-  itf_enabled: boolean;
-  itf_rate_bps: number;
-  payslip_in_app: boolean;
-  payslip_email: boolean;
-  previous_pay_required: boolean;
+  paye_method?: PayeMethod;
+  paye_method_label?: string;
+  paye_method_options?: ChoiceOption<PayeMethod>[];
+  tax_country?: string;
+  employee_pension_enabled?: boolean;
+  employee_pension_rate_bps?: number;
+  employer_pension_enabled?: boolean;
+  employer_pension_rate_bps?: number;
+  nhf_enabled?: boolean;
+  nhf_rate_bps?: number;
+  nsitf_enabled?: boolean;
+  nsitf_rate_bps?: number;
+  itf_enabled?: boolean;
+  itf_rate_bps?: number;
+  payslip_in_app?: boolean;
+  payslip_email?: boolean;
+  previous_pay_required?: boolean;
   /** `YYYY-MM-DD`, or null when payroll has always run here. */
-  payroll_moved_here_on: string | null;
+  payroll_moved_here_on?: string | null;
   /** How posted runs are paid: from the branch's own bank, or through the payment provider. Absent from older servers. */
   payment_route?: PayrollPaymentRoute;
   payment_route_label?: string;
@@ -395,6 +403,7 @@ export interface FinancePayrollSettingsValues {
   paystack_route_unavailable_reason?: string | null;
   updated_at: string | null;
   updated_by: string | null;
+  _read_only_fields?: string[];
 }
 
 export interface FinancePayrollSettingsPayload {
@@ -405,7 +414,7 @@ export interface FinancePayrollSettingsPayload {
 
 /** A partial payroll settings write. */
 export type FinancePayrollSettingsBody = Partial<Omit<FinancePayrollSettingsValues,
-  "paye_method_label" | "paye_method_options" | "payment_route_label" | "payment_route_options"
+  "_read_only_fields" | "paye_method_label" | "paye_method_options" | "payment_route_label" | "payment_route_options"
   | "paystack_route_available" | "paystack_route_unavailable_reason" | "updated_at" | "updated_by">>;
 
 /** The statutory details a salary record's create and edit accept. A state or

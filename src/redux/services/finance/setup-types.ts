@@ -311,8 +311,16 @@ export interface FinanceAccountMapping {
   is_valid: boolean;
 }
 
+/**
+ * The account mappings. Each role is a `finance.settings` field travelling
+ * under its key (`CASH_BANK`): a role the role-holder may not read is absent
+ * from `mappings` and `consumers`, and `read_only_keys` names the roles they
+ * may read and not change.
+ */
 export interface FinanceAccountSettings {
   mappings: FinanceAccountMapping[];
+  /** Absent from older servers, where every role shown may be changed. */
+  read_only_keys?: string[];
   consumers: Record<string, SettingConsumer>;
   account_options: Pick<Account, "id" | "code" | "name" | "account_type">[];
   history: FinanceAuditLog[];
@@ -326,13 +334,19 @@ export interface FinanceDocumentBankOption {
   currency?: string;
 }
 
+/**
+ * The document defaults. Each default is a `finance.settings` Field Access
+ * field with its own Read and Write switch: a value the role may not read is
+ * absent, and one it may read and not change is named in `_read_only_fields`.
+ * The collection account and its options follow the bank account switches.
+ */
 export interface FinanceDocumentSettingsValues {
-  default_invoice_due_days: number;
-  default_invoice_narration: string;
-  auto_post_manual_invoices: boolean;
-  allow_customer_opening_balances: boolean;
+  default_invoice_due_days?: number;
+  default_invoice_narration?: string;
+  auto_post_manual_invoices?: boolean;
+  allow_customer_opening_balances?: boolean;
   /** Share of a term's fees the school aims to collect by its end (1 to 100). */
-  term_collection_target_pct: number;
+  term_collection_target_pct?: number;
   /** Whether a customer's unused credit settles each new bill of theirs as it posts. */
   auto_apply_customer_credit?: boolean;
   /** Kobo. Above this running total per bill, a concession needs a second person. */
@@ -341,6 +355,7 @@ export interface FinanceDocumentSettingsValues {
   bank_account_options: FinanceDocumentBankOption[];
   updated_at: string | null;
   updated_by: string | null;
+  _read_only_fields?: string[];
 }
 
 export interface FinanceDocumentSettingsPayload {

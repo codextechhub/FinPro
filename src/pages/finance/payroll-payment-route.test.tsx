@@ -3,15 +3,26 @@
  * payroll to Paystack; the save carries the route and nothing else. Greenfield's
  * online payments settle straight into each branch's bank, so Paystack is
  * closed to it, with the server's reason beside the option. Mrs Adeyemi, who
- * keeps Lekki's books only, reads the choice greyed.
+ * keeps Lekki's books only, reads the choice greyed. The route is a
+ * `finance.settings` field: a role that may not read it gets no panel, and one
+ * that may read and not change it gets the choice greyed with no way to save.
  */
 
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ update: vi.fn() }));
+const mocks = vi.hoisted(() => ({ update: vi.fn(), access: {} as Record<string, unknown> }));
 
+vi.mock("@/hooks/use-permissions", () => ({
+  usePermissions: () => ({
+    hasPermission: () => true,
+    hasAnyPermission: () => true,
+    hasAllPermissions: () => true,
+    hasModuleAccess: () => true,
+    fieldAccess: mocks.access,
+  }),
+}));
 vi.mock("@/redux/services/finance/payroll-api", () => ({
   useUpdateFinancePayrollSettingsMutation: () => [mocks.update, { isLoading: false }],
 }));
@@ -34,6 +45,7 @@ let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
   mocks.update.mockReset();
+  mocks.access = {};
   mocks.update.mockReturnValue({ unwrap: async () => ({ message: "Saved." }) });
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -89,6 +101,27 @@ describe("how staff are paid", () => {
   it("is absent from a server that does not send the route", () => {
     render(values({ payment_route: undefined }));
     expect(container.textContent).toBe("");
+  });
+
+  it("is absent for a role that may not read the route", () => {
+    mocks.access = { "finance.settings": { hidden: ["payment_route"] } };
+    render(values({ payment_route: undefined }));
+    expect(container.textContent).toBe("");
+  });
+
+  it("is greyed with nothing to save for a role that may read the route and not change it", () => {
+    render(values({ _read_only_fields: ["payment_route"] }));
+    expect(container.querySelector("[data-field=payment_route]")?.getAttribute("data-read-only")).toBe("true");
+    expect(radio("PAYSTACK").disabled).toBe(true);
+    expect(save().disabled).toBe(true);
+  });
+
+  it("shows a refusal under the route", async () => {
+    mocks.update.mockReturnValue({ unwrap: async () => { throw { status: 403, data: { error: { code: "field_write_denied", detail: { payment_route: ["You may not change how staff are paid."] } } } }; } });
+    render();
+    act(() => radio("PAYSTACK").click());
+    await act(async () => { save().click(); });
+    expect(container.querySelector("[data-field=payment_route] [role=alert]")?.textContent).toBe("You may not change how staff are paid.");
   });
 
   it("words the two routes in plain words", () => {
