@@ -1,7 +1,12 @@
-import { act, type ComponentType } from "react";
+import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { ConsoleSidebar } from "./console-sidebar";
+
+const hostState = vi.hoisted(() => ({ footerEnabled: true }));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({ hasAnyPermission: () => true, hasModuleAccess: () => true }),
@@ -12,34 +17,32 @@ vi.mock("./raising-branch", () => ({
 }));
 vi.mock("./held-custody", () => ({ useCustodyReading: () => undefined }));
 vi.mock("./use-entity", () => ({ useActiveEntity: () => ({ code: "BSS" }) }));
-
-/**
- * The host contract is read once, when the sidebar module loads, so each case
- * loads the sidebar afresh against its own host. The sidebar primitive is
- * loaded alongside it so both share one sidebar context.
- */
-async function loadSidebar(footer: ComponentType<{ collapsed: boolean }> | undefined) {
-  vi.resetModules();
-  vi.doMock("../../host", async () => (await import("../../host-fake")).fakeHost({ HostConsoleSidebarFooter: footer }));
-  const [{ ConsoleSidebar }, { SidebarProvider }] = await Promise.all([
-    import("./console-sidebar"),
-    import("@/components/ui/sidebar"),
+vi.mock("../../host", async () => {
+  const [{ fakeHost }, React] = await Promise.all([
+    import("../../host-fake"),
+    import("react"),
   ]);
-  return { ConsoleSidebar, SidebarProvider };
-}
+  const host = fakeHost();
+  const Footer = ({ collapsed }: { collapsed: boolean }) => React.createElement(
+    "button",
+    { type: "button", "data-collapsed": String(collapsed) },
+    "Lekki Branch",
+  );
+  Object.defineProperty(host, "HostConsoleSidebarFooter", {
+    enumerable: true,
+    get: () => hostState.footerEnabled ? Footer : undefined,
+  });
+  return host;
+});
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-/** The host's footer, standing in for the school app's branch switcher. */
-function BranchSwitcher({ collapsed }: { collapsed: boolean }) {
-  return <button type="button" data-collapsed={String(collapsed)}>Lekki Branch</button>;
-}
 
 describe("ConsoleSidebar footer", () => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
+    hostState.footerEnabled = true;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -51,8 +54,7 @@ describe("ConsoleSidebar footer", () => {
     container.remove();
   });
 
-  async function draw(open: boolean, footer?: ComponentType<{ collapsed: boolean }>) {
-    const { ConsoleSidebar, SidebarProvider } = await loadSidebar(footer);
+  async function draw(open: boolean) {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/finance/receivables"]}>
@@ -65,18 +67,19 @@ describe("ConsoleSidebar footer", () => {
   }
 
   it("pins the host's footer under the menu, so the branch switcher survives entering Finance", async () => {
-    await draw(true, BranchSwitcher);
+    await draw(true);
     const footer = container.querySelector('[data-sidebar="footer"]');
     expect(footer?.textContent).toBe("Lekki Branch");
     expect(footer?.querySelector("button")?.dataset.collapsed).toBe("false");
   });
 
   it("tells the footer when the sidebar is collapsed to its icon rail", async () => {
-    await draw(false, BranchSwitcher);
+    await draw(false);
     expect(container.querySelector('[data-sidebar="footer"] button')?.getAttribute("data-collapsed")).toBe("true");
   });
 
   it("ends with the menu when the host has no footer", async () => {
+    hostState.footerEnabled = false;
     await draw(true);
     expect(container.querySelector('[data-sidebar="footer"]')).toBeNull();
     expect(container.textContent).toContain("Receivables");
