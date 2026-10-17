@@ -145,7 +145,7 @@ export default function GeneralLedgerPage() {
                 is on screen. That is the dataset a trial balance needs. */}
             <QuickExportButton
               screen="finance.gl_postings"
-              params={{ ...statusArgs, source, search, ...scope }}
+              params={{ ...statusArgs, source, search, ...scope, ...includeArchivedArg(showArchived) }}
               entity={entity}
               typeface="geist"
               defaultName="General ledger postings"

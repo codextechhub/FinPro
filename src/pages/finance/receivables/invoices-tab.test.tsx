@@ -95,6 +95,7 @@ describe("the invoice counts", () => {
     mount("/finance/receivables/invoices?archived=1");
     expect(mocks.invoices.mock.lastCall?.[0]).toMatchObject({ include_archived: "true" });
     expect(mocks.summary.mock.lastCall?.[0]).toEqual({ entity: "BSS", include_archived: "true" });
+    expect(mocks.exported.mock.lastCall?.[0]).toMatchObject({ include_archived: "true" });
   });
 });
 

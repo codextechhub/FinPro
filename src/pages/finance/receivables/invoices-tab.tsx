@@ -188,7 +188,7 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
           {/* The list's own params: the server reads each tab by the list's rules, so the file holds the invoices the tab shows. */}
           <QuickExportButton
             screen="finance.invoices"
-            params={{ bucket, search, ...scope }}
+            params={{ bucket, search, ...scope, ...includeArchivedArg(showArchived) }}
             entity={entity}
             typeface="geist"
             defaultName="Customer invoices"
