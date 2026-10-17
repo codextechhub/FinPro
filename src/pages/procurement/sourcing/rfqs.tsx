@@ -42,7 +42,7 @@ import { RFQ_TABS, isForbidden } from "./helpers";
 import { NO_DEADLINE, deadlineInstant, type DeadlineValue } from "./deadline";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
-import { ListBranchSelect, procurementBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
+import { useProcurementListScope } from "../list-scope";
 import { useDates } from "../../../lib/display-prefs";
 import { useReaderReach } from "../../../host";
 import { VENDOR_CONTACT, canReadRfqRecipients } from "../vendors/vendor-contacts";
@@ -93,14 +93,13 @@ export default function RfqsPage() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  const list = useListBranch();
-  const branch = procurementBranchArg(list.view).branch;
+  const { scope, filters } = useProcurementListScope(entity, () => setPage(1));
   const params = useMemo(
-    () => ({ entity: entity!, page, branch, ...(status ? { status } : {}), ...(debounced ? { q: debounced } : {}) }),
-    [entity, page, branch, status, debounced],
+    () => ({ entity: entity!, page, ...scope, ...(status ? { status } : {}), ...(debounced ? { q: debounced } : {}) }),
+    [entity, page, scope, status, debounced],
   );
   const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetRfqsQuery(params, { skip: !entity || !canPROC_VIEW_RFQS });
-  const { data: summaryData, isLoading: summaryLoading } = useGetRfqSummaryQuery({ entity: entity!, branch }, { skip: !entity || !canPROC_VIEW_RFQS });
+  const { data: summaryData, isLoading: summaryLoading } = useGetRfqSummaryQuery({ entity: entity!, ...scope }, { skip: !entity || !canPROC_VIEW_RFQS });
   const rows = toArray(data?.data);
   const summary = summaryData?.data;
 
@@ -157,8 +156,8 @@ export default function RfqsPage() {
             className="gap-5 self-center border-b-0"
             buttonClassName="px-0 py-3"
           />
-          <div className="my-2 flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-            <ListBranchSelect view={list.view} onChange={(next) => { setPage(1); list.choose(next); }} className="w-full sm:w-48" />
+          <div className="my-2 flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            {filters}
             <label className="relative min-w-0 flex-1 sm:w-64 sm:flex-none"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search RFQ # or title" className="h-9 bg-white pl-9" /></label>
           </div>
         </div>

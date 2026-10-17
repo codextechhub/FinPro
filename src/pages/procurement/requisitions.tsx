@@ -28,7 +28,7 @@ import {
   MoneyInput, StatCard, StatusPill, TabStrip, toArray, useActiveEntity, type Column,
   type TabStripItem, RaisingBranchChoiceField, useRaisingBranchChoice,
 } from "@/components/finance-ui";
-import { ListBranchSelect, procurementBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
+import { useProcurementListScope } from "./list-scope";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../host";
@@ -119,17 +119,16 @@ export default function RequisitionsPage() {
   // waiting on the typing delay - adjust during render.
   if (!search.trim() && debouncedSearch !== "") setDebouncedSearch("");
 
-  const list = useListBranch();
-  const branch = procurementBranchArg(list.view).branch;
+  const { scope, filters } = useProcurementListScope(entity, () => setPage(1));
   const params = useMemo(() => ({
-    entity: entity!, page, ...statusFilterArgs(status), branch,
+    entity: entity!, page, ...statusFilterArgs(status), ...scope,
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
-  }), [entity, page, status, branch, debouncedSearch]);
+  }), [entity, page, status, scope, debouncedSearch]);
   const { currentData: data, isLoading, isFetching, isError, refetch } = useGetRequisitionsQuery(
     params, { skip: !entity || !canPROC_VIEW_REQUISITIONS },
   );
   const { data: summaryData, isLoading: summaryLoading } = useGetRequisitionSummaryQuery(
-    { entity: entity!, branch }, { skip: !entity || !canPROC_VIEW_REQUISITIONS },
+    { entity: entity!, ...scope }, { skip: !entity || !canPROC_VIEW_REQUISITIONS },
   );
   const rows = toArray(data?.data);
   const pg = data?.pagination;
@@ -227,8 +226,8 @@ export default function RequisitionsPage() {
               className="gap-5 self-center border-b-0"
               buttonClassName="py-3"
             />
-            <div className="flex w-full flex-wrap items-center gap-2 py-2 sm:ml-auto sm:w-auto sm:flex-nowrap">
-              <ListBranchSelect view={list.view} onChange={(next) => { setPage(1); list.choose(next); }} className="w-full sm:w-48" />
+            <div className="flex w-full flex-wrap items-center gap-2 py-2 sm:ml-auto sm:w-auto sm:justify-end">
+              {filters}
               <label className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
                 <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" />
                 <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search requisitions" className="h-9 bg-white pl-9" />

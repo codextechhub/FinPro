@@ -32,7 +32,7 @@ import { useDates } from "../../lib/display-prefs";
 import { GoodsReturnDrawer } from "./goods-return-drawer";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { returnableQuantity, returnedGoodsText } from "./goods-return";
-import { ListBranchSelect, procurementBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
+import { useProcurementListScope } from "./list-scope";
 
 const DETAIL_TABS = [
   { value: "overview", label: "Overview", icon: FileText },
@@ -61,10 +61,9 @@ export default function GoodsReceiptsPage() {
   const { can } = useCan();
   useActionParam("new", can(P.PROC_CREATE_GOODS_RECEIPT), () => setCreating(true));
   const [page, setPage] = useState(1);
-  const list = useListBranch();
-  const branch = procurementBranchArg(list.view).branch;
+  const { scope, filters } = useProcurementListScope(entity, () => setPage(1));
   const { data, isLoading, isFetching, isError, refetch } = useGetGoodsReceiptsQuery(
-    { entity: entity!, page, branch }, { skip: !entity || !canPROC_VIEW_GOODS_RECEIPTS },
+    { entity: entity!, page, ...scope }, { skip: !entity || !canPROC_VIEW_GOODS_RECEIPTS },
   );
   const rows = toArray(data?.data);
   const pg = data?.pagination;
@@ -101,11 +100,9 @@ export default function GoodsReceiptsPage() {
         />
 
         <section data-guide="procurement-goods-receipts.list" className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
-          {list.view.canChoose && (
-            <div className="flex flex-wrap items-center gap-2 border-b border-white-02 px-4 py-2.5">
-              <ListBranchSelect view={list.view} onChange={(next) => { setPage(1); list.choose(next); }} className="w-full sm:w-48" />
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-2 border-b border-white-02 px-4 py-2.5">
+            {filters}
+          </div>
           <DataTable columns={columns} rows={rows} rowKey={(receipt) => receipt.id}
             loading={isLoading || isFetching} error={isError} onRetry={refetch}
             onRowClick={(receipt) => setSelectedId(receipt.id)} page={pg?.currentPage} totalPages={pg?.totalPages}

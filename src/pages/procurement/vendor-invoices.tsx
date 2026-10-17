@@ -66,7 +66,7 @@ import { BillCreditNotes, CreditNoteForm, CreditNotesView } from "./vendor-credi
 import { VENDOR_INVOICE_TABS, approvalStateWord, vendorInvoiceWord } from "./document-status";
 import { SENT_BACK_WORD, WITH_APPROVERS_NOTE, isSentBack, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
-import { ListBranchSelect, procurementBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
+import { useProcurementListScope } from "./list-scope";
 import { vendorInvoiceChanges } from "./vendor-invoice-edit";
 import { OpeningBillsDrawer } from "./opening-bills-drawer";
 import { billCorrection } from "./bill-correction";
@@ -150,11 +150,10 @@ function BillsView({ entity, currency, switcher }: { entity: string; currency?: 
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => window.clearTimeout(timer);
   }, [search]);
-  const list = useListBranch();
-  const branch = procurementBranchArg(list.view).branch;
-  const params = useMemo(() => ({ entity, page, branch, ...statusFilterArgs(status, "display_status"), ...(debouncedSearch ? { search: debouncedSearch } : {}) }), [entity, page, branch, status, debouncedSearch]);
+  const { scope, filters } = useProcurementListScope(entity, () => setPage(1));
+  const params = useMemo(() => ({ entity, page, ...scope, ...statusFilterArgs(status, "display_status"), ...(debouncedSearch ? { search: debouncedSearch } : {}) }), [entity, page, scope, status, debouncedSearch]);
   const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetVendorInvoicesQuery(params);
-  const { data: summaryData, isLoading: summaryLoading } = useGetVendorInvoiceSummaryQuery({ entity, branch });
+  const { data: summaryData, isLoading: summaryLoading } = useGetVendorInvoiceSummaryQuery({ entity, ...scope });
   const rows = toArray(data?.data);
   const summary = summaryData?.data;
   const money = (value: number) => formatMoney(value, currency);
@@ -202,8 +201,8 @@ function BillsView({ entity, currency, switcher }: { entity: string; currency?: 
             className="gap-5 self-center border-b-0"
             buttonClassName="px-0 py-3"
           />
-          <div className="my-2 flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-            <ListBranchSelect view={list.view} onChange={(next) => { setPage(1); list.choose(next); }} className="w-full sm:w-48" />
+          <div className="my-2 flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            {filters}
             <label className="relative min-w-0 flex-1 sm:w-64 sm:flex-none"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search invoices or vendors" className="h-9 bg-white pl-9" /></label>
           </div>
         </div>
