@@ -8,9 +8,12 @@
  * - A reader whose reach is one branch (Mrs Adeyemi, posted to Lekki) sees
  *   Lekki's floats without being asked.
  * - Anyone else at a school with several branches (Mrs Bello, bursar for Ikeja
- *   and Lekki) picks All branches or one branch. The pick lives in the page
- *   address (`?branch=`), as does the fund (`?fund=`), so two tabs can hold two
- *   branches. Under All branches every fund and every return names its branch.
+ *   and Lekki) reads the branch she picks on the app's own branch switcher, the
+ *   pill under the sidebar menu, and the page offers no branch picker of its
+ *   own. An app with no switcher (the console) offers the picker on the page,
+ *   held in the page address (`?branch=`).
+ * - The fund lives in the page address (`?fund=`) either way. Under All
+ *   branches every fund and every return names its branch.
  */
 
 import { useCallback, useMemo } from "react";
@@ -18,6 +21,7 @@ import { useSearchParams } from "react-router";
 
 import { useReaderBranchLens, type ReaderBranchLens } from "@/components/finance-ui/raising-branch";
 import type { PettyCashFund } from "@/redux/services/finance/ops-types";
+import { hostBranchLens } from "../../../host";
 import { NO_BRANCH_YET } from "../../../lib/branch-labels";
 
 /** The page-address keys the petty cash page keeps. */
@@ -34,6 +38,9 @@ export interface PettyCashBranch {
   /** Rows name their branch: several branches are on screen at once. */
   showBranch: boolean;
   choices: { id: number; name: string }[];
+  /** The page offers its own branch picker. False where the app's switcher is
+   *  the branch control; absent is read as true. */
+  pageControl?: boolean;
 }
 
 /** The rule in the file's doc block, as plain data. */
@@ -97,9 +104,15 @@ export function fundOptionLabel(fund: PettyCashFund, view: PettyCashBranch): str
 export function usePettyCashBranch() {
   const lens = useReaderBranchLens();
   const [params, setParams] = useSearchParams();
-  const branchParam = params.get(PETTY_CASH_BRANCH_PARAM);
+  const appSwitcher = hostBranchLens != null;
+  const branchParam = appSwitcher
+    ? (lens.branch === "all" ? null : String(lens.branch))
+    : params.get(PETTY_CASH_BRANCH_PARAM);
   const fundParam = params.get(PETTY_CASH_FUND_PARAM);
-  const view = useMemo(() => pettyCashBranchFor(lens, branchParam), [lens, branchParam]);
+  const view = useMemo(
+    () => ({ ...pettyCashBranchFor(lens, branchParam), pageControl: !appSwitcher }),
+    [lens, branchParam, appSwitcher],
+  );
   const set = useCallback((key: string, value: string | null, clear?: string) => {
     setParams((current) => {
       const next = new URLSearchParams(current);

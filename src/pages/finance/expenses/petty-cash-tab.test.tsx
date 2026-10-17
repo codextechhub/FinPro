@@ -235,19 +235,19 @@ describe("branches", () => {
     expect(container.querySelector("select[aria-label=Branch]")).toBeNull();
   });
 
-  it("lets a reader of several branches pick, naming each fund's branch under All branches", () => {
+  it("names each fund's branch under All branches, and leaves the branch to the sidebar switcher", () => {
     mocks.lens = { applies: true, pinnedBranch: null, branch: "all", choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
     mocks.funds = [fund(), fund({ id: 2, branch_id: 2, name: "Lekki float" })];
     render();
-    expect(container.querySelector("select[aria-label=Branch]")).not.toBeNull();
+    expect(container.querySelector("select[aria-label=Branch]")).toBeNull();
     const options = [...container.querySelectorAll("select[aria-label=Fund] option")].map((o) => o.textContent);
     expect(options).toEqual(["Front desk · Mrs Eze · Ikeja", "Lekki float · Mrs Eze · Lekki"]);
   });
 
-  it("shows only the branch in the page address", () => {
-    mocks.lens = { applies: true, pinnedBranch: null, branch: "all", choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
+  it("shows only the branch picked on the switcher, whatever the page address says", () => {
+    mocks.lens = { applies: true, pinnedBranch: null, branch: 2, choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
     mocks.funds = [fund(), fund({ id: 2, branch_id: 2, name: "Lekki float" })];
-    render("/?branch=2");
+    render("/?branch=1");
     const options = [...container.querySelectorAll("select[aria-label=Fund] option")].map((o) => o.textContent);
     expect(options).toEqual(["Lekki float · Mrs Eze"]);
   });

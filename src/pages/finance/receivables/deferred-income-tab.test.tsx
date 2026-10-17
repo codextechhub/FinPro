@@ -20,6 +20,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  lensBranch: "all" as number | "all",
   summary: vi.fn(), releases: vi.fn(), rows: [] as unknown[],
   access: {} as Record<string, unknown>,
   summaryData: {} as Record<string, unknown>,
@@ -41,7 +42,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: true, branchIds: null, covers: () => true }),
   useBranches: () => ({ data: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false, isError: false }),
-  hostBranchLens: () => ({ applies: true, pinnedBranch: null, branch: "all", choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false }),
+  hostBranchLens: () => ({ applies: true, pinnedBranch: null, branch: mocks.lensBranch, choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false }),
 }));
 vi.mock("@/redux/services/finance/fees-api", () => ({
   useGetDeferredIncomeQuery: (args: unknown) => {
@@ -123,8 +124,10 @@ describe("the months a release can be undone in", () => {
 });
 
 describe("the deferred income tab", () => {
-  it("lists the releases posted, and follows the branch picked", () => {
-    act(() => root.render(<MemoryRouter initialEntries={["/finance/receivables/deferred-income?branch=2"]}><DeferredIncomeTab entity="BSS" currency="NGN" /></MemoryRouter>));
+  it("lists the releases posted, and follows the branch picked on the sidebar switcher", () => {
+    mocks.lensBranch = 2;
+    act(() => root.render(<MemoryRouter><DeferredIncomeTab entity="BSS" currency="NGN" /></MemoryRouter>));
+    mocks.lensBranch = "all";
     expect(mocks.summary).toHaveBeenLastCalledWith({ entity: "BSS", branch: 2 });
     expect(mocks.releases).toHaveBeenCalledWith({ entity: "BSS", page: 1, branch: 2 });
     expect(container.textContent).toContain("JE-0401");
@@ -199,10 +202,10 @@ describe("deferred income under Field Access", () => {
     expect(alignedTables()).toBe(true);
   });
 
-  it("keeps the branch picker and column whatever the map lists", () => {
+  it("keeps the branch column whatever the map lists; the branch itself is picked on the sidebar switcher", () => {
     restrict({ hidden: ["branch_id", "branch_name"] });
     mount();
-    expect(container.querySelector('select[aria-label="Branch"]')).not.toBeNull();
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
     expect(headers()[1]).toEqual(["Date", "Branch", "Month", "Journal", "Released", "Status"]);
     expect(alignedTables()).toBe(true);
   });

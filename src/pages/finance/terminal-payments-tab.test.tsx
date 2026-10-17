@@ -15,6 +15,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  lensBranch: "all" as number | "all",
   held: new Set<string>(),
   fieldAccess: {} as Record<string, unknown>,
   rows: [] as unknown[],
@@ -55,7 +56,7 @@ vi.mock("@/redux/services/finance/ar-api", () => ({
 
 vi.mock("../../host", () => ({
   hostBranchLens: () => ({
-    applies: mocks.applies, pinnedBranch: mocks.pinned, branch: "all",
+    applies: mocks.applies, pinnedBranch: mocks.pinned, branch: mocks.lensBranch,
     choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false,
   }),
   useBranches: () => ({ data: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false, isError: false }),
@@ -107,6 +108,7 @@ beforeEach(() => {
   mocks.total = 1;
   mocks.asked = [];
   mocks.applies = true;
+  mocks.lensBranch = "all";
   mocks.pinned = null;
   mocks.customers = [customer(1, 1), customer(2, 2), customer(3, null)];
   mocks.customersAsked = [];
@@ -174,16 +176,18 @@ describe("the list", () => {
     expect(headers()).not.toContain("Branch");
   });
 
-  it("asks only for the branch picked, and reads 'No branch yet' in the address as every branch", () => {
-    render("/?branch=2");
+  it("asks only for the branch picked on the sidebar switcher, and offers no picker of its own", () => {
+    mocks.lensBranch = 2;
+    render();
     expect(mocks.asked.at(-1)).toMatchObject({ branch: 2 });
     expect(headers()).not.toContain("Branch");
-    act(() => root.unmount());
-    root = createRoot(container);
-    mocks.asked = [];
-    render("/?branch=unassigned");
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
+  });
+
+  it("ignores a branch left in the page address, so the switcher is never overruled", () => {
+    render("/?branch=2");
     expect(mocks.asked.at(-1)).not.toHaveProperty("branch");
-    expect([...container.querySelectorAll('select[aria-label="Branch"] option')].map((o) => o.textContent)).not.toContain("No branch yet");
+    expect(headers()).toContain("Branch");
   });
 
   it("drops the payer column and its header where Field Access hides the payer", () => {

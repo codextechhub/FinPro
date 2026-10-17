@@ -202,24 +202,32 @@ describe("the purchase order list's branch", () => {
     mocks.state.lens = { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false };
   });
 
-  it("starts the list and its figures on the branch she is working in", () => {
+  it("starts the list and its figures on the branch she picked on the sidebar switcher", () => {
     mocks.state.lens = { applies: true, pinnedBranch: null, branch: 2, choices: BRANCHES, isLoading: false };
     act(() => root.render(<MemoryRouter><PurchaseOrdersPage /></MemoryRouter>));
     expect(last(mocks.state.listArgs).branch).toBe(2);
     expect(last(mocks.state.summaryArgs).branch).toBe(2);
-    expect(container.querySelector<HTMLSelectElement>('select[aria-label="Branch"]')?.value).toBe("2");
   });
 
-  it("follows the branch she picks on the page, list and figures together", () => {
+  it("offers no branch picker of its own: the sidebar switcher is the one control", () => {
     mocks.state.lens = { applies: true, pinnedBranch: null, branch: 2, choices: BRANCHES, isLoading: false };
     act(() => root.render(<MemoryRouter><PurchaseOrdersPage /></MemoryRouter>));
-    const picker = container.querySelector<HTMLSelectElement>('select[aria-label="Branch"]')!;
-    act(() => {
-      picker.value = "1";
-      picker.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
+  });
+
+  it("moves with the switcher, list and figures together", () => {
+    mocks.state.lens = { applies: true, pinnedBranch: null, branch: 2, choices: BRANCHES, isLoading: false };
+    act(() => root.render(<MemoryRouter><PurchaseOrdersPage /></MemoryRouter>));
+    mocks.state.lens = { applies: true, pinnedBranch: null, branch: 1, choices: BRANCHES, isLoading: false };
+    act(() => root.render(<MemoryRouter><PurchaseOrdersPage /></MemoryRouter>));
     expect(last(mocks.state.listArgs).branch).toBe(1);
     expect(last(mocks.state.summaryArgs).branch).toBe(1);
+  });
+
+  it("ignores a branch left in the page address, so the switcher is never overruled", () => {
+    mocks.state.lens = { applies: true, pinnedBranch: null, branch: 2, choices: BRANCHES, isLoading: false };
+    act(() => root.render(<MemoryRouter initialEntries={["/?branch=1"]}><PurchaseOrdersPage /></MemoryRouter>));
+    expect(last(mocks.state.listArgs).branch).toBe(2);
   });
 
   it("asks nothing of a school with one branch", () => {

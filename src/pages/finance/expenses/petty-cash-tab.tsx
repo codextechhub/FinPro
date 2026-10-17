@@ -94,7 +94,7 @@ export function PettyCashTab({ entity, currency }: { entity: string; currency?: 
     <EstablishFloatDrawer open={establishing} onClose={() => setEstablishing(false)} entity={entity}
       currency={currency} onCreated={(id) => chooseFund(id)} />
   );
-  const branchPicker = view.canChoose ? (
+  const branchPicker = view.canChoose && view.pageControl !== false ? (
     <div className="w-full sm:w-56">
       <NativeSelect value={view.selected === "all" ? "" : String(view.selected)} aria-label="Branch" className="h-9"
         onChange={(e) => chooseBranch(e.target.value ? Number(e.target.value) : "all")}>
