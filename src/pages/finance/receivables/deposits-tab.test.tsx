@@ -130,7 +130,7 @@ describe("the deposit list under Field Access", () => {
     mount();
     expect(headers()).toEqual(["Customer", "Branch", "Invoice", "Amount", "Left on", "Status"]);
     expect(container.querySelector('select[aria-label="Status"]')).not.toBeNull();
-    expect(container.querySelector('select[aria-label="Branch"]')).not.toBeNull();
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
     expect(container.textContent).toContain("customer-picker");
     expect(aligned()).toBe(true);
   });
@@ -171,11 +171,11 @@ describe("the deposit list under Field Access", () => {
     expect(container.querySelector("tbody tr td")!.textContent).toBe("C-001");
   });
 
-  it("keeps the branch column and picker whatever the map lists", () => {
+  it("keeps the branch column whatever the map lists; the branch itself is picked on the sidebar switcher", () => {
     restrict({ hidden: ["branch_id", "branch_name"] });
     mount();
     expect(headers()).toEqual(["Customer", "Branch", "Invoice", "Amount", "Left on", "Status"]);
-    expect(container.querySelector('select[aria-label="Branch"]')).not.toBeNull();
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
   });
 
   it("drops the invoice, amount and date columns that are hidden", () => {

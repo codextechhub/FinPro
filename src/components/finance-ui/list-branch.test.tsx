@@ -65,6 +65,17 @@ describe("the branch picker", () => {
     expect(options).toEqual(["All branches", "Ikeja", "Lekki", "No branch yet"]);
   });
 
+  it("is absent where the app's own switcher is the branch control", () => {
+    const view = { ...listBranchFor(lens(), null, true), pageControl: false };
+    act(() => root.render(<ListBranchSelect view={view} onChange={vi.fn()} />));
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("stays on the page in an app with no switcher of its own, such as the console", () => {
+    act(() => root.render(<ListBranchSelect view={listBranchFor(lens(), null, true)} onChange={vi.fn()} />));
+    expect(container.querySelector('select[aria-label="Branch"]')).not.toBeNull();
+  });
+
   it("is absent where there is nothing to choose", () => {
     act(() => root.render(<ListBranchSelect view={listBranchFor(lens({ applies: false }), null, true)} onChange={vi.fn()} />));
     expect(container.innerHTML).toBe("");
