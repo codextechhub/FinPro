@@ -45,6 +45,7 @@ export function fakeHost(overrides: Record<string, unknown> = {}): Record<string
     FeeGenerationPanel: undefined,
     hostBranchLens: undefined,
     HostLoadingMark: undefined,
+    HostConsoleSidebarFooter: undefined,
     ...overrides,
   };
 }

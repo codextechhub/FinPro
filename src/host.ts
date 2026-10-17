@@ -35,6 +35,12 @@ export interface HostLoadingMarkProps {
   inButton?: boolean;
 }
 
+/** What the package passes to the host's sidebar footer. */
+export interface HostSidebarFooterProps {
+  /** The sidebar is collapsed to its icon rail. */
+  collapsed: boolean;
+}
+
 /** The minimum a branch must expose. Apps may return richer rows. */
 export interface HostBranch {
   id: string | number;
@@ -347,6 +353,20 @@ export interface HostContract {
    *  The mark sizes from `className`; `label: null` marks it decorative, for
    *  a place where nearby text already says what is loading. */
   LoadingMark?: ComponentType<HostLoadingMarkProps>;
+  /** What sits pinned at the foot of the Finance and Procurement sidebars,
+   *  under the menu.
+   *
+   *  Those areas replace the application's own sidebar with this package's,
+   *  so anything the application keeps at the foot of its sidebar would
+   *  disappear on entering them. The school app keeps its branch switcher
+   *  there: Mrs Bello, bursar for Ikeja and Lekki, switches to Lekki from
+   *  Finance > Receivables and the lists and new invoices follow Lekki,
+   *  without leaving Finance to find the switcher. The host decides what
+   *  appears and on which screens; `collapsed` is true on the icon rail.
+   *
+   *  Optional. An app with nothing at the foot of its sidebar omits it and the
+   *  sidebar ends with its menu. */
+  ConsoleSidebarFooter?: ComponentType<HostSidebarFooterProps>;
   /** An extra section on Setup -> Entities, below the caller's own books.
    *
    *  The platform console shows a roll-call there: every tenant on the
@@ -382,3 +402,4 @@ export const {
 export const FeeGenerationPanel = _satisfies.FeeGenerationPanel;
 export const hostBranchLens = _satisfies.useBranchLens;
 export const HostLoadingMark = _satisfies.LoadingMark;
+export const HostConsoleSidebarFooter = _satisfies.ConsoleSidebarFooter;
