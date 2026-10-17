@@ -28,6 +28,10 @@
  * read-only. The payer, status and branch filters are neither shown nor sent
  * when their field is hidden, and the payer's links are not fetched unless the
  * payer, customer and active switches are all readable.
+ *
+ * The list answers for one branch and one stretch of time
+ * (`useFinanceListScope`), each payment placed by its payment date. A role that
+ * may not read that date is offered no Year picker and sends no period.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -54,7 +58,7 @@ import type {
   PayerPayment, PayerPaymentPlan, PayerPaymentShare, PayerPaymentSplit, PayerPlanShare,
 } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
-import { ListBranchSelect, listBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
+import { useFinanceListScope } from "../list-scope";
 import {
   amountsFromPlan, emptyPayerPaymentForm, inputKey, manualTotals, needsManualAmounts, payerPaymentInput,
   type PayerPaymentFormState,
@@ -123,16 +127,16 @@ export function PayerPaymentsTab({ entity, currency }: { entity: string; currenc
   const { can } = useCan();
   const access = useFieldAccess(PAYMENT);
   const branches = useBranchColumn();
-  const list = useListBranch();
   const [payer, setPayer] = useState("");
   const [page, setPage] = useState(1);
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1), { periodReadable: !access.isHidden("payment_date") });
   const [recording, setRecording] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   // A branch's list holds what it received and what holds a share for it, so "Received at" stays.
   const payerFilter = !access.isHidden("payer");
   const params = useMemo(() => ({
-    entity, page, ...(payerFilter && payer ? { payer } : {}), ...listBranchArg(list.view),
-  }), [entity, page, payer, payerFilter, list.view]);
+    entity, page, ...(payerFilter && payer ? { payer } : {}), ...scope,
+  }), [entity, page, payer, payerFilter, scope]);
   const { data, isLoading, isFetching, isError, refetch } = useGetPayerPaymentsQuery(params);
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
@@ -153,7 +157,7 @@ export function PayerPaymentsTab({ entity, currency }: { entity: string; currenc
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="flex flex-wrap items-end gap-2">
-          <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
+          {filters}
           {payerFilter ? (
             <div className="w-64 max-w-full">
               <CustomerPicker entity={entity} value={payer} onChange={(v) => { setPayer(v); setPage(1); }} placeholder="Any payer" />

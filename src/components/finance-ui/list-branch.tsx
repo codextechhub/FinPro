@@ -1,8 +1,10 @@
 /**
- * Which branch a list shows, in Finance (deferred income, provisions, deposits,
- * credit transfers, payer payments, terminal payments) and in Procurement
- * (requisitions, sourcing, orders, receipts, supplier bills, payments, credit
- * notes and the analytics reports).
+ * Which branch a list shows, in Finance (invoices, receipts, credit notes,
+ * journals, expense claims, bank documents, deferred income, provisions,
+ * deposits, credit transfers, payer payments, terminal payments) and in
+ * Procurement (requisitions, sourcing, orders, receipts, supplier bills,
+ * payments, credit notes and the analytics reports). A document list reads it
+ * together with its period through `list-scope`.
  *
  * The server narrows each list with `?branch=` (one branch the reader works in,
  * or the rows not yet given one) and refuses a branch outside the reader's

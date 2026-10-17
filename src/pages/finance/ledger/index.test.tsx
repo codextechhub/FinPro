@@ -12,6 +12,9 @@
  *      journals sent back, which the Sent back tab counts.
  *   5. The export asks for what the list asks for: the Sent back tab exports
  *      the journals sent back (approval=returned), and Drafts the drafts.
+ *   6. The list has one period control, the Year picker every document list
+ *      offers: FY 2015 or a custom range reaches the list, the counts and the
+ *      export alike.
  */
 
 import { act } from "react";
@@ -26,6 +29,10 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true,
     hasModuleAccess: () => true, fieldAccess: {},
   }),
+}));
+vi.mock("@/redux/store", () => ({
+  useAppSelector: (select: (state: unknown) => unknown) => select({ auth: {} }),
+  useAppDispatch: () => () => undefined,
 }));
 vi.mock("../finance-shell", () => ({ FinanceShell: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/components/layout/page-shell", () => ({
@@ -52,6 +59,11 @@ vi.mock("@/redux/services/finance/gl-api", () => ({
     mocks.summary(args);
     return { data: mocks.summaryData };
   },
+}));
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetFiscalYearsQuery: () => ({ data: { data: [
+    { id: 1, year: 2015, start_date: "2014-09-01", end_date: "2015-08-31", is_archived: false },
+  ] } }),
 }));
 vi.mock("./direct-entry-drawer", () => ({ DirectEntryDrawer: () => null }));
 vi.mock("./journal-detail-drawer", () => ({
@@ -157,5 +169,24 @@ describe("the Period column", () => {
     mount();
     expect(container.textContent).toContain("September 2026");
     expect(container.textContent).not.toContain("2026-09");
+  });
+});
+
+describe("the journal list's period", () => {
+  it("is the one Year picker, and the list, counts and export all ask for it", () => {
+    mount("/finance/ledger?year=2015");
+    expect(container.querySelectorAll('select[aria-label="Year"]')).toHaveLength(1);
+    expect(container.querySelector('select[aria-label="Period"]')).toBeNull();
+    expect(mocks.journals.mock.lastCall?.[0]).toMatchObject({ fiscal_year: 2015 });
+    expect(mocks.summary.mock.lastCall?.[0]).toEqual({ entity: "BSS", fiscal_year: 2015 });
+    expect(mocks.exported.mock.lastCall?.[0]).toMatchObject({ fiscal_year: 2015 });
+    expect(mocks.exported.mock.lastCall?.[0]).not.toHaveProperty("date_from");
+  });
+
+  it("sends custom dates as the range, without a year", () => {
+    mount("/finance/ledger?year=custom&from=2015-03-01&to=2015-05-31");
+    expect(mocks.journals.mock.lastCall?.[0]).toMatchObject({ date_from: "2015-03-01", date_to: "2015-05-31" });
+    expect(mocks.journals.mock.lastCall?.[0]).not.toHaveProperty("fiscal_year");
+    expect(mocks.exported.mock.lastCall?.[0]).toMatchObject({ date_from: "2015-03-01", date_to: "2015-05-31" });
   });
 });

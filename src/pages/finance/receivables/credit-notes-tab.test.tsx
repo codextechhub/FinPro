@@ -44,6 +44,7 @@ vi.mock("@/redux/store", () => ({
   useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { tenant: {}, user: { id: returned.uid } } }),
   useAppDispatch: () => vi.fn(),
 }));
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost());
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({
   useNoApproverPrompt: () => ({ promptIfParked: vi.fn(), noApproverDialog: null }),
 }));
@@ -64,6 +65,9 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   MoneyInput: ({ valueKobo, onChangeKobo }: { valueKobo: number; onChangeKobo: (v: number) => void }) => (
     <input aria-label="Amount in kobo" value={valueKobo} onChange={(e) => onChangeKobo(Number(e.target.value))} />
   ),
+}));
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetFiscalYearsQuery: () => ({ data: { data: [] } }),
 }));
 vi.mock("@/redux/services/finance/ar-api", () => {
   const call = (spy: (body: unknown) => void) => () => [

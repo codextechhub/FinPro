@@ -4,6 +4,10 @@
  * this week / unallocated / count), status + method filters, an avatar table with
  * each receipt's unallocated amount + status, Export, Record receipt, and a row-
  * click allocation drawer.
+ *
+ * The list, the figures above it and its export answer for one branch and one
+ * stretch of time (`useFinanceListScope`), so the receipts counted are the
+ * receipts listed and the receipts exported.
  */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
@@ -26,6 +30,7 @@ import { openPaymentReceipt } from "@/utils/finance-documents";
 import { RecordReceiptDrawer } from "./record-receipt-drawer";
 import { PaymentAllocationDrawer } from "./payment-allocation-drawer";
 import { useDates } from "../../../lib/display-prefs";
+import { useFinanceListScope } from "../list-scope";
 
 const STATUS_TABS = [
   { key: "", label: "All" }, { key: "ALLOCATED", label: "Allocated" },
@@ -70,6 +75,7 @@ export function ReceiptsAllocationTab({ entity, currency }: { entity: string; cu
   const [selected, setSelected] = useState<number | null>(null);
 
   const [page, setPage] = useState(1);
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1));
   // All filters are server-side; reset to page 1 when any of them changes.
   // Adjust during render (not an effect) so the reset lands in the same pass.
   const filterKey = `${search} ${status} ${method}`;
@@ -79,9 +85,9 @@ export function ReceiptsAllocationTab({ entity, currency }: { entity: string; cu
     setPage(1);
   }
 
-  const listParams = useMemo(() => ({ entity, page, ...(search ? { search } : {}), ...(status ? { status } : {}), ...(method ? { method } : {}) }), [entity, page, search, status, method]);
+  const listParams = useMemo(() => ({ entity, page, ...(search ? { search } : {}), ...(status ? { status } : {}), ...(method ? { method } : {}), ...scope }), [entity, page, search, status, method, scope]);
   const { data, isLoading, isFetching, isError, refetch } = useGetPaymentsQuery(listParams);
-  const { data: summaryRes } = useGetPaymentSummaryQuery({ entity, ...(search ? { search } : {}), ...(method ? { method } : {}) });
+  const { data: summaryRes } = useGetPaymentSummaryQuery({ entity, ...(search ? { search } : {}), ...(method ? { method } : {}), ...scope });
   const rows = toArray<Payment>(data?.data);
   const pg = data?.pagination;
   const sum = summaryRes?.data;
@@ -157,11 +163,12 @@ export function ReceiptsAllocationTab({ entity, currency }: { entity: string; cu
           <option value="">All methods</option>
           {METHODS.map((m) => <option key={m} value={m}>{methodLabel(m)}</option>)}
         </select>
+        {filters}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {/* Server-side export: the same filters over the whole set, not the 25 rows on this page. */}
           <QuickExportButton
             screen="finance.receipts"
-            params={{ search, status, method }}
+            params={{ search, status, method, ...scope }}
             entity={entity}
             typeface="geist"
             defaultName="Customer receipts"

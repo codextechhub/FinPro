@@ -177,7 +177,7 @@ function BillsView({ entity, currency, switcher }: { entity: string; currency?: 
         actions={<>
           {switcher}
           <Can permission={P.PROC_IMPORT_OPENING_VENDOR_INVOICES}><Button variant="outline" onClick={() => setImporting(true)}><Upload className="size-4" /> Opening bills</Button></Can>
-          <QuickExportButton screen="procurement.vendor_invoices" params={{ ...statusFilterArgs(status, "display_status"), search: debouncedSearch }} entity={entity} typeface="geist" defaultName="Vendor invoices" />
+          <QuickExportButton screen="procurement.vendor_invoices" params={{ ...statusFilterArgs(status, "display_status"), search: debouncedSearch, ...scope }} entity={entity} typeface="geist" defaultName="Vendor invoices" />
           <Can permission={P.PROC_CREATE_VENDOR_INVOICE}><Button onClick={() => setCreating(true)}><Plus className="size-4" /> Record Invoice</Button></Can>
         </>}
       />

@@ -2,6 +2,7 @@
 // + the Direct Entry write serializer. All money is integer kobo.
 
 import type { JournalLineView } from "@/components/finance-ui/journal-table";
+import type { FinanceListScope } from "./api-types";
 
 export type JournalStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "REVERSED" | "CANCELLED";
 export type JournalSource =
@@ -94,15 +95,14 @@ export interface SourceDocumentAction {
   correction_message?: string;
 }
 
-export interface JournalListParams {
+/** The journal list's filters. Its period is the list scope's: a year, or `date_from` and `date_to`. */
+export interface JournalListParams extends FinanceListScope {
   entity: string;
   page?: number;
   status?: JournalStatus;
   /** "returned" keeps only journals an approver sent back to whoever sent them. */
   approval?: "returned";
   source?: JournalSource;
-  date_from?: string;
-  date_to?: string;
   search?: string;
   /** Journals dated in an archived fiscal year are left out unless this asks for them. */
   include_archived?: "true";

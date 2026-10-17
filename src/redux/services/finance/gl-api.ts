@@ -15,7 +15,7 @@
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
-import type { ApiEnvelope, PaginatedEnvelope } from "./api-types";
+import type { ApiEnvelope, FinanceListScope, PaginatedEnvelope } from "./api-types";
 import type {
   DirectEntryChanges,
   DirectEntryPayload,
@@ -25,7 +25,7 @@ import type {
   JournalSummary,
 } from "./gl-types";
 
-type SummaryParams = { entity: string; source?: string; date_from?: string; date_to?: string; search?: string; include_archived?: "true" };
+type SummaryParams = { entity: string; source?: string; search?: string; include_archived?: "true" } & FinanceListScope;
 
 export const glApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({

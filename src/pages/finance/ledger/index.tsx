@@ -1,6 +1,6 @@
 /**
  * General Ledger / Journal Entries (§6.2) - design topology in the house theme:
- * status tabs with counts, source + period filters, search, a Total-Debit /
+ * status tabs with counts, source, branch and period filters, search, a Total-Debit /
  * Created-By table, and a posted-total footer. Read-only list + detail drawer +
  * the Reverse action; Direct Entry is the only raw-lines post ("New journal").
  *
@@ -9,6 +9,12 @@
  * tab's count always matches the rows under it. A journal raised by somebody
  * who has since left the school keeps their name, with the dashed outline the
  * server's `created_by_is_exited` flag draws.
+ *
+ * The period is the one every document list offers (`useFinanceListScope`):
+ * All years, one financial year, or custom dates, read from the page address.
+ * The list, the counts, the footer and the export all ask for that period and
+ * the branch picked, so Mrs Bello on Ikeja with FY 2015 picked exports exactly
+ * the journals she is looking at.
  */
 
 import { useMemo, useState } from "react";
@@ -20,7 +26,6 @@ import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { UserAvatar } from "../../../host";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useActionParam } from "@/hooks/use-action-param";
@@ -38,9 +43,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { useDates } from "../../../lib/display-prefs";
-import { presetRange } from "../../../utils/date-presets";
 import { FINANCE_HELP } from "../screen-help";
 import { SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
+import { useFinanceListScope } from "../list-scope";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont text-sm text-black-01 focus:border-primary focus:outline-none";
 const SOURCES: JournalSource[] = ["MANUAL", "SALES", "PURCHASE", "BANK", "PAYROLL", "CLOSING", "OPENING", "FX", "SYSTEM"];
@@ -60,8 +65,6 @@ export default function GeneralLedgerPage() {
   const { code: entity, currency } = useActiveEntity();
   const [status, setStatus] = useState<JournalStatus | typeof SENT_BACK_FILTER | "">("");
   const [source, setSource] = useState<JournalSource | "">("");
-  const [preset, setPreset] = useState("all");
-  const [custom, setCustom] = useState({ from: "", to: "" });
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
   const search = useDebounce(searchInput.trim(), 350);
   const [page, setPage] = useState(1);
@@ -73,14 +76,13 @@ export default function GeneralLedgerPage() {
   // A link from another screen (`?document=<journal id>`) opens that journal.
   useSourceDocumentParam(setSelected);
 
-  const range = preset === "custom" ? custom : presetRange(preset, dates.today());
+  const { scope, filters: scopeFilters } = useFinanceListScope(entity, () => setPage(1));
   const filters = useMemo(() => ({
     entity: entity!,
     ...(source ? { source } : {}),
-    ...(range.from ? { date_from: range.from } : {}),
-    ...(range.to ? { date_to: range.to } : {}),
     ...(search ? { search } : {}),
-  }), [entity, source, range.from, range.to, search]);
+    ...scope,
+  }), [entity, source, search, scope]);
 
   // The list and its export ask for the same status, Sent back as approval=returned.
   const statusArgs = statusFilterArgs(status) as Pick<JournalListParams, "status" | "approval">;
@@ -143,7 +145,7 @@ export default function GeneralLedgerPage() {
                 is on screen. That is the dataset a trial balance needs. */}
             <QuickExportButton
               screen="finance.gl_postings"
-              params={{ ...statusArgs, source, date_from: range.from, date_to: range.to, search }}
+              params={{ ...statusArgs, source, search, ...scope }}
               entity={entity}
               typeface="geist"
               defaultName="General ledger postings"
@@ -171,19 +173,7 @@ export default function GeneralLedgerPage() {
             <option value="">All sources</option>
             {SOURCES.map((s) => <option key={s} value={s}>{cap(s)}</option>)}
           </select>
-          <select value={preset} onChange={(e) => { setPreset(e.target.value); setPage(1); }} className={selectCls} aria-label="Period">
-            <option value="all">All time</option>
-            <option value="this-month">This month</option>
-            <option value="last-month">Last month</option>
-            <option value="ytd">Year to date</option>
-            <option value="custom">Custom range</option>
-          </select>
-          {preset === "custom" && (
-            <>
-              <DatePickerInput value={custom.from} onChange={(e) => { setCustom((c) => ({ ...c, from: e.target.value })); setPage(1); }} aria-label="From" className="h-9 w-36 bg-white" />
-              <DatePickerInput value={custom.to} onChange={(e) => { setCustom((c) => ({ ...c, to: e.target.value })); setPage(1); }} aria-label="To" className="h-9 w-36 bg-white" />
-            </>
-          )}
+          {scopeFilters}
         </div>
 
         <DataTable

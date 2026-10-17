@@ -35,6 +35,12 @@
  * The section reads `?bank_document=transaction|transfer` and `?document=<id>`,
  * which is where an approval's link to a bank document lands.
  *
+ * Each list answers for one branch and one stretch of time
+ * (`useFinanceListScope`), each document placed by its own date; a reader
+ * who may not read that date is offered no Year picker. Under All
+ * branches each row names its branch; with one branch picked the column would
+ * repeat itself, so it is left out.
+ *
  * Each document kind is a Field Access resource (`finance.banktransaction`,
  * `finance.banktransfer`). A field the reader may not see has no column, no row
  * in the drawer and no input in the form; one they may see and not change is
@@ -87,6 +93,7 @@ import {
   bankDocumentAccountProblem, bankDocumentApprovalNote, bankDocumentReworkable, bankDocumentStatus, changedFields,
 } from "./bank-document-rules";
 import { NO_BRANCH_YET } from "../../lib/branch-labels";
+import { useFinanceListScope } from "./list-scope";
 
 type Kind = "transaction" | "transfer";
 const KIND_PARAM = "bank_document";
@@ -163,13 +170,14 @@ function TransactionsList({ entity, currency, openId, onOpen }: { entity: string
   const [approval, setApproval] = useState("");
   const access = useFieldAccess(TRANSACTION);
   const canFilter = !access.isHidden("status");
-  const { data, isLoading, isFetching, isError, error, refetch } = useGetBankTransactionsQuery({ entity, page, ...(canFilter ? statusFilterArgs(approval) : {}) });
+  const { scope, filters, branchView } = useFinanceListScope(entity, () => setPage(1), { periodReadable: !access.isHidden("transaction_date") });
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetBankTransactionsQuery({ entity, page, ...(canFilter ? statusFilterArgs(approval) : {}), ...scope });
   const rows = toArray(data?.data);
   const columns: Column<BankTransactionDocument>[] = [
     { header: "Document", cell: (t) => <span className="font-mont text-sm font-semibold text-primary">{t.document_number}</span> },
     ...shown<BankTransactionDocument>(access.isHidden("transaction_date"), { header: "Date", cell: (t) => dates.day(t.transaction_date, t.branch_id) }),
     ...shown<BankTransactionDocument>(access.isHidden("bank_account_name"), { header: "Bank account", cell: (t) => t.bank_account_name }),
-    ...(branches.multiBranch ? [{ header: "Branch", cell: (t: BankTransactionDocument) => branches.name(t) }] : []),
+    ...(branches.multiBranch && branchView.selected === "all" ? [{ header: "Branch", cell: (t: BankTransactionDocument) => branches.name(t) }] : []),
     ...shown<BankTransactionDocument>(access.isHidden("counter_account_name"), { header: "Other side", cell: (t) => <span className="min-w-0">{access.isHidden("counter_account_code") ? null : <span className="tabular-nums text-gray-05">{t.counter_account_code} </span>}{t.counter_account_name}</span> }),
     ...shown<BankTransactionDocument>(access.isHidden("amount"), { header: "Amount", align: "right", cell: (t) => access.isHidden("direction")
       ? <span className="tabular-nums text-black-01">{formatMoney(t.amount, currency)}</span>
@@ -177,7 +185,10 @@ function TransactionsList({ entity, currency, openId, onOpen }: { entity: string
     ...shown<BankTransactionDocument>(!canFilter, { header: "Status", cell: (t) => <StatusPill {...sentBackPill(t, bankDocumentStatus(t), undefined, true)} /> }),
   ];
   return <>
-    {canFilter ? <SentBackSelect value={approval} onChange={(v) => { setApproval(v); setPage(1); }} /> : null}
+    <ListFilters>
+      {canFilter ? <SentBackSelect value={approval} onChange={(v) => { setApproval(v); setPage(1); }} /> : null}
+      {filters}
+    </ListFilters>
     <DataTable columns={columns} rows={rows} rowKey={(t) => t.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(t) => onOpen(t.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle={approval ? "Nothing sent back" : "No bank transactions"} emptyMessage="Record capital, a loan, drawings, interest or charges here." />
     {openId !== null && <BankDocumentDrawer kind="transaction" id={openId} entity={entity} currency={currency} onClose={() => onOpen(null)} />}
   </>;
@@ -190,33 +201,40 @@ function TransfersList({ entity, currency, openId, onOpen }: { entity: string; c
   const [approval, setApproval] = useState("");
   const access = useFieldAccess(TRANSFER);
   const canFilter = !access.isHidden("status");
-  const { data, isLoading, isFetching, isError, error, refetch } = useGetBankTransfersQuery({ entity, page, ...(canFilter ? statusFilterArgs(approval) : {}) });
+  const { scope, filters, branchView } = useFinanceListScope(entity, () => setPage(1), { periodReadable: !access.isHidden("transfer_date") });
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetBankTransfersQuery({ entity, page, ...(canFilter ? statusFilterArgs(approval) : {}), ...scope });
   const rows = toArray(data?.data);
   const columns: Column<BankTransferDocument>[] = [
     { header: "Document", cell: (t) => <span className="font-mont text-sm font-semibold text-primary">{t.document_number}</span> },
     ...shown<BankTransferDocument>(access.isHidden("transfer_date"), { header: "Date", cell: (t) => dates.day(t.transfer_date, t.branch_id) }),
     ...shown<BankTransferDocument>(access.isHidden("from_account_name"), { header: "From", cell: (t) => t.from_account_name }),
     ...shown<BankTransferDocument>(access.isHidden("to_account_name"), { header: "To", cell: (t) => t.to_account_name }),
-    ...(branches.multiBranch ? [{ header: "Branch", cell: (t: BankTransferDocument) => branches.name(t) }] : []),
+    ...(branches.multiBranch && branchView.selected === "all" ? [{ header: "Branch", cell: (t: BankTransferDocument) => branches.name(t) }] : []),
     ...shown<BankTransferDocument>(access.isHidden("amount"), { header: "Amount", align: "right", cell: (t) => <span className="tabular-nums">{formatMoney(t.amount, currency)}</span> }),
     ...shown<BankTransferDocument>(!canFilter, { header: "Status", cell: (t) => <StatusPill {...sentBackPill(t, bankDocumentStatus(t), undefined, true)} /> }),
   ];
   return <>
-    {canFilter ? <SentBackSelect value={approval} onChange={(v) => { setApproval(v); setPage(1); }} /> : null}
+    <ListFilters>
+      {canFilter ? <SentBackSelect value={approval} onChange={(v) => { setApproval(v); setPage(1); }} /> : null}
+      {filters}
+    </ListFilters>
     <DataTable columns={columns} rows={rows} rowKey={(t) => t.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(t) => onOpen(t.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle={approval ? "Nothing sent back" : "No transfers"} emptyMessage="Move money between two accounts of the same branch here." />
     {openId !== null && <BankDocumentDrawer kind="transfer" id={openId} entity={entity} currency={currency} onClose={() => onOpen(null)} />}
   </>;
 }
 
-/** The bank lists' one filter: every document, or those an approver sent back. */
+/** The filter bar above a bank list, wrapping onto a second line on a phone. */
+function ListFilters({ children }: { children: React.ReactNode }) {
+  return <div className="mb-3 flex flex-wrap items-center gap-2">{children}</div>;
+}
+
+/** The bank lists' status filter: every document, or those an approver sent back. */
 function SentBackSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2">
-      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Status" className="h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01">
-        <option value="">All statuses</option>
-        <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
-      </select>
-    </div>
+    <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Status" className="h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01">
+      <option value="">All statuses</option>
+      <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
+    </select>
   );
 }
 

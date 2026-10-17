@@ -11,7 +11,9 @@
  * Field Access: the run and its branch lines are `finance.provision` fields. A
  * role that may not read one has it, its header and its filter left out, a role
  * that may not read the status is offered no Submit or Post, and the provision
- * date and narration are the two typed in when a run is raised.
+ * date and narration are the two typed in when a run is raised. A role that may
+ * not read the provision date is offered no Year picker and asks for no period,
+ * which the server would refuse; one that may only read it keeps the picker.
  */
 import { act } from "react";
 import { MemoryRouter } from "react-router";
@@ -69,6 +71,9 @@ vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHo
 }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({
   useNoApproverPrompt: () => ({ promptIfParked: vi.fn(), noApproverDialog: null }),
+}));
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetFiscalYearsQuery: () => ({ data: { data: [] } }),
 }));
 vi.mock("@/redux/services/finance/fees-api", () => ({
   useGetProvisionsQuery: (args: unknown) => (mocks.query(args), { data: { data: mocks.rows, pagination: { currentPage: 1, totalPages: 1 } }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
@@ -449,5 +454,30 @@ describe("raising a provision run under Field Access", () => {
     await act(async () => { type("Age debts to", "2026-12-31"); });
     await prepare();
     expect(document.body.querySelector('[data-field="as_of"] [role=alert]')?.textContent).toContain("do not have permission");
+  });
+});
+
+describe("the provision list's year under Field Access", () => {
+  const year = () => document.body.querySelector('select[aria-label="Year"]');
+  const show = (restrictions: { hidden?: string[]; read_only?: string[] }) => {
+    mocks.rows = restrict(restrictions);
+    mocks.held = new Set(["finance.provision.view"]);
+    mocks.query.mockReset();
+    act(() => root.render(<MemoryRouter initialEntries={["/finance/receivables/provisions?year=2015"]}><ProvisionsTab entity="BSS" currency="NGN" /></MemoryRouter>));
+  };
+  const asked = () => mocks.query.mock.lastCall?.[0] as Record<string, unknown>;
+
+  it("offers no Year picker and sends no period when the provision date is hidden", () => {
+    show({ hidden: ["as_of"] });
+    expect(year()).toBeNull();
+    expect(asked()).not.toHaveProperty("fiscal_year");
+    expect(asked()).not.toHaveProperty("date_from");
+    expect(asked()).not.toHaveProperty("date_to");
+  });
+
+  it("keeps the Year picker and sends the year when the date is only read-only", () => {
+    show({ read_only: ["as_of"] });
+    expect(year()).not.toBeNull();
+    expect(asked()).toMatchObject({ fiscal_year: 2015 });
   });
 });

@@ -10,6 +10,9 @@
  * A transfer belongs to the source customer's branch, or, for a customer every
  * branch shares, to the branch the person raising it names, and both customers
  * must be filed under that branch or shared.
+ *
+ * The list answers for one branch and one stretch of time
+ * (`useFinanceListScope`), each transfer placed by its transfer date.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -36,7 +39,7 @@ import {
 import type { CustomerCreditTransfer } from "@/redux/services/finance/fees-types";
 import { CUSTOMER_RESOURCE, customerCreditReadable } from "./customer-credit-access";
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
-import { ListBranchSelect, listBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
+import { useFinanceListScope } from "../list-scope";
 import { DOCUMENT_STATUS_WORDS } from "@/components/finance-ui/status-words";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";
@@ -54,12 +57,12 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
   const dates = useDates();
   const { can } = useCan();
   const branches = useBranchColumn();
-  const list = useListBranch();
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const { scope, filters, branchView } = useFinanceListScope(entity, () => setPage(1));
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<CustomerCreditTransfer | null>(null);
-  const params = useMemo(() => ({ entity, page, ...statusFilterArgs(status), ...listBranchArg(list.view) }), [entity, page, status, list.view]);
+  const params = useMemo(() => ({ entity, page, ...statusFilterArgs(status), ...scope }), [entity, page, status, scope]);
   const { data, isLoading, isFetching, isError, refetch } = useGetCreditTransfersQuery(params);
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
@@ -69,7 +72,7 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
     { header: "Ref", cell: (t) => <span className="font-semibold tabular-nums">{t.document_number}</span> },
     { header: "From", cell: (t) => <span className="font-medium text-gray-01">{t.from_customer_name}</span> },
     { header: "To", cell: (t) => <span className="font-medium text-gray-01">{t.to_customer_name}</span> },
-    ...(branches.show && list.view.selected === "all" ? [{ header: "Branch", cell: (t: CustomerCreditTransfer) => branches.name(t.branch_id) }] : []),
+    ...(branches.show && branchView.selected === "all" ? [{ header: "Branch", cell: (t: CustomerCreditTransfer) => branches.name(t.branch_id) }] : []),
     { header: "Amount", align: "right", cell: (t) => <Money kobo={t.amount} currency={currency} align="right" /> },
     { header: "Date", cell: (t) => <span className="tabular-nums">{dates.day(t.transfer_date)}</span> },
     { header: "Status", cell: (t) => <StatusPill {...sentBackPill(t, t.status, CREDIT_TRANSFER_STATUS[t.status], true)} /> },
@@ -84,7 +87,7 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
             {FILTER_STATUSES.map((code) => <option key={code} value={code}>{CREDIT_TRANSFER_STATUS[code]}</option>)}
             <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
           </select>
-          <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
+          {filters}
         </div>
         {can(P.FIN_CREATE_CREDIT_TRANSFER) ? (
           <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New transfer</Button>

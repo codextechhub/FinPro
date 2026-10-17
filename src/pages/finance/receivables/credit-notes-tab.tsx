@@ -12,6 +12,9 @@
  *     "Apply to balance" and the auto-allocate toggle show only for credit notes;
  *   • "Issue note" creates then posts - the auto-allocate toggle chooses whether
  *     it lands "Issued" (auto_allocate:false) or is applied oldest-first ("Applied").
+ *
+ * The list answers for one branch and one stretch of time (`useFinanceListScope`),
+ * each note placed by its own note date.
  */
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
@@ -46,6 +49,7 @@ import { creditNoteChanges, creditNoteCorrection, creditNoteCorrectionProblem, s
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { IncomeGivenBack } from "./income-given-back";
 import { useDates } from "../../../lib/display-prefs";
+import { useFinanceListScope } from "../list-scope";
 
 const kindLabel = (k: string) => (k === "DEBIT" ? "Debit note" : "Credit note");
 const DRAWER_W = "sm:max-w-3xl";
@@ -144,12 +148,14 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
   const [selected, setSelected] = useState<CreditNote | null>(null);
 
   // Filters + search + paging are server-side so they work across the whole set.
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1));
   const params = useMemo(() => ({
     entity, page,
     ...(typeFilter ? { kind: typeFilter } : {}),
     ...statusFilterArgs(statusFilter),
     ...(search ? { search } : {}),
-  }), [entity, page, typeFilter, statusFilter, search]);
+    ...scope,
+  }), [entity, page, typeFilter, statusFilter, search, scope]);
   const { data, isLoading, isFetching, isError, refetch } = useGetCreditNotesQuery(params);
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
@@ -197,6 +203,7 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
             {CREDIT_NOTE_FILTER_STATUSES.map((code) => <option key={code} value={code}>{STATUS_LABEL[code]}</option>)}
             <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
           </select>
+          {filters}
         </div>
         <Can permission={P.FIN_CREATE_CREDIT_NOTE}>
           <Button data-guide="finance-credit-notes.issue" onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> Issue note</Button>

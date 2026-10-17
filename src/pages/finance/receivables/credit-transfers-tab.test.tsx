@@ -67,6 +67,9 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   CustomerPicker: ({ onChange }: { onChange: (v: string) => void }) => <button type="button" onClick={() => onChange("C-001")}>customer-picker</button>,
   PostingDateField: () => <div>posting-date</div>,
 }));
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetFiscalYearsQuery: () => ({ data: { data: [] } }),
+}));
 vi.mock("@/redux/services/finance/fees-api", () => ({
   useGetCreditTransfersQuery: () => ({ data: { data: mocks.rows, pagination: { currentPage: 1, totalPages: 1 } }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
   useCreateCreditTransferMutation: mocks.mutation,

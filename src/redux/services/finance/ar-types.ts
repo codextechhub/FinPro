@@ -1,6 +1,7 @@
 // Accounts-Receivable types - mirror the vs_finance AR serializers. Money kobo.
 
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
+import type { FinanceListScope } from "./api-types";
 
 export type InvoiceStatus = "DRAFT" | "POSTED" | "REVERSED" | "CANCELLED";
 export type PaymentStatus = "UNPAID" | "PARTIAL" | "PAID";
@@ -363,7 +364,8 @@ export interface DunningNotice {
   sent_at: string | null;
 }
 
-export interface InvoiceListParams {
+/** The invoice list's filters, its branch and period among them (`FinanceListScope`). */
+export interface InvoiceListParams extends FinanceListScope {
   entity: string;
   page?: number;
   page_size?: number;

@@ -310,6 +310,14 @@ describe("the purchase order export", () => {
     act(() => tab("Sent back").click());
     expect(mocks.state.exported).toEqual({ approval: "returned", search: "" });
   });
+
+  it("sends the branch and year the list shows, with no branch spelled none", () => {
+    mocks.state.held = new Set([P.PROC_VIEW_PURCHASE_ORDERS]);
+    mocks.state.lens = { applies: true, pinnedBranch: null, branch: 1, choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
+    act(() => root.render(<MemoryRouter initialEntries={["/?year=2015"]}><PurchaseOrdersPage /></MemoryRouter>));
+    expect(mocks.state.exported).toEqual({ search: "", branch: 1, fiscal_year: 2015 });
+    mocks.state.lens = { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false };
+  });
 });
 
 /**

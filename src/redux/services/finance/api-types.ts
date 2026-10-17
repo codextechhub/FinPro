@@ -39,6 +39,23 @@ export interface EntityScopedParams {
 }
 
 /**
+ * The branch a Finance list or summary is narrowed to: one branch id, or
+ * `unassigned` for documents not yet given a branch. Left out, the server
+ * answers for every branch in the reader's reach. See `listBranchArg`.
+ */
+export type FinanceBranchArg = { branch?: number | "unassigned" };
+
+/**
+ * The stretch of time a Finance list, or the summary above it, is narrowed to:
+ * one financial year by its label, or a range of dates, never both. See
+ * `listPeriodArg`.
+ */
+export type FinancePeriodArg = { fiscal_year?: number; date_from?: string; date_to?: string };
+
+/** The filters a Finance document list, its summary and its export share. */
+export type FinanceListScope = FinanceBranchArg & FinancePeriodArg;
+
+/**
  * Coerce an endpoint's `data` field to an array. The backend's success_response
  * does `data or {}`, so a list endpoint returns `[]` as `{}` when EMPTY - guard
  * every non-paginated list read with this so the UI never gets a non-array.

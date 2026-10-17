@@ -4,7 +4,7 @@
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
-import type { ApiEnvelope, PaginatedEnvelope, Pagination } from "./api-types";
+import type { ApiEnvelope, FinanceListScope, PaginatedEnvelope, Pagination } from "./api-types";
 import type {
   ArAdjustment,
   SubmittedDocument,
@@ -55,7 +55,7 @@ export const arApi = baseApi.injectEndpoints({
       query: (params) => ({ url: `/finance/invoices/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceInvoices"],
     }),
-    getInvoiceSummary: builder.query<ApiEnvelope<InvoiceSummary>, { entity: string; search?: string; include_archived?: "true" }>({
+    getInvoiceSummary: builder.query<ApiEnvelope<InvoiceSummary>, { entity: string; search?: string; include_archived?: "true" } & FinanceListScope>({
       query: (params) => ({ url: `/finance/invoices/summary/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceInvoices"],
     }),
@@ -113,7 +113,7 @@ export const arApi = baseApi.injectEndpoints({
     }),
 
     // Credit notes
-    getCreditNotes: builder.query<PaginatedEnvelope<CreditNote>, EntityList & { kind?: string; search?: string }>({
+    getCreditNotes: builder.query<PaginatedEnvelope<CreditNote>, EntityList & { kind?: string; search?: string } & FinanceListScope>({
       query: (params) => ({ url: `/finance/credit-notes/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceCreditNotes"],
     }),
@@ -406,12 +406,12 @@ export const arApi = baseApi.injectEndpoints({
       query: ({ entity, id, ...body }) => ({ url: `/finance/customers/${id}/receipt/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceCustomers", "FinanceInvoices", "FinanceReports", "FinanceJournals", "FinancePayments", "FinancePaymentPlans"],
     }),
-    getPayments: builder.query<PaginatedEnvelope<Payment>, { entity: string; page?: number; status?: string; method?: string; customer?: string; search?: string }>({
+    getPayments: builder.query<PaginatedEnvelope<Payment>, { entity: string; page?: number; status?: string; method?: string; customer?: string; search?: string } & FinanceListScope>({
       query: (p) => ({ url: `/finance/payments/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePayments"],
     }),
     // Entity-wide receipts KPI totals + allocation-status counts.
-    getPaymentSummary: builder.query<ApiEnvelope<PaymentSummary>, { entity: string; method?: string; customer?: string; search?: string }>({
+    getPaymentSummary: builder.query<ApiEnvelope<PaymentSummary>, { entity: string; method?: string; customer?: string; search?: string } & FinanceListScope>({
       query: (p) => ({ url: `/finance/payments/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePayments"],
     }),

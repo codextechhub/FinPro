@@ -194,7 +194,7 @@ export default function RequisitionsPage() {
           actions={<>
             <QuickExportButton
               screen="procurement.requisitions"
-              params={{ ...statusFilterArgs(status), search: debouncedSearch }}
+              params={{ ...statusFilterArgs(status), search: debouncedSearch, ...scope }}
               entity={entity}
               typeface="geist"
               defaultName="Purchase requisitions"

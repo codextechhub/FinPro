@@ -24,6 +24,10 @@
  * narration are typed in, and a new run needs the date, so a role that may not
  * write it is not offered one. The age bands travel with their own switch,
  * apart from the branch lines' totals.
+ *
+ * The list answers for one branch and one stretch of time
+ * (`useFinanceListScope`), each run placed by its provision date. A role that
+ * may not read that date is offered no Year picker and sends no period.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -49,7 +53,7 @@ import {
 } from "@/redux/services/finance/fees-api";
 import type { DoubtfulDebtProvision, ProvisionLine } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, bandLabel, bpsToPercent, useBranchColumn } from "./fees-parts";
-import { ListBranchSelect, listBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
+import { useFinanceListScope } from "../list-scope";
 
 const RESOURCE = "finance.provision";
 
@@ -85,16 +89,16 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
   const access = useFieldAccess(RESOURCE);
   const { branchIds } = useReaderReach();
   const { wholeSchool, canWholeSchool, heldWithoutReach } = useWholeSchoolAccess();
-  const list = useListBranch();
   const statusHidden = access.isHidden("status");
   const [page, setPage] = useState(1);
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1), { periodReadable: !access.isHidden("as_of") });
   // Runs have no status filter: the one choice is all runs, or those sent back.
   const [approval, setApproval] = useState("");
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<DoubtfulDebtProvision | null>(null);
   // A run names no branch; a branch's list keeps the runs with a line for it.
   const { data, isLoading, isFetching, isError, refetch } = useGetProvisionsQuery({
-    entity, page, ...(statusHidden ? {} : statusFilterArgs(approval)), ...listBranchArg(list.view),
+    entity, page, ...(statusHidden ? {} : statusFilterArgs(approval)), ...scope,
   });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
@@ -127,7 +131,7 @@ export function ProvisionsTab({ entity, currency }: { entity: string; currency?:
               <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
             </select>
           ) : null}
-          <ListBranchSelect view={list.view} onChange={(v) => { setPage(1); list.choose(v); }} />
+          {filters}
           <p className="font-mont text-xs text-gray-05">One journal per branch, worked out from each branch&apos;s aged debts.</p>
         </div>
         {canWholeSchool(P.FIN_CREATE_PROVISION) && !access.isReadOnly("as_of") ? (

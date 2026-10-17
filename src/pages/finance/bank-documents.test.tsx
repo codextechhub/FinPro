@@ -67,6 +67,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 }));
 vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetBankAccountsQuery: () => ({ data: { data: [{ id: 3, name: "Lekki current", branch_id: 2 }, { id: 4, name: "Lekki savings", branch_id: 2 }] } }),
+  useGetFiscalYearsQuery: () => ({ data: { data: [] } }),
 }));
 vi.mock("@/redux/services/finance/bank-documents-api", () => {
   const list = (key: "transaction" | "transfer") => (args: unknown) => (mocks.listArgs(key, args), {
@@ -322,6 +323,42 @@ describe("Field Access on the transfer list", () => {
     expect(headers()).toEqual(["Document", "Date", "To", "Branch", "Status"]);
     expect(cells()).toHaveLength(5);
     expect(container.textContent).not.toContain("Lekki current");
+  });
+});
+
+/**
+ * A period is a filter on the document's own date, so a role that may not read
+ * that date is offered no Year picker and asks for no period, even one a link
+ * carries; one that may only read it keeps the picker.
+ */
+describe("the bank lists' year under Field Access", () => {
+  const showYear = (kind: "transaction" | "transfer") => act(() => root.render(
+    <MemoryRouter initialEntries={[`/finance/banking?bank_document=${kind}&year=2015`]}>
+      <BankDocumentsSection entity="BSS" currency="NGN" />
+    </MemoryRouter>,
+  ));
+  const year = () => container.querySelector('select[aria-label="Year"]');
+  const asked = (kind: string) => mocks.listArgs.mock.calls.filter((call) => call[0] === kind).at(-1)?.[1] as Record<string, unknown>;
+
+  it("drops the picker and the period when the transaction date is hidden", () => {
+    mocks.fieldAccess = { [TXN]: { hidden: ["transaction_date"] } };
+    showYear("transaction");
+    expect(year()).toBeNull();
+    expect(asked("transaction")).not.toHaveProperty("fiscal_year");
+  });
+
+  it("drops the picker and the period when the transfer date is hidden", () => {
+    mocks.fieldAccess = { [XFER]: { hidden: ["transfer_date"] } };
+    showYear("transfer");
+    expect(year()).toBeNull();
+    expect(asked("transfer")).not.toHaveProperty("fiscal_year");
+  });
+
+  it("keeps the picker and sends the year when the date is only read-only", () => {
+    mocks.fieldAccess = { [TXN]: { read_only: ["transaction_date"] } };
+    showYear("transaction");
+    expect(year()).not.toBeNull();
+    expect(asked("transaction")).toMatchObject({ fiscal_year: 2015 });
   });
 });
 

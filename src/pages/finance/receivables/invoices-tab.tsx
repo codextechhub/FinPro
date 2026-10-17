@@ -3,6 +3,10 @@
  * (invoiced / collected / collection rate / overdue), status tabs with counts,
  * search, a Customer-avatar table with a derived status pill, and a totals footer.
  * Keeps the detail drawer + the write-off action.
+ *
+ * The list, the figures above it and its export answer for one branch and one
+ * stretch of time (`useFinanceListScope`): Mrs Bello on Ikeja with FY 2015
+ * picked sees Ikeja's 2015 invoices, counted and exported as the same set.
  */
 
 import { useMemo, useState } from "react";
@@ -28,6 +32,7 @@ import { NewInvoiceDrawer } from "./new-invoice-drawer";
 import { useDates } from "../../../lib/display-prefs";
 import { ShowArchivedToggle, includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { DOCUMENT_STATUS_WORDS, PAYMENT_PROGRESS_WORDS } from "@/components/finance-ui/status-words";
+import { useFinanceListScope } from "../list-scope";
 
 const TABS = [
   { key: "", label: "All" }, { key: "draft", label: "Draft" }, { key: "issued", label: "Issued" },
@@ -103,10 +108,11 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
   useActionParam("new", can(P.FIN_CREATE_INVOICE), () => setNewOpen(true));
 
   const [showArchived] = useShowArchived();
-  const params = useMemo(() => ({ entity, page, ...(bucket ? { bucket } : {}), ...(search ? { search } : {}), ...includeArchivedArg(showArchived) }), [entity, page, bucket, search, showArchived]);
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1));
+  const params = useMemo(() => ({ entity, page, ...(bucket ? { bucket } : {}), ...(search ? { search } : {}), ...includeArchivedArg(showArchived), ...scope }), [entity, page, bucket, search, showArchived, scope]);
   const { data, isLoading, isFetching, isError, refetch } = useGetInvoicesQuery(params);
-  // The counts leave archived years out exactly as the list does, so a tab's count matches its rows.
-  const summaryQ = useGetInvoiceSummaryQuery({ entity, ...(search ? { search } : {}), ...includeArchivedArg(showArchived) });
+  // The counts read the list's archived years, branch and period, so a tab's count matches its rows.
+  const summaryQ = useGetInvoiceSummaryQuery({ entity, ...(search ? { search } : {}), ...includeArchivedArg(showArchived), ...scope });
   const summary = summaryQ.data?.data;
   const [doWriteOff, { isLoading: writingOff }] = useWriteOffInvoiceMutation();
 
@@ -176,12 +182,13 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
           <Input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); setPage(1); }} placeholder="Search invoice no / customer" className="h-9 w-full pl-8 font-mont text-sm" />
         </div>
+        {filters}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <ShowArchivedToggle entity={entity} />
           {/* The list's own params: the server reads each tab by the list's rules, so the file holds the invoices the tab shows. */}
           <QuickExportButton
             screen="finance.invoices"
-            params={{ bucket, search }}
+            params={{ bucket, search, ...scope }}
             entity={entity}
             typeface="geist"
             defaultName="Customer invoices"

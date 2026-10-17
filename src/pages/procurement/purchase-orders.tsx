@@ -150,7 +150,7 @@ export default function PurchaseOrdersPage() {
           actions={<>
             <QuickExportButton
               screen="procurement.purchase_orders"
-              params={{ ...statusFilterArgs(status), search: debouncedSearch }}
+              params={{ ...statusFilterArgs(status), search: debouncedSearch, ...scope }}
               entity={entity}
               typeface="geist"
               defaultName="Purchase orders"

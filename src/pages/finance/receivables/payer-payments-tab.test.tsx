@@ -13,6 +13,7 @@
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PayerPayment, PayerPlanShare } from "@/redux/services/finance/fees-types";
 
@@ -44,6 +45,9 @@ vi.mock("@/hooks/use-permissions", () => ({
     hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true,
     hasModuleAccess: () => true, fieldAccess: mocks.fieldAccess,
   }),
+}));
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetFiscalYearsQuery: () => ({ data: { data: [] } }),
 }));
 vi.mock("@/redux/services/finance/fees-api", () => ({
   useVoidPayerPaymentMutation: () => [vi.fn(), { isLoading: false }],
@@ -335,7 +339,7 @@ describe("the payments list", () => {
   };
   const mount = () => {
     mocks.branches = [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }];
-    act(() => root.render(<PayerPaymentsTab entity="HOLYCROSS" currency="NGN" />));
+    act(() => root.render(<MemoryRouter><PayerPaymentsTab entity="HOLYCROSS" currency="NGN" /></MemoryRouter>));
   };
   const tableHeaders = () => [...container.querySelectorAll("table thead th")].map((th) => th.textContent);
 

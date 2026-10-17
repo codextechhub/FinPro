@@ -14,7 +14,7 @@
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
-import type { ApiEnvelope, PaginatedEnvelope } from "./api-types";
+import type { ApiEnvelope, FinanceBranchArg, FinanceListScope, PaginatedEnvelope } from "./api-types";
 import type { Invoice, WriteOffRequest } from "./ar-types";
 import type {
   CustomerCreditTransfer,
@@ -45,8 +45,6 @@ const qs = (p: object) => generateQueryString(p as Record<string, string | numbe
 /** Everything a posting that moves receivables can change on screen. */
 const LEDGER_TAGS = ["FinanceReports", "FinanceJournals", "FinanceInvoices", "FinanceCustomers"] as const;
 
-/** `?branch=`: one branch the reader works in, or the rows not yet given one. */
-type BranchArg = { branch?: number | "unassigned" };
 
 export const feesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -63,7 +61,7 @@ export const feesApi = baseApi.injectEndpoints({
     }),
 
     // Deferred income
-    getDeferredIncome: builder.query<ApiEnvelope<DeferredIncomeSummary>, { entity: string } & BranchArg>({
+    getDeferredIncome: builder.query<ApiEnvelope<DeferredIncomeSummary>, { entity: string } & FinanceBranchArg>({
       query: (params) => ({ url: `/finance/deferred-income/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceDeferredIncome"],
     }),
@@ -73,7 +71,7 @@ export const feesApi = baseApi.injectEndpoints({
     }),
     getDeferredIncomeReleases: builder.query<
       PaginatedEnvelope<DeferredIncomeReleaseRow>,
-      { entity: string; page?: number; page_size?: number; period?: number; month?: string; reversed?: "true" | "false" } & BranchArg
+      { entity: string; page?: number; page_size?: number; period?: number; month?: string; reversed?: "true" | "false" } & FinanceBranchArg
     >({
       query: (params) => ({ url: `/finance/deferred-income/releases/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceDeferredIncome"],
@@ -84,7 +82,7 @@ export const feesApi = baseApi.injectEndpoints({
     }),
 
     // Doubtful-debt provision
-    getProvisions: builder.query<PaginatedEnvelope<DoubtfulDebtProvision>, { entity: string; page?: number; approval?: "returned" } & BranchArg>({
+    getProvisions: builder.query<PaginatedEnvelope<DoubtfulDebtProvision>, { entity: string; page?: number; approval?: "returned" } & FinanceListScope>({
       query: (params) => ({ url: `/finance/provisions/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceProvisions"],
     }),
@@ -104,7 +102,7 @@ export const feesApi = baseApi.injectEndpoints({
     // Customer deposits
     getDeposits: builder.query<
       PaginatedEnvelope<CustomerDeposit>,
-      { entity: string; page?: number; status?: DepositStatus; customer?: string } & BranchArg
+      { entity: string; page?: number; status?: DepositStatus; customer?: string } & FinanceBranchArg
     >({
       query: (params) => ({ url: `/finance/deposits/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceDeposits"],
@@ -129,7 +127,7 @@ export const feesApi = baseApi.injectEndpoints({
 
     // Credit transfers between customers (always approval-gated)
     getCreditTransfers: builder.query<
-      PaginatedEnvelope<CustomerCreditTransfer>, { entity: string; page?: number; status?: string; customer?: string; approval?: "returned" } & BranchArg
+      PaginatedEnvelope<CustomerCreditTransfer>, { entity: string; page?: number; status?: string; customer?: string; approval?: "returned" } & FinanceListScope
     >({
       query: (params) => ({ url: `/finance/credit-transfers/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceCreditTransfers"],
@@ -191,7 +189,7 @@ export const feesApi = baseApi.injectEndpoints({
     }),
 
     // Payments from a payer
-    getPayerPayments: builder.query<PaginatedEnvelope<PayerPayment>, { entity: string; page?: number; payer?: string; status?: string } & BranchArg>({
+    getPayerPayments: builder.query<PaginatedEnvelope<PayerPayment>, { entity: string; page?: number; payer?: string; status?: string } & FinanceListScope>({
       query: (params) => ({ url: `/finance/payer-payments/${qs(params)}`, method: "GET" }),
       providesTags: ["FinancePayerPayments"],
     }),

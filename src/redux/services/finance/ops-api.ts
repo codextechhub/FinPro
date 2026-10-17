@@ -4,7 +4,7 @@
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
-import type { ApiEnvelope, PaginatedEnvelope } from "./api-types";
+import type { ApiEnvelope, FinanceListScope, PaginatedEnvelope } from "./api-types";
 import type {
   BankAccount,
   BankAccountDetail,
@@ -189,11 +189,11 @@ export const opsApi = baseApi.injectEndpoints({
     }),
 
     // Expense claims
-    getExpenseClaims: b.query<PaginatedEnvelope<ExpenseClaim>, E & { payment_status?: string; display_status?: string; q?: string; approval?: "returned" }>({
+    getExpenseClaims: b.query<PaginatedEnvelope<ExpenseClaim>, E & { payment_status?: string; display_status?: string; q?: string; approval?: "returned" } & FinanceListScope>({
       query: (p) => ({ url: `/finance/expense-claims/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceExpenseClaims"],
     }),
-    getExpenseClaimSummary: b.query<ApiEnvelope<{ open: number; month_total: number; avg: number; awaiting: number; sent_back?: number }>, { entity: string }>({
+    getExpenseClaimSummary: b.query<ApiEnvelope<{ open: number; month_total: number; avg: number; awaiting: number; sent_back?: number }>, { entity: string } & FinanceListScope>({
       query: (p) => ({ url: `/finance/expense-claims/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceExpenseClaims"],
     }),

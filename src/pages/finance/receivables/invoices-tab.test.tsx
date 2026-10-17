@@ -7,6 +7,10 @@
  * term bill is "Partly paid" under the "Partly paid" tab, Ada's bill waiting
  * on an approver reads "Awaiting approval", and a voided one "Voided", never
  * the raw state the server sends.
+ *
+ * Mrs Bello, bursar for Ikeja and Lekki, switches the sidebar to Lekki and picks
+ * FY 2015: the list, the figures above it and the exported file all answer for
+ * Lekki's 2015 invoices, and the page offers no branch picker of its own.
  */
 
 import { act } from "react";
@@ -14,7 +18,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ invoices: vi.fn(), summary: vi.fn(), exported: vi.fn(), rows: [] as unknown[] }));
+const NO_LENS = { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false };
+const mocks = vi.hoisted(() => ({
+  invoices: vi.fn(), summary: vi.fn(), exported: vi.fn(), rows: [] as unknown[],
+  lens: { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false } as unknown,
+}));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
@@ -28,6 +36,13 @@ vi.mock("@/components/finance-ui/archived-years", async (importOriginal) => ({
 }));
 vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   QuickExportButton: (props: { params?: unknown }) => { mocks.exported(props.params); return null; },
+  hostBranchLens: () => mocks.lens,
+}));
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetFiscalYearsQuery: () => ({ data: { data: [
+    { id: 1, year: 2015, start_date: "2014-09-01", end_date: "2015-08-31", is_archived: false },
+    { id: 2, year: 2016, start_date: "2015-09-01", end_date: "2016-08-31", is_archived: false },
+  ] } }),
 }));
 vi.mock("@/redux/services/finance/ar-api", () => ({
   useGetInvoicesQuery: (args: unknown) => {
@@ -53,7 +68,9 @@ let root: Root;
 beforeEach(() => {
   mocks.invoices.mockReset();
   mocks.summary.mockReset();
+  mocks.exported.mockReset();
   mocks.rows = [];
+  mocks.lens = NO_LENS;
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -116,5 +133,42 @@ describe("the invoice export", () => {
     act(() => tab.click());
     expect(mocks.invoices.mock.lastCall?.[0]).toMatchObject({ bucket: "overdue" });
     expect(mocks.exported.mock.lastCall?.[0]).toMatchObject({ bucket: "overdue" });
+  });
+});
+
+describe("the invoice list's branch and year", () => {
+  const LEKKI = { applies: true, pinnedBranch: null, branch: 2, choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
+  const year = () => container.querySelector<HTMLSelectElement>('select[aria-label="Year"]')!;
+  const pick = (el: HTMLSelectElement, value: string) => act(() => {
+    el.value = value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
+  it("opens on All years and asks the list and its figures for no period", () => {
+    mount("/finance/receivables/invoices");
+    expect(year().value).toBe("all");
+    expect(mocks.invoices.mock.lastCall?.[0]).not.toHaveProperty("fiscal_year");
+    expect(mocks.summary.mock.lastCall?.[0]).toEqual({ entity: "BSS" });
+  });
+
+  it("asks the list and its figures for the switcher's branch and the year picked", () => {
+    mocks.lens = LEKKI;
+    mount("/finance/receivables/invoices");
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
+    pick(year(), "2015");
+    expect(mocks.invoices.mock.lastCall?.[0]).toMatchObject({ entity: "BSS", page: 1, branch: 2, fiscal_year: 2015 });
+    expect(mocks.summary.mock.lastCall?.[0]).toEqual({ entity: "BSS", branch: 2, fiscal_year: 2015 });
+  });
+
+  it("sends custom dates as a range and never with a year", () => {
+    mount("/finance/receivables/invoices?year=custom&from=2015-03-01&to=2015-05-31");
+    expect(mocks.invoices.mock.lastCall?.[0]).toMatchObject({ date_from: "2015-03-01", date_to: "2015-05-31" });
+    expect(mocks.summary.mock.lastCall?.[0]).not.toHaveProperty("fiscal_year");
+  });
+
+  it("exports the branch and period the list shows, beside its tab", () => {
+    mocks.lens = LEKKI;
+    mount("/finance/receivables/invoices?year=2015");
+    expect(mocks.exported.mock.lastCall?.[0]).toEqual({ bucket: "", search: "", branch: 2, fiscal_year: 2015 });
   });
 });

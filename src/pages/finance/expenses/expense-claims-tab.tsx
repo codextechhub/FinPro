@@ -4,10 +4,13 @@
  * stepper, line items (cost center + receipt attachment), and Approve / Reject /
  * Pay / Print actions.
  *
- * Honest adaptations: the prototype's school "Branch" column/filter is dropped
- * (claims are by staff, classified by cost center, which we keep). The 3-step
- * stepper maps to our real states - Submitted (draft) → Approved & accrued
- * (post: Dr expense / Cr accrued reimbursement) → Reimbursed (settle: Cr bank).
+ * Claims are by staff and classified by cost center. The list, the figures
+ * above it and its export answer for one branch and one stretch of time
+ * (`useFinanceListScope`): the branch the app's switcher shows, or the page's
+ * own picker where the app has none, and the Year picker beside the search.
+ * The 3-step stepper maps to the real states - Submitted (draft) → Approved &
+ * accrued (post: Dr expense / Cr accrued reimbursement) → Reimbursed (settle:
+ * Cr bank).
  */
 
 import { useMemo, useRef, useState } from "react";
@@ -44,6 +47,7 @@ import {
 import type { ExpenseClaim, ExpenseClaimLine } from "@/redux/services/finance/ops-types";
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
 import { useDates } from "../../../lib/display-prefs";
+import { useFinanceListScope } from "../list-scope";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -103,7 +107,7 @@ export const CLAIM_STATUS_OPTIONS: readonly { value: string; label: string }[] =
   { value: SENT_BACK_FILTER, label: SENT_BACK_WORD },
 ];
 
-/** The claims list's filter arguments, which its export sends unchanged. */
+/** The claims list's filter arguments, which its export sends unchanged beside the list's branch and period. */
 export function claimListArgs(status: string, search: string): Record<string, string> {
   return { ...(search ? { q: search } : {}), ...statusFilterArgs(status, "display_status") };
 }
@@ -127,14 +131,15 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
   const displayedClaim = selected
     ?? (linkedDocumentDismissed ? null : linkedClaimQuery.data?.data ?? null);
 
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1));
   const { data, isLoading, isFetching, isError, refetch } = useGetExpenseClaimsQuery({
-    entity, page, ...claimListArgs(status, search),
+    entity, page, ...claimListArgs(status, search), ...scope,
   });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
   const resetPage = () => setPage(1);
 
-  const summaryQ = useGetExpenseClaimSummaryQuery({ entity });
+  const summaryQ = useGetExpenseClaimSummaryQuery({ entity, ...scope });
   const kpis = summaryQ.data?.data ?? { open: 0, month_total: 0, avg: 0, awaiting: 0, sent_back: 0 };
 
   const columns: Column<ExpenseClaim>[] = [
@@ -166,12 +171,13 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
             <option value="">All statuses</option>
             {CLAIM_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+          {filters}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {/* The server reads the list's own filters, so the file holds the claims the list shows. */}
           <QuickExportButton
             screen="finance.expense_claims"
-            params={claimListArgs(status, search)}
+            params={{ ...claimListArgs(status, search), ...scope }}
             entity={entity}
             typeface="geist"
             defaultName="Expense claims"
