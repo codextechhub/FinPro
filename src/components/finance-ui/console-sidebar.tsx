@@ -4,6 +4,10 @@
  * collapsible NavMain - expand-only parents + leaf links. Replaces the global
  * nav while you're inside the console.
  *
+ * The host may pin something under the menu through `ConsoleSidebarFooter`
+ * in the host contract: the school app keeps its branch switcher there, so
+ * entering Finance or Procurement does not take it away.
+ *
  * There is no way-out row. The mark at the top is already a link home, and the
  * header's search box reaches any screen by name, so a permanent "Back to Home"
  * was a third route to the same place, taking the first slot on every console
@@ -15,13 +19,14 @@ import { Link, useLocation } from "react-router";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { AppLogo } from "../../host";
+import { AppLogo, HostConsoleSidebarFooter } from "../../host";
 import { NavMain } from "./nav-main";
 import { usePermissions } from "@/hooks/use-permissions";
 import { routesPath } from "@/routes/routes-path";
@@ -151,6 +156,12 @@ export function ConsoleSidebar({ title, nav, gateOnCustody = false }: { title: s
           </div>
         ))}
       </SidebarContent>
+      {/* Pinned under the menu so it stays put while the menu scrolls. */}
+      {HostConsoleSidebarFooter && (
+        <SidebarFooter className="bg-white p-0">
+          <HostConsoleSidebarFooter collapsed={isCollapsed} />
+        </SidebarFooter>
+      )}
       <SidebarRail />
     </Sidebar>
   );
