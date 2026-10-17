@@ -11,10 +11,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { ReaderBranchLens } from "@/components/finance-ui/raising-branch";
-import { actionBranch, actionBranchReady, calendarBranchFor } from "./calendar-branch";
+import { actionBranch, actionBranchReady, calendarBranchFor, questionBranch } from "./calendar-branch";
 
 const IKEJA = { id: 1, name: "Ikeja" };
 const LEKKI = { id: 2, name: "Lekki" };
+const VICTORIA_ISLAND = { id: 3, name: "Victoria Island" };
 
 const lens = (patch: Partial<ReaderBranchLens>): ReaderBranchLens => ({
   applies: true,
@@ -66,5 +67,28 @@ describe("a reader posted to one branch of several", () => {
     const calendar = calendarBranchFor(lens({ pinnedBranch: 1, choices: [IKEJA] }), "2");
 
     expect(calendar).toMatchObject({ canChoose: false, selected: 1, readBranch: 1, actBranch: 1, mustAsk: false });
+  });
+});
+
+describe("the branch a confirm dialog's question starts on", () => {
+  const allBranches = calendarBranchFor(lens({ choices: [VICTORIA_ISLAND, IKEJA, LEKKI] }), null);
+
+  it("starts on none while the act may be sent for several branches", () => {
+    expect(questionBranch(allBranches, [IKEJA, LEKKI], "")).toBe("");
+  });
+
+  it("starts on the only branch the act may be sent for", () => {
+    expect(questionBranch(allBranches, [LEKKI], "")).toBe("2");
+  });
+
+  it("keeps the reader's pick while it is one of the choices, and drops it otherwise", () => {
+    expect(questionBranch(allBranches, [IKEJA, LEKKI], "1")).toBe("1");
+    expect(questionBranch(allBranches, [IKEJA, LEKKI], "3")).toBe("");
+    expect(questionBranch(allBranches, [LEKKI], "3")).toBe("2");
+  });
+
+  it("asks nothing with a branch chosen or at a one-branch school", () => {
+    expect(questionBranch(calendarBranchFor(lens({}), "2"), [LEKKI], "")).toBe("");
+    expect(questionBranch(calendarBranchFor(lens({ applies: false }), null), [IKEJA], "")).toBe("");
   });
 });

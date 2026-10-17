@@ -99,6 +99,7 @@ import {
 import {
   actionBranch,
   actionBranchReady,
+  questionBranch,
   calendarBranchFor,
   calendarBranchName,
   useCalendarBranch,
@@ -144,8 +145,9 @@ function forBranch(calendar: CalendarBranch, branch: number | undefined): string
 /**
  * The branch question inside a confirm dialog, asked only under All branches at
  * a school with several (see `calendar-branch.ts`). It offers `choices`, the
- * branches the act may be sent for (see `branch-close-actions.ts`), and starts
- * on none.
+ * branches the act may be sent for (see `branch-close-actions.ts`). `value`
+ * comes from `questionBranch`, so the question starts on the only branch when
+ * the act may be sent for one alone, and on none otherwise.
  */
 function CalendarBranchQuestion({ calendar, choices, value, onChange, hint }: {
   calendar: CalendarBranch;
@@ -294,7 +296,9 @@ export function PeriodsTab({ entity, headerSlot }: {
     setYearBranch("");
     setYearReason("");
   };
-  const yearTarget = actionBranch(calendar, yearBranch);
+  const yearChoices = (yearAction?.kind === "reopen" ? yearReopenFor : yearCloseFor) ?? calendar.choices;
+  const yearChosen = questionBranch(calendar, yearChoices, yearBranch);
+  const yearTarget = actionBranch(calendar, yearChosen);
   const yearScope = forBranch(calendar, yearTarget);
   const doYearAction = async () => {
     if (!yearAction) return;
@@ -519,7 +523,7 @@ export function PeriodsTab({ entity, headerSlot }: {
         loading={yearBusy}
         confirmDisabled={yearActionWhole
           ? !hasReason(yearReason)
-          : !actionBranchReady(calendar, yearBranch) || (yearAction?.kind === "reopen" && !hasReason(yearReason))}
+          : !actionBranchReady(calendar, yearChosen) || (yearAction?.kind === "reopen" && !hasReason(yearReason))}
         onConfirm={doYearAction}
       >
         {yearActionWhole ? (
@@ -536,8 +540,8 @@ export function PeriodsTab({ entity, headerSlot }: {
           <div className="space-y-4">
             <CalendarBranchQuestion
               calendar={calendar}
-              choices={(yearAction?.kind === "reopen" ? yearReopenFor : yearCloseFor) ?? calendar.choices}
-              value={yearBranch}
+              choices={yearChoices}
+              value={yearChosen}
               onChange={setYearBranch}
               hint={yearAction?.kind === "reopen"
                 ? "Only this branch's year re-opens. The school's year re-opens with it."
@@ -1026,7 +1030,9 @@ export function PeriodCloseDrawer({
   const lockHeldFor = heldFor("lock");
   const itThem = (branches: CalendarBranchOption[]) => (branches.length === 1 ? "it" : "them");
   const isAre = (branches: CalendarBranchOption[]) => (branches.length === 1 ? "is" : "are");
-  const target = actionBranch(calendar, branchChoice);
+  const actionChoices = action ? offeredFor(action) : calendar.choices;
+  const chosenBranch = questionBranch(calendar, actionChoices, branchChoice);
+  const target = actionBranch(calendar, chosenBranch);
   const branchArg = target != null ? { branch: target } : {};
   const scope = forBranch(calendar, target);
 
@@ -1321,15 +1327,15 @@ export function PeriodCloseDrawer({
         confirmText={activeCopy?.text}
         destructive={activeCopy?.destructive}
         loading={busy}
-        confirmDisabled={!actionBranchReady(calendar, branchChoice) || ((action === "reopen" || action === "force") && !hasReason(reason))}
+        confirmDisabled={!actionBranchReady(calendar, chosenBranch) || ((action === "reopen" || action === "force") && !hasReason(reason))}
         onConfirm={confirm}
       >
         {calendar.mustAsk || action === "reopen" || action === "force" ? (
           <div className="space-y-4">
             <CalendarBranchQuestion
               calendar={calendar}
-              choices={action ? offeredFor(action) : calendar.choices}
-              value={branchChoice}
+              choices={actionChoices}
+              value={chosenBranch}
               onChange={setBranchChoice}
               hint={activeCopy?.branchHint ?? ""}
             />

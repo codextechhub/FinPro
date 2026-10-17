@@ -873,6 +873,105 @@ describe("under All branches, a month the branches stand apart on", () => {
   });
 });
 
+describe("Meridian Crest's October, after Victoria Island re-opens it", () => {
+  const VICTORIA_ISLAND = { id: 3, name: "Victoria Island" };
+
+  beforeEach(() => {
+    mocks.lens = { applies: true, pinnedBranch: null, branch: "all", choices: [VICTORIA_ISLAND, IKEJA, LEKKI], isLoading: false };
+  });
+
+  const own = (victoriaIsland: string, ikeja: string, lekki: string) => [
+    { branch: 3, branch_name: "Victoria Island", status: victoriaIsland, closed_at: null },
+    { branch: 1, branch_name: "Ikeja", status: ikeja, closed_at: null },
+    { branch: 2, branch_name: "Lekki", status: lekki, closed_at: null },
+  ];
+
+  async function mountOctober(month: ReturnType<typeof own>, branch: string | null = null) {
+    checklistWith([], "OPEN");
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <PeriodCloseDrawer
+            id={MARCH.id}
+            entity="MERIDIAN"
+            finalPeriodOfOpenYear={false}
+            calendar={calendarBranchFor(mocks.lens, branch)}
+            status={month.find((state) => String(state.branch) === branch)?.status as "OPEN" ?? "OPEN"}
+            branchStates={month}
+            fiscalYear={{ year: 2026, status: "OPEN", branch_states: own("OPEN", "OPEN", "OPEN") }}
+            onClose={() => undefined}
+          />
+        </MemoryRouter>,
+      );
+    });
+  }
+
+  const question = () => dialog()?.querySelector("select") ?? null;
+  const offered = () => Array.from(question()?.options ?? []).map((o) => o.textContent);
+
+  it("offers Re-open for Ikeja and Lekki, still closed, and asks between them", async () => {
+    await mountOctober(own("OPEN", "CLOSED", "CLOSED"));
+
+    const states = document.body.querySelector("[aria-label=\"Each branch's month\"]");
+    expect(states?.textContent).toContain("Victoria Island");
+    expect(states?.textContent).toContain("Ikeja");
+    expect(states?.textContent).toContain("Lekki");
+
+    expect(button("Re-open")?.disabled).toBe(false);
+    await click(button("Re-open"));
+    expect(offered()).toEqual(["Select branch", "Ikeja", "Lekki"]);
+    expect(question()?.value).toBe("");
+    await typeReason("A Lekki bill dated in October arrived late");
+    expect(button("Re-open period", dialog()!)?.disabled).toBe(true);
+
+    await pick(question(), "2");
+    await click(button("Re-open period", dialog()!));
+    expect(mocks.reopen).toHaveBeenCalledWith({ id: 41, entity: "MERIDIAN", branch: 2, reason: "A Lekki bill dated in October arrived late" });
+  });
+
+  it("starts the question on Lekki once it is the only branch still closed, and still shows it", async () => {
+    await mountOctober(own("OPEN", "OPEN", "CLOSED"));
+
+    await click(button("Re-open"));
+    expect(offered()).toEqual(["Select branch", "Lekki"]);
+    expect(question()?.value).toBe("2");
+    expect(dialog()?.textContent).toContain("for Lekki");
+    await typeReason("A Lekki bill dated in October arrived late");
+    await click(button("Re-open period", dialog()!));
+
+    expect(mocks.reopen).toHaveBeenCalledWith({ id: 41, entity: "MERIDIAN", branch: 2, reason: "A Lekki bill dated in October arrived late" });
+  });
+
+  it("offers the close only for Victoria Island, the branch open again", async () => {
+    await mountOctober(own("OPEN", "CLOSED", "CLOSED"));
+
+    await click(button("Run close steps"));
+    expect(offered()).toEqual(["Select branch", "Victoria Island"]);
+    expect(question()?.value).toBe("3");
+  });
+
+  it("offers no Re-open or Lock once every branch is open", async () => {
+    await mountOctober(own("OPEN", "OPEN", "OPEN"));
+
+    expect(button("Re-open")).toBeUndefined();
+    expect(button("Lock period")).toBeUndefined();
+    await click(button("Run close steps"));
+    expect(offered()).toEqual(["Select branch", "Victoria Island", "Ikeja", "Lekki"]);
+    expect(question()?.value).toBe("");
+  });
+
+  it("follows Victoria Island's own state with Victoria Island chosen, and asks no branch", async () => {
+    await mountOctober(own("OPEN", "CLOSED", "CLOSED"), "3");
+
+    expect(button("Re-open")).toBeUndefined();
+    expect(document.body.querySelector("[aria-label=\"Each branch's month\"]")).toBeNull();
+    await click(button("Run close steps"));
+    expect(question()).toBeNull();
+    await click(button("Run period close", dialog()!));
+    expect(lastArgs(mocks.closePeriod)).toMatchObject({ id: 41, entity: "MERIDIAN", branch: 3 });
+  });
+});
+
 describe("under All branches, a year the branches stand apart on", () => {
   beforeEach(atBrightStar);
 
@@ -888,7 +987,7 @@ describe("under All branches, a year the branches stand apart on", () => {
 
     await click(button("Re-open year"));
     expect(Array.from(dialog()?.querySelector("select")?.options ?? []).map((o) => o.textContent)).toEqual(["Select branch", "Ikeja"]);
-    await pick(dialog()?.querySelector("select") ?? null, "1");
+    expect(dialog()?.querySelector("select")?.value).toBe("1");
     await typeReason("A June bill for Ikeja arrived late");
     await click(button("Re-open fiscal year", dialog()!));
 

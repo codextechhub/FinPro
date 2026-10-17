@@ -92,6 +92,23 @@ export function actionBranch(calendar: CalendarBranch, chosen: string): number |
   return undefined;
 }
 
+/**
+ * The branch a confirm dialog's question holds, given `choices`, the branches
+ * the act may be sent for: the reader's pick while it is one of them, else the
+ * only one when there is exactly one, else none.
+ *
+ * Meridian Crest's October is open at Victoria Island and closed at Ikeja and
+ * Lekki, so its Re-open asks between Ikeja and Lekki and starts on neither:
+ * guessing would re-open the wrong branch's books. Once Ikeja has re-opened
+ * too, only Lekki is left, and the question starts on Lekki. It is still
+ * shown, so the reader sees whose books move before confirming.
+ */
+export function questionBranch(calendar: CalendarBranch, choices: readonly CalendarBranchOption[], chosen: string): string {
+  if (!calendar.mustAsk) return chosen;
+  if (chosen && choices.some((b) => String(b.id) === chosen)) return chosen;
+  return choices.length === 1 ? String(choices[0].id) : "";
+}
+
 /** Whether a confirm dialog has the branch it needs. */
 export function actionBranchReady(calendar: CalendarBranch, chosen: string): boolean {
   return !calendar.mustAsk || !!chosen;
