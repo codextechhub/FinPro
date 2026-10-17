@@ -42,10 +42,10 @@ import type {
   VendorAssessmentInput,
   VendorPerformance,
 } from "./procurement-ext-types";
-import type { ProcBranchArg } from "./procurement-api";
+import type { ProcBranchArg, ProcListScope } from "./procurement-api";
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
-type E = { entity: string; page?: number; status?: string } & ProcBranchArg;
+type E = { entity: string; page?: number; status?: string } & ProcListScope;
 type Act = { id: number; entity: string };
 
 export const procurementExtApi = baseApi.injectEndpoints({
@@ -137,7 +137,7 @@ export const procurementExtApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/procurement/rfqs/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["ProcRfqs"],
     }),
-    getRfqSummary: b.query<ApiEnvelope<RfqSummary>, { entity: string } & ProcBranchArg>({
+    getRfqSummary: b.query<ApiEnvelope<RfqSummary>, { entity: string } & ProcListScope>({
       query: (p) => ({ url: `/procurement/rfqs/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcRfqs"],
     }),

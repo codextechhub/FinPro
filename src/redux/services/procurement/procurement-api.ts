@@ -44,8 +44,15 @@ const qs = (p: object) => generateQueryString(p as Record<string, string | numbe
  * branch in the reader's reach. See `procurementBranchArg`.
  */
 export type ProcBranchArg = { branch?: number | "none" };
+/**
+ * The stretch of time a list, or the summary above it, is narrowed to: one
+ * financial year by its label, or a range of dates. See `listPeriodArg`.
+ */
+export type ProcPeriodArg = { fiscal_year?: number; date_from?: string; date_to?: string };
+/** The filters a document list and its summary share. */
+export type ProcListScope = ProcBranchArg & ProcPeriodArg;
 /** `approval: "returned"` keeps only documents an approver sent back to whoever sent them. */
-type E = { entity: string; page?: number; page_size?: number; status?: string; search?: string; approval?: "returned" } & ProcBranchArg;
+type E = { entity: string; page?: number; page_size?: number; status?: string; search?: string; approval?: "returned" } & ProcListScope;
 type Act = { id: number; entity: string };
 
 /**
@@ -152,7 +159,7 @@ export const procurementApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/procurement/requisitions/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["ProcRequisitions"],
     }),
-    getRequisitionSummary: b.query<ApiEnvelope<RequisitionSummary>, { entity: string } & ProcBranchArg>({
+    getRequisitionSummary: b.query<ApiEnvelope<RequisitionSummary>, { entity: string } & ProcListScope>({
       query: (p) => ({ url: `/procurement/requisitions/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcRequisitions"],
     }),
@@ -182,7 +189,7 @@ export const procurementApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/procurement/purchase-orders/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["ProcPurchaseOrders"],
     }),
-    getPurchaseOrderSummary: b.query<ApiEnvelope<PurchaseOrderSummary>, { entity: string } & ProcBranchArg>({
+    getPurchaseOrderSummary: b.query<ApiEnvelope<PurchaseOrderSummary>, { entity: string } & ProcListScope>({
       query: (p) => ({ url: `/procurement/purchase-orders/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcPurchaseOrders"],
     }),
@@ -241,7 +248,7 @@ export const procurementApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/procurement/vendor-invoices/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["ProcVendorInvoices"],
     }),
-    getVendorInvoiceSummary: b.query<ApiEnvelope<VendorInvoiceSummary>, { entity: string } & ProcBranchArg>({
+    getVendorInvoiceSummary: b.query<ApiEnvelope<VendorInvoiceSummary>, { entity: string } & ProcListScope>({
       query: (p) => ({ url: `/procurement/vendor-invoices/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcVendorInvoices"],
     }),

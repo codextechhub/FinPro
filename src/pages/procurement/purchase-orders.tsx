@@ -51,7 +51,7 @@ import { purchaseOrderChanges, purchaseOrderForm } from "./purchase-order-edit";
 import { emailRecipientsText, hasNoEmailRecipient } from "./purchase-order-email";
 import { SENT_BACK_WORD, WITH_APPROVERS_NOTE, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
-import { ListBranchSelect, procurementBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
+import { useProcurementListScope } from "./list-scope";
 
 const STATUS_TABS = PURCHASE_ORDER_TABS;
 
@@ -106,17 +106,16 @@ export default function PurchaseOrdersPage() {
   // retaining stale rows - adjust during render, not on a delay.
   if (!search.trim() && debouncedSearch !== "") setDebouncedSearch("");
 
-  const list = useListBranch();
-  const branch = procurementBranchArg(list.view).branch;
+  const { scope, filters } = useProcurementListScope(entity, () => setPage(1));
   const params = useMemo(() => ({
-    entity: entity!, page, ...statusFilterArgs(status), branch,
+    entity: entity!, page, ...statusFilterArgs(status), ...scope,
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
-  }), [entity, page, status, branch, debouncedSearch]);
+  }), [entity, page, status, scope, debouncedSearch]);
   const { currentData: data, isLoading, isFetching, isError, refetch } = useGetPurchaseOrdersQuery(
     params, { skip: !entity || !canPROC_VIEW_PURCHASE_ORDERS },
   );
   const { data: summaryData, isLoading: summaryLoading } = useGetPurchaseOrderSummaryQuery(
-    { entity: entity!, branch }, { skip: !entity || !canPROC_VIEW_PURCHASE_ORDERS },
+    { entity: entity!, ...scope }, { skip: !entity || !canPROC_VIEW_PURCHASE_ORDERS },
   );
   const rows = toArray(data?.data);
   const summary = summaryData?.data;
@@ -181,7 +180,7 @@ export default function PurchaseOrdersPage() {
               className="gap-5 self-center border-b-0"
               buttonClassName="py-3"
             />
-            <div className="flex w-full flex-wrap items-center gap-2 py-2 sm:ml-auto sm:w-auto sm:flex-nowrap"><ListBranchSelect view={list.view} onChange={(next) => { setPage(1); list.choose(next); }} className="w-full sm:w-48" /><label className="relative min-w-0 flex-1 sm:w-64 sm:flex-none"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search purchase orders" className="h-9 bg-white pl-9" /></label></div>
+            <div className="flex w-full flex-wrap items-center gap-2 py-2 sm:ml-auto sm:w-auto sm:justify-end">{filters}<label className="relative min-w-0 flex-1 sm:w-64 sm:flex-none"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search purchase orders" className="h-9 bg-white pl-9" /></label></div>
           </div>
           <DataTable columns={columns} rows={rows} rowKey={(po) => po.id} loading={isLoading || isFetching} error={isError} onRetry={refetch} onRowClick={(po) => setSelectedId(po.id)} page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage} emptyTitle={status ? `No ${STATUS_TABS.find((tab) => tab.value === status)?.label.toLowerCase()} purchase orders` : "No purchase orders yet"} emptyMessage={debouncedSearch ? "Try a different search term or status." : "Create an order from an approved requisition to begin."} />
         </section>

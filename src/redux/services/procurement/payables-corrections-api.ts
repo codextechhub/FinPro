@@ -25,7 +25,7 @@ import type {
   VendorInvoice,
 } from "./procurement-types";
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
-import type { ProcBranchArg } from "./procurement-api";
+import type { ProcListScope } from "./procurement-api";
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
 type Act = { id: number; entity: string };
@@ -44,7 +44,7 @@ export type CreditNoteDraft = {
 
 export const payablesCorrectionsApi = baseApi.injectEndpoints({
   endpoints: (b) => ({
-    getVendorCreditNotes: b.query<PaginatedEnvelope<VendorCreditNote>, { entity: string; page?: number; page_size?: number; status?: string; vendor?: string; vendor_invoice?: number; approval?: "returned" } & ProcBranchArg>({
+    getVendorCreditNotes: b.query<PaginatedEnvelope<VendorCreditNote>, { entity: string; page?: number; page_size?: number; status?: string; vendor?: string; vendor_invoice?: number; approval?: "returned" } & ProcListScope>({
       query: (p) => ({ url: `/procurement/vendor-credit-notes/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcVendorCreditNotes"],
     }),

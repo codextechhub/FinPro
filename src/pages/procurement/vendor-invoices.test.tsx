@@ -72,6 +72,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   TaxCodePicker: () => null,
 }));
 vi.mock("@/redux/services/finance/setup-api", () => mocks.api({}));
+vi.mock("@/redux/services/finance/ops-api", () => mocks.api({}));
 vi.mock("./procurement-shell", () => ({ ProcurementShell: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/components/layout/page-shell", () => ({ PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({

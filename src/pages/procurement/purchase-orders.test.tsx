@@ -23,8 +23,8 @@ const mocks = vi.hoisted(() => {
     update: (() => undefined) as (body: unknown) => void,
     resume: (() => undefined) as (id: unknown) => void,
     lens: { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false } as unknown,
-    listArgs: [] as { branch?: unknown }[],
-    summaryArgs: [] as { branch?: unknown }[],
+    listArgs: [] as Record<string, unknown>[],
+    summaryArgs: [] as Record<string, unknown>[],
   };
   const query = () => ({ data: undefined, currentData: undefined, isLoading: false, isFetching: false, isError: false, refetch: () => undefined });
   const mutation = (spy?: (body: unknown) => void) => () => [
@@ -74,6 +74,12 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   TaxCodePicker: () => null,
 }));
 vi.mock("@/redux/services/finance/setup-api", () => mocks.api({}));
+vi.mock("@/redux/services/finance/ops-api", () => mocks.api({
+  useGetFiscalYearsQuery: () => ({ ...mocks.query(), data: { data: [
+    { id: 1, year: 2015, start_date: "2014-09-01", end_date: "2015-08-31", is_archived: true },
+    { id: 2, year: 2016, start_date: "2015-09-01", end_date: "2016-08-31", is_archived: false },
+  ] } }),
+}));
 vi.mock("./procurement-shell", () => ({ ProcurementShell: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/components/layout/page-shell", () => ({ PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
@@ -220,6 +226,68 @@ describe("the purchase order list's branch", () => {
     act(() => root.render(<MemoryRouter><PurchaseOrdersPage /></MemoryRouter>));
     expect(last(mocks.state.listArgs).branch).toBeUndefined();
     expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
+  });
+});
+
+/**
+ * Bright Star keeps a September to August year: FY 2015 runs from 1 September
+ * 2014. Mrs Bello looks back at Ikeja's orders from that year.
+ */
+describe("the purchase order list's year", () => {
+  const last = (calls: Record<string, unknown>[]) => calls[calls.length - 1];
+  const select = (label: string) => container.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
+  const pick = (el: HTMLSelectElement, value: string) => act(() => {
+    el.value = value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const open = (path = "/") => act(() => root.render(
+    <MemoryRouter initialEntries={[path]}><PurchaseOrdersPage /></MemoryRouter>,
+  ));
+
+  beforeEach(() => {
+    mocks.state.held = new Set([P.PROC_VIEW_PURCHASE_ORDERS]);
+    mocks.state.listArgs = [];
+    mocks.state.summaryArgs = [];
+  });
+  afterEach(() => {
+    mocks.state.lens = { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false };
+  });
+
+  it("opens on All years and asks for no period", () => {
+    open();
+    expect(select("Year").value).toBe("all");
+    expect(last(mocks.state.listArgs)).not.toHaveProperty("fiscal_year");
+    expect(last(mocks.state.listArgs).date_from).toBeUndefined();
+  });
+
+  it("offers the school's years newest first, the archived one marked", () => {
+    open();
+    expect([...select("Year").options].map((o) => o.textContent)).toEqual([
+      "All years", "FY 2016", "FY 2015 · archived", "Custom dates",
+    ]);
+  });
+
+  it("asks the list and its figures for the year she picks", () => {
+    open();
+    pick(select("Year"), "2015");
+    expect(last(mocks.state.listArgs).fiscal_year).toBe(2015);
+    expect(last(mocks.state.summaryArgs).fiscal_year).toBe(2015);
+  });
+
+  it("combines the year with the branch", () => {
+    mocks.state.lens = { applies: true, pinnedBranch: null, branch: 1, choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
+    open("/?year=2015");
+    expect(last(mocks.state.listArgs)).toMatchObject({ branch: 1, fiscal_year: 2015 });
+    expect(last(mocks.state.summaryArgs)).toMatchObject({ branch: 1, fiscal_year: 2015 });
+  });
+
+  it("reads custom dates from the address and offers the two ends", () => {
+    open("/?year=custom&from=2015-03-01&to=2015-05-31");
+    expect(select("Year").value).toBe("custom");
+    expect(last(mocks.state.listArgs)).toMatchObject({ date_from: "2015-03-01", date_to: "2015-05-31" });
+    expect(last(mocks.state.listArgs)).not.toHaveProperty("fiscal_year");
+    expect(container.querySelector('[aria-label="From"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="To"]')).not.toBeNull();
   });
 });
 

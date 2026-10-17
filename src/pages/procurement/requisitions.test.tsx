@@ -86,6 +86,7 @@ vi.mock("@/redux/services/procurement/procurement-api", () => mocks.api({
   useUpdateRequisitionMutation: mocks.mutation((body) => mocks.state.update(body)),
 }));
 vi.mock("@/redux/services/finance/setup-api", () => mocks.api({}));
+vi.mock("@/redux/services/finance/ops-api", () => mocks.api({}));
 vi.mock("@/redux/services/dashboard/workflow-api", () => mocks.api({
   useGetWorkflowInstanceQuery: () => ({ ...mocks.query(), data: mocks.state.workflow }),
   useResubmitWorkflowInstanceMutation: mocks.mutation((id) => mocks.state.resume(id)),

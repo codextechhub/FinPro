@@ -41,7 +41,7 @@ import { fetchAttachmentBlob } from "@/utils/attachment-download";
 import { FilePreviewDialog, type PreviewFile } from "../../../components/finance-ui/file-preview-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
-import { ListBranchSelect, procurementBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
+import { useProcurementListScope } from "../list-scope";
 import { useDates } from "../../../lib/display-prefs";
 
 const DETAIL_TABS = [
@@ -76,14 +76,13 @@ export default function QuotationsPage() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  const list = useListBranch();
-  const branch = procurementBranchArg(list.view).branch;
+  const { scope, filters } = useProcurementListScope(entity, () => { setPage(1); setRfqFilter(""); });
   const params = useMemo(
-    () => ({ entity: entity!, page, branch, ...(status ? { status } : {}), ...(rfqFilter ? { rfq: rfqFilter } : {}), ...(vendorFilter ? { vendor: vendorFilter } : {}), ...(debounced ? { q: debounced } : {}) }),
-    [entity, page, branch, status, rfqFilter, vendorFilter, debounced],
+    () => ({ entity: entity!, page, ...scope, ...(status ? { status } : {}), ...(rfqFilter ? { rfq: rfqFilter } : {}), ...(vendorFilter ? { vendor: vendorFilter } : {}), ...(debounced ? { q: debounced } : {}) }),
+    [entity, page, scope, status, rfqFilter, vendorFilter, debounced],
   );
   const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetQuotationsQuery(params, { skip: !entity });
-  const { data: rfqOptData } = useGetRfqsQuery({ entity: entity!, branch }, { skip: !entity });
+  const { data: rfqOptData } = useGetRfqsQuery({ entity: entity!, branch: scope.branch }, { skip: !entity });
   const { data: vendorOptData } = useGetVendorsQuery({ entity: entity!, page_size: 100 }, { skip: !entity });
   const rows = toArray(data?.data);
 
@@ -129,7 +128,7 @@ export default function QuotationsPage() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2 border-b border-white-02 px-4 py-2.5">
-          <ListBranchSelect view={list.view} onChange={(next) => { setPage(1); setRfqFilter(""); list.choose(next); }} className="min-w-44 flex-1 sm:max-w-48" />
+          {filters}
           <div className="min-w-44 flex-1 sm:max-w-56"><SearchSelect options={rfqOptions} value={rfqFilter} onChange={(e) => { setRfqFilter(e.target.value); setPage(1); }} placeholder="All RFQs" revealOnSearch /></div>
           <div className="min-w-44 flex-1 sm:max-w-56"><SearchSelect options={vendorOptions} value={vendorFilter} onChange={(e) => { setVendorFilter(e.target.value); setPage(1); }} placeholder="All vendors" revealOnSearch /></div>
           <label className="relative min-w-0 flex-1 sm:max-w-64"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search quote #, vendor or reference" className="h-9 bg-white pl-9" /></label>
