@@ -40,7 +40,7 @@ import {
 } from "@/redux/services/finance/fees-api";
 import type { CustomerDeposit, DepositStatus } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
-import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
+import { ListBranchSelect, listBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
 
 /**
  * The one word for each state a deposit takes (vs_finance DepositStatus), read

@@ -13,7 +13,7 @@
 
 import type { TerminalPayment, TerminalPaymentFilter, TerminalSuggestion } from "@/redux/services/payments/payments-types";
 import type { Customer } from "@/redux/services/finance/ar-types";
-import type { ListBranchView } from "./receivables/list-branch";
+import type { ListBranchView } from "@/components/finance-ui/list-branch";
 
 export const TERMINAL_FILTERS: readonly (readonly [TerminalPaymentFilter, string])[] = [
   ["UNMATCHED", "Unmatched"],

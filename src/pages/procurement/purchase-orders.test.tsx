@@ -22,6 +22,9 @@ const mocks = vi.hoisted(() => {
     workflow: undefined as unknown,
     update: (() => undefined) as (body: unknown) => void,
     resume: (() => undefined) as (id: unknown) => void,
+    lens: { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false } as unknown,
+    listArgs: [] as { branch?: unknown }[],
+    summaryArgs: [] as { branch?: unknown }[],
   };
   const query = () => ({ data: undefined, currentData: undefined, isLoading: false, isFetching: false, isError: false, refetch: () => undefined });
   const mutation = (spy?: (body: unknown) => void) => () => [
@@ -75,12 +78,15 @@ vi.mock("./procurement-shell", () => ({ ProcurementShell: ({ children }: { child
 vi.mock("@/components/layout/page-shell", () => ({ PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
   QuickExportButton: (props: { params?: unknown }) => { mocks.state.exported = props.params; return null; },
+  hostBranchLens: () => mocks.state.lens,
 }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverPrompt: () => ({ promptIfParked: () => undefined, noApproverDialog: null }) }));
 vi.mock("sonner", () => ({ toast: { success: () => undefined, error: () => undefined } }));
 vi.mock("./pickers", () => ({ VendorPicker: () => null, ContractPicker: () => null, RequisitionPicker: () => null }));
 vi.mock("@/redux/services/procurement/procurement-api", () => mocks.api({
   useGetPurchaseOrderQuery: () => ({ ...mocks.query(), data: { data: mocks.state.doc } }),
+  useGetPurchaseOrdersQuery: (args: { branch?: unknown }) => { mocks.state.listArgs.push(args); return mocks.query(); },
+  useGetPurchaseOrderSummaryQuery: (args: { branch?: unknown }) => { mocks.state.summaryArgs.push(args); return mocks.query(); },
   useUpdatePurchaseOrderMutation: mocks.mutation((body) => mocks.state.update(body)),
 }));
 vi.mock("@/redux/services/procurement/payables-corrections-api", () => mocks.api({}));
@@ -170,6 +176,50 @@ describe("a purchase order with its approver", () => {
     expect(document.body.textContent).toContain("With the approver.");
     expect(button("Edit")).toBeUndefined();
     expect(button("Resume")).toBeUndefined();
+  });
+});
+
+/**
+ * Bright Star runs Ikeja (1) and Lekki (2). Mrs Bello buys for both and is
+ * working in Lekki on the sidebar's branch switcher.
+ */
+describe("the purchase order list's branch", () => {
+  const BRANCHES = [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }];
+  const last = (calls: { branch?: unknown }[]) => calls[calls.length - 1];
+
+  beforeEach(() => {
+    mocks.state.held = new Set([P.PROC_VIEW_PURCHASE_ORDERS]);
+    mocks.state.listArgs = [];
+    mocks.state.summaryArgs = [];
+  });
+  afterEach(() => {
+    mocks.state.lens = { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false };
+  });
+
+  it("starts the list and its figures on the branch she is working in", () => {
+    mocks.state.lens = { applies: true, pinnedBranch: null, branch: 2, choices: BRANCHES, isLoading: false };
+    act(() => root.render(<MemoryRouter><PurchaseOrdersPage /></MemoryRouter>));
+    expect(last(mocks.state.listArgs).branch).toBe(2);
+    expect(last(mocks.state.summaryArgs).branch).toBe(2);
+    expect(container.querySelector<HTMLSelectElement>('select[aria-label="Branch"]')?.value).toBe("2");
+  });
+
+  it("follows the branch she picks on the page, list and figures together", () => {
+    mocks.state.lens = { applies: true, pinnedBranch: null, branch: 2, choices: BRANCHES, isLoading: false };
+    act(() => root.render(<MemoryRouter><PurchaseOrdersPage /></MemoryRouter>));
+    const picker = container.querySelector<HTMLSelectElement>('select[aria-label="Branch"]')!;
+    act(() => {
+      picker.value = "1";
+      picker.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(last(mocks.state.listArgs).branch).toBe(1);
+    expect(last(mocks.state.summaryArgs).branch).toBe(1);
+  });
+
+  it("asks nothing of a school with one branch", () => {
+    act(() => root.render(<MemoryRouter><PurchaseOrdersPage /></MemoryRouter>));
+    expect(last(mocks.state.listArgs).branch).toBeUndefined();
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
   });
 });
 

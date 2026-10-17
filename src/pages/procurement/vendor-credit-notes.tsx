@@ -56,6 +56,7 @@ import {
 import { VENDOR_CREDIT_NOTE_TABS, approvalStateWord, vendorCreditNoteWord } from "./document-status";
 import { sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
 import { ResumeButton, ReturnedNote, useReturnedStanding } from "@/components/finance-ui/returned-note";
+import { ListBranchSelect, procurementBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
 
 const STATUS_TABS: TabStripItem<string>[] = VENDOR_CREDIT_NOTE_TABS.map((tab) => ({ ...tab }));
 
@@ -73,8 +74,9 @@ export function CreditNotesView({ entity, currency }: { entity: string; currency
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   useSourceDocumentParam(setSelectedId);
+  const list = useListBranch();
   const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetVendorCreditNotesQuery(
-    { entity, page, ...statusFilterArgs(status) },
+    { entity, page, ...statusFilterArgs(status), ...procurementBranchArg(list.view) },
   );
   const rows = toArray(data?.data);
   const money = (value: number) => formatMoney(value, currency);
@@ -92,7 +94,10 @@ export function CreditNotesView({ entity, currency }: { entity: string; currency
     <section className={cn(INFORMATION_CARD_SURFACE, "min-w-0 rounded-md")}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white-02 px-4">
         <TabStrip items={STATUS_TABS} value={status} onChange={(next) => { setStatus(next); setPage(1); }} variant="underline" ariaLabel="Credit note status" className="gap-5 self-center border-b-0" buttonClassName="px-0 py-3" />
-        <p className="py-2 font-mont text-[11px] text-gray-05">Raise a credit note from a posted bill.</p>
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 py-2 sm:w-auto">
+          <p className="font-mont text-[11px] text-gray-05">Raise a credit note from a posted bill.</p>
+          <ListBranchSelect view={list.view} onChange={(next) => { setPage(1); list.choose(next); }} className="w-full sm:w-48" />
+        </div>
       </div>
       <DataTable columns={columns} rows={rows} rowKey={(note) => note.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(note) => setSelectedId(note.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle="No credit notes" emptyMessage="Open a posted bill and choose Credit note to correct it." />
     </section>

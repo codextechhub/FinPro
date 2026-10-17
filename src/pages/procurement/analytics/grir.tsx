@@ -21,10 +21,10 @@ import { formatMoney } from "@/utils/money";
 import { formatQuantity } from "@/utils/quantity";
 import { isForbidden } from "../sourcing/helpers";
 import { Field, EmptyPanel } from "../sourcing/shared";
-import { Card, ChartEmpty, ScopeNote, StatusDotPill, SectionHeader, type PillTone } from "./shared";
+import { BranchFilter, Card, ChartEmpty, ScopeNote, StatusDotPill, SectionHeader, type PillTone } from "./shared";
 import { PageShell } from "@/components/layout/page-shell";
 import {
-  BUCKET_LABEL, TD, TDR, TH, THR, ageColor, kobo, type SectionProps,
+  BUCKET_LABEL, TD, TDR, TH, THR, ageColor, kobo, type SectionProps, useReportBranch,
 } from "./helpers";
 import { useDates } from "../../../lib/display-prefs";
 
@@ -47,12 +47,15 @@ const CONTROL_WITHHELD_NOTE =
   + "carries them.";
 
 export default function GrirScreen({ entity, currency }: SectionProps) {
-  const { data, isLoading, isError, error, refetch } = useGetGrirAgingQuery({ entity });
+  const branch = useReportBranch();
+  const { data, isLoading, isError, error, refetch } = useGetGrirAgingQuery({ entity, branch });
   const d = data?.data;
 
   return (
     <PageShell className="space-y-5 text-black-01">
-      <SectionHeader title="Goods not yet billed" subtitle="Goods received but not yet billed, checked against the clearing account." screen="goodsNotBilled" />
+      <SectionHeader title="Goods not yet billed" subtitle="Goods received but not yet billed, checked against the clearing account." screen="goodsNotBilled">
+        <BranchFilter />
+      </SectionHeader>
 
       {isForbidden(error) ? (
         <div className={cn(INFORMATION_CARD_SURFACE, "rounded-md")}><ForbiddenState /></div>
@@ -137,7 +140,8 @@ function GrirLinesTable({ entity, currency, onSelect }: {
   currency?: string | null;
   onSelect: (poLine: number) => void;
 }) {
-  const { data, isLoading, isError, error, refetch } = useGetGrirPoLinesQuery({ entity });
+  const branch = useReportBranch();
+  const { data, isLoading, isError, error, refetch } = useGetGrirPoLinesQuery({ entity, branch });
   const rows = toArray(data?.data?.rows);
 
   return (
@@ -193,8 +197,9 @@ function GrirPoLineDrawer({ poLine, entity, currency, onClose }: {
   currency?: string | null;
   onClose: () => void;
 }) {
+  const branch = useReportBranch();
   const { data, isLoading, isError, refetch } = useGetGrirPoLineDetailQuery(
-    { entity, po_line: poLine ?? 0 }, { skip: poLine == null },
+    { entity, branch, po_line: poLine ?? 0 }, { skip: poLine == null },
   );
   const d = data?.data;
   return (

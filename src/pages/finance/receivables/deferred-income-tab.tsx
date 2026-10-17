@@ -55,7 +55,7 @@ import {
 } from "@/redux/services/finance/fees-api";
 import type { DeferredIncomeRelease, DeferredIncomeReleaseRow } from "@/redux/services/finance/fees-types";
 import { Kpi, Note, useBranchColumn } from "./fees-parts";
-import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
+import { ListBranchSelect, listBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
 
 /** One month the undo form lists: what its open releases hold, and why it cannot be undone, if it cannot. */
 export interface UndoableMonth {

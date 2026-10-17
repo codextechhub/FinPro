@@ -44,7 +44,7 @@ import type { TerminalPayment, TerminalPaymentFilter } from "@/redux/services/pa
 import { P } from "../../permissions";
 import { refusalSentence } from "../../lib/api-errors";
 import { useDates } from "../../lib/display-prefs";
-import { ListBranchSelect, useListBranch } from "./receivables/list-branch";
+import { ListBranchSelect, useListBranch } from "@/components/finance-ui/list-branch";
 import {
   TERMINAL_FILTERS,
   customersForBranch,

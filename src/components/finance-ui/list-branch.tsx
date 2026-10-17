@@ -1,10 +1,14 @@
 /**
- * Which branch a receivables list shows: deferred income, provisions, deposits,
- * credit transfers and payer payments.
+ * Which branch a list shows, in Finance (deferred income, provisions, deposits,
+ * credit transfers, payer payments, terminal payments) and in Procurement
+ * (requisitions, sourcing, orders, receipts, supplier bills, payments, credit
+ * notes and the analytics reports).
  *
  * The server narrows each list with `?branch=` (one branch the reader works in,
- * or `unassigned` for rows not yet given one) and refuses a branch outside the
- * reader's reach. The rule for the screen:
+ * or the rows not yet given one) and refuses a branch outside the reader's
+ * reach. The two engines spell "not yet given one" differently, so each has its
+ * own argument builder: `listBranchArg` for Finance, `procurementBranchArg` for
+ * Procurement. The rule for the screen:
  *
  * - At a school with one branch nothing about branches is asked or shown.
  * - A reader whose reach is one branch (Mrs Adeyemi, posted to Lekki) sees
@@ -23,10 +27,10 @@
 import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router";
 
-import { useReaderBranchLens, type ReaderBranchLens } from "@/components/finance-ui/raising-branch";
+import { useReaderBranchLens, type ReaderBranchLens } from "./raising-branch";
 import { NativeSelect } from "@/components/ui/native-select";
-import { useReaderReach } from "../../../host";
-import { NO_BRANCH_YET } from "../../../lib/branch-labels";
+import { useReaderReach } from "../../host";
+import { NO_BRANCH_YET } from "../../lib/branch-labels";
 
 export const LIST_BRANCH_PARAM = "branch";
 const UNASSIGNED = "unassigned";
@@ -63,6 +67,12 @@ export function listBranchFor(lens: ReaderBranchLens, param: string | null, whol
 /** The `?branch=` a list asks the server for: the branch picked, or none for all of the reader's. */
 export function listBranchArg(view: ListBranchView): { branch?: number | "unassigned" } {
   return view.canChoose && view.selected !== "all" ? { branch: view.selected } : {};
+}
+
+/** The same `?branch=` for a Procurement list, whose server spells "no branch yet" as `none`. */
+export function procurementBranchArg(view: ListBranchView): { branch?: number | "none" } {
+  if (!view.canChoose || view.selected === "all") return {};
+  return { branch: view.selected === UNASSIGNED ? "none" : view.selected };
 }
 
 /** The list's branch, read from and written to the page address. */

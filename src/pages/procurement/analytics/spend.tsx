@@ -13,16 +13,17 @@ import type { SpendAnalysis } from "@/redux/services/procurement/procurement-ext
 import { formatMoney } from "@/utils/money";
 import { isForbidden } from "../sourcing/helpers";
 import { Field } from "../sourcing/shared";
-import { Card, ChartEmpty, DateFilter, HBars, Meter, SectionHeader } from "./shared";
-import { DONUT_COLORS, TD, TDR, TH, THR, kobo, type SectionProps } from "./helpers";
+import { BranchFilter, Card, ChartEmpty, DateFilter, HBars, Meter, SectionHeader } from "./shared";
+import { DONUT_COLORS, TD, TDR, TH, THR, kobo, type SectionProps, useReportBranch } from "./helpers";
 import { PageShell } from "@/components/layout/page-shell";
 
 export default function SpendScreen({ entity, currency }: SectionProps) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const branch = useReportBranch();
   const params = useMemo(
-    () => ({ entity, ...(start ? { start_date: start } : {}), ...(end ? { end_date: end } : {}) }),
-    [entity, start, end],
+    () => ({ entity, branch, ...(start ? { start_date: start } : {}), ...(end ? { end_date: end } : {}) }),
+    [entity, branch, start, end],
   );
   const { data, isLoading, isError, error, refetch } = useGetSpendAnalysisQuery(params);
   const d = data?.data;
@@ -30,6 +31,7 @@ export default function SpendScreen({ entity, currency }: SectionProps) {
   return (
     <PageShell className="space-y-5 text-black-01">
       <SectionHeader title="Spend Analytics" subtitle={d && d.by_category === undefined ? "Spend by vendor and over time." : "Spend by category, vendor and over time."} screen="spend">
+        <BranchFilter />
         <DateFilter label="From" value={start} onChange={setStart} />
         <DateFilter label="To" value={end} onChange={setEnd} />
       </SectionHeader>
@@ -157,8 +159,9 @@ function SpendCategoryDrawer({ sel, entity, start, end, currency, onClose }: {
   currency?: string | null;
   onClose: () => void;
 }) {
+  const branch = useReportBranch();
   const { data, isLoading, isError, refetch } = useGetSpendAnalysisQuery(
-    { entity, category: sel?.key ?? "", ...(start ? { start_date: start } : {}), ...(end ? { end_date: end } : {}) },
+    { entity, branch, category: sel?.key ?? "", ...(start ? { start_date: start } : {}), ...(end ? { end_date: end } : {}) },
     { skip: !sel },
   );
   const d = data?.data;

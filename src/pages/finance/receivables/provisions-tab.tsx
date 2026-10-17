@@ -49,7 +49,7 @@ import {
 } from "@/redux/services/finance/fees-api";
 import type { DoubtfulDebtProvision, ProvisionLine } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, bandLabel, bpsToPercent, useBranchColumn } from "./fees-parts";
-import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
+import { ListBranchSelect, listBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
 
 const RESOURCE = "finance.provision";
 

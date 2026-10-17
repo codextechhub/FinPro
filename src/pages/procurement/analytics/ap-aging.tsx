@@ -16,12 +16,12 @@ import type { ReportMoney } from "@/redux/services/finance/reports-types";
 import { formatMoney } from "@/utils/money";
 import { isForbidden } from "../sourcing/helpers";
 import { Field, EmptyPanel } from "../sourcing/shared";
-import { Card, ChartEmpty, DateFilter, Pill, StatusDotPill, SectionHeader, type PillTone } from "./shared";
+import { BranchFilter, Card, ChartEmpty, DateFilter, Pill, StatusDotPill, SectionHeader, type PillTone } from "./shared";
 import { paymentTermsLabel } from "../payment-terms";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   BUCKET_LABEL, TD, TDR, TFOOT, TFOOTR, TH, THR, ageColor, kobo,
-  type SectionProps,
+  type SectionProps, useReportBranch,
 } from "./helpers";
 import { useDates } from "../../../lib/display-prefs";
 
@@ -44,7 +44,8 @@ function bucketTone(bucket: string): PillTone {
 export default function ApAgingScreen({ entity, currency }: SectionProps) {
   const dates = useDates();
   const [asOf, setAsOf] = useState(() => dates.today());
-  const params = useMemo(() => ({ entity, ...(asOf ? { as_of: asOf } : {}) }), [entity, asOf]);
+  const branch = useReportBranch();
+  const params = useMemo(() => ({ entity, branch, ...(asOf ? { as_of: asOf } : {}) }), [entity, branch, asOf]);
   const aging = useGetApAgingQuery(params);
   const cash = useGetApCashRequirementsQuery(params);
 
@@ -54,6 +55,7 @@ export default function ApAgingScreen({ entity, currency }: SectionProps) {
   return (
     <PageShell className="space-y-5 text-black-01">
       <SectionHeader title="Unpaid bills by age" subtitle="What is owed to suppliers, grouped by how late it is." screen="unpaidBills">
+        <BranchFilter />
         <DateFilter label="As of" value={asOf} onChange={setAsOf} />
       </SectionHeader>
 
@@ -173,8 +175,9 @@ function ApVendorDrawer({ sel, entity, asOf, currency, onClose }: {
   currency?: string | null;
   onClose: () => void;
 }) {
+  const branch = useReportBranch();
   const { data, isLoading, isError, refetch } = useGetApAgingVendorQuery(
-    { entity, vendor: sel?.code ?? "", ...(asOf ? { as_of: asOf } : {}) }, { skip: !sel },
+    { entity, branch, vendor: sel?.code ?? "", ...(asOf ? { as_of: asOf } : {}) }, { skip: !sel },
   );
   const d = data?.data;
   return (

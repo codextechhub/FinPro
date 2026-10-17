@@ -22,8 +22,8 @@ import { formatMoney } from "@/utils/money";
 import { isForbidden } from "../sourcing/helpers";
 import { Field, EmptyPanel } from "../sourcing/shared";
 import { AssessmentFormDrawer } from "./assessment-form";
-import { DateFilter, GradeBadge, GradePill, Meter, Pill, SectionHeader } from "./shared";
-import { TD, TH, meanOrNull, meterScoreColor, type SectionProps } from "./helpers";
+import { BranchFilter, DateFilter, GradeBadge, GradePill, Meter, Pill, SectionHeader } from "./shared";
+import { TD, TH, meanOrNull, meterScoreColor, type SectionProps, useReportBranch } from "./helpers";
 import { PageShell } from "@/components/layout/page-shell";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
@@ -40,9 +40,10 @@ export default function PerformanceScreen({ entity, currency }: SectionProps) {
   const [selected, setSelected] = useState<VendorPerformanceRow | null>(null);
   const { can } = useCan();
   useActionParam("new", can(P.PROC_CREATE_VENDOR_ASSESSMENT), () => setCreating(true));
+  const branch = useReportBranch();
   const params = useMemo(
-    () => ({ entity, ...(start ? { start_date: start } : {}), ...(end ? { end_date: end } : {}) }),
-    [entity, start, end],
+    () => ({ entity, branch, ...(start ? { start_date: start } : {}), ...(end ? { end_date: end } : {}) }),
+    [entity, branch, start, end],
   );
   const { data, isLoading, isError, error, refetch } = useGetVendorPerformanceQuery(params);
   const d = data?.data;
@@ -56,6 +57,7 @@ export default function PerformanceScreen({ entity, currency }: SectionProps) {
   return (
     <PageShell className="space-y-5 text-black-01">
       <SectionHeader title="Vendor Performance" subtitle="Delivery timeliness and payment behaviour from posted records." screen="vendorPerformance">
+        <BranchFilter />
         <DateFilter label="From" value={start} onChange={setStart} />
         <DateFilter label="To" value={end} onChange={setEnd} />
         <Can permission={P.PROC_CREATE_VENDOR_ASSESSMENT}>
