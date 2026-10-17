@@ -42,6 +42,7 @@ import { RFQ_TABS, isForbidden } from "./helpers";
 import { NO_DEADLINE, deadlineInstant, type DeadlineValue } from "./deadline";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
+import { ListBranchSelect, procurementBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
 import { useDates } from "../../../lib/display-prefs";
 import { useReaderReach } from "../../../host";
 import { VENDOR_CONTACT, canReadRfqRecipients } from "../vendors/vendor-contacts";
@@ -92,12 +93,14 @@ export default function RfqsPage() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
+  const list = useListBranch();
+  const branch = procurementBranchArg(list.view).branch;
   const params = useMemo(
-    () => ({ entity: entity!, page, ...(status ? { status } : {}), ...(debounced ? { q: debounced } : {}) }),
-    [entity, page, status, debounced],
+    () => ({ entity: entity!, page, branch, ...(status ? { status } : {}), ...(debounced ? { q: debounced } : {}) }),
+    [entity, page, branch, status, debounced],
   );
   const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetRfqsQuery(params, { skip: !entity || !canPROC_VIEW_RFQS });
-  const { data: summaryData, isLoading: summaryLoading } = useGetRfqSummaryQuery({ entity: entity! }, { skip: !entity || !canPROC_VIEW_RFQS });
+  const { data: summaryData, isLoading: summaryLoading } = useGetRfqSummaryQuery({ entity: entity!, branch }, { skip: !entity || !canPROC_VIEW_RFQS });
   const rows = toArray(data?.data);
   const summary = summaryData?.data;
 
@@ -154,7 +157,10 @@ export default function RfqsPage() {
             className="gap-5 self-center border-b-0"
             buttonClassName="px-0 py-3"
           />
-          <label className="relative my-2 min-w-0 flex-1 sm:max-w-64"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search RFQ # or title" className="h-9 bg-white pl-9" /></label>
+          <div className="my-2 flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+            <ListBranchSelect view={list.view} onChange={(next) => { setPage(1); list.choose(next); }} className="w-full sm:w-48" />
+            <label className="relative min-w-0 flex-1 sm:w-64 sm:flex-none"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search RFQ # or title" className="h-9 bg-white pl-9" /></label>
+          </div>
         </div>
         <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(r) => setSelectedId(r.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle="No RFQs" emptyMessage={debounced ? "Try a different search term or status." : "Create an RFQ to invite vendor quotations."} />
       </section>

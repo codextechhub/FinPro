@@ -42,9 +42,10 @@ import type {
   VendorAssessmentInput,
   VendorPerformance,
 } from "./procurement-ext-types";
+import type { ProcBranchArg } from "./procurement-api";
 
 const qs = (p: object) => generateQueryString(p as Record<string, string | number>);
-type E = { entity: string; page?: number; status?: string };
+type E = { entity: string; page?: number; status?: string } & ProcBranchArg;
 type Act = { id: number; entity: string };
 
 export const procurementExtApi = baseApi.injectEndpoints({
@@ -136,7 +137,7 @@ export const procurementExtApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/procurement/rfqs/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["ProcRfqs"],
     }),
-    getRfqSummary: b.query<ApiEnvelope<RfqSummary>, { entity: string }>({
+    getRfqSummary: b.query<ApiEnvelope<RfqSummary>, { entity: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/rfqs/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcRfqs"],
     }),
@@ -321,42 +322,42 @@ export const procurementExtApi = baseApi.injectEndpoints({
       query: ({ entity, ...body }) => ({ url: `/procurement/stock-items/restock-requisition/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcRequisitions"],
     }),
-    getApAging: b.query<ApiEnvelope<ApAging>, { entity: string; as_of?: string }>({
+    getApAging: b.query<ApiEnvelope<ApAging>, { entity: string; as_of?: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/ap-aging/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcStock"],
     }),
-    getApReconciliation: b.query<ApiEnvelope<ApReconciliation>, { entity: string; as_of?: string }>({
+    getApReconciliation: b.query<ApiEnvelope<ApReconciliation>, { entity: string; as_of?: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/ap-reconciliation/${qs(p)}`, method: "GET" }),
     }),
-    getApCashRequirements: b.query<ApiEnvelope<ApCashRequirements>, { entity: string; as_of?: string }>({
+    getApCashRequirements: b.query<ApiEnvelope<ApCashRequirements>, { entity: string; as_of?: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/ap-cash-requirements/${qs(p)}`, method: "GET" }),
     }),
-    getGrirBalance: b.query<ApiEnvelope<GrirBalance>, { entity: string }>({
+    getGrirBalance: b.query<ApiEnvelope<GrirBalance>, { entity: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/grir/${qs(p)}`, method: "GET" }),
     }),
-    getGrirAging: b.query<ApiEnvelope<GrirAging>, { entity: string; as_of?: string }>({
+    getGrirAging: b.query<ApiEnvelope<GrirAging>, { entity: string; as_of?: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/grir-aging/${qs(p)}`, method: "GET" }),
     }),
     // GR/IR at the PO-line grain (feeds the GR/IR table + its per-line drawer).
-    getGrirPoLines: b.query<ApiEnvelope<GrirPoLines>, { entity: string; as_of?: string }>({
+    getGrirPoLines: b.query<ApiEnvelope<GrirPoLines>, { entity: string; as_of?: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/grir-lines/${qs(p)}`, method: "GET" }),
     }),
-    getGrirPoLineDetail: b.query<ApiEnvelope<GrirPoLineDetail>, { entity: string; po_line: number; as_of?: string }>({
+    getGrirPoLineDetail: b.query<ApiEnvelope<GrirPoLineDetail>, { entity: string; po_line: number; as_of?: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/grir-lines/detail/${qs(p)}`, method: "GET" }),
     }),
-    getSpendAnalysis: b.query<ApiEnvelope<SpendAnalysis>, { entity: string; start_date?: string; end_date?: string; category?: string }>({
+    getSpendAnalysis: b.query<ApiEnvelope<SpendAnalysis>, { entity: string; start_date?: string; end_date?: string; category?: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/spend-analysis/${qs(p)}`, method: "GET" }),
     }),
-    getVendorPerformance: b.query<ApiEnvelope<VendorPerformance>, { entity: string; start_date?: string; end_date?: string }>({
+    getVendorPerformance: b.query<ApiEnvelope<VendorPerformance>, { entity: string; start_date?: string; end_date?: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/vendor-performance/${qs(p)}`, method: "GET" }),
       // Refetch when a new assessment lands so the scorecard columns stay live.
       providesTags: ["ProcVendorAssessments"],
     }),
     // Report-drawer detail endpoints - all report.view-gated.
-    getApAgingVendor: b.query<ApiEnvelope<ApVendorDetail>, { entity: string; vendor: string; as_of?: string }>({
+    getApAgingVendor: b.query<ApiEnvelope<ApVendorDetail>, { entity: string; vendor: string; as_of?: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/ap-aging/vendor/${qs(p)}`, method: "GET" }),
     }),
-    getGrirGrnDetail: b.query<ApiEnvelope<GrirGrnDetail>, { entity: string; grn: number; as_of?: string }>({
+    getGrirGrnDetail: b.query<ApiEnvelope<GrirGrnDetail>, { entity: string; grn: number; as_of?: string } & ProcBranchArg>({
       query: (p) => ({ url: `/procurement/reports/grir-aging/grn/${qs(p)}`, method: "GET" }),
     }),
 

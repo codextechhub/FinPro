@@ -36,7 +36,7 @@ import {
 import type { CustomerCreditTransfer } from "@/redux/services/finance/fees-types";
 import { CUSTOMER_RESOURCE, customerCreditReadable } from "./customer-credit-access";
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
-import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
+import { ListBranchSelect, listBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
 import { DOCUMENT_STATUS_WORDS } from "@/components/finance-ui/status-words";
 
 const selectCls = "h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01";

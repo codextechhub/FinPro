@@ -15,6 +15,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ aging: vi.fn(), lines: vi.fn(), detail: vi.fn() }));
 
+vi.mock("@/components/finance-ui/list-branch", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useListBranch: () => ({ view: { applies: false, canChoose: false, selected: "all", showBranch: false, offerUnassigned: false, choices: [] }, choose: vi.fn() }),
+}));
 vi.mock("@/redux/services/procurement/procurement-ext-api", () => ({
   useGetGrirAgingQuery: (...args: unknown[]) => mocks.aging(...args),
   useGetGrirPoLinesQuery: (...args: unknown[]) => mocks.lines(...args),

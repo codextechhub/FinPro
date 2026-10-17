@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { formatMoney } from "@/utils/money";
 import { ProcurementPageHeader, type ProcurementHelpKey } from "../screen-help";
+import { ListBranchSelect, useListBranch } from "@/components/finance-ui/list-branch";
 
 export type PillTone = "green" | "amber" | "red" | "gray";
 
@@ -96,6 +97,18 @@ export function SectionHeader({ title, subtitle, screen, children }: {
       description={subtitle}
       actions={children ? <div className="flex flex-wrap items-end gap-3">{children}</div> : null}
     />
+  );
+}
+
+/** The report's branch picker, beside its date filters; nothing where there is no choice. */
+export function BranchFilter() {
+  const list = useListBranch();
+  if (!list.view.canChoose) return null;
+  return (
+    <div className="flex w-full flex-col gap-1 sm:w-48">
+      <span className="font-mont text-[11px] font-medium text-gray-05">Branch</span>
+      <ListBranchSelect view={list.view} onChange={list.choose} className="w-full" />
+    </div>
   );
 }
 

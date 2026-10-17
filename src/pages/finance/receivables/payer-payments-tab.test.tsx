@@ -83,7 +83,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
   MoneyInput: ({ onChangeKobo }: { onChangeKobo: (v: number) => void }) => <button type="button" data-picker="amount" onClick={() => onChangeKobo(500_000_00)}>amount</button>,
 }));
 vi.mock("@/components/finance-ui/can", () => ({ useCan: () => ({ can: () => mocks.can }) }));
-vi.mock("./list-branch", async (importOriginal) => ({
+vi.mock("@/components/finance-ui/list-branch", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useListBranch: () => ({ view: { applies: true, canChoose: true, selected: 2, showBranch: false, offerUnassigned: false, choices: [] }, choose: vi.fn() }),
   ListBranchSelect: () => <span data-picker="branch-filter" />,

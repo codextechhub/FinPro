@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Customer } from "@/redux/services/finance/ar-types";
-import type { ListBranchView } from "./receivables/list-branch";
+import type { ListBranchView } from "@/components/finance-ui/list-branch";
 import {
   customersForBranch,
   isUnmatched,

@@ -3,6 +3,17 @@
 
 import { CHART_COLORS, headCls, cellCls } from "@/components/finance-ui";
 import type { ReportMoney } from "@/redux/services/finance/reports-types";
+import { procurementBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
+
+/**
+ * The branch a report answers for: the one picked on the report, else the one
+ * the sidebar's branch switcher is working in, else every branch in the
+ * reader's reach. Read from the page address, so a report and the drawers it
+ * opens always agree. See `useListBranch`.
+ */
+export function useReportBranch(): number | "none" | undefined {
+  return procurementBranchArg(useListBranch().view).branch;
+}
 
 export interface SectionProps {
   entity: string;

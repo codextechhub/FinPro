@@ -12,7 +12,16 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ spend: undefined as unknown, aging: undefined as unknown, performance: undefined as unknown }));
+const NO_CHOICE = { applies: false, canChoose: false, selected: "all", showBranch: false, offerUnassigned: false, choices: [] };
+const mocks = vi.hoisted(() => ({
+  spend: undefined as unknown, aging: undefined as unknown, performance: undefined as unknown,
+  branchView: undefined as unknown, spendArgs: [] as unknown[],
+}));
+
+vi.mock("@/components/finance-ui/list-branch", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useListBranch: () => ({ view: mocks.branchView, choose: vi.fn() }),
+}));
 
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
@@ -27,7 +36,7 @@ vi.mock("../../../lib/display-prefs", () => ({
 vi.mock("@/redux/services/procurement/procurement-ext-api", () => {
   const result = (data: () => unknown) => ({ data: { data: data() }, isLoading: false, isError: false, error: undefined, refetch: vi.fn() });
   return {
-    useGetSpendAnalysisQuery: () => result(() => mocks.spend),
+    useGetSpendAnalysisQuery: (args: unknown) => { mocks.spendArgs.push(args); return result(() => mocks.spend); },
     useGetApAgingQuery: () => result(() => mocks.aging),
     useGetApCashRequirementsQuery: () => ({ data: undefined, isLoading: false, isError: false, error: undefined }),
     useGetApAgingVendorQuery: () => ({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() }),
@@ -53,6 +62,8 @@ const SPEND_BASE = {
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
+  mocks.branchView = NO_CHOICE;
+  mocks.spendArgs = [];
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -93,3 +104,38 @@ describe("spend analysis", () => {
   });
 });
 
+describe("the branch the report answers for", () => {
+  const BRANCHES = [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }];
+  const lastArgs = () => mocks.spendArgs[mocks.spendArgs.length - 1] as { branch?: unknown };
+
+  it("asks the server for the branch Mrs Bello picked, and offers her the picker", () => {
+    mocks.spend = SPEND_BASE;
+    mocks.branchView = { applies: true, canChoose: true, selected: 2, showBranch: false, offerUnassigned: true, choices: BRANCHES };
+    render(<SpendScreen entity="BSS" currency="NGN" />);
+    expect(lastArgs().branch).toBe(2);
+    const picker = container.querySelector<HTMLSelectElement>('select[aria-label="Branch"]');
+    expect(picker?.value).toBe("2");
+  });
+
+  it("asks for every branch in reach under All branches", () => {
+    mocks.spend = SPEND_BASE;
+    mocks.branchView = { applies: true, canChoose: true, selected: "all", showBranch: true, offerUnassigned: true, choices: BRANCHES };
+    render(<SpendScreen entity="BSS" currency="NGN" />);
+    expect(lastArgs().branch).toBeUndefined();
+  });
+
+  it("asks for the bills with no branch yet in the Procurement server's own spelling", () => {
+    mocks.spend = SPEND_BASE;
+    mocks.branchView = { applies: true, canChoose: true, selected: "unassigned", showBranch: false, offerUnassigned: true, choices: BRANCHES };
+    render(<SpendScreen entity="BSS" currency="NGN" />);
+    expect(lastArgs().branch).toBe("none");
+  });
+
+  it("shows no picker to a reader posted to one branch", () => {
+    mocks.spend = SPEND_BASE;
+    mocks.branchView = { applies: true, canChoose: false, selected: 2, showBranch: false, offerUnassigned: false, choices: [BRANCHES[1]] };
+    render(<SpendScreen entity="BSS" currency="NGN" />);
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
+    expect(lastArgs().branch).toBeUndefined();
+  });
+});

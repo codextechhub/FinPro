@@ -54,7 +54,7 @@ import type {
   PayerPayment, PayerPaymentPlan, PayerPaymentShare, PayerPaymentSplit, PayerPlanShare,
 } from "@/redux/services/finance/fees-types";
 import { DetailField, Note, useBranchColumn } from "./fees-parts";
-import { ListBranchSelect, listBranchArg, useListBranch } from "./list-branch";
+import { ListBranchSelect, listBranchArg, useListBranch } from "@/components/finance-ui/list-branch";
 import {
   amountsFromPlan, emptyPayerPaymentForm, inputKey, manualTotals, needsManualAmounts, payerPaymentInput,
   type PayerPaymentFormState,

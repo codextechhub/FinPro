@@ -13,6 +13,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ spend: undefined as unknown, aging: undefined as unknown, performance: undefined as unknown }));
 
+vi.mock("@/components/finance-ui/list-branch", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useListBranch: () => ({ view: { applies: false, canChoose: false, selected: "all", showBranch: false, offerUnassigned: false, choices: [] }, choose: vi.fn() }),
+}));
 vi.mock("@/hooks/use-permissions", () => ({
   usePermissions: () => ({
     hasPermission: () => true, hasAnyPermission: () => true, hasAllPermissions: () => true,

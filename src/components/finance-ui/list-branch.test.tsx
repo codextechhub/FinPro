@@ -8,7 +8,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ListBranchSelect, listBranchArg, listBranchFor } from "./list-branch";
+import { ListBranchSelect, listBranchArg, listBranchFor, procurementBranchArg } from "./list-branch";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -68,5 +68,23 @@ describe("the branch picker", () => {
   it("is absent where there is nothing to choose", () => {
     act(() => root.render(<ListBranchSelect view={listBranchFor(lens({ applies: false }), null, true)} onChange={vi.fn()} />));
     expect(container.innerHTML).toBe("");
+  });
+});
+
+describe("the branch a Procurement list asks for", () => {
+  it("names the branch picked, or the switcher's, like a Finance list", () => {
+    expect(procurementBranchArg(listBranchFor(lens(), "1", true))).toEqual({ branch: 1 });
+    expect(procurementBranchArg(listBranchFor(lens({ branch: 2 }), null, true))).toEqual({ branch: 2 });
+  });
+
+  it("asks for nothing under All branches, or of a reader posted to one branch", () => {
+    expect(procurementBranchArg(listBranchFor(lens(), "all", true))).toEqual({});
+    expect(procurementBranchArg(listBranchFor(lens({ pinnedBranch: 2, choices: [BRANCHES[1]] }), null, false))).toEqual({});
+  });
+
+  it("spells No branch yet the way the Procurement server reads it", () => {
+    const view = listBranchFor(lens(), "unassigned", true);
+    expect(listBranchArg(view)).toEqual({ branch: "unassigned" });
+    expect(procurementBranchArg(view)).toEqual({ branch: "none" });
   });
 });
