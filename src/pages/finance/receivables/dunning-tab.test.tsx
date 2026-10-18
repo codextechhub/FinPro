@@ -7,29 +7,43 @@
  * Adeyemi is Lekki's own bursar: holding the same keys she reads the policies,
  * is told why she cannot change them, and is offered nothing the server would
  * refuse. A reader without the keys is offered nothing and told nothing.
+ *
+ * The reminder queue answers for the branch on the sidebar switcher and the
+ * year in the page address. The age buckets follow the branch only: they age
+ * what is owed today, so Mrs Bello picking FY 2015 does not move them.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   denied: new Set<string>(),
   wholeSchool: true,
   summary: undefined as unknown,
+  summaryArgs: vi.fn(),
+  notices: vi.fn(),
+  lens: { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false } as unknown,
 }));
 
 const { idle } = vi.hoisted(() => ({ idle: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/redux/services/finance/ar-api", () => ({
-  useGetDunningSummaryQuery: () => ({ data: mocks.summary === undefined ? undefined : { data: mocks.summary } }),
+  useGetDunningSummaryQuery: (args: unknown) => (mocks.summaryArgs(args), { data: mocks.summary === undefined ? undefined : { data: mocks.summary } }),
   useGetDunningPoliciesQuery: () => ({
     data: { data: [{ id: 1, name: "Standard 7/14/30-day", is_active: true, is_default: true, stages: [] }] },
   }),
-  useGetDunningNoticesQuery: () => ({ data: { data: [] }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
+  useGetDunningNoticesQuery: (args: unknown) => (mocks.notices(args), {
+    data: { data: [], pagination: { currentPage: 1, totalPages: 2 } }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
+  }),
   useGenerateDunningMutation: idle,
   useCancelDunningNoticeMutation: idle,
   useSendDunningNoticeMutation: idle,
   useCreateDunningPolicyMutation: idle,
   useUpdateDunningPolicyMutation: idle,
+}));
+
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetFiscalYearsQuery: () => ({ data: { data: [{ id: 1, year: 2015, start_date: "2014-09-01", end_date: "2015-08-31", is_archived: false }] } }),
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -43,6 +57,7 @@ vi.mock("@/hooks/use-permissions", () => ({
 
 vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.wholeSchool ? null : [2], covers: () => mocks.wholeSchool }),
+  hostBranchLens: () => mocks.lens,
 }));
 
 import { P } from "../../../permissions";
@@ -57,6 +72,9 @@ beforeEach(() => {
   mocks.denied = new Set();
   mocks.wholeSchool = true;
   mocks.summary = undefined;
+  mocks.summaryArgs.mockReset();
+  mocks.notices.mockReset();
+  mocks.lens = { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false };
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -71,7 +89,7 @@ const button = (text: string) => [...container.querySelectorAll("button")].find(
 const toggle = () => container.querySelector<HTMLButtonElement>("button[aria-pressed]");
 
 function openPolicies() {
-  act(() => root.render(<DunningTab entity="BSS" currency="NGN" />));
+  act(() => root.render(<MemoryRouter initialEntries={["/finance/receivables/dunning"]}><DunningTab entity="BSS" currency="NGN" /></MemoryRouter>));
   act(() => button("Policies")!.click());
 }
 
@@ -106,7 +124,7 @@ describe("the reminder policies", () => {
 
 describe("the ageing strip", () => {
   const tiles = () => [...container.querySelectorAll("[data-testid=aging-tile]")];
-  const open = () => act(() => root.render(<DunningTab entity="BSS" currency="NGN" />));
+  const open = () => act(() => root.render(<MemoryRouter initialEntries={["/finance/receivables/dunning"]}><DunningTab entity="BSS" currency="NGN" /></MemoryRouter>));
 
   it("shows each bucket's amount and invoice count when the balance is readable", () => {
     mocks.summary = {
@@ -137,5 +155,47 @@ describe("the ageing strip", () => {
     open();
     expect(tiles()).toHaveLength(0);
     expect(container.textContent).not.toContain("Due soon");
+  });
+});
+
+describe("the reminder queue's branch and year", () => {
+  const LEKKI = { applies: true, pinnedBranch: null, branch: 2, choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
+  const show = (path: string) => act(() => root.render(
+    <MemoryRouter initialEntries={[path]}><DunningTab entity="BSS" currency="NGN" /></MemoryRouter>,
+  ));
+  const year = () => container.querySelector<HTMLSelectElement>('select[aria-label="Year"]')!;
+
+  it("asks the queue for the switcher's branch and the year, and the age buckets for the branch alone", () => {
+    mocks.lens = LEKKI;
+    show("/finance/receivables/dunning?year=2015");
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
+    expect(mocks.notices.mock.lastCall?.[0]).toEqual({ entity: "BSS", page: 1, branch: 2, fiscal_year: 2015 });
+    expect(mocks.summaryArgs.mock.lastCall?.[0]).toEqual({ entity: "BSS", branch: 2 });
+  });
+
+  it("sends custom dates to the queue as a range and never to the age buckets", () => {
+    show("/finance/receivables/dunning?year=custom&from=2015-03-01&to=2015-05-31");
+    expect(mocks.notices.mock.lastCall?.[0]).toMatchObject({ date_from: "2015-03-01", date_to: "2015-05-31" });
+    expect(mocks.notices.mock.lastCall?.[0]).not.toHaveProperty("fiscal_year");
+    expect(mocks.summaryArgs.mock.lastCall?.[0]).toEqual({ entity: "BSS" });
+  });
+
+  it("offers the Year picker on the queue and not on the policies", () => {
+    show("/finance/receivables/dunning");
+    expect(year()).not.toBeNull();
+    act(() => button("Policies")!.click());
+    expect(container.querySelector('select[aria-label="Year"]')).toBeNull();
+  });
+
+  it("goes back to the first page when the year changes", () => {
+    show("/finance/receivables/dunning");
+    const next = Array.from(container.querySelectorAll("button")).find((b) => /next/i.test(b.getAttribute("aria-label") ?? b.textContent ?? ""));
+    act(() => next!.click());
+    expect(mocks.notices.mock.lastCall?.[0]).toMatchObject({ page: 2 });
+    act(() => {
+      year().value = "2015";
+      year().dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(mocks.notices.mock.lastCall?.[0]).toMatchObject({ page: 1, fiscal_year: 2015 });
   });
 });

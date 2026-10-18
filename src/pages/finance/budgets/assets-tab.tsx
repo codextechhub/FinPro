@@ -7,6 +7,10 @@
  * Backed by the real model: straight-line only; the schedule is monthly (rolled up to
  * years for display); depreciation posts per-asset OR period-wide; disposal posts a
  * real gain/loss journal. Acquisition codes the asset (FA document number = its tag).
+ *
+ * The register and the figures above it answer for one branch and one stretch of
+ * time (`useFinanceListScope`), each asset placed by its acquisition date. With
+ * nothing picked the figures count every asset.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -31,6 +35,7 @@ import { monthBounds } from "../../../utils/dates";
 import { useDates } from "../../../lib/display-prefs";
 import type { SkippedDepreciationCharge } from "@/redux/services/finance/ops-types";
 import { SkippedCharges } from "./depreciation-skipped";
+import { useFinanceListScope } from "../list-scope";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -85,14 +90,15 @@ export function AssetsTab({ entity, currency }: { entity: string; currency?: str
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1));
   const { data, isLoading, isFetching, isError, refetch } = useGetFixedAssetsQuery({
-    entity, page, ...(category ? { category } : {}), ...(status ? { asset_status: status } : {}),
+    entity, page, ...(category ? { category } : {}), ...(status ? { asset_status: status } : {}), ...scope,
   });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
   const resetPage = () => setPage(1);
 
-  const summaryQ = useGetFixedAssetSummaryQuery({ entity });
+  const summaryQ = useGetFixedAssetSummaryQuery({ entity, ...scope });
   const kpis = summaryQ.data?.data ?? { cost: 0, accum: 0, nbv: 0, monthly: 0 };
 
   const columns: Column<FixedAsset>[] = [
@@ -125,8 +131,9 @@ export function AssetsTab({ entity, currency }: { entity: string; currency?: str
             <option value="">All status</option>
             {Object.entries(STATUS).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
           </Select>
+          {filters}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Can permission={P.FIN_DEPRECIATE_FIXED_ASSET}>
             <Button variant="outline" onClick={() => setRunning(true)} className="gap-1.5"><Sparkles className="size-4" /> Run depreciation</Button>
           </Can>

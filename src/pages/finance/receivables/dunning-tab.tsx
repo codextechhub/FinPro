@@ -15,6 +15,11 @@
  * whole-school reader only. Lekki's own bursar, holding the keys, reads the
  * policies and is told why she cannot change them, rather than being offered
  * New policy, Edit or the active switch and refused after saving.
+ *
+ * The reminder queue answers for one branch and one stretch of time
+ * (`useFinanceListScope`), each notice placed by its own date. The age buckets
+ * above it follow the branch only: they age what is owed today, so a year
+ * picked for the queue does not move them.
  */
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -28,6 +33,8 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import { WHOLE_TENANT_SETTINGS_NOTE, useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
 import { P } from "../../../permissions";
+import type { FinanceListScope } from "@/redux/services/finance/api-types";
+import { useFinanceListScope } from "../list-scope";
 import {
   useGetDunningNoticesQuery, useGetDunningSummaryQuery, useGetDunningPoliciesQuery,
   useGenerateDunningMutation, useCancelDunningNoticeMutation, useSendDunningNoticeMutation,
@@ -110,9 +117,11 @@ export function AgingStrip({ summary, loaded, currency }: {
 
 export function DunningTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const [tab, setTab] = useState<"queue" | "policies">("queue");
-  const summaryQ = useGetDunningSummaryQuery({ entity });
+  const [page, setPage] = useState(1);
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1));
+  const summaryQ = useGetDunningSummaryQuery({ entity, ...(scope.branch === undefined ? {} : { branch: scope.branch }) });
   const policiesQ = useGetDunningPoliciesQuery({ entity });
-  const noticesQ = useGetDunningNoticesQuery({ entity, page: 1 });
+  const noticesQ = useGetDunningNoticesQuery({ entity, page: 1, ...scope });
   const [generate, { isLoading: generating }] = useGenerateDunningMutation();
   const { can } = useCan();
   const policyWrite = useSettingsWriteAccess(P.FIN_UPDATE_DUNNING);
@@ -139,8 +148,11 @@ export function DunningTab({ entity, currency }: { entity: string; currency?: st
       <AgingStrip summary={s} loaded={summaryQ.data !== undefined} currency={currency} />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <TabStrip items={viewTabs} value={tab} onChange={setTab} variant="segmented" ariaLabel="Dunning view" />
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <TabStrip items={viewTabs} value={tab} onChange={setTab} variant="segmented" ariaLabel="Dunning view" />
+          {tab === "queue" ? filters : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {policyWrite.canUpdate ? (
             <Button variant="outline" onClick={() => setTab("policies")} className="gap-1.5"><SlidersHorizontal className="size-4" /> Configure cadence</Button>
           ) : null}
@@ -151,18 +163,18 @@ export function DunningTab({ entity, currency }: { entity: string; currency?: st
       </div>
 
       {tab === "queue"
-        ? <ReminderQueue entity={entity} policies={policies} canDispatch={can(P.FIN_SEND_DUNNING)} />
+        ? <ReminderQueue entity={entity} scope={scope} page={page} onPageChange={setPage} policies={policies} canDispatch={can(P.FIN_SEND_DUNNING)} />
         : <PoliciesPanel entity={entity} policies={policies} />}
     </>
   );
 }
 
-function ReminderQueue({ entity, policies, canDispatch }: {
-  entity: string; policies: DunningPolicy[]; canDispatch: boolean;
+function ReminderQueue({ entity, scope, page, onPageChange, policies, canDispatch }: {
+  entity: string; scope: FinanceListScope; page: number; onPageChange: (page: number) => void;
+  policies: DunningPolicy[]; canDispatch: boolean;
 }) {
-  const [page, setPage] = useState(1);
   const [sending, setSending] = useState<DunningNotice | null>(null);
-  const { data, isLoading, isFetching, isError, refetch } = useGetDunningNoticesQuery({ entity, page });
+  const { data, isLoading, isFetching, isError, refetch } = useGetDunningNoticesQuery({ entity, page, ...scope });
   const [cancel] = useCancelDunningNoticeMutation();
   const [send, { isLoading: dispatching }] = useSendDunningNoticeMutation();
   const rows = useMemo(() => toArray(data?.data), [data]);
@@ -203,7 +215,7 @@ function ReminderQueue({ entity, policies, canDispatch }: {
         <DataTable
           columns={columns} rows={rows} rowKey={(n) => n.id}
           loading={isLoading || isFetching} error={isError} onRetry={refetch}
-          page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={setPage}
+          page={pg?.currentPage} totalPages={pg?.totalPages} onPageChange={onPageChange}
           emptyTitle="No reminders queued"
           emptyMessage="Run reminders to raise notices for overdue invoices."
         />

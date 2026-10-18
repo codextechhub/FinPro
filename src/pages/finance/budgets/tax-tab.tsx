@@ -6,6 +6,10 @@
  *
  * Backed by the real model: prepare_filing accrues from the GL control account; file
  * records the reference (+ optional adjustment); pay posts Dr liability, Cr bank.
+ *
+ * The filings list and the figures above it answer for one branch and one
+ * stretch of time (`useFinanceListScope`), each filing placed by the end of the
+ * period it files.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -31,6 +35,7 @@ import { TaxRemittances, TaxReturnLines, TaxReturnShares, payableShares, penalty
 import { AnnualPayeReturnDrawer, RemittanceSchedulePanel } from "./payroll-returns";
 import { useDates } from "../../../lib/display-prefs";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
+import { useFinanceListScope } from "../list-scope";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 
@@ -67,11 +72,12 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
   const [annualReturn, setAnnualReturn] = useState(false);
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching, isError, refetch } = useGetTaxFilingsQuery({ entity, page, ...(status ? { filing_status: status } : {}) });
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1));
+  const { data, isLoading, isFetching, isError, refetch } = useGetTaxFilingsQuery({ entity, page, ...(status ? { filing_status: status } : {}), ...scope });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
 
-  const summaryQ = useGetTaxFilingSummaryQuery({ entity });
+  const summaryQ = useGetTaxFilingSummaryQuery({ entity, ...scope });
   const kpis = summaryQ.data?.data ?? { outstanding: 0, open: 0, filed: 0, paid: 0 };
 
   const columns: Column<TaxFiling>[] = [
@@ -95,10 +101,13 @@ export function TaxTab({ entity, currency }: { entity: string; currency?: string
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3" data-guide="finance-tax.controls">
-        <Select value={status} onChange={(v) => { setStatus(v); setPage(1); }} className="w-40">
-          <option value="">All status</option>
-          {Object.entries(STATUS).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
-        </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={status} onChange={(v) => { setStatus(v); setPage(1); }} className="w-40">
+            <option value="">All status</option>
+            {Object.entries(STATUS).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
+          </Select>
+          {filters}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={() => printTaxFilingPack(rows, currency, dates.prefs)} disabled={!rows.length} className="gap-1.5"><Printer className="size-4" /> Filing pack</Button>
           <Button variant="outline" onClick={() => setAnnualReturn(true)} className="gap-1.5"><FileCheck2 className="size-4" /> Annual PAYE return</Button>

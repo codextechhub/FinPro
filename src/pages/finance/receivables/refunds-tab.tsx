@@ -17,6 +17,10 @@
  *     It is raised as an online refund, tied to the payment it returns before it
  *     is posted, and a refund whose tie is refused stays a draft to be finished
  *     from its drawer.
+ *
+ * The list and the figures above it answer for one branch and one stretch of
+ * time (`useFinanceListScope`), each refund or write-off placed by its own date.
+ * Refundable credit is what customers hold today, so it follows the branch only.
  */
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
@@ -66,6 +70,7 @@ import { GATEWAY_CLEARING_NAME } from "../settlement-booking";
 import { OnlineRefundFields, ProviderRefundChip, ProviderRefundPanel, useProviderRefundMap, useTieRefund } from "./provider-refund-panel";
 import { NO_ONLINE_REFUND, ONLINE_REFUND_METHOD, BANK_REFUND_METHOD, paymentAmountError, paymentChoiceReady, type OnlineRefundChoice } from "./provider-refund-model";
 import { useDates } from "../../../lib/display-prefs";
+import { useFinanceListScope } from "../list-scope";
 
 type Mode = "REFUND" | "WRITEOFF";
 
@@ -126,6 +131,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * list still loading shows both, then settles on what arrived. The counts of
  * pending and sent-back items always show, so the row holds two to four tiles.
  */
+/**
+ * The written-off figure's label. With no period picked the server counts this
+ * year's write-offs; with one, the write-offs posted inside it, so the label
+ * names the year or says the dates rather than claiming "year to date".
+ */
+export function writtenOffLabel(scope: { fiscal_year?: number | string; date_from?: string; date_to?: string }): string {
+  if (scope.fiscal_year !== undefined) return `Written off in FY ${scope.fiscal_year}`;
+  if (scope.date_from || scope.date_to) return "Written off in these dates";
+  return "Written off (YTD)";
+}
+
 export function adjustmentKpiTiles(kpis: { written_off_ytd?: number | null; refundable_credit?: number | null } | undefined): {
   showCredit: boolean; showWrittenOff: boolean; count: 2 | 3 | 4;
 } {
@@ -146,6 +162,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
   const search = useDebounce(searchInput.trim(), 350);
   const [page, setPage] = useState(1);
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1));
   const [creating, setCreating] = useState(false);
   const [batching, setBatching] = useState(false);
   useActionParam("new", canAny(P.FIN_CREATE_REFUND, P.FIN_CREATE_WRITE_OFF, P.FIN_WRITE_OFF_INVOICE), () => setCreating(true));
@@ -157,7 +174,8 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
     ...(filter ? { type: filter.toLowerCase() } : {}),
     ...statusFilterArgs(approval),
     ...(search ? { search } : {}),
-  }), [entity, page, filter, approval, search]);
+    ...scope,
+  }), [entity, page, filter, approval, search, scope]);
   const { data, isLoading, isFetching, isError, refetch } = useGetArAdjustmentsQuery(params);
 
   const rows = useMemo(() => toArray(data?.data), [data]);
@@ -193,7 +211,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
           <Stat label="Refundable credit" hint="Total customer credit available to refund." value={formatMoney(data?.kpis.refundable_credit ?? 0, currency)} />
         )}
         {showWrittenOff && (
-          <Stat label="Written off (YTD)" value={formatMoney(data?.kpis.written_off_ytd ?? 0, currency)} />
+          <Stat label={writtenOffLabel(scope)} value={formatMoney(data?.kpis.written_off_ytd ?? 0, currency)} />
         )}
         <Stat label={DOCUMENT_STATUS_WORDS.PENDING_APPROVAL} value={String(data?.kpis.pending ?? 0)} />
         <Stat label={SENT_BACK_WORD} value={String(data?.kpis.sent_back ?? 0)} />
@@ -217,6 +235,7 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
             <option value="">All statuses</option>
             <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
           </select>
+          {filters}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {can(P.FIN_CREATE_REFUND) || can(P.FIN_CREATE_WRITE_OFF) ? (

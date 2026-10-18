@@ -259,7 +259,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: ({ id, entity, ...body }) => ({ url: `/finance/petty-cash-funds/${id}/replenish/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePettyCash", "FinanceJournals"],
     }),
-    getPettyCashVouchers: b.query<PaginatedEnvelope<PettyCashVoucher>, E & { fund?: number }>({
+    getPettyCashVouchers: b.query<PaginatedEnvelope<PettyCashVoucher>, E & { fund?: number } & FinanceListScope>({
       query: (p) => ({ url: `/finance/petty-cash-vouchers/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePettyCash"],
     }),
@@ -299,7 +299,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: ({ id, entity, ...body }) => ({ url: `/finance/petty-cash-funds/${id}/reopen/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinancePettyCash"],
     }),
-    getPettyCashReturns: b.query<PaginatedEnvelope<PettyCashReturn>, E & { fund?: number; kind?: string; branch?: number | "unassigned" }>({
+    getPettyCashReturns: b.query<PaginatedEnvelope<PettyCashReturn>, E & { fund?: number; kind?: string } & FinanceListScope>({
       query: (p) => ({ url: `/finance/petty-cash-returns/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePettyCash"],
     }),
@@ -321,7 +321,7 @@ export const opsApi = baseApi.injectEndpoints({
     }),
 
     // Payroll
-    getPayrollRuns: b.query<PaginatedEnvelope<PayrollRun>, E & { run_status?: string }>({
+    getPayrollRuns: b.query<PaginatedEnvelope<PayrollRun>, E & { run_status?: string } & FinanceListScope>({
       query: (p) => ({ url: `/finance/payroll-runs/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePayroll"],
     }),
@@ -329,7 +329,7 @@ export const opsApi = baseApi.injectEndpoints({
     // whether to ask which branch a run is for, and reading the setting through
     // the config API needs `config.value.view` - a settings key no payroll
     // officer holds.
-    getPayrollSummary: b.query<ApiEnvelope<{ payroll_scope: "CENTRAL" | "PER_BRANCH"; runs: number; employees: number; net: number; to_pay: number }>, { entity: string }>({
+    getPayrollSummary: b.query<ApiEnvelope<{ payroll_scope: "CENTRAL" | "PER_BRANCH"; runs: number; employees: number; net: number; to_pay: number }>, { entity: string } & FinanceListScope>({
       query: (p) => ({ url: `/finance/payroll-runs/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinancePayroll"],
     }),
@@ -467,11 +467,11 @@ export const opsApi = baseApi.injectEndpoints({
     }),
 
     // Fixed assets
-    getFixedAssets: b.query<PaginatedEnvelope<FixedAsset>, { entity: string; page?: number; category?: string; asset_status?: string }>({
+    getFixedAssets: b.query<PaginatedEnvelope<FixedAsset>, { entity: string; page?: number; category?: string; asset_status?: string } & FinanceListScope>({
       query: (p) => ({ url: `/finance/fixed-assets/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceFixedAssets"],
     }),
-    getFixedAssetSummary: b.query<ApiEnvelope<{ cost: number; accum: number; nbv: number; monthly: number }>, { entity: string }>({
+    getFixedAssetSummary: b.query<ApiEnvelope<{ cost: number; accum: number; nbv: number; monthly: number }>, { entity: string } & FinanceListScope>({
       query: (p) => ({ url: `/finance/fixed-assets/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceFixedAssets"],
     }),
@@ -509,11 +509,11 @@ export const opsApi = baseApi.injectEndpoints({
       query: ({ entity, ...body }) => ({ url: `/finance/tax-obligations/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceTax"],
     }),
-    getTaxFilings: b.query<PaginatedEnvelope<TaxFiling>, { entity: string; page?: number; filing_status?: string; obligation?: number }>({
+    getTaxFilings: b.query<PaginatedEnvelope<TaxFiling>, { entity: string; page?: number; filing_status?: string; obligation?: number } & FinanceListScope>({
       query: (p) => ({ url: `/finance/tax-filings/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceTax"],
     }),
-    getTaxFilingSummary: b.query<ApiEnvelope<{ outstanding: number; open: number; filed: number; paid: number }>, { entity: string }>({
+    getTaxFilingSummary: b.query<ApiEnvelope<{ outstanding: number; open: number; filed: number; paid: number }>, { entity: string } & FinanceListScope>({
       query: (p) => ({ url: `/finance/tax-filings/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceTax"],
     }),

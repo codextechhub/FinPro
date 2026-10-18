@@ -17,6 +17,12 @@
  * Branches follow `petty-cash-branch.ts`: nothing at a one-branch school, a
  * branch picker kept in the page address for a reader who covers several.
  *
+ * The Vouchers and Returns lists also answer for one stretch of time, from the
+ * Year picker beside each (`list-period`, held in the page address so both
+ * tabs share it), each document placed by its own date. Close fund and Reopen
+ * still read every voucher and return of the fund, so a draft from an earlier
+ * year still holds a closure up whichever year is picked.
+ *
  * A link naming one return (`?document=<id>`, a journal's "Open return") opens
  * that return over the page, whichever fund or branch is shown.
  */
@@ -47,7 +53,8 @@ import type { PettyCashFund, PettyCashVoucher, PettyCashMovement } from "@/redux
 import { useDates } from "../../../lib/display-prefs";
 import { exitedOutline, exitedTitle } from "@/components/finance-ui/exited-person";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
-import { branchName, fundOptionLabel, inBranch, pickFund, usePettyCashBranch, type PettyCashBranch } from "./petty-cash-branch";
+import { ListPeriodSelect, listPeriodArg, useListPeriod } from "@/components/finance-ui/list-period";
+import { branchName, branchQueryArg, fundOptionLabel, inBranch, pickFund, usePettyCashBranch, type PettyCashBranch } from "./petty-cash-branch";
 import { closeBlockers, floatBeforeClosure, registerTone, type RegisterTone } from "./petty-cash-returns";
 import { CloseFundDrawer, EditFundDrawer, ReduceFloatDrawer, ReopenFundDialog } from "./petty-cash-return-drawers";
 import { LinkedReturnDrawer, PettyCashReturnsList } from "./petty-cash-returns-list";
@@ -163,8 +170,13 @@ function FundWorkbench({ fund, funds, view, entity, currency, onEstablish }: {
   const detail = detailData?.data;
   const live = detail ?? fund;
   const register = useMemo(() => detail?.register ?? [], [detail]);
-  const vouchersQ = useGetPettyCashVouchersQuery({ entity, fund: fund.id, page_size: 100 });
+  const period = useListPeriod();
+  const fundVouchers = { entity, fund: fund.id, page_size: 100, ...branchQueryArg(view) };
+  const vouchersQ = useGetPettyCashVouchersQuery(fundVouchers);
   const vouchers = useMemo(() => toArray(vouchersQ.data?.data), [vouchersQ.data]);
+  // The Vouchers tab's rows: the year picked; with none, the same read as above.
+  const listedQ = useGetPettyCashVouchersQuery({ ...fundVouchers, ...listPeriodArg(period.view) });
+  const listed = useMemo(() => toArray(listedQ.data?.data), [listedQ.data]);
   const fundReturnsQ = useGetPettyCashReturnsQuery({ entity, fund: fund.id, page_size: 100 });
   const fundReturns = useMemo(() => toArray(fundReturnsQ.data?.data), [fundReturnsQ.data]);
   const closed = live.state === "CLOSED";
@@ -173,8 +185,8 @@ function FundWorkbench({ fund, funds, view, entity, currency, onEstablish }: {
   // Voucher tab carries its own count; the strip re-measures when the label grows.
   const tabItems = useMemo<TabStripItem<(typeof TABS)[number]["key"]>[]>(() => TABS.map((t) => ({
     value: t.key,
-    label: <><t.icon className="size-3.5" /> {t.label}{t.key === "vouchers" && vouchers.length ? ` · ${vouchers.length}` : ""}</>,
-  })), [vouchers.length]);
+    label: <><t.icon className="size-3.5" /> {t.label}{t.key === "vouchers" && listed.length ? ` · ${listed.length}` : ""}</>,
+  })), [listed.length]);
 
   const registerCols: Column<PettyCashMovement>[] = [
     { header: "Date", cell: (m) => <span className="tabular-nums text-gray-05">{dates.day(m.date)}</span> },
@@ -270,7 +282,12 @@ function FundWorkbench({ fund, funds, view, entity, currency, onEstablish }: {
         <DataTable columns={registerCols} rows={register} rowKey={(m) => m.id}
           emptyTitle="No movements yet" emptyMessage="Establish cash or record a voucher to see the register." />
       ) : tab === "vouchers" ? (
-        <VouchersList vouchers={vouchers} entity={entity} currency={currency} loading={vouchersQ.isFetching} />
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <ListPeriodSelect entity={entity} view={period.view} onYear={period.chooseYear} onRange={period.chooseRange} />
+          </div>
+          <VouchersList vouchers={listed} entity={entity} currency={currency} loading={listedQ.isFetching} />
+        </div>
       ) : (
         <PettyCashReturnsList entity={entity} currency={currency} funds={funds} view={view} />
       )}

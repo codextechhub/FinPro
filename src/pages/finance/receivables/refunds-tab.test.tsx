@@ -6,9 +6,14 @@
  * refund and the bursar (user 7) returned it asking for the bank reference.
  * Her drawer reads "Sent back", offers Resume and no Submit for approval.
  * Mr Ade (user 9) is offered neither. A draft never sent keeps Submit.
+ *
+ * The list and its figures answer for the branch on the sidebar switcher and
+ * the year in the page address: Mrs Bello on Lekki with FY 2015 picked sees
+ * Lekki's 2015 refunds and write-offs.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ArAdjustment } from "@/redux/services/finance/ar-types";
 
@@ -16,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   held: new Set<string>(), detail: undefined as unknown, uid: 4, request: undefined as unknown, resume: vi.fn(), availability: undefined as unknown, fieldAccess: {} as Record<string, unknown>, availabilityAsked: [] as unknown[],
   createRefund: vi.fn(), postRefund: vi.fn(), tie: vi.fn(),
   defaultAccount: null as unknown, listAsked: [] as boolean[],
+  adjustments: vi.fn(),
+  lens: { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false } as unknown,
 }));
 
 vi.mock("@/redux/services/finance/approval-request-api", () => ({
@@ -54,6 +61,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 vi.mock("../../../components/workflow/use-user-directory", () => ({ useUserDirectory: () => ({ name: (id: unknown) => `User ${id}` }) }));
 vi.mock("@/components/finance-ui/no-approver-prompt", () => ({ useNoApproverPrompt: () => ({ promptIfParked: vi.fn(), noApproverDialog: null }) }));
 vi.mock("./document-void-action", () => ({ DocumentVoidAction: () => null }));
+vi.mock("./batch-adjustment-drawer", () => ({ BatchAdjustmentDrawer: () => null }));
 // The online side of a refund has its own test (provider-refund-panel.test.tsx); here a button stands in for choosing it.
 vi.mock("./provider-refund-panel", () => ({
   OnlineRefundFields: ({ onChange }: { onChange: (v: { online: boolean; collection: string; payment: null }) => void }) => (
@@ -73,6 +81,12 @@ vi.mock("@/components/custom/search-select", () => ({
   ),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
+  hostBranchLens: () => mocks.lens,
+}));
+vi.mock("@/redux/services/finance/ops-api", () => ({
+  useGetFiscalYearsQuery: () => ({ data: { data: [{ id: 1, year: 2015, start_date: "2014-09-01", end_date: "2015-08-31", is_archived: false }] } }),
+}));
 vi.mock("@/redux/services/finance/ar-api", () => {
   const mutation = () => [() => ({ unwrap: async () => ({ data: {} }) }), { isLoading: false }];
   const query = () => ({ data: undefined, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() });
@@ -81,14 +95,18 @@ vi.mock("@/redux/services/finance/ar-api", () => {
       mocks.listAsked.push(options?.skip === true),
       { data: options?.skip ? undefined : { data: [], default_write_off_account: mocks.defaultAccount } }
     ),
-    useGetArAdjustmentsQuery: query, useGetInvoicesQuery: query, useGetRefundAvailabilityQuery: (_args: unknown, options?: { skip?: boolean }) => (mocks.availabilityAsked.push(options?.skip === true), { data: options?.skip ? undefined : mocks.availability, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
+    useGetArAdjustmentsQuery: (args: unknown) => (mocks.adjustments(args), {
+      data: { data: [], kpis: { written_off_ytd: 0, pending: 0, sent_back: 0 }, kinds: ["REFUND", "WRITEOFF"], pagination: { currentPage: 1, totalPages: 2 } },
+      isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
+    }),
+    useGetInvoicesQuery: query, useGetRefundAvailabilityQuery: (_args: unknown, options?: { skip?: boolean }) => (mocks.availabilityAsked.push(options?.skip === true), { data: options?.skip ? undefined : mocks.availability, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
     useCreateRefundMutation: () => [mocks.createRefund, { isLoading: false }], usePostRefundMutation: () => [mocks.postRefund, { isLoading: false }], useSubmitRefundMutation: mutation,
     useCreateWriteOffRequestMutation: mutation, usePostWriteOffRequestMutation: mutation, useSubmitWriteOffRequestMutation: mutation,
   };
 });
 
 import { P } from "../../../permissions";
-import { AdjustmentDetailDrawer, NewActionDrawer, adjustmentKpiTiles } from "./refunds-tab";
+import { AdjustmentDetailDrawer, NewActionDrawer, RefundsTab, adjustmentKpiTiles, writtenOffLabel } from "./refunds-tab";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -119,6 +137,8 @@ beforeEach(() => {
   mocks.postRefund.mockReturnValue({ unwrap: async () => ({ message: "Refund processed." }) });
   mocks.tie.mockReset();
   mocks.tie.mockResolvedValue(true);
+  mocks.adjustments.mockReset();
+  mocks.lens = { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false };
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -270,5 +290,52 @@ describe("the refunds and write-offs figures", () => {
     expect(adjustmentKpiTiles({ written_off_ytd: null, refundable_credit: 9 })).toEqual({ showCredit: true, showWrittenOff: false, count: 3 });
     expect(adjustmentKpiTiles({ written_off_ytd: null, refundable_credit: null })).toEqual({ showCredit: false, showWrittenOff: false, count: 2 });
     expect(adjustmentKpiTiles({ written_off_ytd: 0, refundable_credit: 0 }).count).toBe(4);
+  });
+});
+
+describe("the written-off figure's label", () => {
+  it("names the year picked, says the dates, and is this year's otherwise", () => {
+    expect(writtenOffLabel({ fiscal_year: 2015 })).toBe("Written off in FY 2015");
+    expect(writtenOffLabel({ date_from: "2015-03-01" })).toBe("Written off in these dates");
+    expect(writtenOffLabel({})).toBe("Written off (YTD)");
+  });
+});
+
+describe("the refunds and write-offs list's branch and year", () => {
+  const LEKKI = { applies: true, pinnedBranch: null, branch: 2, choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
+  const show = (path = "/finance/receivables/refunds") => act(() => root.render(
+    <MemoryRouter initialEntries={[path]}><RefundsTab entity="BSS" currency="NGN" /></MemoryRouter>,
+  ));
+  const year = () => container.querySelector<HTMLSelectElement>('select[aria-label="Year"]')!;
+
+  it("opens on All years and asks for no period", () => {
+    show();
+    expect(year().value).toBe("all");
+    expect(mocks.adjustments.mock.lastCall?.[0]).toEqual({ entity: "BSS", page: 1 });
+  });
+
+  it("asks for the switcher's branch and the year in the page address, which its figures ride on", () => {
+    mocks.lens = LEKKI;
+    show("/finance/receivables/refunds?year=2015");
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
+    expect(mocks.adjustments.mock.lastCall?.[0]).toEqual({ entity: "BSS", page: 1, branch: 2, fiscal_year: 2015 });
+  });
+
+  it("sends custom dates as a range and never with a year", () => {
+    show("/finance/receivables/refunds?year=custom&from=2015-03-01&to=2015-05-31");
+    expect(mocks.adjustments.mock.lastCall?.[0]).toMatchObject({ date_from: "2015-03-01", date_to: "2015-05-31" });
+    expect(mocks.adjustments.mock.lastCall?.[0]).not.toHaveProperty("fiscal_year");
+  });
+
+  it("goes back to the first page when the year changes", () => {
+    show();
+    const next = Array.from(container.querySelectorAll("button")).find((b) => /next/i.test(b.getAttribute("aria-label") ?? b.textContent ?? ""));
+    act(() => next!.click());
+    expect(mocks.adjustments.mock.lastCall?.[0]).toMatchObject({ page: 2 });
+    act(() => {
+      year().value = "2015";
+      year().dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(mocks.adjustments.mock.lastCall?.[0]).toMatchObject({ page: 1, fiscal_year: 2015 });
   });
 });

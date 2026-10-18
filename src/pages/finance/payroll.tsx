@@ -31,6 +31,9 @@
  * history, earlier pay brought forward into the tax year, voluntary deductions
  * and tax year. People who joined after January with no earlier pay recorded
  * are listed above the roster, and named again when a run is generated.
+ *
+ * The runs list and the figures above it answer for one branch and one stretch
+ * of time (`useFinanceListScope`), each run placed by its pay date.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -82,6 +85,7 @@ import {
 import type { PayrollLine, PayrollRun, PayrollRunBranchShare, EmployeeSalary, SalaryStructure, SalaryComponent, PayslipComponent } from "@/redux/services/finance/ops-types";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageHeader } from "@/components/layout/page-header";
+import { useFinanceListScope } from "./list-scope";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { FINANCE_HELP } from "./screen-help";
 import { useDates } from "../../lib/display-prefs";
@@ -226,7 +230,8 @@ export default function PayrollPage() {
   );
 }
 
-function RunsTab({ entity, currency, onShowRoster }: { entity: string; currency?: string | null; onShowRoster: () => void }) {
+/** The payroll runs: their figures, the runs list and the new-run drawer. */
+export function RunsTab({ entity, currency, onShowRoster }: { entity: string; currency?: string | null; onShowRoster: () => void }) {
   const dates = useDates();
   const missing = useGetPreviousPayMissingQuery({ entity, year: Number(dates.today().slice(0, 4)) }).data?.data;
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -237,11 +242,12 @@ function RunsTab({ entity, currency, onShowRoster }: { entity: string; currency?
   // An approval's "open the source document" link lands on the run.
   useSourceDocumentParam(setSelectedId);
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching, isError, refetch } = useGetPayrollRunsQuery({ entity, page });
+  const { scope, filters } = useFinanceListScope(entity, () => setPage(1));
+  const { data, isLoading, isFetching, isError, refetch } = useGetPayrollRunsQuery({ entity, page, ...scope });
   const rows = useMemo(() => toArray(data?.data), [data]);
   const pg = data?.pagination;
 
-  const summaryQ = useGetPayrollSummaryQuery({ entity });
+  const summaryQ = useGetPayrollSummaryQuery({ entity, ...scope });
   const s = summaryQ.data?.data;
   const kpis = { runs: s?.runs ?? 0, employees: s?.employees ?? 0, net: s?.net ?? 0, toPay: s?.to_pay ?? 0 };
 
@@ -282,10 +288,13 @@ function RunsTab({ entity, currency, onShowRoster }: { entity: string; currency?
         <p className="font-mont text-xs text-gray-05">{`Runs for the whole school show only ${yourBranchesPart(branchIds)}: its staff and its totals.`}</p>
       ) : null}
 
-      <div className="flex justify-end">
-        <Can permission={P.FIN_CREATE_PAYROLL}>
-          <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New payroll run</Button>
-        </Can>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">{filters}</div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Can permission={P.FIN_CREATE_PAYROLL}>
+            <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New payroll run</Button>
+          </Can>
+        </div>
       </div>
 
       {missing?.people.length ? (

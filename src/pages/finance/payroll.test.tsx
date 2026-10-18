@@ -15,10 +15,15 @@
  * are told it covers the whole school and that they see only Lekki's part, and
  * are offered nothing to post, pay or void; a whole-school bursar opening the
  * same run is offered paying and voiding as before.
+ *
+ * The runs list and the figures above it answer for the branch on the sidebar
+ * switcher and the year in the page address, each run placed by its pay date:
+ * Mrs Bello on Lekki with FY 2015 picked sees Lekki's runs paid in 2015.
  */
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -39,6 +44,9 @@ const mocks = vi.hoisted(() => ({
   post: vi.fn(),
   retry: vi.fn(),
   record: vi.fn(),
+  runs: vi.fn(),
+  summary: vi.fn(),
+  lens: { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false } as unknown,
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -62,6 +70,11 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetEmployeeSalariesQuery: () => ({ data: { data: [] } }),
   useGeneratePayrollRunMutation: () => [vi.fn(), { isLoading: false }],
   useCreatePayrollRunMutation: () => [vi.fn(), { isLoading: false }],
+  useGetPayrollRunsQuery: (args: unknown) => (mocks.runs(args), {
+    data: { data: [], pagination: { currentPage: 1, totalPages: 2 } }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn(),
+  }),
+  useGetPayrollSummaryQuery: (args: unknown) => (mocks.summary(args), { data: { data: { payroll_scope: "CENTRAL", runs: 0, employees: 0, net: 0, to_pay: 0 } } }),
+  useGetFiscalYearsQuery: () => ({ data: { data: [{ id: 1, year: 2015, start_date: "2014-09-01", end_date: "2015-08-31", is_archived: false }] } }),
 }));
 vi.mock("@/redux/services/finance/payroll-api", () => ({
   useGetPayrollTaxStatesQuery: () => ({ data: { data: [
@@ -98,7 +111,7 @@ vi.mock("@/redux/services/finance/reports-api", () => ({}));
 vi.mock("@/redux/services/tenants-api", () => ({ useGetBranchOptionsQuery: () => ({ data: { data: [] } }) }));
 vi.mock("../../host", async () => (await import("../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.branchIds, covers: () => true }),
-  hostBranchLens: undefined,
+  hostBranchLens: () => mocks.lens,
 }));
 
 vi.mock("@/components/finance-ui", async (importOriginal) => ({
@@ -117,7 +130,7 @@ vi.mock("@/components/finance-ui", async (importOriginal) => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { P } from "../../permissions";
-import { EmployeeDrawer, GeneratedRunNotice, NewRunDrawer, PayDrawer, PreviousPayMissingBanner, RunDrawer, canPrintPayslip, offeredStructures, salaryChanges, statutoryTotals, withSequences } from "./payroll";
+import { EmployeeDrawer, GeneratedRunNotice, NewRunDrawer, PayDrawer, PreviousPayMissingBanner, RunDrawer, RunsTab, canPrintPayslip, offeredStructures, salaryChanges, statutoryTotals, withSequences } from "./payroll";
 import { resolveFieldAccess } from "@/components/finance-ui";
 import type { EmployeeSalary, PayrollRun } from "@/redux/services/finance/ops-types";
 
@@ -748,5 +761,53 @@ describe("Paying a posted run", () => {
     mocks.payments = PAYMENTS({ lines: [{ id: 1, line_no: 1, employee_id: 5, employee_name: "A", net_amount: 1, branch_id: 1, branch_name: "Ikeja", pay_state: "SENT" }] });
     openRun(POSTED());
     expect(buttonLabels().some((l) => l.includes("through Paystack"))).toBe(false);
+  });
+});
+
+describe("the runs list's branch and year", () => {
+  const LEKKI = { applies: true, pinnedBranch: null, branch: 2, choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
+  const show = (path = "/finance/payroll") => act(() => root.render(
+    <MemoryRouter initialEntries={[path]}><RunsTab entity="BSS" currency="NGN" onShowRoster={() => undefined} /></MemoryRouter>,
+  ));
+  const year = () => container.querySelector<HTMLSelectElement>('select[aria-label="Year"]')!;
+
+  beforeEach(() => {
+    mocks.runs.mockReset();
+    mocks.summary.mockReset();
+    mocks.lens = { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false };
+  });
+
+  it("opens on All years and asks the list and its figures for no period", () => {
+    show();
+    expect(year().value).toBe("all");
+    expect(mocks.runs.mock.lastCall?.[0]).toEqual({ entity: "BSS", page: 1 });
+    expect(mocks.summary.mock.lastCall?.[0]).toEqual({ entity: "BSS" });
+  });
+
+  it("asks the list and its figures for the switcher's branch and the year in the page address", () => {
+    mocks.lens = LEKKI;
+    show("/finance/payroll?year=2015");
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
+    expect(mocks.runs.mock.lastCall?.[0]).toEqual({ entity: "BSS", page: 1, branch: 2, fiscal_year: 2015 });
+    expect(mocks.summary.mock.lastCall?.[0]).toEqual({ entity: "BSS", branch: 2, fiscal_year: 2015 });
+  });
+
+  it("sends custom dates as a range and never with a year", () => {
+    show("/finance/payroll?year=custom&from=2015-03-01&to=2015-05-31");
+    expect(mocks.runs.mock.lastCall?.[0]).toMatchObject({ date_from: "2015-03-01", date_to: "2015-05-31" });
+    expect(mocks.runs.mock.lastCall?.[0]).not.toHaveProperty("fiscal_year");
+    expect(mocks.summary.mock.lastCall?.[0]).toEqual({ entity: "BSS", date_from: "2015-03-01", date_to: "2015-05-31" });
+  });
+
+  it("goes back to the first page when the year changes", () => {
+    show();
+    const next = Array.from(container.querySelectorAll("button")).find((b) => /next/i.test(b.getAttribute("aria-label") ?? b.textContent ?? ""));
+    act(() => next!.click());
+    expect(mocks.runs.mock.lastCall?.[0]).toMatchObject({ page: 2 });
+    act(() => {
+      year().value = "2015";
+      year().dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(mocks.runs.mock.lastCall?.[0]).toMatchObject({ page: 1, fiscal_year: 2015 });
   });
 });

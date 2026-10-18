@@ -7,9 +7,14 @@
  * who counted and raised it, by the names the server sent. Void is offered only to
  * a holder of `finance.pettycash.reverse`; an older return while a later one of
  * the same fund stands is not sent, and says which return to void first.
+ *
+ * The year or dates picked narrow the list by each return's date. A role that
+ * may not read the return date is offered no Year picker and asks for no
+ * period, which the server would refuse; one that may only read it keeps both.
  */
-import { act } from "react";
+import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -44,6 +49,7 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
   },
   useGetPettyCashReturnQuery: () => ({ data: undefined }),
   useVoidPettyCashReturnMutation: () => [mocks.voidReturn, { isLoading: false }],
+  useGetFiscalYearsQuery: () => ({ data: { data: [{ id: 1, year: 2015, start_date: "2014-09-01", end_date: "2015-08-31", is_archived: false }] } }),
 }));
 
 vi.mock("@/hooks/use-permissions", () => ({
@@ -109,13 +115,15 @@ afterEach(async () => {
   container.remove();
 });
 
+/** The list at a page address, which holds the year or dates picked. */
+const routed = (node: ReactNode, path = "/finance/expenses/petty-cash") => <MemoryRouter initialEntries={[path]}>{node}</MemoryRouter>;
 const tableRows = () => [...container.querySelectorAll("tbody tr")];
 const headers = () => [...container.querySelectorAll("thead th")].map((th) => th.textContent);
 const button = (text: string) => [...document.body.querySelectorAll("button")].find((b) => b.textContent?.trim().includes(text));
 
 describe("petty cash returns", () => {
   it("lists every return and closure with its fund, branch, amount, difference and status", () => {
-    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />)));
     expect(headers()).toEqual(["Return no.", "Fund", "Branch", "Kind", "Date", "Banked", "Difference", "Status"]);
     expect(tableRows()).toHaveLength(2);
     const ikeja = tableRows()[1].textContent ?? "";
@@ -130,7 +138,7 @@ describe("petty cash returns", () => {
 
   it("asks the server for the picked branch's returns, without a branch column", () => {
     mocks.rows = [LEKKI_CLOSE];
-    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, "2")} />));
+    act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, "2")} />)));
     expect(mocks.list).toHaveBeenCalledWith({ entity: "BSS", page_size: 100, branch: 2 });
     expect(headers()).not.toContain("Branch");
     expect(tableRows().map((r) => r.querySelector("td")?.textContent)).toEqual(["PCR-0011"]);
@@ -138,7 +146,7 @@ describe("petty cash returns", () => {
 
   it("names a branch and the people as the server sent them, marking who has left", () => {
     mocks.rows = [ret({ branch_id: 3, branch_name: "Victoria Island", counted_by_is_exited: true })];
-    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />)));
     expect(tableRows()[0].textContent).toContain("Victoria Island");
     act(() => (tableRows()[0] as HTMLElement).click());
     expect(document.body.textContent).toContain("Counted byMrs Eze (left)");
@@ -146,7 +154,7 @@ describe("petty cash returns", () => {
   });
 
   it("voids a closure, which reopens the fund", async () => {
-    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />)));
     act(() => (tableRows()[0] as HTMLElement).click());
     expect(document.body.textContent).toContain("Raised byMrs Bello");
     act(() => button("Void")!.click());
@@ -158,7 +166,7 @@ describe("petty cash returns", () => {
 
   it("does not send a void the server would refuse for a later return", () => {
     mocks.rows = [ret({ id: 12, document_number: "PCR-0012" }), IKEJA_REDUCE];
-    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />)));
     act(() => (tableRows()[1] as HTMLElement).click());
     act(() => button("Void")!.click());
     expect(document.body.querySelector("[role=alert]")?.textContent).toBe("Return PCR-0012 of this fund came after PCR-0010. Void it first.");
@@ -169,7 +177,7 @@ describe("petty cash returns", () => {
     returned.uid = 4;
     returned.request = { id: "wf-10", status: "RETURNED", requested_by: 4, stage_instances: [] };
     mocks.rows = [{ ...IKEJA_REDUCE, status: "DRAFT", approval_state: "PENDING", approval_returned: true, workflow_instance_id: "wf-10" }];
-    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />)));
     expect(tableRows()[0].textContent).toContain("Sent back");
     act(() => (tableRows()[0] as HTMLElement).click());
     expect(button("Cancel return")).toBeUndefined();
@@ -179,7 +187,7 @@ describe("petty cash returns", () => {
   });
 
   it("asks for what was sent back when the Status filter says Sent back", () => {
-    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />)));
     const select = container.querySelector('select[aria-label="Status"]') as HTMLSelectElement;
     expect([...select.options].map((o) => o.textContent)).toEqual(["All statuses", "Sent back"]);
     act(() => {
@@ -191,7 +199,7 @@ describe("petty cash returns", () => {
 
   it("keeps Draft and Cancel return on a draft no approver holds", () => {
     mocks.rows = [{ ...IKEJA_REDUCE, status: "DRAFT", approval_state: "REJECTED", approval_returned: false }];
-    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />)));
     expect(tableRows()[0].textContent).toContain("Draft");
     act(() => (tableRows()[0] as HTMLElement).click());
     expect(button("Cancel return")).toBeDefined();
@@ -199,7 +207,7 @@ describe("petty cash returns", () => {
 
   it("offers no Void without the reverse key", () => {
     mocks.denied = new Set([P.FIN_REVERSE_PETTY_CASH]);
-    act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />));
+    act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, null)} />)));
     act(() => (tableRows()[0] as HTMLElement).click());
     expect(button("Void")).toBeUndefined();
   });
@@ -213,7 +221,7 @@ describe("petty cash returns", () => {
 describe("Field Access on petty cash returns", () => {
   const restrict = (hidden: string[]) => { mocks.fieldAccess = { [PETTY_CASH_RETURN]: { hidden } }; };
   const omit = (row: PettyCashReturn, ...keys: string[]) => Object.fromEntries(Object.entries(row).filter(([k]) => !keys.includes(k))) as unknown as PettyCashReturn;
-  const render = (view = pettyCashBranchFor(LENS, null)) => act(() => root.render(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={view} />));
+  const render = (view = pettyCashBranchFor(LENS, null)) => act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={view} />)));
   const cellCounts = () => tableRows().map((r) => r.querySelectorAll("td").length);
 
   it("drops a hidden column with its header, row by row", () => {
@@ -334,5 +342,43 @@ describe("Field Access on petty cash returns", () => {
     act(() => (tableRows()[1] as HTMLElement).click());
     act(() => button("Void")!.click());
     expect(document.body.querySelector("[role=alert]")?.textContent).toBe("Return PCR-0012 of this fund came after PCR-0010. Void it first.");
+  });
+});
+
+describe("the returns list's year", () => {
+  const show = (path: string) => act(() => root.render(routed(<PettyCashReturnsList entity="BSS" funds={FUNDS} view={pettyCashBranchFor(LENS, "2")} />, path)));
+  const year = () => container.querySelector<HTMLSelectElement>('select[aria-label="Year"]');
+  const asked = () => mocks.list.mock.lastCall?.[0] as Record<string, unknown>;
+
+  it("asks for the branch shown and the year in the page address", () => {
+    show("/finance/expenses/petty-cash?year=2015");
+    expect(year()?.value).toBe("2015");
+    expect(asked()).toEqual({ entity: "BSS", page_size: 100, branch: 2, fiscal_year: 2015 });
+  });
+
+  it("sends custom dates as a range and never with a year", () => {
+    show("/finance/expenses/petty-cash?year=custom&from=2015-03-01&to=2015-05-31");
+    expect(asked()).toMatchObject({ date_from: "2015-03-01", date_to: "2015-05-31" });
+    expect(asked()).not.toHaveProperty("fiscal_year");
+  });
+
+  it("offers no Year picker and sends no period when the return date is hidden", () => {
+    mocks.fieldAccess = { [PETTY_CASH_RETURN]: { hidden: ["return_date"] } };
+    show("/finance/expenses/petty-cash?year=2015");
+    expect(year()).toBeNull();
+    expect(asked()).toEqual({ entity: "BSS", page_size: 100, branch: 2 });
+  });
+
+  it("keeps the Year picker and sends the year when the return date is only read-only", () => {
+    mocks.fieldAccess = { [PETTY_CASH_RETURN]: { read_only: ["return_date"] } };
+    show("/finance/expenses/petty-cash?year=2015");
+    expect(year()).not.toBeNull();
+    expect(asked()).toMatchObject({ fiscal_year: 2015 });
+  });
+
+  it("checks Void against every return of the fund, not only the year's rows", () => {
+    show("/finance/expenses/petty-cash?year=2015");
+    act(() => (tableRows()[1] as HTMLElement).click());
+    expect(mocks.list.mock.lastCall?.[0]).toEqual({ entity: "BSS", fund: 1, page_size: 100 });
   });
 });

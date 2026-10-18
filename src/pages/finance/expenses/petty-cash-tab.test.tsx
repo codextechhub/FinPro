@@ -13,6 +13,10 @@
  *
  * A journal's link to a return (`?document=<id>`) opens that return over the
  * page.
+ *
+ * The Vouchers tab answers for the branch on the switcher and the year in the
+ * page address. Close fund still reads every voucher of the fund, so Mrs Bello
+ * looking at FY 2015 is still told about a draft voucher from this year.
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -23,6 +27,9 @@ const mocks = vi.hoisted(() => ({
   funds: [] as unknown[],
   detail: null as unknown,
   vouchers: [] as unknown[],
+  yearVouchers: [] as unknown[],
+  voucherArgs: vi.fn(),
+  returnArgs: vi.fn(),
   returns: [] as unknown[],
   linked: null as unknown,
   cancel: vi.fn(),
@@ -56,8 +63,16 @@ vi.mock("@/redux/store", () => ({
 vi.mock("@/redux/services/finance/ops-api", () => ({
   useGetPettyCashFundsQuery: () => ({ data: { data: mocks.funds }, isLoading: false }),
   useGetPettyCashFundQuery: () => ({ data: mocks.detail ? { data: mocks.detail } : undefined }),
-  useGetPettyCashVouchersQuery: () => ({ data: { data: mocks.vouchers }, isFetching: false }),
-  useGetPettyCashReturnsQuery: () => ({ data: { data: mocks.returns, pagination: { totalItems: mocks.returns.length } }, isLoading: false, isError: false, refetch: vi.fn() }),
+  useGetPettyCashVouchersQuery: (args: Record<string, unknown>) => {
+    mocks.voucherArgs(args);
+    const dated = "fiscal_year" in args || "date_from" in args || "date_to" in args;
+    return { data: { data: dated ? mocks.yearVouchers : mocks.vouchers }, isFetching: false };
+  },
+  useGetPettyCashReturnsQuery: (args: unknown) => {
+    mocks.returnArgs(args);
+    return { data: { data: mocks.returns, pagination: { totalItems: mocks.returns.length } }, isLoading: false, isError: false, refetch: vi.fn() };
+  },
+  useGetFiscalYearsQuery: () => ({ data: { data: [{ id: 1, year: 2015, start_date: "2014-09-01", end_date: "2015-08-31", is_archived: false }] } }),
   useGetPettyCashReturnQuery: () => ({ data: mocks.linked ? { data: mocks.linked } : undefined }),
   useGetBankAccountsQuery: () => ({ data: { data: [] } }),
   useCancelPettyCashVoucherMutation: () => [mocks.cancel, { isLoading: false }],
@@ -131,6 +146,9 @@ beforeEach(() => {
   mocks.funds = [fund()];
   mocks.detail = null;
   mocks.vouchers = [];
+  mocks.yearVouchers = [];
+  mocks.voucherArgs.mockReset();
+  mocks.returnArgs.mockReset();
   mocks.returns = [];
   mocks.linked = null;
   mocks.denied = new Set();
@@ -270,5 +288,44 @@ describe("a link to one return", () => {
   it("opens nothing without one", () => {
     render();
     expect(document.body.querySelector("[role=dialog]")).toBeNull();
+  });
+});
+
+describe("the vouchers' year", () => {
+  const LEKKI = { applies: true, pinnedBranch: null, branch: 2, choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
+  const voucherCalls = () => mocks.voucherArgs.mock.calls.map((call) => call[0] as Record<string, unknown>);
+  const listed = () => voucherCalls().filter((args) => "fiscal_year" in args || "date_from" in args || "date_to" in args).at(-1);
+
+  beforeEach(() => {
+    mocks.lens = LEKKI;
+    mocks.funds = [fund({ id: 2, branch_id: 2, name: "Lekki float" })];
+  });
+
+  it("asks for the switcher's branch and the year picked, beside the Year picker", () => {
+    mocks.yearVouchers = [voucher("POSTED", "PCV-2")];
+    render("/?year=2015");
+    act(() => tab("Vouchers").click());
+    expect(container.querySelector<HTMLSelectElement>('select[aria-label="Year"]')?.value).toBe("2015");
+    expect(listed()).toEqual({ entity: "BSS", fund: 2, page_size: 100, branch: 2, fiscal_year: 2015 });
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(1);
+  });
+
+  it("sends custom dates as a range and never with a year", () => {
+    render("/?year=custom&from=2015-03-01&to=2015-05-31");
+    expect(listed()).toMatchObject({ date_from: "2015-03-01", date_to: "2015-05-31" });
+    expect(listed()).not.toHaveProperty("fiscal_year");
+  });
+
+  it("asks for no period with All years", () => {
+    render();
+    for (const args of voucherCalls()) expect(args).toEqual({ entity: "BSS", fund: 2, page_size: 100, branch: 2 });
+  });
+
+  it("still holds Close fund up on a draft outside the year picked", () => {
+    mocks.vouchers = [{ ...voucher("DRAFT", "PCV-1"), fund_id: 2 }];
+    render("/?year=2015");
+    act(() => button("Close fund")!.click());
+    expect(document.body.querySelector("[data-testid=close-blockers]")?.textContent).toContain("PCV-1");
+    expect(mocks.returnArgs.mock.calls.map((call) => call[0])).toContainEqual({ entity: "BSS", fund: 2, page_size: 100 });
   });
 });

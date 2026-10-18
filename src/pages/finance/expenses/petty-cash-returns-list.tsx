@@ -13,8 +13,13 @@
  * and lists the rest, and the central handler words any refusal that comes back.
  *
  * The list reads up to the latest 100 returns in the reader's reach, asking the
- * server for the branch shown (`?branch=`) and the fund picked. Each row names
- * its branch and its people as the server sent them.
+ * server for the branch shown (`?branch=`), the fund picked and the year or
+ * dates picked (`list-period`, each return placed by its return date). Each row
+ * names its branch and its people as the server sent them. A reader who may not
+ * read the return date is offered no Year picker and asks for no period, since
+ * the server refuses a period on a date the reader may not read. A return
+ * opened from the list is checked for Void against every return of its fund,
+ * not only the rows the filters leave on screen.
  *
  * Every column, filter and detail row follows Field Access
  * (`finance.pettycash_return`): a field the reader may not read has no column
@@ -46,6 +51,7 @@ import { exitedTitle } from "@/components/finance-ui/exited-person";
 import { P } from "../../../permissions";
 import { useDates } from "../../../lib/display-prefs";
 import { VoidReturnDialog } from "./petty-cash-return-drawers";
+import { ListPeriodSelect, listPeriodArg, useListPeriod, type ListPeriodView } from "@/components/finance-ui/list-period";
 import { branchQueryArg, inBranch, rowBranchName, type PettyCashBranch } from "./petty-cash-branch";
 import { PETTY_CASH_RETURN, returnVoidable, voidBlocker } from "./petty-cash-returns";
 import { RETURNED_HINT, SENT_BACK_FILTER, SENT_BACK_WORD, sentBackPill, statusFilterArgs } from "@/components/finance-ui/returned-correction";
@@ -53,6 +59,8 @@ import { ResumeButton, ReturnedNote, useFinanceReturned } from "@/components/fin
 
 /** The page size the list asks for: the server's ceiling. */
 const RETURNS_PAGE = 100;
+
+const ALL_YEARS: ListPeriodView = { kind: "all" };
 
 /** A return's kind, in the words the fund screens use. */
 export function returnKindLabel(ret: Pick<PettyCashReturn, "kind">): string {
@@ -72,6 +80,8 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
   const dates = useDates();
   const access = useFieldAccess(PETTY_CASH_RETURN);
   const showStatus = !access.isHidden("status");
+  const periodReadable = !access.isHidden("return_date");
+  const period = useListPeriod();
   const [fundFilter, setFundFilter] = useState("");
   // Returns have no status filter: the one choice is all of them, or those sent back.
   const [approval, setApproval] = useState("");
@@ -81,6 +91,7 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
     ...branchQueryArg(view),
     ...(fundFilter ? { fund: Number(fundFilter) } : {}),
     ...(showStatus ? statusFilterArgs(approval) : {}),
+    ...listPeriodArg(periodReadable ? period.view : ALL_YEARS),
   });
   const all = useMemo(() => toArray(data?.data), [data]);
   const total = data?.pagination?.totalItems ?? all.length;
@@ -116,6 +127,9 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
             </NativeSelect>
           </div>
         ) : null}
+        {periodReadable ? (
+          <ListPeriodSelect entity={entity} view={period.view} onYear={period.chooseYear} onRange={period.chooseRange} />
+        ) : null}
         {total > all.length ? <span className="font-mont text-[11px] text-gray-05">Showing the latest {all.length} of {total}.</span> : null}
       </div>
       <DataTable
@@ -124,11 +138,7 @@ export function PettyCashReturnsList({ entity, currency, funds, view }: {
         emptyTitle="No returns yet" emptyMessage="Reduce a float or close a fund to bank its cash."
       />
       {open ? (
-        <ReturnDetailDrawer
-          ret={open} entity={entity} currency={currency} view={view}
-          fund={funds.find((f) => f.id === open.fund_id)} returns={all}
-          onClose={() => setOpenId(null)}
-        />
+        <FundReturnDrawer ret={open} entity={entity} currency={currency} view={view} funds={funds} onClose={() => setOpenId(null)} />
       ) : null}
     </div>
   );
@@ -141,19 +151,16 @@ function Person({ name, exited }: { name?: string | null; exited?: boolean | nul
 }
 
 /**
- * A return opened from a link, read on its own so it opens whichever fund or
- * branch the page shows. Its fund's other returns are read beside it, so Void
- * names a later return of the same fund before the server would refuse it.
+ * A return in full beside every return of its fund, so Void names a later
+ * return of the same fund before the server would refuse it, including one the
+ * list's filters leave off screen. A return with no fund is shown alone: its
+ * siblings cannot be told apart, and the server refuses to filter by it.
  */
-export function LinkedReturnDrawer({ id, entity, currency, view, funds, onClose }: {
-  id: number; entity: string; currency?: string | null; view: PettyCashBranch;
+function FundReturnDrawer({ ret, entity, currency, view, funds, onClose }: {
+  ret: PettyCashReturn; entity: string; currency?: string | null; view: PettyCashBranch;
   funds: PettyCashFund[]; onClose: () => void;
 }) {
-  const { data } = useGetPettyCashReturnQuery({ id, entity });
-  const ret = data?.data;
-  // Without the fund the siblings cannot be told apart, and the server refuses to filter by it.
-  const siblings = useGetPettyCashReturnsQuery(ret && ret.fund_id != null ? { entity, fund: ret.fund_id, page_size: RETURNS_PAGE } : skipToken);
-  if (!ret) return null;
+  const siblings = useGetPettyCashReturnsQuery(ret.fund_id != null ? { entity, fund: ret.fund_id, page_size: RETURNS_PAGE } : skipToken);
   return (
     <ReturnDetailDrawer
       ret={ret} entity={entity} currency={currency} view={view}
@@ -161,6 +168,20 @@ export function LinkedReturnDrawer({ id, entity, currency, view, funds, onClose 
       onClose={onClose}
     />
   );
+}
+
+/**
+ * A return opened from a link, read on its own so it opens whichever fund or
+ * branch the page shows.
+ */
+export function LinkedReturnDrawer({ id, entity, currency, view, funds, onClose }: {
+  id: number; entity: string; currency?: string | null; view: PettyCashBranch;
+  funds: PettyCashFund[]; onClose: () => void;
+}) {
+  const { data } = useGetPettyCashReturnQuery({ id, entity });
+  const ret = data?.data;
+  if (!ret) return null;
+  return <FundReturnDrawer ret={ret} entity={entity} currency={currency} view={view} funds={funds} onClose={onClose} />;
 }
 
 /** One return in full, with Void for a holder of the reverse key. */

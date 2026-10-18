@@ -4,7 +4,7 @@
 
 import { generateQueryString } from "@/utils/helpers";
 import { baseApi } from "@/redux/services/base-api";
-import type { ApiEnvelope, FinanceListScope, PaginatedEnvelope, Pagination } from "./api-types";
+import type { ApiEnvelope, FinanceBranchArg, FinanceListScope, PaginatedEnvelope, Pagination } from "./api-types";
 import type {
   ArAdjustment,
   SubmittedDocument,
@@ -226,7 +226,7 @@ export const arApi = baseApi.injectEndpoints({
         kinds: ("REFUND" | "WRITEOFF")[];
         data: ArAdjustment[];
       },
-      { entity: string; type?: string; search?: string; page?: number; approval?: "returned" }
+      { entity: string; type?: string; search?: string; page?: number; approval?: "returned" } & FinanceListScope
     >({
       query: (params) => ({ url: `/finance/ar-adjustments/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceRefunds", "FinanceInvoices", "FinanceWriteOffs"],
@@ -344,11 +344,12 @@ export const arApi = baseApi.injectEndpoints({
     }),
 
     // Dunning notices + policies + cadence
-    getDunningNotices: builder.query<PaginatedEnvelope<DunningNotice>, EntityList>({
+    getDunningNotices: builder.query<PaginatedEnvelope<DunningNotice>, EntityList & FinanceListScope>({
       query: (params) => ({ url: `/finance/dunning-notices/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceDunning"],
     }),
-    getDunningSummary: builder.query<ApiEnvelope<DunningSummary>, { entity: string }>({
+    // Ages what is owed today, so it takes the branch and never a period.
+    getDunningSummary: builder.query<ApiEnvelope<DunningSummary>, { entity: string } & FinanceBranchArg>({
       query: (params) => ({ url: `/finance/dunning/summary/${qs(params)}`, method: "GET" }),
       providesTags: ["FinanceDunning", "FinanceInvoices"],
     }),

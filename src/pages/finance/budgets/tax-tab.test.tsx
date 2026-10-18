@@ -7,9 +7,14 @@
  * left on the default it is shared by each branch's share of the tax. A school
  * with one branch is asked neither. Mrs Adeyemi, Lekki's own bursar, is not
  * offered filing at all: the server keeps it for the whole school.
+ *
+ * Mrs Bello, bursar for Ikeja and Lekki, switches the sidebar to Lekki and picks
+ * FY 2015: the filings list and the figures above it answer for Lekki's returns
+ * for periods ending in 2015.
  */
-import { act } from "react";
+import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -18,11 +23,15 @@ const mocks = vi.hoisted(() => ({
   file: vi.fn(),
   bankBranch: [] as unknown[],
   wholeSchool: true,
+  list: vi.fn(),
+  summary: vi.fn(),
+  lens: { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false } as unknown,
 }));
 
 vi.mock("@/redux/services/finance/ops-api", () => ({
-  useGetTaxFilingsQuery: () => ({ data: { data: [mocks.filing], pagination: { currentPage: 1, totalPages: 1 } }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
-  useGetTaxFilingSummaryQuery: () => ({ data: { data: { outstanding: 0, open: 0, filed: 1, paid: 0 } } }),
+  useGetTaxFilingsQuery: (args: unknown) => (mocks.list(args), { data: { data: [mocks.filing], pagination: { currentPage: 1, totalPages: 2 } }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
+  useGetTaxFilingSummaryQuery: (args: unknown) => (mocks.summary(args), { data: { data: { outstanding: 0, open: 0, filed: 1, paid: 0 } } }),
+  useGetFiscalYearsQuery: () => ({ data: { data: [{ id: 1, year: 2015, start_date: "2014-09-01", end_date: "2015-08-31", is_archived: false }] } }),
   useGetTaxObligationsQuery: () => ({ data: { data: [] } }),
   useCreateTaxObligationMutation: () => [vi.fn(), { isLoading: false }],
   useCreateTaxFilingMutation: () => [vi.fn(), { isLoading: false }],
@@ -62,6 +71,7 @@ vi.mock("@/hooks/use-permissions", () => ({
 
 vi.mock("../../../host", async () => (await import("../../../host-fake")).fakeHost({
   useReaderReach: () => ({ wholeSchool: mocks.wholeSchool, branchIds: mocks.wholeSchool ? null : [2], covers: () => mocks.wholeSchool }),
+  hostBranchLens: () => mocks.lens,
 }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -98,6 +108,9 @@ beforeEach(() => {
   mocks.file.mockReset().mockReturnValue({ unwrap: () => Promise.resolve({ message: "Filed." }) });
   mocks.bankBranch = [];
   mocks.wholeSchool = true;
+  mocks.list.mockReset();
+  mocks.summary.mockReset();
+  mocks.lens = { applies: false, pinnedBranch: null, branch: "all", choices: [], isLoading: false };
 });
 
 afterEach(async () => {
@@ -105,6 +118,8 @@ afterEach(async () => {
   container.remove();
 });
 
+/** The screen at a page address, which holds the year or dates picked. */
+const routed = (node: ReactNode, path = "/finance/budgets/tax") => <MemoryRouter initialEntries={[path]}>{node}</MemoryRouter>;
 const button = (label: string) =>
   Array.from(document.body.querySelectorAll("button")).find((el) => el.textContent?.trim() === label);
 /** The last button whose label starts so: the drawer opened last sits last in the page. */
@@ -113,7 +128,7 @@ const buttonStarting = (label: string) =>
 const click = async (el: Element | undefined) => { expect(el).toBeTruthy(); await act(async () => (el as HTMLElement).click()); };
 
 async function openReturn() {
-  await act(async () => root.render(<TaxTab entity="BRIGHTSTAR" />));
+  await act(async () => root.render(routed(<TaxTab entity="BRIGHTSTAR" />)));
   const row = Array.from(document.body.querySelectorAll("tr, [role='row'], li")).find((el) => el.textContent?.includes("FIRS"));
   await click(row ?? undefined);
 }
@@ -194,7 +209,7 @@ describe("the words a bursar reads on the tax screens", () => {
 
   it("prepare a return in plain words", async () => {
     mocks.filing = { ...base, filing_status: "FILED", branch_breakdown: [share(1, "Main", 12_000_000)] };
-    await act(async () => root.render(<TaxTab entity="BRIGHTSTAR" />));
+    await act(async () => root.render(routed(<TaxTab entity="BRIGHTSTAR" />)));
     await click(button("New filing"));
     const text = document.body.textContent ?? "";
     expect(text).toContain("Prepare a return: works out what is owed for the period from the books.");
@@ -213,5 +228,43 @@ describe("the words a bursar reads on the tax screens", () => {
     const note = Array.from(document.body.querySelectorAll("p")).find((p) => p.textContent?.startsWith("Pays what is owed"));
     expect(note?.textContent).toContain("Pays what is owed out of the bank account you choose, and clears it from VAT output payable.");
     expect(note?.textContent).not.toMatch(/\bDr\b|\bCr\b|liability -/);
+  });
+});
+
+describe("the filings list's branch and year", () => {
+  const LEKKI = { applies: true, pinnedBranch: null, branch: 2, choices: [{ id: 1, name: "Ikeja" }, { id: 2, name: "Lekki" }], isLoading: false };
+  const show = (path: string) => act(() => root.render(routed(<TaxTab entity="BRIGHTSTAR" />, path)));
+  const year = () => container.querySelector<HTMLSelectElement>('select[aria-label="Year"]')!;
+
+  beforeEach(() => {
+    mocks.filing = { ...base, filing_status: "FILED", branch_breakdown: [share(1, "Main", 12_000_000)] };
+  });
+
+  it("asks the list and its figures for the switcher's branch and the year in the page address", () => {
+    mocks.lens = LEKKI;
+    show("/finance/budgets/tax?year=2015");
+    expect(container.querySelector('select[aria-label="Branch"]')).toBeNull();
+    expect(mocks.list.mock.lastCall?.[0]).toEqual({ entity: "BRIGHTSTAR", page: 1, branch: 2, fiscal_year: 2015 });
+    expect(mocks.summary.mock.lastCall?.[0]).toEqual({ entity: "BRIGHTSTAR", branch: 2, fiscal_year: 2015 });
+  });
+
+  it("sends custom dates as a range and never with a year", () => {
+    show("/finance/budgets/tax?year=custom&from=2015-03-01&to=2015-05-31");
+    expect(mocks.list.mock.lastCall?.[0]).toMatchObject({ date_from: "2015-03-01", date_to: "2015-05-31" });
+    expect(mocks.list.mock.lastCall?.[0]).not.toHaveProperty("fiscal_year");
+    expect(mocks.summary.mock.lastCall?.[0]).toEqual({ entity: "BRIGHTSTAR", date_from: "2015-03-01", date_to: "2015-05-31" });
+  });
+
+  it("goes back to the first page when the year changes", () => {
+    show("/finance/budgets/tax");
+    const next = Array.from(container.querySelectorAll("button")).find((b) => /next/i.test(b.getAttribute("aria-label") ?? b.textContent ?? ""));
+    expect(next).toBeTruthy();
+    act(() => next!.click());
+    expect(mocks.list.mock.lastCall?.[0]).toMatchObject({ page: 2 });
+    act(() => {
+      year().value = "2015";
+      year().dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(mocks.list.mock.lastCall?.[0]).toMatchObject({ page: 1, fiscal_year: 2015 });
   });
 });
