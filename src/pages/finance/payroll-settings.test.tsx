@@ -164,10 +164,16 @@ describe("the payroll policy under Field Access", () => {
     expect(field("paye_method")).toBeNull();
   });
 
-  it("leaves the country out of the PAYE sentence when only the country is hidden", () => {
+  it("leaves the country out when only the country is hidden, and keeps the method's ⓘ", () => {
     mount(hiding("tax_country"));
-    expect(document.body.textContent).toContain("A person's PAYE can still be set by hand");
     expect(document.body.textContent).not.toContain("Tax tables for");
+    act(() => { byLabel("About Where PAYE comes from").click(); });
+    expect(document.body.textContent).toContain("A person's PAYE can still be set by hand");
+  });
+
+  it("shows the tax country on the page when the reader may see it", () => {
+    mount(SAVED);
+    expect(document.body.textContent).toContain("Tax tables for");
   });
 
   it("keeps a deduction's switch when its rate is hidden, and its rate when its switch is hidden", () => {

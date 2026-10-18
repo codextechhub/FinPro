@@ -114,8 +114,10 @@ describe("receivables settings", () => {
 });
 
 describe("the release method hint", () => {
-  it("names each method by the label the choice above it shows", () => {
-    const text = render(true);
+  it("names each method by the label the choice above it shows, behind the field's ⓘ", () => {
+    expect(render(true)).not.toContain("an equal share is released each month");
+    act(() => { container.querySelector<HTMLElement>('[aria-label="About Release method"]')!.click(); });
+    const text = document.body.textContent ?? "";
     expect(text).toContain("Spread evenly over each month of the service period: an equal share is released each month");
     expect(text).toContain("All in the month the service period starts: the whole fee is released in the term's first month");
     expect(text).not.toContain("Spread monthly");

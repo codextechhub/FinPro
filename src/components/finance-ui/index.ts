@@ -54,6 +54,7 @@ export { default as KpiCard } from "@/components/custom/kpi-card";
 export { StatCard, type StatTone } from "./stat-card";
 export { TeachingNote } from "./teaching-note";
 export { InfoHint } from "./info-hint";
+export { HintedPanel, HintedRow, SettingField, SettingHint, SettingName, SettingToggle, UsedBy } from "./setting-help";
 export { BarChart, Donut, StatStrip, WorkflowStrip, Sparkline, BudgetBar, AgingStack, TrendArea, CHART_COLORS, type BarDatum, type DonutDatum, type AgingDatum } from "./charts";
 // Coerce an endpoint's `data` to an array (backend sends `{}` for an empty list).
 export { toArray } from "@/redux/services/finance/api-types";

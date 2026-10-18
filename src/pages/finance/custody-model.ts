@@ -25,15 +25,22 @@ import type {
   FullCustodyPayload,
 } from "@/redux/services/payments/payments-types";
 
-export const CUSTODY_MODES: { value: CustodyMode; label: string; detail: string }[] = [
+/**
+ * The two custody modes: the `label` names the mode, the one-line `summary`
+ * beside the option names the consequence that sets the two apart, and the
+ * whole of it is the `detail` in the panel's ⓘ.
+ */
+export const CUSTODY_MODES: { value: CustodyMode; label: string; summary: string; detail: string }[] = [
   {
     value: "HELD",
     label: "Held, then paid to each branch",
+    summary: "Online payouts draw on what is held for the branch.",
     detail: "Payments are held for the school and paid into each branch's bank on its settlement interval. Online payouts draw on what is held for the branch.",
   },
   {
     value: "DIRECT",
     label: "Straight to each branch's bank",
+    summary: "No online payouts or online refunds.",
     detail: "Each branch's collection account takes its payments directly. There are no online payouts or online refunds; pay and refund from the bank.",
   },
 ];

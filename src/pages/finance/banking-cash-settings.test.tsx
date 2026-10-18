@@ -77,11 +77,13 @@ const choose = (label: string, value: string) => {
 };
 
 describe("banking and cash defaults", () => {
-  it("shows the transfers switch on by default, with what it does", () => {
+  it("shows the transfers switch on by default, with what it does behind its ⓘ", () => {
     render();
     expect(container.textContent).toContain(TRANSFERS);
-    expect(container.textContent).toContain("any excess waits as credit");
     expect(control(TRANSFERS)?.getAttribute("aria-checked")).toBe("true");
+    expect(document.body.textContent).not.toContain("Anything left over waits as their credit");
+    act(() => { control(`About ${TRANSFERS}`)!.click(); });
+    expect(document.body.textContent).toContain("Anything left over waits as their credit");
   });
 
   it("sends only the switch when only the switch changed", async () => {

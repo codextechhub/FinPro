@@ -19,24 +19,29 @@ import { Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { AccessField, fieldWriteErrors, useFieldAccess, type FieldErrors } from "@/components/finance-ui";
-import { SettingsPanel } from "@/components/settings/settings-layout";
+import { AccessField, HintedPanel, UsedBy, fieldWriteErrors, useFieldAccess, type FieldErrors } from "@/components/finance-ui";
 import { useUpdateFinancePayrollSettingsMutation } from "@/redux/services/finance/payroll-api";
 import type { FinancePayrollSettingsValues } from "@/redux/services/finance/payroll-types";
 import type { PayrollPaymentRoute } from "@/redux/services/finance/payroll-paystack-types";
+import type { SettingConsumer } from "@/redux/services/finance/setup-types";
 import { providerInfo } from "./payment-providers";
 
-/** The two routes in plain words, in the order they are offered. */
-export function paymentRouteChoices(provider: string): { value: PayrollPaymentRoute; label: string; detail: string }[] {
+/**
+ * The two routes in plain words, in the order they are offered: a one-line
+ * `summary` beside the option, and the whole of it as `detail` in the ⓘ.
+ */
+export function paymentRouteChoices(provider: string): { value: PayrollPaymentRoute; label: string; summary: string; detail: string }[] {
   return [
     {
       value: "OWN_BANK",
       label: "From the school's bank",
+      summary: "The bursar pays staff from each branch's bank, then records it.",
       detail: "The bursar pays each branch's staff from that branch's own bank account, then records it against the run.",
     },
     {
       value: "PAYSTACK",
       label: `Through ${provider}`,
+      summary: `Net pay is sent from the money ${provider} holds for each branch.`,
       detail: `Paying a run sends each person's net pay from the money ${provider} holds for their branch. Staff need a checked bank account, kept under Bank accounts in Payroll.`,
     },
   ];
@@ -50,9 +55,10 @@ export function routeSelectable(route: PayrollPaymentRoute, current: PayrollPaym
   return route === "OWN_BANK" || route === current || paystackAvailable;
 }
 
-export function PayrollPaymentRouteSection({ entityCode, values, canUpdate, readOnlyReason }: {
+export function PayrollPaymentRouteSection({ entityCode, values, consumer, canUpdate, readOnlyReason }: {
   entityCode: string;
   values: FinancePayrollSettingsValues;
+  consumer?: SettingConsumer;
   canUpdate: boolean;
   readOnlyReason: string | null;
 }) {
@@ -65,6 +71,7 @@ export function PayrollPaymentRouteSection({ entityCode, values, canUpdate, read
   const editable = canUpdate && !access.isReadOnly("payment_route");
 
   const provider = providerInfo("PAYSTACK").label;
+  const choices = paymentRouteChoices(provider);
   const available = values.paystack_route_available !== false;
   const reason = values.paystack_route_unavailable_reason;
   const dirty = route !== saved;
@@ -78,11 +85,20 @@ export function PayrollPaymentRouteSection({ entityCode, values, canUpdate, read
   };
 
   return (
-    <SettingsPanel title="How staff are paid" description="What happens when a posted payroll run is paid. It applies to the next payment of any posted run.">
+    <HintedPanel
+      title="How staff are paid"
+      consumer={consumer}
+      hint={<>
+        <p>What happens when a posted payroll run is paid. It applies to the next payment of any posted run.</p>
+        {choices.map((choice) => (
+          <p key={choice.value}><span className="font-semibold text-gray-01">{choice.label}:</span> {choice.detail}</p>
+        ))}
+      </>}
+    >
       <AccessField access={access} name="payment_route" errors={denied}>
       <fieldset className="space-y-0" disabled={!editable}>
         <legend className="sr-only">How staff are paid</legend>
-        {paymentRouteChoices(provider).map((choice) => {
+        {choices.map((choice) => {
           const selectable = routeSelectable(choice.value, saved, available);
           const closed = choice.value === "PAYSTACK" && !available;
           return (
@@ -93,13 +109,14 @@ export function PayrollPaymentRouteSection({ entityCode, values, canUpdate, read
               />
               <span className="min-w-0">
                 <span className="block font-mont text-sm font-medium text-gray-01">{choice.label}</span>
-                <span className="mt-0.5 block font-mont text-xs leading-5 text-gray-05">{choice.detail}</span>
+                <span className="mt-0.5 block font-mont text-xs leading-5 text-gray-05">{choice.summary}</span>
                 {closed && reason ? <span data-testid="payment-route-reason" className="mt-1.5 block font-mont text-xs leading-5 text-amber-900">{reason}</span> : null}
               </span>
             </label>
           );
         })}
       </fieldset>
+      <div className="px-4 pb-4 sm:px-5"><UsedBy consumer={consumer} /></div>
       </AccessField>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
         <p className="font-mont text-xs text-gray-05">{readOnlyReason ?? (canUpdate ? "" : "You have read-only access.")}</p>
@@ -107,6 +124,6 @@ export function PayrollPaymentRouteSection({ entityCode, values, canUpdate, read
           <Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save how staff are paid"}
         </Button>
       </div>
-    </SettingsPanel>
+    </HintedPanel>
   );
 }
