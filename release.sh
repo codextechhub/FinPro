@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 #
 # Cut a version of this package and move both applications onto it.
+# The package version and tag name match on the commit consumers install.
+# The console's local npm link is restored after the app installs.
 #
 #   ./release.sh v0.2.0 "bank reconciliation screen"
 #
-# Four steps, and step 4 is the one that costs twenty minutes when forgotten:
-# installing into console-fe REPLACES the npm link with the git copy, so your
-# local edits stop appearing and nothing tells you why.
-
 set -euo pipefail
 
 VERSION="${1:-}"
@@ -47,6 +45,11 @@ if [[ -z "$VERSION" || -z "$MESSAGE" ]]; then
   exit 64
 fi
 [[ "$VERSION" == v* ]] || { echo "version should start with v, eg v0.2.0" >&2; exit 64; }
+PACKAGE_VERSION="${VERSION#v}"
+[[ "$PACKAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+  echo "version should be a release tag such as v0.2.0" >&2
+  exit 64
+}
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
@@ -79,6 +82,14 @@ node check-boundary.mjs
 # files that do not exist. Nothing else in the pipeline asks that question.
 echo "==> checking the public subpaths resolve"
 node check-exports.mjs
+
+echo "==> setting package version to $PACKAGE_VERSION"
+npm pkg set "version=$PACKAGE_VERSION"
+if ! git diff --quiet -- package.json; then
+  git add package.json
+  git commit -m "chore(release): $VERSION"
+  git push -q origin HEAD:main
+fi
 
 echo "==> tagging $VERSION"
 git tag -a "$VERSION" -m "$MESSAGE"

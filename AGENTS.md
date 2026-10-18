@@ -63,8 +63,9 @@ Cutting a version and moving both applications onto it:
 ./release.sh v0.2.0 "bank reconciliation screen"
 ```
 
-It refuses a dirty or unpushed tree, runs both checks, tags, installs into both
-applications, and restores the console's npm link that the install overwrites.
+It refuses a dirty or unpushed tree, runs both checks, sets and commits the
+package version to match the tag, then tags, installs into both applications,
+and restores the console's npm link that the install overwrites.
 It moves versions; it does not verify them. Committing the two lockfiles and
 running both suites afterwards is still yours.
 
