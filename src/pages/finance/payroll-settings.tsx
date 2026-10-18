@@ -32,9 +32,12 @@ import { Switch } from "@/components/ui/switch";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
-  SettingsConsumer, SettingsPanel, SettingsRow, SettingsSectionHeader,
+  SettingsPanel, SettingsRow, SettingsSectionHeader,
 } from "@/components/settings/settings-layout";
-import { AccessField, AccountPicker, fieldWriteErrors, toArray, useFieldAccess, type FieldErrors } from "@/components/finance-ui";
+import {
+  AccessField, AccountPicker, HintedPanel, SettingName, SettingToggle, UsedBy,
+  fieldWriteErrors, toArray, useFieldAccess, type FieldErrors,
+} from "@/components/finance-ui";
 import { P } from "../../permissions";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import {
@@ -80,7 +83,7 @@ export function PayrollSettingsPanel({ entityCode }: { entityCode: string | null
   if (!canView) return null;
   return (
     <div className="space-y-5">
-      <SettingsSectionHeader title="Payroll" description="How PAYE and the statutory deductions are worked out, how payslips reach staff, and how earlier pay is handled." />
+      <SettingsSectionHeader title="Payroll" description="PAYE, statutory deductions, payslips and earlier pay." />
       {query.isLoading || !payload ? (
         <SettingsPanel><SettingsRow label="Loading the payroll policy" description="Reading the selected entity's payroll settings." /></SettingsPanel>
       ) : (
@@ -88,7 +91,7 @@ export function PayrollSettingsPanel({ entityCode }: { entityCode: string | null
           canUpdate={canUpdate} readOnlyReason={heldWithoutReach(P.FIN_UPDATE_SETTINGS) ? "The payroll policy binds every branch, so only someone who covers the whole school may change it." : null} />
       )}
       {payload ? (
-        <PayrollPaymentRouteSection key={`route-${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings}
+        <PayrollPaymentRouteSection key={`route-${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumer={payload.consumers.payment_route}
           canUpdate={canUpdate} readOnlyReason={heldWithoutReach(P.FIN_UPDATE_SETTINGS) ? "The payroll policy binds every branch, so only someone who covers the whole school may change it." : null} />
       ) : null}
       {canView && entityCode ? <DeductionTypesPanel entityCode={entityCode} /> : null}
@@ -160,13 +163,13 @@ export function PayrollSettingsForm({ entityCode, values, consumers, canUpdate, 
   return (
     <>
       {shown("paye_method") ? (
-        <SettingsPanel title="PAYE" description="Worked out from the national tax table for the payroll month's year, cumulatively, so the year's tax comes out right. Or supplied: taken from each person's salary structure or roster figures.">
+        <HintedPanel title="PAYE" hint="Worked out from the national tax table for the payroll month's year, cumulatively, so the year's tax comes out right. Or supplied: taken from each person's salary structure or roster figures.">
           <AccessField access={access} name="paye_method" errors={denied}>
             <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div className="min-w-0">
-                <p className="font-mont text-sm font-medium text-gray-01">Where PAYE comes from</p>
-                <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">{`${values.tax_country ? `Tax tables for ${values.tax_country}. ` : ""}A person's PAYE can still be set by hand on their salary record, with a reason.`}</p>
-                <SettingsConsumer consumer={consumers.paye_method} />
+                <SettingName label="Where PAYE comes from" hint="A person's PAYE can still be set by hand on their salary record, with a reason." consumer={consumers.paye_method} />
+                {values.tax_country ? <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">{`Tax tables for ${values.tax_country}.`}</p> : null}
+                <UsedBy consumer={consumers.paye_method} />
               </div>
               <select aria-label="Where PAYE comes from" value={method} disabled={!editable("paye_method")} onChange={(event) => setMethod(event.target.value as PayeMethod)}
                 className="h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02 sm:w-64">
@@ -174,17 +177,17 @@ export function PayrollSettingsForm({ entityCode, values, consumers, canUpdate, 
               </select>
             </div>
           </AccessField>
-        </SettingsPanel>
+        </HintedPanel>
       ) : null}
 
       {STATUTORY_ITEMS.some(({ key }) => itemShown(key)) ? (
-        <SettingsPanel title="Deductions and contributions" description="Switch each one off, or change its rate. The employer's contributions are booked to each branch's own accounts.">
+        <HintedPanel title="Deductions and contributions" hint="Switch each one off, or change its rate. The employer's contributions are booked to each branch's own accounts.">
           {STATUTORY_ITEMS.filter(({ key }) => itemShown(key)).map(({ key, label, basis }) => (
             <div key={key} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div className="min-w-0">
-                <p className="font-mont text-sm font-medium text-gray-01">{label}</p>
+                <SettingName label={label} consumer={consumers[`${key}_rate_bps`] ?? consumers[`${key}_enabled`]} />
                 {shown(`${key}_rate_bps`) ? <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">{`${rates[key] || "0"}% ${basis}.`}</p> : null}
-                <SettingsConsumer consumer={consumers[`${key}_rate_bps`]} />
+                <UsedBy consumer={consumers[`${key}_rate_bps`] ?? consumers[`${key}_enabled`]} />
               </div>
               <div className="flex items-center gap-3">
                 <AccessField access={access} name={`${key}_rate_bps`} errors={denied}>
@@ -200,31 +203,30 @@ export function PayrollSettingsForm({ entityCode, values, consumers, canUpdate, 
               </div>
             </div>
           ))}
-        </SettingsPanel>
+        </HintedPanel>
       ) : null}
 
       {access.anyVisible("payslip_in_app", "payslip_email") ? (
-        <SettingsPanel title="Payslips" description="A payslip is issued to each person when their run is paid.">
+        <HintedPanel title="Payslips" hint="A payslip is issued to each person when their run is paid.">
           <AccessField access={access} name="payslip_in_app" errors={denied}>
-            <SwitchRow label="Show payslips in the app" description="Staff read their own payslips under My payslips and get an in-app notice." checked={inApp} onChange={setInApp} disabled={!editable("payslip_in_app")} consumer={consumers.payslip_in_app} />
+            <SettingToggle label="Show payslips in the app" hint="Staff read their own payslips under My payslips." checked={inApp} onCheckedChange={setInApp} disabled={!editable("payslip_in_app")} consumer={consumers.payslip_in_app} />
           </AccessField>
           <AccessField access={access} name="payslip_email" errors={denied}>
-            <SwitchRow label="Email payslips" description="Each person is emailed their payslip as a PDF." checked={email} onChange={setEmail} disabled={!editable("payslip_email")} consumer={consumers.payslip_email} />
+            <SettingToggle label="Email payslips" checked={email} onCheckedChange={setEmail} disabled={!editable("payslip_email")} consumer={consumers.payslip_email} />
           </AccessField>
-        </SettingsPanel>
+        </HintedPanel>
       ) : null}
 
       {access.anyVisible("previous_pay_required", "payroll_moved_here_on") ? (
-        <SettingsPanel title="Earlier pay" description="PAYE counts the whole tax year. Somebody who joined after January brings their earlier pay with them, recorded on their salary record.">
+        <HintedPanel title="Earlier pay" hint="PAYE counts the whole tax year. Somebody who joined after January brings their earlier pay with them, recorded on their salary record.">
           <AccessField access={access} name="previous_pay_required" errors={denied}>
-            <SwitchRow label="Earlier pay required" description="On: a run is refused while anyone on it joined after January with nothing recorded. Off: they are listed as a warning and paid as though they earned nothing before." checked={required} onChange={setRequired} disabled={!editable("previous_pay_required")} consumer={consumers.previous_pay_required} />
+            <SettingToggle label="Earlier pay required" hint="When off, they are paid as though they earned nothing before." checked={required} onCheckedChange={setRequired} disabled={!editable("previous_pay_required")} consumer={consumers.previous_pay_required} />
           </AccessField>
           <AccessField access={access} name="payroll_moved_here_on" errors={denied}>
             <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div className="min-w-0">
-                <p className="font-mont text-sm font-medium text-gray-01">Payroll moved here on</p>
-                <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">Only for a school whose payroll ran elsewhere earlier in the year. Staff first paid here in that month are its own staff, not joiners: record their earlier months as this school&apos;s own.</p>
-                <SettingsConsumer consumer={consumers.payroll_moved_here_on} />
+                <SettingName label="Payroll moved here on" hint="Only for a school whose payroll ran elsewhere earlier in the year. Record those staff's earlier months as this school's own." consumer={consumers.payroll_moved_here_on} />
+                <UsedBy consumer={consumers.payroll_moved_here_on} />
               </div>
               <div className="flex items-center gap-2">
                 <DatePickerInput aria-label="Payroll moved here on" value={movedOn} disabled={!editable("payroll_moved_here_on")} onChange={(event) => setMovedOn(event.target.value)} />
@@ -232,7 +234,7 @@ export function PayrollSettingsForm({ entityCode, values, consumers, canUpdate, 
               </div>
             </div>
           </AccessField>
-        </SettingsPanel>
+        </HintedPanel>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -240,21 +242,6 @@ export function PayrollSettingsForm({ entityCode, values, consumers, canUpdate, 
         <Button onClick={save} disabled={!canUpdate || !dirty || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save payroll settings"}</Button>
       </div>
     </>
-  );
-}
-
-function SwitchRow({ label, description, checked, onChange, disabled, consumer }: {
-  label: string; description: string; checked: boolean; onChange: (checked: boolean) => void; disabled: boolean; consumer?: SettingConsumer;
-}) {
-  return (
-    <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-      <div className="min-w-0">
-        <p className="font-mont text-sm font-medium text-gray-01">{label}</p>
-        <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">{description}</p>
-        <SettingsConsumer consumer={consumer} />
-      </div>
-      <Switch aria-label={label} checked={checked} disabled={disabled} onCheckedChange={onChange} />
-    </div>
   );
 }
 
@@ -291,7 +278,7 @@ export function DeductionTypesPanel({ entityCode }: { entityCode: string }) {
   };
 
   return (
-    <SettingsPanel title="Voluntary deductions" description="Kinds of deduction staff can have taken from pay, such as a staff loan or cooperative savings. Each person's own amount is set on their salary record.">
+    <HintedPanel title="Voluntary deductions" hint="Kinds of deduction staff can have taken from pay, such as a staff loan or cooperative savings. Each person's own amount is set on their salary record.">
       {isLoading ? <SettingsRow label="Loading deduction types" description="Reading this entity's deduction types." />
         : !types.length ? <SettingsRow label="None set up" description="Add a kind below to offer it on salary records." />
         : types.map((type) => (
@@ -311,6 +298,6 @@ export function DeductionTypesPanel({ entityCode }: { entityCode: string }) {
           <Button onClick={add} disabled={creating.isLoading || !code.trim() || !name.trim() || !account}>Add</Button>
         </div>
       ) : null}
-    </SettingsPanel>
+    </HintedPanel>
   );
 }

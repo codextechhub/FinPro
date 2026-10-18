@@ -29,21 +29,18 @@
  */
 
 import { useState } from "react";
-import { Archive, Landmark, Save, ShieldCheck } from "lucide-react";
+import { Landmark, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import {
-  PolicyBadge,
-  SettingsConsumer,
-  SettingsPanel,
-  SettingsRow,
-} from "@/components/settings/settings-layout";
+import { PolicyBadge, SettingsPanel, SettingsRow } from "@/components/settings/settings-layout";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
-import { AccessField, fieldWriteErrors, useFieldAccess, type FieldErrors } from "@/components/finance-ui";
+import {
+  AccessField, HintedPanel, HintedRow, SettingField, SettingHint, SettingToggle, UsedBy,
+  fieldWriteErrors, useFieldAccess, type FieldErrors,
+} from "@/components/finance-ui";
 import {
   useGetFinanceCalendarSettingsQuery,
   useGetRecordRetentionSettingsQuery,
@@ -62,13 +59,18 @@ export const LEAD_DAYS_MIN = 7;
 export const LEAD_DAYS_MAX = 180;
 
 /**
- * What each next-year mode does, written beside the option. The option's name
- * comes from the server (`next_year_mode_options`) so the form, the history line
- * and every refusal use the same words.
+ * What each next-year mode does: one line beside the option, and the whole of
+ * it in the ⓘ above the choice. The option's name comes from the server
+ * (`next_year_mode_options`) so the form, the history line and every refusal
+ * use the same words.
  */
-const MODE_DESCRIPTION: Record<NextYearMode, string> = {
-  AUTO_OPEN: "The next fiscal year opens by itself, starting the day after the last one ends, with the same months.",
-  WARN_ONLY: "Nothing opens by itself. Whoever may open a fiscal year for the whole school is warned in the app and by email, weekly and then daily in the last week.",
+const MODE_SUMMARY: Record<NextYearMode, string> = {
+  AUTO_OPEN: "The next year opens by itself, on the same months.",
+  WARN_ONLY: "Nothing opens by itself. Someone opens the next year by hand.",
+};
+const MODE_DETAIL: Record<NextYearMode, string> = {
+  AUTO_OPEN: "the next fiscal year opens by itself, starting the day after the last one ends, with the same months.",
+  WARN_ONLY: "nothing opens by itself. Whoever may open a fiscal year for the whole school is warned in the app and by email, weekly and then daily in the last week.",
 };
 
 /** Whether `text` is a whole number of days the server accepts as a lead. */
@@ -135,10 +137,21 @@ function CalendarRuleForm({ entityCode, payload }: { entityCode: string; payload
   return (
     <>
       {access.anyVisible("next_year_mode", "next_year_lead_days") ? (
-        <SettingsPanel title="Opening the next year" description="What happens as the last fiscal year comes to its end. After that day nothing can post until a new year is open.">
+        <HintedPanel title="Opening the next year" hint="A fiscal calendar is opened a year at a time. Once the last year ends, nothing can post until the next one is open.">
           <AccessField access={access} name="next_year_mode" errors={denied}>
-            <fieldset className="space-y-2 px-4 py-4 sm:px-5" disabled={!editable("next_year_mode")}>
-              <legend className="sr-only">When the calendar nears its end</legend>
+            {/* Padded outside the fieldset: a legend sits above its fieldset's padding. */}
+            <div className="px-4 py-4 sm:px-5">
+            <fieldset className="space-y-2" disabled={!editable("next_year_mode")}>
+              <legend className="mb-2 flex items-center gap-1 font-mont text-xs font-semibold text-gray-01">
+                When the year nears its end
+                <SettingHint
+                  label="When the year nears its end"
+                  consumer={payload.consumers.next_year_mode}
+                  hint={(values.next_year_mode_options ?? []).map((option) => (
+                    <p key={option.value}><span className="font-semibold text-gray-01">{option.label}:</span> {MODE_DETAIL[option.value]}</p>
+                  ))}
+                />
+              </legend>
               {(values.next_year_mode_options ?? []).map((option) => (
                 <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-md border border-white-02 bg-white p-3 has-[:checked]:border-primary has-[:disabled]:cursor-default">
                   <input
@@ -153,19 +166,24 @@ function CalendarRuleForm({ entityCode, payload }: { entityCode: string; payload
                     <span className="block font-mont text-sm font-medium text-gray-01">
                       {option.label}{option.value === "AUTO_OPEN" ? <span className="ml-1.5 font-normal text-gray-05">(default)</span> : null}
                     </span>
-                    <span className="mt-0.5 block font-mont text-xs leading-5 text-gray-05">{MODE_DESCRIPTION[option.value]}</span>
+                    <span className="mt-0.5 block font-mont text-xs leading-5 text-gray-05">{MODE_SUMMARY[option.value]}</span>
                   </span>
                 </label>
               ))}
-              <SettingsConsumer consumer={payload.consumers.next_year_mode} />
+              <UsedBy consumer={payload.consumers.next_year_mode} />
             </fieldset>
+            </div>
           </AccessField>
           <AccessField access={access} name="next_year_lead_days" errors={denied}>
             <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-2 sm:px-5">
-              <label className="font-mont text-xs font-semibold text-gray-01">
-                Days ahead
-                <Input
-                  className="mt-2 bg-white"
+              <SettingField
+                label="Days ahead"
+                hint={`A whole number from ${LEAD_DAYS_MIN} to ${LEAD_DAYS_MAX}. The dashboard warns within the same window.`}
+                consumer={payload.consumers.next_year_lead_days}
+              >
+                {(id) => <Input
+                  id={id}
+                  className="bg-white"
                   type="number"
                   min={LEAD_DAYS_MIN}
                   max={LEAD_DAYS_MAX}
@@ -174,17 +192,13 @@ function CalendarRuleForm({ entityCode, payload }: { entityCode: string; payload
                   onChange={(event) => setLeadDays(event.target.value)}
                   disabled={!editable("next_year_lead_days")}
                   aria-invalid={!valid}
-                />
-                <span className="mt-1 block font-normal leading-5 text-gray-05">
-                  How many days before the calendar ends the next year opens, or the warning starts. From {LEAD_DAYS_MIN} to {LEAD_DAYS_MAX} days.
-                </span>
-                <SettingsConsumer consumer={payload.consumers.next_year_lead_days} />
-              </label>
+                />}
+              </SettingField>
             </div>
           </AccessField>
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
             <p className="font-mont text-xs text-gray-05">
-              {!valid ? `Use a whole number from ${LEAD_DAYS_MIN} to ${LEAD_DAYS_MAX} days.` : readOnlyNote ?? "Only changed values are written to audit history."}
+              {!valid ? `Use a whole number from ${LEAD_DAYS_MIN} to ${LEAD_DAYS_MAX} days.` : readOnlyNote}
             </p>
             {canUpdate ? (
               <Button onClick={save} disabled={!dirty || !valid || state.isLoading}>
@@ -192,7 +206,7 @@ function CalendarRuleForm({ entityCode, payload }: { entityCode: string; payload
               </Button>
             ) : null}
           </div>
-        </SettingsPanel>
+        </HintedPanel>
       ) : null}
       {access.anyVisible("periods_close_in_order") ? <div className="mt-5"><CloseOrderPanel entityCode={entityCode} payload={payload} /></div> : null}
     </>
@@ -226,30 +240,27 @@ function CloseOrderPanel({ entityCode, payload }: { entityCode: string; payload:
   };
 
   return (
-    <SettingsPanel title="Closing months" description="Whether months must close one after another.">
+    <HintedPanel title="Closing months">
       <AccessField access={access} name="periods_close_in_order" errors={denied}>
-        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="min-w-0">
-            <p className="font-mont text-sm font-medium text-gray-01">
-              Close months in order<span className="ml-1.5 font-normal text-gray-05">(default)</span>
-            </p>
-            <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">
-              A month closes only once every earlier month is closed, and reopens only while every later month is open. January cannot close while December of the year before is still open. Force close does not get past it.
-            </p>
-            <SettingsConsumer consumer={payload.consumers.periods_close_in_order} />
-          </div>
-          <Switch checked={inOrder} onCheckedChange={setInOrder} disabled={!editable} aria-label="Close months in order" />
-        </div>
+        <SettingToggle
+          label="Close months in order"
+          suffix="(default)"
+          hint="The rule crosses the year boundary: January cannot close while December of the year before is still open. Force close does not get past it."
+          consumer={payload.consumers.periods_close_in_order}
+          checked={inOrder}
+          onCheckedChange={setInOrder}
+          disabled={!editable}
+        />
       </AccessField>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-        <p className="font-mont text-xs text-gray-05">{readOnlyNote ?? "Only changed values are written to audit history."}</p>
+        <p className="font-mont text-xs text-gray-05">{readOnlyNote}</p>
         {editable ? (
           <Button onClick={save} disabled={inOrder === saved || state.isLoading}>
             <Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save close order"}
           </Button>
         ) : null}
       </div>
-    </SettingsPanel>
+    </HintedPanel>
   );
 }
 
@@ -307,29 +318,32 @@ function RecordKeepingForm({ entityCode, payload }: { entityCode: string; payloa
   const anyShown = shown("retention_years") || shown("archive_min_age_years");
   return (
     <>
-      <SettingsPanel title="Record keeping" description="Financial records are kept from the end of each fiscal year for the period in force. A kept record cannot be deleted, whatever its screen offers.">
-        <SettingsRow
+      <HintedPanel title="Record keeping" hint="Financial records are kept from the end of each fiscal year for the period in force. A kept record cannot be deleted, whatever its screen offers.">
+        <HintedRow
           icon={Landmark}
           label="Statutory floor"
-          description="Set by CodeX for every school. A school may keep its records longer, never shorter."
+          hint="Set by CodeX for every school. A school may keep its records longer, never shorter."
           value={yearsText(floor)}
           badge={<PolicyBadge kind="enforced">Read-only</PolicyBadge>}
         />
         {payload.effective_retention_years != null ? (
-          <SettingsRow
+          <HintedRow
             icon={ShieldCheck}
             label="Period in force"
-            description="The longer of the floor and the school's own choice."
+            hint="The longer of the floor and the school's own choice."
             value={yearsText(payload.effective_retention_years)}
           />
         ) : null}
         {anyShown ? (
           <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-2 sm:px-5">
             <AccessField access={access} name="retention_years" errors={denied}>
-              <label className="font-mont text-xs font-semibold text-gray-01">
-                The school's own period (years)
-                <Input
-                  className="mt-2 bg-white"
+              <SettingField
+                label="The school's own period (years)"
+                hint={`Leave blank to keep the statutory floor. It cannot be shorter than ${yearsText(floor)}.`}
+              >
+                {(id) => <Input
+                  id={id}
+                  className="bg-white"
                   type="number"
                   min={floor}
                   step="1"
@@ -338,17 +352,17 @@ function RecordKeepingForm({ entityCode, payload }: { entityCode: string; payloa
                   onChange={(event) => setYears(event.target.value)}
                   disabled={!editable("retention_years")}
                   aria-invalid={!yearsOk}
-                />
-                <span className="mt-1 block font-normal leading-5 text-gray-05">
-                  Leave blank to keep the statutory floor. It cannot be shorter than {yearsText(floor)}.
-                </span>
-              </label>
+                />}
+              </SettingField>
             </AccessField>
             <AccessField access={access} name="archive_min_age_years" errors={denied}>
-              <label className="font-mont text-xs font-semibold text-gray-01">
-                <span className="inline-flex items-center gap-1.5"><Archive className="size-3.5 text-gray-05" aria-hidden />Archive a closed year after (years)</span>
-                <Input
-                  className="mt-2 bg-white"
+              <SettingField
+                label="Archive a closed year after (years)"
+                hint="How long after its end a closed year may be archived. Archiving hides it from pickers and lists; nothing is deleted."
+              >
+                {(id) => <Input
+                  id={id}
+                  className="bg-white"
                   type="number"
                   min={1}
                   step="1"
@@ -356,11 +370,8 @@ function RecordKeepingForm({ entityCode, payload }: { entityCode: string; payloa
                   onChange={(event) => setArchiveAge(event.target.value)}
                   disabled={!editable("archive_min_age_years")}
                   aria-invalid={!ageOk}
-                />
-                <span className="mt-1 block font-normal leading-5 text-gray-05">
-                  How long after its end a closed year may be archived. Archiving hides it from pickers and lists; nothing is deleted.
-                </span>
-              </label>
+                />}
+              </SettingField>
             </AccessField>
           </div>
         ) : null}
@@ -371,7 +382,7 @@ function RecordKeepingForm({ entityCode, payload }: { entityCode: string; payloa
                 ? `Keep records for at least ${yearsText(floor)}, or leave the field blank.`
                 : !ageOk
                   ? "Use a whole number of years, at least 1."
-                  : readOnlyNote ?? "Only changed values are written to audit history."}
+                  : readOnlyNote}
             </p>
             {canUpdate ? (
               <Button onClick={save} disabled={!valid || !dirty || state.isLoading}>
@@ -380,7 +391,7 @@ function RecordKeepingForm({ entityCode, payload }: { entityCode: string; payloa
             ) : null}
           </div>
         ) : null}
-      </SettingsPanel>
+      </HintedPanel>
     </>
   );
 }

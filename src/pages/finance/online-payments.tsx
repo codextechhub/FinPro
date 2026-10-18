@@ -33,10 +33,10 @@ import { Landmark, Save, ShieldCheck, Wallet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ConfirmActionModal, FormField } from "@/components/finance-ui";
+import { ConfirmActionModal, FormField, HintedPanel, SettingField } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useCustodyReading } from "@/components/finance-ui/held-custody";
-import { PolicyBadge, SettingsPanel, SettingsRow } from "@/components/settings/settings-layout";
+import { PolicyBadge, SettingsRow } from "@/components/settings/settings-layout";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/utils/money";
 import {
@@ -85,13 +85,19 @@ export function OnlinePaymentsPanel({ entityCode }: { entityCode: string | null 
   const payload = query.data?.data;
   if (!canView || !entityCode) return null;
   return (
-    <SettingsPanel title="Online payments" description="Who holds the school's online payments before they reach each branch's bank, and each branch's account at the payment provider.">
+    <HintedPanel
+      title="Online payments"
+      hint={<>
+        <p>Who holds the school&apos;s online payments before they reach each branch&apos;s bank, and each branch&apos;s account at the payment provider.</p>
+        {CUSTODY_MODES.map((m) => <p key={m.value}><span className="font-semibold text-gray-01">{m.label}:</span> {m.detail}</p>)}
+      </>}
+    >
       {query.isLoading || !isFullCustodyPayload(payload) ? (
         <SettingsRow label={query.isError || payload ? "Could not read the online payments settings" : "Loading online payments"} description={query.isError || payload ? "Try again in a moment." : "Reading the custody setting and each branch's collection account."} />
       ) : (
         <CustodyForm key={payload.settings.updated_at ?? "default"} entity={entityCode} payload={payload} />
       )}
-    </SettingsPanel>
+    </HintedPanel>
   );
 }
 
@@ -155,7 +161,7 @@ function CustodyForm({ entity, payload }: { entity: string; payload: FullCustody
               <input type="radio" name="custody-mode" value={m.value} checked={mode === m.value} onChange={() => setMode(m.value)} disabled={!write.may} className="mt-0.5 accent-primary" />
               <span className="min-w-0">
                 <span className="block text-sm font-medium text-gray-01">{m.label}</span>
-                <span className="mt-0.5 block text-xs leading-5 text-gray-05">{m.detail}</span>
+                <span className="mt-0.5 block text-xs leading-5 text-gray-05">{m.summary}</span>
               </span>
             </label>
           ))}
@@ -169,16 +175,12 @@ function CustodyForm({ entity, payload }: { entity: string; payload: FullCustody
         ) : null}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <label className="font-mont text-xs font-semibold text-gray-01">
-            Settlement interval (days)
-            <Input className="mt-2 bg-white" type="number" min={SETTLEMENT_INTERVAL_DAYS.low} max={SETTLEMENT_INTERVAL_DAYS.high} step="1" value={intervalDays} onChange={(e) => setIntervalDays(e.target.value)} disabled={!write.may} />
-            <span className="mt-1 block font-normal leading-5 text-gray-05">While payments are held, each branch is paid every this many days (1 to 7).</span>
-          </label>
-          <label className="font-mont text-xs font-semibold text-gray-01">
-            Clearing warning (days)
-            <Input className="mt-2 bg-white" type="number" min={CLEARING_STALE_DAYS.low} max={CLEARING_STALE_DAYS.high} step="1" value={staleDays} onChange={(e) => setStaleDays(e.target.value)} disabled={!write.may} />
-            <span className="mt-1 block font-normal leading-5 text-gray-05">The month-end checklist warns about online payments still waiting to be paid into the bank longer than this (1 to 60).</span>
-          </label>
+          <SettingField label="Settlement interval (days)" hint={`While payments are held, each branch is paid every this many days, from ${SETTLEMENT_INTERVAL_DAYS.low} to ${SETTLEMENT_INTERVAL_DAYS.high}.`}>
+            {(id) => <Input id={id} className="bg-white" type="number" min={SETTLEMENT_INTERVAL_DAYS.low} max={SETTLEMENT_INTERVAL_DAYS.high} step="1" value={intervalDays} onChange={(e) => setIntervalDays(e.target.value)} disabled={!write.may} />}
+          </SettingField>
+          <SettingField label="Clearing warning (days)" hint={`The month-end checklist warns about online payments still waiting to be paid into the bank longer than this, from ${CLEARING_STALE_DAYS.low} to ${CLEARING_STALE_DAYS.high}.`}>
+            {(id) => <Input id={id} className="bg-white" type="number" min={CLEARING_STALE_DAYS.low} max={CLEARING_STALE_DAYS.high} step="1" value={staleDays} onChange={(e) => setStaleDays(e.target.value)} disabled={!write.may} />}
+          </SettingField>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">

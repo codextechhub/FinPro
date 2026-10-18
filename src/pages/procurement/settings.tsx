@@ -27,7 +27,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -35,7 +34,6 @@ import {
   ConsoleSettingsLayout,
   PolicyBadge,
   SettingsAuditHistory,
-  SettingsConsumer,
   SettingsOverviewCard,
   SettingsPanel,
   SettingsRow,
@@ -43,7 +41,7 @@ import {
   type ConsoleSettingsGroup,
   type ConsoleSettingsSection,
 } from "@/components/settings/settings-layout";
-import { InfoHint, useActiveEntity } from "@/components/finance-ui";
+import { HintedPanel, HintedRow, InfoHint, SettingField, SettingToggle, useActiveEntity } from "@/components/finance-ui";
 import { useSettingsWriteAccess } from "@/components/finance-ui/whole-school-access";
 import { useGetFinanceAccountSettingsQuery } from "@/redux/services/finance/setup-api";
 import { useGetProcurementSettingsHistoryQuery, useGetProcurementSettingsQuery, useUpdateProcurementSettingsMutation } from "@/redux/services/procurement/procurement-api";
@@ -129,9 +127,9 @@ function Overview({ entity }: { entity: ReturnType<typeof useActiveEntity>["enti
   return (
     <div className="space-y-5">
       <div data-guide="procurement-settings.overview"><SettingsSectionHeader title="Configuration overview" description="Review entity inheritance first, then the policies that control the procure-to-pay chain." /></div>
-      <SettingsPanel title="Active entity" description="Procurement uses the same entity and fiscal posting window as Finance.">
+      <HintedPanel title="Active entity" hint="Procurement uses the same entity and fiscal posting window as Finance.">
         <SettingsRow icon={Building2} label={entity?.name ?? "No active entity selected"} description={entity ? `${entity.code} · reporting currency ${entity.base_currency}` : "Choose an entity from the header to inspect procurement settings."} badge={<PolicyBadge kind={entity ? "configured" : "default"}>{entity ? "Inherited" : "Needs entity"}</PolicyBadge>} />
-      </SettingsPanel>
+      </HintedPanel>
       <div data-guide="procurement-settings.sections" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <SettingsOverviewCard icon={Building2} title="General defaults" description="Review entity inheritance, currency, payment terms and delivery behavior." to={`${PR.SETTINGS}/general`} status="Inherited" />
         <SettingsOverviewCard icon={ShoppingCart} title="Purchasing policy" description="Set vendor eligibility, requisition timing and receipt evidence." to={`${PR.SETTINGS}/purchasing`} status="Configurable" tone="ready" />
@@ -184,11 +182,11 @@ function General({ entity, entityCode }: { entity: ReturnType<typeof useActiveEn
   const payload = query.data?.data;
   return (
     <div className="space-y-5">
-      <SettingsSectionHeader title="General defaults" description="Set the payment and delivery defaults applied when buyers create new Procurement records." action={canManageEntities ? <Button asChild variant="outline"><Link to={`${F.SETTINGS}/entities`}>Manage entities</Link></Button> : undefined} />
-      <SettingsPanel title="Inherited from Finance">
-        <SettingsRow icon={Building2} label="Ledger entity" description="Every procurement document and journal is isolated to this entity." value={entity ? `${entity.code} · ${entity.name}` : "Not selected"} badge={<PolicyBadge kind="enforced">Shared scope</PolicyBadge>} />
-        <SettingsRow icon={BookOpenCheck} label="Reporting currency" description="Purchase amounts post in the selected entity's reporting currency." value={entity?.base_currency ?? "Not selected"} badge={<PolicyBadge kind="default">Inherited</PolicyBadge>} />
-      </SettingsPanel>
+      <SettingsSectionHeader title="General defaults" description="Payment and delivery defaults for new Procurement records." action={canManageEntities ? <Button asChild variant="outline"><Link to={`${F.SETTINGS}/entities`}>Manage entities</Link></Button> : undefined} />
+      <HintedPanel title="Inherited from Finance">
+        <HintedRow icon={Building2} label="Ledger entity" hint="Every procurement document and journal is isolated to this entity." value={entity ? `${entity.code} · ${entity.name}` : "Not selected"} badge={<PolicyBadge kind="enforced">Shared scope</PolicyBadge>} />
+        <HintedRow icon={BookOpenCheck} label="Reporting currency" hint="Purchase amounts post in the selected entity's reporting currency." value={entity?.base_currency ?? "Not selected"} badge={<PolicyBadge kind="default">Inherited</PolicyBadge>} />
+      </HintedPanel>
       {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading defaults" description="Reading the selected entity's procurement settings." /></SettingsPanel> : <GeneralForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
     </div>
   );
@@ -206,13 +204,17 @@ function GeneralForm({ entityCode, values, consumers, canUpdate, readOnlyNote }:
     } catch { /* Central API handling shows the actionable error. */ }
   };
   return <>
-    <SettingsPanel title="Procurement defaults" description="New vendors and contracts use the payment term. New purchase orders use the delivery address when the buyer leaves it blank.">
+    <HintedPanel title="Procurement defaults" hint="New vendors and contracts use the payment term. New purchase orders use the delivery address when the buyer leaves it blank.">
       <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
-        <label className="min-w-0 font-mont text-xs font-semibold text-gray-01">Default payment terms<select className="mt-2 h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={terms} onChange={(event) => setTerms(event.target.value)} disabled={!canUpdate}>{PAYMENT_TERMS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><span className="mt-1 block font-normal leading-5 text-gray-05">Applied to new vendor records.</span><SettingsConsumer consumer={consumers.default_payment_terms} /></label>
-        <label className="min-w-0 font-mont text-xs font-semibold text-gray-01">Default delivery address<Textarea className="mt-2 min-h-24 bg-white font-mont text-sm" value={address} onChange={(event) => setAddress(event.target.value)} disabled={!canUpdate} placeholder="Enter the standard receiving location" maxLength={2000} /><span className="mt-1 block font-normal leading-5 text-gray-05">Buyers can still override this on a purchase order.</span><SettingsConsumer consumer={consumers.default_delivery_address} /></label>
+        <SettingField label="Default payment terms" consumer={consumers.default_payment_terms}>
+          {(id) => <select id={id} className="h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={terms} onChange={(event) => setTerms(event.target.value)} disabled={!canUpdate}>{PAYMENT_TERMS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>}
+        </SettingField>
+        <SettingField label="Default delivery address" hint="Buyers can still override it on a purchase order." consumer={consumers.default_delivery_address}>
+          {(id) => <Textarea id={id} className="min-h-24 bg-white font-mont text-sm" value={address} onChange={(event) => setAddress(event.target.value)} disabled={!canUpdate} placeholder="Enter the standard receiving location" maxLength={2000} />}
+        </SettingField>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{readOnlyNote ?? "Only changed values are recorded in audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save defaults"}</Button> : null}</div>
-    </SettingsPanel>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{readOnlyNote}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save defaults"}</Button> : null}</div>
+    </HintedPanel>
   </>;
 }
 
@@ -225,13 +227,13 @@ function PurchasingPolicy({ entityCode }: { entityCode: string | null }) {
   const payload = query.data?.data;
   return (
     <div className="space-y-5">
-      <div data-guide="procurement-settings.purchasing"><SettingsSectionHeader title="Purchasing policy" description={`Set ${wholeBooks.toLowerCase()} vendor, requisition and receipt defaults. The backend applies each saved rule to new purchasing activity.`} /></div>
+      <div data-guide="procurement-settings.purchasing"><SettingsSectionHeader title="Purchasing policy" description={`${wholeBooks} vendor, requisition and receipt defaults.`} /></div>
       {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading purchasing policy" description="Reading the selected entity's procurement controls." /></SettingsPanel> : <PurchasingForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
-      <SettingsPanel title="Always-enforced controls">
-        <SettingsRow icon={ClipboardCheck} label="Approved requisition required" description="A purchase order can only be created from an approved requisition in the same entity." badge={<PolicyBadge kind="enforced" />} />
-        <SettingsRow icon={BadgeCheck} label="Verified vendor required for payment" description="Vendor payments require an active, KYC-verified vendor that is not on hold." badge={<PolicyBadge kind="enforced" />} />
-        <SettingsRow icon={FileCheck2} label="Approved payment required" description="Interactive vendor payments must complete approval before they can post." badge={<PolicyBadge kind="enforced" />} />
-      </SettingsPanel>
+      <HintedPanel title="Always-enforced controls" hint="These hold for every entity and cannot be switched off.">
+        <HintedRow icon={ClipboardCheck} label="Approved requisition required" hint="A purchase order can only be created from an approved requisition in the same entity." badge={<PolicyBadge kind="enforced" />} />
+        <HintedRow icon={BadgeCheck} label="Verified vendor required for payment" hint="Vendor payments require an active, KYC-verified vendor that is not on hold." badge={<PolicyBadge kind="enforced" />} />
+        <HintedRow icon={FileCheck2} label="Approved payment required" hint="Interactive vendor payments must complete approval before they can post." badge={<PolicyBadge kind="enforced" />} />
+      </HintedPanel>
     </div>
   );
 }
@@ -261,14 +263,18 @@ function PurchasingForm({ entityCode, values, consumers, canUpdate, readOnlyNote
     } catch { /* Central API handling shows the actionable error. */ }
   };
   return <>
-    <SettingsPanel title="Configurable controls" description="These defaults affect new purchasing records immediately after a successful save.">
+    <HintedPanel title="Configurable controls" hint="A saved change applies to new purchasing records straight away.">
       <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-2 sm:px-5">
-        <label className="min-w-0 font-mont text-xs font-semibold text-gray-01">Vendor KYC requirement<select className="mt-2 h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={kycRequirement} onChange={(event) => setKycRequirement(event.target.value as ProcurementSettingsValues["vendor_purchase_kyc_requirement"])} disabled={!canUpdate}><option value="PENDING_OR_VERIFIED">Pending or verified</option><option value="VERIFIED_ONLY">Verified only</option></select><span className="mt-1 block font-normal leading-5 text-gray-05">Controls which active vendors buyers can use for new sourcing, orders, contracts and catalog links.</span><SettingsConsumer consumer={consumers.vendor_purchase_kyc_requirement} /></label>
-        <label className="font-mont text-xs font-semibold text-gray-01">Default requisition lead days<Input type="number" min="0" max="365" step="1" className="mt-2 bg-white" value={leadDays} onChange={(event) => setLeadDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Sets needed-by from the request date when the requester leaves it blank.</span><SettingsConsumer consumer={consumers.default_requisition_lead_days} /></label>
+        <SettingField label="Vendor KYC requirement" hint="Applies to new sourcing, orders, contracts and catalog links." consumer={consumers.vendor_purchase_kyc_requirement}>
+          {(id) => <select id={id} className="h-10 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm disabled:bg-gray-02" value={kycRequirement} onChange={(event) => setKycRequirement(event.target.value as ProcurementSettingsValues["vendor_purchase_kyc_requirement"])} disabled={!canUpdate}><option value="PENDING_OR_VERIFIED">Pending or verified</option><option value="VERIFIED_ONLY">Verified only</option></select>}
+        </SettingField>
+        <SettingField label="Default requisition lead days" hint="Counted from the request date. A whole number from 0 to 365." consumer={consumers.default_requisition_lead_days}>
+          {(id) => <Input id={id} type="number" min="0" max="365" step="1" className="bg-white" value={leadDays} onChange={(event) => setLeadDays(event.target.value)} disabled={!canUpdate} />}
+        </SettingField>
       </div>
-      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div className="min-w-0"><p className="font-mont text-sm font-medium text-gray-01">Require a purchase order for goods receipts</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When on, receiving cannot record a vendor delivery without purchase-order evidence.</p><SettingsConsumer consumer={consumers.require_purchase_order_for_receipts} /></div><Switch checked={requirePo} onCheckedChange={setRequirePo} disabled={!canUpdate} aria-label="Require a purchase order for goods receipts" /></div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 0 to 365 days." : readOnlyNote ?? "Only changed values are recorded in audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save purchasing policy"}</Button> : null}</div>
-    </SettingsPanel>
+      <SettingToggle label="Require a purchase order for goods receipts" consumer={consumers.require_purchase_order_for_receipts} checked={requirePo} onCheckedChange={setRequirePo} disabled={!canUpdate} />
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 0 to 365 days." : readOnlyNote}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save purchasing policy"}</Button> : null}</div>
+    </HintedPanel>
   </>;
 }
 
@@ -282,13 +288,13 @@ function SourcingLifecycle({ entityCode }: { entityCode: string | null }) {
   const payload = query.data?.data;
   return (
     <div className="space-y-5">
-      <SettingsSectionHeader title="Sourcing and lifecycle" description="Set the default time buyers give vendors to respond, the RFQ alert horizon, and the renewal notice copied to new contracts." />
+      <SettingsSectionHeader title="Sourcing and lifecycle" description="RFQ response and alert windows, and the renewal notice for new contracts." />
       {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading sourcing policy" description="Reading the selected entity's RFQ and contract defaults." /></SettingsPanel> : <SourcingLifecycleForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
-      <SettingsPanel title="How lifecycle defaults behave">
-        <SettingsRow icon={Clock3} label="Explicit dates win" description="A response due date entered on an RFQ overrides the default response period for that RFQ." badge={<PolicyBadge kind="enforced">Override allowed</PolicyBadge>} />
-        <SettingsRow icon={FileSignature} label="Existing records keep their terms" description="Changing these values does not rewrite existing RFQ due dates or contract renewal windows." badge={<PolicyBadge kind="enforced" />} />
-        <SettingsRow icon={ShieldCheck} label="Contract alerts use each stored notice" description="The expiring list and summary use the renewal notice saved on each contract, not a hidden fixed 30-day window." badge={<PolicyBadge kind="configured">Aligned</PolicyBadge>} />
-      </SettingsPanel>
+      <HintedPanel title="How lifecycle defaults behave">
+        <HintedRow icon={Clock3} label="Explicit dates win" hint="A response due date entered on an RFQ overrides the default response period for that RFQ." badge={<PolicyBadge kind="enforced">Override allowed</PolicyBadge>} />
+        <HintedRow icon={FileSignature} label="Existing records keep their terms" hint="Changing these values does not rewrite existing RFQ due dates or contract renewal windows." badge={<PolicyBadge kind="enforced" />} />
+        <HintedRow icon={ShieldCheck} label="Contract alerts use each stored notice" hint="The expiring list and summary use the renewal notice saved on each contract, not a hidden fixed 30-day window." badge={<PolicyBadge kind="configured">Aligned</PolicyBadge>} />
+      </HintedPanel>
     </div>
   );
 }
@@ -322,14 +328,20 @@ function SourcingLifecycleForm({ entityCode, values, consumers, canUpdate, readO
     } catch { /* Central API handling shows the actionable error. */ }
   };
   return <>
-    <SettingsPanel title="RFQ and contract defaults" description="Values are measured in calendar days and apply after a successful save.">
+    <HintedPanel title="RFQ and contract defaults" hint="Each value is in calendar days, a whole number from 0 to 365.">
       <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-3">
-        <label className="font-mont text-xs font-semibold text-gray-01">Default RFQ response days<Input type="number" min="0" max="365" step="1" className="mt-2 bg-white" value={responseDays} onChange={(event) => setResponseDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Sets the response due date for a new RFQ when the buyer leaves it blank.</span><SettingsConsumer consumer={consumers.default_rfq_response_days} /></label>
-        <label className="font-mont text-xs font-semibold text-gray-01">RFQ closing-soon horizon<Input type="number" min="0" max="365" step="1" className="mt-2 bg-white" value={closingSoonDays} onChange={(event) => setClosingSoonDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Counts issued RFQs due within this many days in the sourcing summary.</span><SettingsConsumer consumer={consumers.rfq_closing_soon_days} /></label>
-        <label className="font-mont text-xs font-semibold text-gray-01">Contract renewal notice days<Input type="number" min="0" max="365" step="1" className="mt-2 bg-white" value={renewalDays} onChange={(event) => setRenewalDays(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Copied to new contracts when no notice window is supplied.</span><SettingsConsumer consumer={consumers.contract_renewal_notice_days} /></label>
+        <SettingField label="Default RFQ response days" consumer={consumers.default_rfq_response_days}>
+          {(id) => <Input id={id} type="number" min="0" max="365" step="1" className="bg-white" value={responseDays} onChange={(event) => setResponseDays(event.target.value)} disabled={!canUpdate} />}
+        </SettingField>
+        <SettingField label="RFQ closing-soon horizon" hint="Issued RFQs due within this many days are counted in the sourcing summary." consumer={consumers.rfq_closing_soon_days}>
+          {(id) => <Input id={id} type="number" min="0" max="365" step="1" className="bg-white" value={closingSoonDays} onChange={(event) => setClosingSoonDays(event.target.value)} disabled={!canUpdate} />}
+        </SettingField>
+        <SettingField label="Contract renewal notice days" consumer={consumers.contract_renewal_notice_days}>
+          {(id) => <Input id={id} type="number" min="0" max="365" step="1" className="bg-white" value={renewalDays} onChange={(event) => setRenewalDays(event.target.value)} disabled={!canUpdate} />}
+        </SettingField>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 0 to 365 days." : readOnlyNote ?? "Only effective changes are written to audit history."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save lifecycle policy"}</Button> : null}</div>
-    </SettingsPanel>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 0 to 365 days." : readOnlyNote}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save lifecycle policy"}</Button> : null}</div>
+    </HintedPanel>
   </>;
 }
 
@@ -343,13 +355,13 @@ function CompetitiveGovernance({ entityCode }: { entityCode: string | null }) {
   const payload = query.data?.data;
   return (
     <div className="space-y-5">
-      <div data-guide="procurement-settings.competition"><SettingsSectionHeader title="Competitive bidding governance" description="Set the minimum market evidence required before an RFQ can be issued or a supplier can be selected." /></div>
+      <div data-guide="procurement-settings.competition"><SettingsSectionHeader title="Competitive bidding governance" description="The minimum competition before an RFQ is issued or a supplier is chosen." /></div>
       {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading competitive policy" description="Reading the selected entity's bidding controls." /></SettingsPanel> : <CompetitiveGovernanceForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
-      <SettingsPanel title="Exception controls">
-        <SettingsRow icon={ShieldCheck} label="Separate override permission" description="Changing settings does not grant exception authority. A user also needs the critical competitive-policy override permission." badge={<PolicyBadge kind="enforced">Critical permission</PolicyBadge>} />
-        <SettingsRow icon={FileCheck2} label="Written reason required" description="An RFQ below either minimum cannot proceed until an authorized user supplies a reason for the exception." badge={<PolicyBadge kind="enforced" />} />
-        <SettingsRow icon={ClipboardCheck} label="Evidence stays in audit history" description="The audit entry records the actual count, required minimum, exception decision and written reason." badge={<PolicyBadge kind="enforced">Immutable evidence</PolicyBadge>} />
-      </SettingsPanel>
+      <HintedPanel title="Exception controls">
+        <HintedRow icon={ShieldCheck} label="Separate override permission" hint="Changing settings does not grant exception authority. A user also needs the critical competitive-policy override permission." badge={<PolicyBadge kind="enforced">Critical permission</PolicyBadge>} />
+        <HintedRow icon={FileCheck2} label="Written reason required" hint="An RFQ below either minimum cannot proceed until an authorized user supplies a reason for the exception." badge={<PolicyBadge kind="enforced" />} />
+        <HintedRow icon={ClipboardCheck} label="Evidence stays in audit history" hint="The audit entry records the actual count, required minimum, exception decision and written reason." badge={<PolicyBadge kind="enforced">Immutable evidence</PolicyBadge>} />
+      </HintedPanel>
     </div>
   );
 }
@@ -378,13 +390,17 @@ function CompetitiveGovernanceForm({ entityCode, values, consumers, canUpdate, r
     } catch { /* Central API handling shows the actionable error. */ }
   };
   return <>
-    <SettingsPanel title="Competitive minimums" description="Defaults of one preserve the existing sourcing process. Raise them when this entity requires broader competition.">
+    <HintedPanel title="Competitive minimums" hint="A minimum of one keeps sourcing as it is. Raise them when this entity requires broader competition.">
       <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-2 sm:px-5">
-        <label className="font-mont text-xs font-semibold text-gray-01">Minimum vendors invited<Input type="number" min="1" max="50" step="1" className="mt-2 bg-white" value={invitedVendors} onChange={(event) => setInvitedVendors(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Checked when a draft RFQ is issued. Duplicate invitations do not increase the count.</span><SettingsConsumer consumer={consumers.minimum_rfq_invited_vendors} /></label>
-        <label className="font-mont text-xs font-semibold text-gray-01">Minimum submitted quotations<Input type="number" min="1" max="50" step="1" className="mt-2 bg-white" value={submittedBids} onChange={(event) => setSubmittedBids(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Checked when a submitted quotation is awarded and converted into a draft purchase order.</span><SettingsConsumer consumer={consumers.minimum_submitted_quotations_before_award} /></label>
+        <SettingField label="Minimum vendors invited" hint="Checked when a draft RFQ is issued. Duplicate invitations do not increase the count." consumer={consumers.minimum_rfq_invited_vendors}>
+          {(id) => <Input id={id} type="number" min="1" max="50" step="1" className="bg-white" value={invitedVendors} onChange={(event) => setInvitedVendors(event.target.value)} disabled={!canUpdate} />}
+        </SettingField>
+        <SettingField label="Minimum submitted quotations" hint="Checked when a submitted quotation is awarded and converted into a draft purchase order." consumer={consumers.minimum_submitted_quotations_before_award}>
+          {(id) => <Input id={id} type="number" min="1" max="50" step="1" className="bg-white" value={submittedBids} onChange={(event) => setSubmittedBids(event.target.value)} disabled={!canUpdate} />}
+        </SettingField>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Use whole numbers from 1 to 50 vendors." : readOnlyNote ?? "Saved minimums apply to the next issue or award decision."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save competitive policy"}</Button> : null}</div>
-    </SettingsPanel>
+    </HintedPanel>
   </>;
 }
 
@@ -396,7 +412,7 @@ function MatchingPolicy({ entityCode }: { entityCode: string | null }) {
   const payload = query.data?.data;
   return (
     <div className="space-y-5">
-      <div data-guide="procurement-settings.matching"><SettingsSectionHeader title="Invoice matching" description="Set the entity's allowed quantity and unit-price variance before an invoice is blocked for review." /></div>
+      <div data-guide="procurement-settings.matching"><SettingsSectionHeader title="Invoice matching" description="How far an invoice may differ from its order and receipt before it is blocked for review." /></div>
       {!canView ? <ProtectedSettings /> : query.isLoading || !payload ? <SettingsPanel><SettingsRow label="Loading matching policy" description="Reading the selected entity's tolerances." /></SettingsPanel> : <MatchingForm key={`${entityCode}-${payload.settings.updated_at}`} entityCode={entityCode!} values={payload.settings} consumers={payload.consumers} canUpdate={canUpdate} readOnlyNote={readOnlyNote} />}
     </div>
   );
@@ -422,18 +438,24 @@ function MatchingForm({ entityCode, values, consumers, canUpdate, readOnlyNote }
     } catch { /* Central API handling shows the actionable error. */ }
   };
   return <>
-    <SettingsPanel title="Three-way match policy" description="Tolerances apply to cumulative invoicing against ordered and received evidence. Values are percentages from 0 to 100.">
+    <HintedPanel title="Three-way match policy" hint="Tolerances apply to cumulative invoicing against ordered and received evidence. Values are percentages from 0 to 100.">
       <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-2 sm:px-5">
-        <label className="font-mont text-xs font-semibold text-gray-01">Quantity tolerance (%)<Input type="number" min="0" max="100" step="0.01" className="mt-2 bg-white" value={quantity} onChange={(event) => setQuantity(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Allowed overage against ordered and received quantity.</span><SettingsConsumer consumer={consumers.quantity_tolerance_bps} /></label>
-        <label className="font-mont text-xs font-semibold text-gray-01">Price tolerance (%)<Input type="number" min="0" max="100" step="0.01" className="mt-2 bg-white" value={price} onChange={(event) => setPrice(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">Allowed absolute unit-price difference from the PO.</span><SettingsConsumer consumer={consumers.price_tolerance_bps} /></label>
+        <SettingField label="Quantity tolerance (%)" hint="The overage allowed against ordered and received quantity." consumer={consumers.quantity_tolerance_bps}>
+          {(id) => <Input id={id} type="number" min="0" max="100" step="0.01" className="bg-white" value={quantity} onChange={(event) => setQuantity(event.target.value)} disabled={!canUpdate} />}
+        </SettingField>
+        <SettingField label="Price tolerance (%)" hint="The unit-price difference allowed from the PO, either way." consumer={consumers.price_tolerance_bps}>
+          {(id) => <Input id={id} type="number" min="0" max="100" step="0.01" className="bg-white" value={price} onChange={(event) => setPrice(event.target.value)} disabled={!canUpdate} />}
+        </SettingField>
       </div>
-      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div className="min-w-0"><p className="font-mont text-sm font-medium text-gray-01">Allow non-PO invoices</p><p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, invoices without purchase-order evidence receive a blocking match status.</p><SettingsConsumer consumer={consumers.allow_non_po_invoices} /></div><Switch checked={allowNonPo} onCheckedChange={setAllowNonPo} disabled={!canUpdate} aria-label="Allow non-PO invoices" /></div>
+      <SettingToggle label="Allow non-PO invoices" hint="When off, an invoice without purchase-order evidence gets a blocking match status." consumer={consumers.allow_non_po_invoices} checked={allowNonPo} onCheckedChange={setAllowNonPo} disabled={!canUpdate} />
       <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-2 sm:px-5">
-        <label className="font-mont text-xs font-semibold text-gray-01">Non-PO spend limit (%)<Input type="number" min="0" max="100" step="1" className="mt-2 bg-white" value={nonPoLimit} onChange={(event) => setNonPoLimit(event.target.value)} disabled={!canUpdate} /><span className="mt-1 block font-normal leading-5 text-gray-05">The share of spend the school accepts on bills without a purchase order. The procurement dashboard marks spend above it.</span><SettingsConsumer consumer={consumers.non_po_spend_limit_pct} /></label>
+        <SettingField label="Non-PO spend limit (%)" hint="The share of spend the school accepts on bills without a purchase order, as a whole number." consumer={consumers.non_po_spend_limit_pct}>
+          {(id) => <Input id={id} type="number" min="0" max="100" step="1" className="bg-white" value={nonPoLimit} onChange={(event) => setNonPoLimit(event.target.value)} disabled={!canUpdate} />}
+        </SettingField>
       </div>
-      <SettingsRow icon={ShieldCheck} label="Variance override" description="Blocking outcomes still require the dedicated variance-override permission, and every override remains audited." badge={<PolicyBadge kind="enforced" />} />
+      <HintedRow icon={ShieldCheck} label="Variance override" hint="Blocking outcomes still require the dedicated variance-override permission, and every override remains audited." badge={<PolicyBadge kind="enforced" />} />
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"><p className="font-mont text-xs text-gray-05">{!valid ? "Enter values between 0 and 100%; the non-PO limit is a whole number." : readOnlyNote ?? "Saved tolerances affect the next match run."}</p>{canUpdate ? <Button onClick={save} disabled={!dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save matching policy"}</Button> : null}</div>
-    </SettingsPanel>
+    </HintedPanel>
   </>;
 }
 
@@ -444,10 +466,10 @@ function AccountingIntegration({ entityCode }: { entityCode: string | null }) {
   const byKey = new Map((query.data?.data.mappings ?? []).map((mapping) => [mapping.key, mapping]));
   return (
     <div className="space-y-5">
-      <div data-guide="procurement-settings.accounting"><SettingsSectionHeader title="Accounting integration" description="Procurement uses the Finance-owned account mappings, so there is one posting source of truth." action={canView ? <Button asChild variant="outline"><Link to={`${F.SETTINGS}/accounting`}>Edit in Finance</Link></Button> : undefined} /></div>
-      <SettingsPanel title="Required Finance accounts" description="Changes are made in Finance Settings and take effect in Procurement posting services immediately.">
-        {!canView ? <SettingsRow icon={ShieldCheck} label="Finance mappings are protected" description="Finance settings view permission is required to resolve these account names." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /> : PROCUREMENT_ACCOUNTS.map(([key, label, description]) => { const mapping = byKey.get(key); return <SettingsRow key={key} label={label} description={description} value={mapping?.account ? `${mapping.account.code} · ${mapping.account.name}` : mapping ? `${mapping.default_code} · Missing` : "Loading"} badge={<PolicyBadge kind={mapping?.is_valid ? "configured" : "default"}>{mapping?.source === "OVERRIDE" ? "Custom" : "Finance-owned"}</PolicyBadge>} />; })}
-      </SettingsPanel>
+      <div data-guide="procurement-settings.accounting"><SettingsSectionHeader title="Accounting integration" description="Procurement posts to the accounts Finance maps." action={canView ? <Button asChild variant="outline"><Link to={`${F.SETTINGS}/accounting`}>Edit in Finance</Link></Button> : undefined} /></div>
+      <HintedPanel title="Required Finance accounts" hint="Procurement uses the Finance account map, so there is one posting source of truth. Changes are made in Finance Settings and apply to Procurement posting straight away.">
+        {!canView ? <SettingsRow icon={ShieldCheck} label="Finance mappings are protected" description="Finance settings view permission is required to resolve these account names." badge={<PolicyBadge kind="enforced">Permission required</PolicyBadge>} /> : PROCUREMENT_ACCOUNTS.map(([key, label, description]) => { const mapping = byKey.get(key); return <HintedRow key={key} label={label} hint={description} value={mapping?.account ? `${mapping.account.code} · ${mapping.account.name}` : mapping ? `${mapping.default_code} · Missing` : "Loading"} badge={<PolicyBadge kind={mapping?.is_valid ? "configured" : "default"}>{mapping?.source === "OVERRIDE" ? "Custom" : "Finance-owned"}</PolicyBadge>} />; })}
+      </HintedPanel>
     </div>
   );
 }
@@ -463,13 +485,13 @@ function Approvals() {
   return (
     <div className="space-y-5">
       <div data-guide="procurement-settings.approvals"><SettingsSectionHeader title="Procurement approvals" description={isSchool ? `Each document type follows its own approval path: one for a branch, one for the whole school, or the ${platformName} version.` : "Each document type can resolve its own branch, tenant or platform workflow template."} action={canView ? <Button asChild><Link to={routesPath.PROTECTED.WORKFLOW.TEMPLATES}>Manage workflows</Link></Button> : undefined} /></div>
-      <SettingsPanel title="Approval-capable documents">
-        <SettingsRow icon={ClipboardCheck} label="Purchase requisitions" description="Route the initial request and estimated commitment." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
-        <SettingsRow icon={ShoppingCart} label="Purchase orders" description="Approve the legal commitment before receipt." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
-        <SettingsRow icon={ReceiptText} label="Vendor invoices" description="Approve the priced and matched invoice evidence before posting." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
-        <SettingsRow icon={FileCheck2} label="Vendor payments" description="Approve cash settlement independently from invoice approval." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
-        <SettingsRow icon={ListChecks} label="Senior approval threshold" description="The seeded fallback workflow adds senior approval from ₦500,000. Scoped templates can replace that ladder." value="₦500,000" badge={<PolicyBadge kind="default" />} />
-      </SettingsPanel>
+      <HintedPanel title="Approval-capable documents">
+        <HintedRow icon={ClipboardCheck} label="Purchase requisitions" hint="Route the initial request and estimated commitment." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
+        <HintedRow icon={ShoppingCart} label="Purchase orders" hint="Approve the legal commitment before receipt." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
+        <HintedRow icon={ReceiptText} label="Vendor invoices" hint="Approve the priced and matched invoice evidence before posting." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
+        <HintedRow icon={FileCheck2} label="Vendor payments" hint="Approve cash settlement independently from invoice approval." badge={<PolicyBadge kind="configured">Workflow ready</PolicyBadge>} />
+        <HintedRow icon={ListChecks} label="Senior approval threshold" hint="The seeded fallback workflow adds senior approval from ₦500,000. Scoped templates can replace that ladder." value="₦500,000" badge={<PolicyBadge kind="default" />} />
+      </HintedPanel>
     </div>
   );
 }

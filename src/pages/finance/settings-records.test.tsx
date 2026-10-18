@@ -334,3 +334,46 @@ describe("record keeping under Field Access", () => {
     expect(field("retention_years")?.querySelector("[role=alert]")?.textContent).toBe("You may not change how long records are kept.");
   });
 });
+
+describe("what the fiscal calendar says on the page and behind each ⓘ", () => {
+  const LEAD_IMPACT = "Sets how many days before the calendar ends the next year is opened or the warning starts.";
+  const hint = (label: string) => container.querySelector<HTMLElement>(`[aria-label="About ${label}"]`);
+  const page = () => document.body.textContent ?? "";
+
+  beforeEach(() => {
+    (mocks.calendar as { consumers: unknown }).consumers = {
+      next_year_mode: { service: "Fiscal calendar rollover", impact: "Decides whether the next fiscal year is opened automatically or finance staff are only warned." },
+      next_year_lead_days: { service: "Fiscal calendar rollover and runway warning", impact: LEAD_IMPACT },
+    };
+  });
+
+  it("shows Days ahead with its box and chip, and neither of its explanations", async () => {
+    await render(<CalendarRulePanel entityCode="BSS" />);
+    expect(container.textContent).toContain("Days ahead");
+    expect(container.textContent).toContain("Used by Fiscal calendar rollover and runway warning");
+    expect(page()).not.toContain("How many days before the calendar ends");
+    expect(page()).not.toContain(LEAD_IMPACT);
+    expect(page()).not.toContain("What happens as the last fiscal year comes to its end");
+  });
+
+  it("opens Days ahead to its range, then what it changes, said once", async () => {
+    await render(<CalendarRulePanel entityCode="BSS" />);
+    await act(async () => hint("Days ahead")!.click());
+    expect(page()).toContain("A whole number from 7 to 180.");
+    expect(page().split(LEAD_IMPACT).length - 1).toBe(1);
+  });
+
+  it("keeps one line under each next-year choice, and the whole of each in the ⓘ above them", async () => {
+    await render(<CalendarRulePanel entityCode="BSS" />);
+    expect(container.textContent).toContain("Nothing opens by itself. Someone opens the next year by hand.");
+    expect(page()).not.toContain("weekly and then daily in the last week");
+    await act(async () => hint("When the year nears its end")!.click());
+    expect(page()).toContain("Warn finance staff only: nothing opens by itself.");
+    expect(page()).toContain("weekly and then daily in the last week");
+  });
+
+  it("drops the audit-history line from an editable form's footer", async () => {
+    await render(<CalendarRulePanel entityCode="BSS" />);
+    expect(page()).not.toContain("Only changed values are written to audit history.");
+  });
+});

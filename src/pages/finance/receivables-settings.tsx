@@ -27,13 +27,15 @@ import { toast } from "sonner";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
-  SettingsConsumer, SettingsPanel, SettingsRow, SettingsSectionHeader,
+  SettingsPanel, SettingsRow, SettingsSectionHeader,
 } from "@/components/settings/settings-layout";
 import { usePermissions } from "@/hooks/use-permissions";
-import { AccessField, MoneyInput, fieldWriteErrors, useFieldAccess, type FieldErrors } from "@/components/finance-ui";
+import {
+  AccessField, HintedPanel, MoneyInput, SettingField, SettingToggle, UsedBy,
+  fieldWriteErrors, useFieldAccess, type FieldErrors,
+} from "@/components/finance-ui";
 import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
@@ -50,7 +52,6 @@ import type {
 import { MAX_PROVISION_BANDS, bandDrafts, parseBands, sameBands, type BandDraft } from "./receivables-settings-model";
 
 const label = "font-mont text-xs font-semibold text-gray-01";
-const hint = "mt-1 block font-normal leading-5 text-gray-05";
 
 /** Who may change these settings: the update key and the whole school. */
 export function useReceivablesSettingsAccess() {
@@ -84,7 +85,7 @@ export function ReceivablesSettings({ entityCode }: { entityCode: string | null 
     <div className="space-y-5">
       <SettingsSectionHeader
         title="Receivables"
-        description="How credit, concessions, fees billed ahead, doubtful debts, deposits and payments from a payer are handled. These apply to every branch."
+        description="Credit, concessions, fees billed ahead, doubtful debts, deposits and payer payments. These apply to every branch."
       />
       {!entityCode ? (
         <SettingsPanel><SettingsRow label="Select an entity" description="Choose an entity to read its receivables policy." /></SettingsPanel>
@@ -136,31 +137,26 @@ function CreditForm({ entityCode, payload, canUpdate }: { entityCode: string; pa
   };
   if (!access.anyVisible("auto_apply_customer_credit", "concession_second_person_threshold")) return null;
   return (
-    <SettingsPanel title="Credit and concessions">
+    <HintedPanel title="Credit and concessions">
       <AccessField access={access} name="auto_apply_customer_credit" errors={denied}>
-        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="min-w-0">
-            <p className="font-mont text-sm font-medium text-gray-01">Apply customer credit to new bills automatically</p>
-            <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When on, a customer&apos;s unused credit settles each new bill of theirs as it posts. When off, the bill stays fully due and the credit waits.</p>
-            <SettingsConsumer consumer={payload.consumers.auto_apply_customer_credit} />
-          </div>
-          <Switch checked={autoCredit} onCheckedChange={setAutoCredit} disabled={!editable("auto_apply_customer_credit")} aria-label="Apply customer credit to new bills automatically" />
-        </div>
+        <SettingToggle label="Apply customer credit to new bills automatically" hint="When off, a new bill stays fully due and the credit waits." consumer={payload.consumers.auto_apply_customer_credit} checked={autoCredit} onCheckedChange={setAutoCredit} disabled={!editable("auto_apply_customer_credit")} />
       </AccessField>
       <AccessField access={access} name="concession_second_person_threshold" errors={denied}>
         <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
-          <label className={label}>Concessions above this need a second person
-            <div className="mt-2"><MoneyInput valueKobo={limit} onChangeKobo={setLimit} disabled={!editable("concession_second_person_threshold")} /></div>
-            <span className={hint}>Counted per bill: two {formatMoney(6_000_00)} discounts on one bill make {formatMoney(12_000_00)}. Above the limit the concession is submitted for approval.</span>
-            <SettingsConsumer consumer={payload.consumers.concession_second_person_threshold} />
-          </label>
+          <SettingField
+            label="Concessions above this need a second person"
+            hint={`Counted per bill: two ${formatMoney(6_000_00)} discounts on one bill make ${formatMoney(12_000_00)}. Above the limit the concession is submitted for approval.`}
+            consumer={payload.consumers.concession_second_person_threshold}
+          >
+            {(id) => <MoneyInput id={id} valueKobo={limit} onChangeKobo={setLimit} disabled={!editable("concession_second_person_threshold")} />}
+          </SettingField>
         </div>
       </AccessField>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-        <p className="font-mont text-xs text-gray-05">{canUpdate ? "Only changed values are written to audit history." : "Read only."}</p>
+        <p className="font-mont text-xs text-gray-05">{canUpdate ? null : "Read only."}</p>
         <Button onClick={save} disabled={!canUpdate || !dirty || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save credit and concessions"}</Button>
       </div>
-    </SettingsPanel>
+    </HintedPanel>
   );
 }
 
@@ -212,7 +208,7 @@ function PolicyForm({ entityCode, payload, canUpdate }: { entityCode: string; pa
   const lastPanel = (["payer", "deposits", "debts", "ahead"] as const).find((key) => panels[key]);
   const footer = (
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-      <p className="font-mont text-xs text-gray-05">{!valid ? "Fix the values marked above." : canUpdate ? "Saves the panels above together. Only changed values are written to audit history." : "Read only."}</p>
+      <p className="font-mont text-xs text-gray-05">{!valid ? "Fix the values marked above." : canUpdate ? "Saves the panels above together." : "Read only."}</p>
       <Button onClick={save} disabled={!canUpdate || !dirty || !valid || state.isLoading}><Save className="mr-2 size-4" />{state.isLoading ? "Saving" : "Save receivables policy"}</Button>
     </div>
   );
@@ -221,24 +217,24 @@ function PolicyForm({ entityCode, payload, canUpdate }: { entityCode: string; pa
   return (
     <>
       {panels.ahead ? (
-        <SettingsPanel title="Fees billed ahead" description="A fee billed before the period it pays for is held as deferred income and released to revenue.">
+        <HintedPanel title="Fees billed ahead" hint="A fee billed before the period it pays for is held as deferred income and released to revenue.">
           <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
             <AccessField access={access} name="revenue_recognition" errors={denied}>
-              <label className={label}>Release method
-                <NativeSelect className="mt-2" value={recognition} onChange={(e) => setRecognition(e.target.value as RevenueRecognition)} disabled={!editable("revenue_recognition")} aria-label="Release method">
-                  {recognitionOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </NativeSelect>
-                <span className={hint}>{recognitionHint(recognitionOptions)}</span>
-                <SettingsConsumer consumer={payload.consumers.revenue_recognition} />
-              </label>
+              <SettingField label="Release method" hint={recognitionHint(recognitionOptions)} consumer={payload.consumers.revenue_recognition}>
+                {(id) => (
+                  <NativeSelect id={id} value={recognition} onChange={(e) => setRecognition(e.target.value as RevenueRecognition)} disabled={!editable("revenue_recognition")} aria-label="Release method">
+                    {recognitionOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </NativeSelect>
+                )}
+              </SettingField>
             </AccessField>
           </div>
           {lastPanel === "ahead" ? footer : null}
-        </SettingsPanel>
+        </HintedPanel>
       ) : null}
 
       {panels.debts ? (
-        <SettingsPanel title="Doubtful debts" description="The share of each overdue balance the allowance for doubtful debts must cover, by how long it has been overdue.">
+        <HintedPanel title="Doubtful debts" hint="Each band applies to balances overdue by more than its days. The allowance for doubtful debts must cover that share of them." consumer={payload.consumers.provision_bands}>
           <AccessField access={access} name="provision_bands" errors={denied}>
             <div className="space-y-2 px-4 py-4 sm:px-5">
               {bands.map((band, i) => (
@@ -258,66 +254,60 @@ function PolicyForm({ entityCode, payload, canUpdate }: { entityCode: string; pa
                 <Button variant="outline" size="sm" onClick={() => setBands((rows) => [...rows, { days: "", percent: "" }])} className="gap-1.5"><Plus className="size-3.5" /> Add band</Button>
               ) : null}
               {parsed.problem && editable("provision_bands") ? <p className="font-mont text-[11px] text-destructive">{parsed.problem}</p> : null}
-              <SettingsConsumer consumer={payload.consumers.provision_bands} />
+              <UsedBy consumer={payload.consumers.provision_bands} />
             </div>
           </AccessField>
           {lastPanel === "debts" ? footer : null}
-        </SettingsPanel>
+        </HintedPanel>
       ) : null}
 
       {panels.deposits ? (
-        <SettingsPanel title="Deposits" description="Refundable deposits, such as a caution deposit, are held for the customer and never earned.">
+        <HintedPanel title="Deposits" hint="Refundable deposits, such as a caution deposit, are held for the customer and never earned.">
           {shown("deposits_offset_unpaid_bills") ? (
             <AccessField access={access} name="deposits_offset_unpaid_bills" errors={denied}>
-              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                <div className="min-w-0">
-                  <p className="font-mont text-sm font-medium text-gray-01">Set a leaver&apos;s deposit against their unpaid bills</p>
-                  <p className="mt-0.5 font-mont text-xs leading-5 text-gray-05">When off, a leaver&apos;s deposit is returned whole as credit to refund, and their unpaid bills are chased as before.</p>
-                  <SettingsConsumer consumer={payload.consumers.deposits_offset_unpaid_bills} />
-                </div>
-                <Switch checked={offset} onCheckedChange={setOffset} disabled={!editable("deposits_offset_unpaid_bills")} aria-label="Set a leaver's deposit against their unpaid bills" />
-              </div>
+              <SettingToggle label="Set a leaver's deposit against their unpaid bills" hint="When off, a leaver's deposit is returned whole as credit to refund, and their unpaid bills are chased as before." consumer={payload.consumers.deposits_offset_unpaid_bills} checked={offset} onCheckedChange={setOffset} disabled={!editable("deposits_offset_unpaid_bills")} />
             </AccessField>
           ) : null}
           {shown("unclaimed_deposit_years") ? (
             <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
               <AccessField access={access} name="unclaimed_deposit_years" errors={denied}>
-                <label className={label}>Forfeit unclaimed deposits after (years)
-                  <Input className="mt-2 bg-white" type="number" min="1" max="50" step="1" value={years} onChange={(e) => setYears(e.target.value)} disabled={!editable("unclaimed_deposit_years")} />
-                  <span className={hint}>Counted from the day the customer left.</span>
-                  {!yearsValid && editable("unclaimed_deposit_years") ? <span className="mt-1 block font-normal text-destructive">Use a whole number from 1 to 50.</span> : null}
-                  <SettingsConsumer consumer={payload.consumers.unclaimed_deposit_years} />
-                </label>
+                <SettingField label="Forfeit unclaimed deposits after (years)" hint="A whole number of years from 1 to 50, counted from the day the customer left." consumer={payload.consumers.unclaimed_deposit_years}>
+                  {(id) => <>
+                    <Input id={id} className="bg-white" type="number" min="1" max="50" step="1" value={years} onChange={(e) => setYears(e.target.value)} disabled={!editable("unclaimed_deposit_years")} />
+                    {!yearsValid && editable("unclaimed_deposit_years") ? <span className="mt-1 block font-mont text-xs text-destructive">Use a whole number from 1 to 50.</span> : null}
+                  </>}
+                </SettingField>
               </AccessField>
             </div>
           ) : null}
           {lastPanel === "deposits" ? footer : null}
-        </SettingsPanel>
+        </HintedPanel>
       ) : null}
 
       {panels.payer ? (
-        <SettingsPanel title="Payments from a payer" description="How one payment from a parent or sponsor is shared among the customers they pay for. The bursar can always enter amounts by hand.">
+        <HintedPanel title="Payments from a payer" hint="How one payment from a parent or sponsor is shared among the customers they pay for. The bursar can always enter amounts by hand.">
           <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-2">
             <AccessField access={access} name="payer_payment_split" errors={denied}>
-              <label className={label}>Split the payment
-                <NativeSelect className="mt-2" value={split} onChange={(e) => setSplit(e.target.value as PayerPaymentSplit)} disabled={!editable("payer_payment_split")} aria-label="Split the payment">
-                  {(v.payer_payment_split_options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </NativeSelect>
-                <SettingsConsumer consumer={payload.consumers.payer_payment_split} />
-              </label>
+              <SettingField label="Split the payment" consumer={payload.consumers.payer_payment_split}>
+                {(id) => (
+                  <NativeSelect id={id} value={split} onChange={(e) => setSplit(e.target.value as PayerPaymentSplit)} disabled={!editable("payer_payment_split")} aria-label="Split the payment">
+                    {(v.payer_payment_split_options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </NativeSelect>
+                )}
+              </SettingField>
             </AccessField>
             <AccessField access={access} name="payer_payment_surplus" errors={denied}>
-              <label className={label}>What no bill takes becomes credit of
-                <NativeSelect className="mt-2" value={surplus} onChange={(e) => setSurplus(e.target.value as PayerPaymentSurplus)} disabled={!editable("payer_payment_surplus")} aria-label="What no bill takes becomes credit of">
-                  {(v.payer_payment_surplus_options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </NativeSelect>
-                <span className={hint}>An amount entered for a customer above their bills always stays as that customer&apos;s credit.</span>
-                <SettingsConsumer consumer={payload.consumers.payer_payment_surplus} />
-              </label>
+              <SettingField label="What no bill takes becomes credit of" hint="An amount entered for a customer above their bills always stays as that customer's credit." consumer={payload.consumers.payer_payment_surplus}>
+                {(id) => (
+                  <NativeSelect id={id} value={surplus} onChange={(e) => setSurplus(e.target.value as PayerPaymentSurplus)} disabled={!editable("payer_payment_surplus")} aria-label="What no bill takes becomes credit of">
+                    {(v.payer_payment_surplus_options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </NativeSelect>
+                )}
+              </SettingField>
             </AccessField>
           </div>
           {lastPanel === "payer" ? footer : null}
-        </SettingsPanel>
+        </HintedPanel>
       ) : null}
     </>
   );
