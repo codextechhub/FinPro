@@ -94,15 +94,16 @@ function age(value?: string | null) {
 export default function RequisitionsPage() {
   const dates = useDates();
   const { code: entity, currency } = useActiveEntity();
-  // Asked before the tables below fetch on mount. A finance grant does not
-  // carry procurement.requisition.view with it, and without this the screen
-  // opened on a pair of 403s and a red toast.
-  const canPROC_VIEW_REQUISITIONS = useCan().can(P.PROC_VIEW_REQUISITIONS);
+  const { can } = useCan();
+  // Asked before the tables below fetch on mount, so a reader who may not open
+  // the screen never sees a pair of 403s and a red toast. View reads every
+  // requisition; create alone (every teacher) reads the ones the reader raised.
+  const readsAll = can(P.PROC_VIEW_REQUISITIONS);
+  const canOpen = readsAll || can(P.PROC_CREATE_REQUISITION);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // A link from an approval names the record to open; it opens here.
   useSourceDocumentParam(setSelectedId);
   const [creating, setCreating] = useState(false);
-  const { can } = useCan();
   useActionParam("new", can(P.PROC_CREATE_REQUISITION), () => setCreating(true));
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
@@ -125,10 +126,10 @@ export default function RequisitionsPage() {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   }), [entity, page, status, scope, debouncedSearch]);
   const { currentData: data, isLoading, isFetching, isError, refetch } = useGetRequisitionsQuery(
-    params, { skip: !entity || !canPROC_VIEW_REQUISITIONS },
+    params, { skip: !entity || !canOpen },
   );
   const { data: summaryData, isLoading: summaryLoading } = useGetRequisitionSummaryQuery(
-    { entity: entity!, ...scope }, { skip: !entity || !canPROC_VIEW_REQUISITIONS },
+    { entity: entity!, ...scope }, { skip: !entity || !canOpen },
   );
   const rows = toArray(data?.data);
   const pg = data?.pagination;
@@ -181,7 +182,7 @@ export default function RequisitionsPage() {
   );
 
   if (!entity) return <ProcurementShell><PageShell><NoEntityState message="Choose an entity to view its requisitions." /></PageShell></ProcurementShell>;
-  if (!canPROC_VIEW_REQUISITIONS) return <ProcurementShell><PageShell><EmptyState title="No requisitions access" message={noAccessMessage("view requisitions")} /></PageShell></ProcurementShell>;
+  if (!canOpen) return <ProcurementShell><PageShell><EmptyState title="No requisitions access" message={noAccessMessage("view requisitions")} /></PageShell></ProcurementShell>;
 
   return (
     <ProcurementShell>
@@ -190,15 +191,17 @@ export default function RequisitionsPage() {
           data-guide="procurement-requisitions.heading"
           screen="requisitions"
           title="Purchase Requisitions"
-          description="Create, track, and approve internal purchase requests."
+          description={readsAll
+            ? "Create, track, and approve internal purchase requests."
+            : "Ask for what you need and follow each request to its decision."}
           actions={<>
-            <QuickExportButton
+            {readsAll && <QuickExportButton
               screen="procurement.requisitions"
               params={{ ...statusFilterArgs(status), search: debouncedSearch, ...scope }}
               entity={entity}
               typeface="geist"
               defaultName="Purchase requisitions"
-            />
+            />}
             <Can permission={P.PROC_CREATE_REQUISITION}>
               <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New Requisition</Button>
             </Can>

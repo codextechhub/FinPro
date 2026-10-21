@@ -26,7 +26,8 @@ export const procurementNav: ConsoleNavGroup[] = [
   {
     label: "Procure to Pay",
     items: [
-      { title: "Requisitions", url: R.REQUISITIONS, icon: FileText, permissions: [P.PROC_VIEW_REQUISITIONS] },
+      // View reads every requisition; create alone reads the reader's own.
+      { title: "Requisitions", url: R.REQUISITIONS, icon: FileText, permissions: [P.PROC_VIEW_REQUISITIONS, P.PROC_CREATE_REQUISITION] },
       { title: "Purchase Orders", url: R.PURCHASE_ORDERS, icon: ShoppingCart, permissions: [P.PROC_VIEW_PURCHASE_ORDERS] },
       { title: "Goods Receipts", url: R.GOODS_RECEIPTS, icon: PackageCheck, permissions: [P.PROC_VIEW_GOODS_RECEIPTS] },
       { title: "Vendor Invoices", url: R.VENDOR_INVOICES, icon: ReceiptText, permissions: [P.PROC_VIEW_VENDOR_INVOICES], resources: ["procurement.vendor_credit_note"] },
