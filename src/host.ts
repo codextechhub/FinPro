@@ -67,12 +67,17 @@ export interface HostBranchLens {
   isLoading: boolean;
 }
 
-/** The minimum a person must expose to be named on an approval.
+/** The minimum a person must expose to be named in a picker or on an approval.
  *
  *  Every field here is one the screens actually read, discovered by the
  *  compiler rather than guessed: `role` is shown beside a name so an approver
  *  is identifiable, and `status` gates delegation, since only an active person
- *  may be handed somebody else's approvals. Apps may return richer rows.
+ *  may be handed somebody else's approvals. `id` is the person's account, the
+ *  id an expense claim's claimant, a payroll roster row and an approval step
+ *  store. `email` and `role` may be empty: a host whose directory is a
+ *  names-only list (the school app's, which finance officers who may not open
+ *  the staff directory can read) offers the name alone, and every screen here
+ *  reads as well without them. Apps may return richer rows.
  */
 export interface HostPerson {
   id: string;
@@ -244,7 +249,9 @@ export interface HostContract {
    *  which branch a whole-school reader is working in, so their create forms start
    *  with no branch chosen. */
   useBranchLens?(): HostBranchLens;
-  /** Everyone the signed-in caller may name. Scoped by the app, not here. */
+  /** Everyone the signed-in caller may name: the one source of every staff
+   *  picker here (an expense claim's claimant, a payroll roster row's staff
+   *  member, approvers, delegates). Scoped by the app, not here. */
   useDirectory(): HostQueryResult<HostPerson>;
   /** Every role an approval step may be pointed at. Supplied by the app because
    *  both apps already read these rows; see :type:`HostRole`. */
