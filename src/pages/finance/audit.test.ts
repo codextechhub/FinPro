@@ -34,8 +34,12 @@ describe("the audit trail's Actor column", () => {
   });
 
   it("names the actor for an ordinary act, and System for an automatic one", () => {
+    expect(auditActorLabel({ ...base, actor_name: "Mrs Bello" })).toBe("Mrs Bello");
+    expect(auditActorLabel({ ...base, actor: null, actor_name: null, acted_label: null })).toBe("System");
+  });
+
+  it("falls back to the email only where an older server sends no name", () => {
     expect(auditActorLabel(base)).toBe("bello@brightstar.example.com");
-    expect(auditActorLabel({ ...base, actor: null, acted_label: null })).toBe("System");
   });
 });
 

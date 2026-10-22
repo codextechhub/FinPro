@@ -250,7 +250,10 @@ export interface FinanceAuditLog {
   action: string;
   action_display: string;
   status: string;
+  /** The email of the person who really acted; null for an automatic posting. */
   actor: string | null;
+  /** That person's name, which is what the trail shows. Absent from an older server. */
+  actor_name?: string | null;
   target_type: string;
   target_id: number | null;
   document_number: string | null;
@@ -409,7 +412,7 @@ export interface FinanceBankingSettingsPayload {
 
 // Distinct filter options for the entity's audit trail (drives the dropdowns).
 export interface FinanceAuditFacets {
-  actors: { id: number; email: string }[];
+  actors: { id: number; email: string; name?: string }[];
   target_types: string[];
   actions: { value: string; label: string }[];
 }

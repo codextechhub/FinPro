@@ -43,12 +43,12 @@ function actionTone(action: string, status: string): string {
   return "bg-green-01/10 text-green-01";
 }
 
-// Initials for the actor monogram (from the email local-part); "SY" for system.
-function initials(actor: string | null): string {
-  if (!actor) return "SY";
-  const local = actor.split("@")[0] ?? actor;
-  const parts = local.split(/[._-]+/).filter(Boolean);
-  return (parts.length >= 2 ? parts[0][0] + parts[1][0] : local.slice(0, 2)).toUpperCase();
+// Initials for the actor monogram, from the name (else the email's local part); "SY" for system.
+function initials(log: Pick<FinanceAuditLog, "actor" | "actor_name">): string {
+  if (!log.actor) return "SY";
+  const source = log.actor_name || (log.actor.split("@")[0] ?? log.actor);
+  const parts = source.split(/[\s._-]+/).filter(Boolean);
+  return (parts.length >= 2 ? parts[0][0] + parts[1][0] : source.slice(0, 2)).toUpperCase();
 }
 
 const DATE_PRESETS = [
@@ -109,12 +109,14 @@ export function auditEntityLabel(targetType: string | null | undefined): string 
 /**
  * Who did it, as the Actor column says it. An act done through a proxy names
  * both people, "Mrs Bello for Mrs Adeyemi", in the server's own words;
- * anything else is the actor's email, or System for an automatic posting.
+ * anything else is the actor's name (their email from an older server), or
+ * System for an automatic posting. The email stays one line below in the
+ * entry's detail, where an auditor tells two people of one name apart.
  */
 export function auditActorLabel(
-  log: Pick<FinanceAuditLog, "actor" | "acted_label" | "proxied_user_name" | "real_actor_name">,
+  log: Pick<FinanceAuditLog, "actor" | "actor_name" | "acted_label" | "proxied_user_name" | "real_actor_name">,
 ): string {
-  return proxyLabel(log) ?? log.actor ?? "System";
+  return proxyLabel(log) ?? log.actor_name ?? log.actor ?? "System";
 }
 
 /**
@@ -132,7 +134,7 @@ export function AuditDetail({ log, currency }: { log: FinanceAuditLog; currency?
         <Stat label="When">{dates.dateTime(log.created_at, null, { seconds: true })}</Stat>
         <Stat label="Actor">
           {auditActorLabel(log)}
-          {proxyLabel(log) && log.actor ? <span className="block font-normal text-gray-05">{log.actor}</span> : null}
+          {log.actor ? <span className="block font-normal text-gray-05">{log.actor}</span> : null}
         </Stat>
         <Stat label="Action">
           <span className={cn("inline-flex rounded px-2 py-0.5 font-mont text-xs font-medium", actionTone(log.action, log.status))}>
@@ -216,7 +218,7 @@ export default function FinanceAuditPage() {
   // it - instead of a faint placeholder.
   const actionOptions = useMemo(() => [{ value: "", label: "All actions" }, ...(facets?.actions ?? []).map((a) => ({ value: a.value, label: a.label }))], [facets]);
   const entityOptions = useMemo(() => [{ value: "", label: "All entities" }, ...(facets?.target_types ?? []).map((t) => ({ value: t, label: auditEntityLabel(t) }))], [facets]);
-  const actorOptions = useMemo(() => [{ value: "", label: "All actors" }, ...(facets?.actors ?? []).map((a) => ({ value: String(a.id), label: a.email }))], [facets]);
+  const actorOptions = useMemo(() => [{ value: "", label: "All actors" }, ...(facets?.actors ?? []).map((a) => ({ value: String(a.id), label: a.name && a.name !== a.email ? `${a.name} (${a.email})` : a.email }))], [facets]);
 
   const showBranch = useReaderBranchLens().applies;
 
@@ -225,7 +227,7 @@ export default function FinanceAuditPage() {
     { header: "Actor", cell: (l) => (
       <span className="flex items-center gap-2">
         <span title={exitedTitle(l.actor_is_exited)} className={cn("grid size-6 shrink-0 place-content-center rounded-full text-[10px] font-semibold",
-          l.actor ? "bg-primary/10 text-primary" : "bg-gray-03 text-gray-05", exitedOutline(l.actor_is_exited))}>{initials(l.actor)}</span>
+          l.actor ? "bg-primary/10 text-primary" : "bg-gray-03 text-gray-05", exitedOutline(l.actor_is_exited))}>{initials(l)}</span>
         <span className="truncate">{auditActorLabel(l)}</span>
       </span>
     ) },
