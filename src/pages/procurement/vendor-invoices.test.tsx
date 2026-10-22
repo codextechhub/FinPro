@@ -197,3 +197,47 @@ describe("the vendor bill export", () => {
     expect(mocks.state.exported).toEqual({ approval: "returned", search: "" });
   });
 });
+
+/**
+ * Labtech bills 9 of 10 microscopes against every posted receipt on its order
+ * rather than one receipt, so the server sends no receipt and no accepted
+ * quantity for the line. The 3-Way Match tab reads "All posted receipts" and a
+ * dash for GR accepted; it does not say 0 were accepted. A line matched to one
+ * receipt shows that receipt and its accepted quantity, including a real 0.
+ */
+describe("the 3-way match tab", () => {
+  const MATCHED = {
+    ...BILL, status: "APPROVED", approval_returned: false, match_status: "AUTO_MATCHED",
+    match_comparisons: [{
+      invoice_line_id: 61, description: "Microscope", po_line_id: 51, po_quantity: "10.0000",
+      received_quantity: "9.0000", previously_invoiced_quantity: "0.0000", invoice_quantity: "9.0000",
+      po_unit_price: 450_000, invoice_unit_price: 450_000, grn_number: null, grn_accepted_quantity: null,
+    }],
+  };
+  const fields = () => Object.fromEntries([...document.body.querySelectorAll("dt")].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]));
+  const openMatch = () => {
+    render();
+    act(() => button("3-Way Match")!.click());
+  };
+
+  it("shows a dash for GR accepted when the line is matched against all posted receipts", () => {
+    mocks.state.doc = MATCHED;
+    openMatch();
+    expect(fields()).toMatchObject({
+      Ordered: "10", Received: "9", "Previously invoiced": "0", "This invoice": "9",
+      "Goods receipt": "All posted receipts", "GR accepted": "-",
+    });
+  });
+
+  it("shows the receipt's accepted quantity, a real 0 included, when matched to one receipt", () => {
+    mocks.state.doc = { ...MATCHED, match_comparisons: [{ ...MATCHED.match_comparisons[0], grn_number: "GRN-0007", grn_accepted_quantity: "0.0000" }] };
+    openMatch();
+    expect(fields()).toMatchObject({ "Goods receipt": "GRN-0007", "GR accepted": "0" });
+  });
+
+  it("shows dashes for the order figures of a line with no order line", () => {
+    mocks.state.doc = { ...MATCHED, match_comparisons: [{ ...MATCHED.match_comparisons[0], po_line_id: null, po_quantity: null, received_quantity: null, previously_invoiced_quantity: null, po_unit_price: null }] };
+    openMatch();
+    expect(fields()).toMatchObject({ Ordered: "-", Received: "-", "Previously invoiced": "-", "PO price": "-", "This invoice": "9" });
+  });
+});

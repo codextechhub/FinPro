@@ -35,8 +35,6 @@ function lineTone(status: string): PillTone {
   return "amber"; // "Received > Invoiced"
 }
 
-const qty = (v: string) => formatQuantity(Number(v));
-
 // Why the two control cards read "Not shown" for a branch-bound reader. Said in full
 // here because a card sub-line cannot carry it, and a figure that is simply blank
 // invites the reader to assume zero.
@@ -176,9 +174,9 @@ function GrirLinesTable({ entity, currency, onSelect }: {
                     <span className="mt-0.5 block font-mont text-[11px] text-gray-05">{r.vendor_name}</span>
                   </td>
                   <td className={TD}>{r.item}</td>
-                  <td className={TDR}>{qty(r.ordered_qty)}</td>
-                  <td className={TDR}>{qty(r.received_qty)}</td>
-                  <td className={TDR}>{qty(r.invoiced_qty)}</td>
+                  <td className={TDR}>{formatQuantity(r.ordered_qty)}</td>
+                  <td className={TDR}>{formatQuantity(r.received_qty)}</td>
+                  <td className={TDR}>{formatQuantity(r.invoiced_qty)}</td>
                   <td className={TDR}><Money kobo={kobo(r.grir_balance)} currency={currency} align="right" /></td>
                   <td className={TD}><StatusDotPill tone={lineTone(r.status)}>{r.status}</StatusDotPill></td>
                 </tr>
@@ -231,9 +229,9 @@ function GrirPoLineBody({ d, currency }: { d: GrirPoLineDetail; currency?: strin
           <StatusDotPill tone={lineTone(d.status)}>{d.status}</StatusDotPill>
         </div>
         <dl className="grid grid-cols-2 gap-4 rounded-md border border-white-02 p-4 sm:grid-cols-3">
-          <Field label="Ordered" value={qty(d.ordered_qty)} />
-          <Field label="Received" value={qty(d.received_qty)} />
-          <Field label="Invoiced" value={qty(d.invoiced_qty)} />
+          <Field label="Ordered" value={formatQuantity(d.ordered_qty)} />
+          <Field label="Received" value={formatQuantity(d.received_qty)} />
+          <Field label="Invoiced" value={formatQuantity(d.invoiced_qty)} />
           <Field label="Received value" value={formatMoney(kobo(d.received_value), currency)} />
           <Field label="Invoiced value" value={formatMoney(kobo(d.invoiced_value), currency)} />
           <Field
@@ -272,7 +270,7 @@ function GrirPoLineBody({ d, currency }: { d: GrirPoLineDetail; currency?: strin
                   <tr key={g.id}>
                     <td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold tabular-nums text-primary">{g.reference}</td>
                     <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{dates.day(g.received_date)}</td>
-                    <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{qty(g.accepted_qty)}</td>
+                    <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{formatQuantity(g.accepted_qty)}</td>
                     <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{formatMoney(kobo(g.value), currency)}</td>
                   </tr>
                 ))}
@@ -301,7 +299,7 @@ function GrirPoLineBody({ d, currency }: { d: GrirPoLineDetail; currency?: strin
                   <tr key={vi.id}>
                     <td className="border-t border-white-02 px-3 py-2 font-mont text-xs font-semibold tabular-nums text-primary">{vi.document_number}</td>
                     <td className="border-t border-white-02 px-3 py-2 font-mont text-xs tabular-nums">{dates.day(vi.invoice_date)}</td>
-                    <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{qty(vi.quantity)}</td>
+                    <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{formatQuantity(vi.quantity)}</td>
                     <td className="border-t border-white-02 px-3 py-2 text-right font-mont text-xs tabular-nums">{formatMoney(kobo(vi.net), currency)}</td>
                   </tr>
                 ))}
