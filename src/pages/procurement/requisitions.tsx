@@ -62,6 +62,7 @@ import { useSourceDocumentParam } from "@/lib/source-document-route";
 import { PageShell } from "@/components/layout/page-shell";
 import { NoEntityState } from "@/components/finance-ui/no-entity-state";
 import { useDates } from "../../lib/display-prefs";
+import { actedBy, type AuditAttribution, type VoteAttribution } from "../../components/workflow/person-flags";
 
 const STATUS_TABS = [
   { label: "All", value: "" },
@@ -372,12 +373,12 @@ export function RequisitionDrawer({ id, entity, currency, onClose }: {
             {tab === "approval" && (workflow?.stage_instances.length ? <div className="space-y-3">
               {workflow.stage_instances.map((stage) => <div key={stage.id} className="rounded-md border border-white-02 p-3">
                 <div className="flex items-center justify-between gap-3"><p className="font-mont text-sm font-semibold">{stage.stage_label}</p><StatusPill status={stage.status} /></div>
-                {stage.actions.length ? <div className="mt-3 space-y-2">{stage.actions.filter((action) => !action.is_reversal_of).map((action) => <div key={action.id} className="border-t border-white-02 pt-2 font-mont text-xs"><p><span className="font-semibold">{name(action.actor)}</span> · {action.action.toLowerCase()}</p><p className="mt-0.5 text-gray-05">{action.comment || "No comment"} · {age(action.acted_at)}</p></div>)}</div> : <p className="mt-2 font-mont text-xs text-gray-05">No decision recorded for this step.</p>}
+                {stage.actions.length ? <div className="mt-3 space-y-2">{stage.actions.filter((action) => !action.is_reversal_of).map((action) => <div key={action.id} className="border-t border-white-02 pt-2 font-mont text-xs"><p><span className="font-semibold">{name(action.actor, actedBy((action as typeof action & VoteAttribution)))}</span> · {action.action.toLowerCase()}</p><p className="mt-0.5 text-gray-05">{action.comment || "No comment"} · {age(action.acted_at)}</p></div>)}</div> : <p className="mt-2 font-mont text-xs text-gray-05">No decision recorded for this step.</p>}
               </div>)}
             </div> : <EmptyBlock text={req.status === "DRAFT" ? "Submit this draft to start its approval trail." : "No approval trail is available."} />)}
 
             {tab === "activity" && (workflow?.audit_logs.length ? <div className="divide-y divide-white-02">
-              {workflow.audit_logs.map((log) => <div key={log.id} className="py-3 first:pt-0"><p className="font-mont text-sm font-medium">{log.message || log.event_type.replaceAll("_", " ").toLowerCase()}</p><p className="mt-1 font-mont text-xs text-gray-05">{log.actor ? name(log.actor) : "System"} · {age(log.occurred_at)}</p></div>)}
+              {workflow.audit_logs.map((log) => <div key={log.id} className="py-3 first:pt-0"><p className="font-mont text-sm font-medium">{log.message || log.event_type.replaceAll("_", " ").toLowerCase()}</p><p className="mt-1 font-mont text-xs text-gray-05">{log.actor ? name(log.actor, actedBy(log as typeof log & AuditAttribution)) : "System"} · {age(log.occurred_at)}</p></div>)}
             </div> : <EmptyBlock text="No workflow activity has been recorded yet." />)}
           </div>
         )}

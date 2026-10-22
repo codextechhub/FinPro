@@ -32,6 +32,7 @@ import {
   type InstanceFilters,
 } from "./manage-approvals";
 import { RefreshIcon } from "@/components/finance-ui/loading-mark";
+import { type RequestNames } from "../../../components/workflow/person-flags";
 
 /** The rows ticked for a bulk action, under the filters they were ticked with. */
 interface Selection {
@@ -122,8 +123,8 @@ export default function ManageApprovals() {
       cell: (r) => (
         <UserChip
           id={r.requested_by}
-          name={name(r.requested_by)}
-          initials={initials(r.requested_by)}
+          name={name(r.requested_by, (r as typeof r & RequestNames).requested_by_name)}
+          initials={initials(r.requested_by, (r as typeof r & RequestNames).requested_by_name)}
           role={role(r.requested_by)}
           size={22}
           exited={(r as { requested_by_is_exited?: boolean | null }).requested_by_is_exited}

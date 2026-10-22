@@ -5,10 +5,11 @@ import { humanizeDocumentType } from "./workflow-format";
 import { InstanceStatusBadge, UserChip } from "./workflow-ui";
 import { sourceDocumentLink, sourceDocumentPrompt } from "./source-document-link";
 import { DocumentDetailsPanel } from "./document-details";
+import type { RequestNames } from "./person-flags";
 import { useServesPath } from "../../lib/host-routes";
 import { useDates } from "../../lib/display-prefs";
 
-type Resolver = (id?: string | number | null) => string;
+type Resolver = (id?: string | number | null, sent?: string | null) => string;
 
 /**
  * Document panel shared by every instance detail view (approver / requester /
@@ -87,8 +88,8 @@ export function DocumentPanel({
             <Field label="Requested by">
               <UserChip
                 id={instance.requested_by}
-                name={name(instance.requested_by)}
-                initials={initials(instance.requested_by)}
+                name={name(instance.requested_by, (instance as RequestNames).requested_by_name)}
+                initials={initials(instance.requested_by, (instance as RequestNames).requested_by_name)}
                 role={role(instance.requested_by)}
                 size={22}
                 exited={(instance as { requested_by_is_exited?: boolean | null }).requested_by_is_exited}

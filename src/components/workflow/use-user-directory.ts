@@ -8,13 +8,15 @@ type UserId = string | number | null | undefined;
 const toKey = (id: UserId): string => (id == null ? "" : String(id));
 
 /**
- * Resolves workflow user IDs (requesters, actors, eligible approvers) to
- * display names + initials by reusing the existing /user/users/ directory.
+ * Names the people on an approval trail: requesters, voters, eligible approvers.
  *
- * The workflow API only returns bare user IDs; this hook fetches the staff
- * directory once (RTK-cached + deduped across every consumer) and exposes
- * cheap lookups. For an internal console with a bounded staff set this is the
- * pragmatic resolver - see project_workflow_module memory.
+ * The workflow API sends each person's name beside their id (`actor_name`,
+ * `requested_by_name`, `acted_label` and so on), because the trail is read by
+ * everyone who may open the document and most of them may not read the staff
+ * list. Callers pass that name as `sent`, and it always wins. The host's staff
+ * directory is only the fallback for a server that sends no name, and the
+ * source of `role`, which the trail deliberately does not carry. A person
+ * neither source can name reads "Unknown user", never their id.
  */
 export function useUserDirectory() {
   const { data, isLoading } = useDirectory();
@@ -30,15 +32,16 @@ export function useUserDirectory() {
     return key ? byId.get(key) : undefined;
   };
 
-  /** Display name, falling back to a shortened ID when the user isn't found. */
-  const name = (id: UserId): string => {
+  const name = (id: UserId, sent?: string | null): string => {
+    if (sent) return sent;
     const key = toKey(id);
     if (!key) return "-";
     const u = byId.get(key);
-    return u?.full_name || u?.email || `User ${key.slice(0, 8)}`;
+    return u?.full_name || u?.email || "Unknown user";
   };
 
-  const initials = (id: UserId): string => {
+  const initials = (id: UserId, sent?: string | null): string => {
+    if (sent) return returnInitial(sent);
     const key = toKey(id);
     if (!key) return "-";
     const u = byId.get(key);

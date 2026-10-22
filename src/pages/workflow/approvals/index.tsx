@@ -15,6 +15,7 @@ import { humanizeDocumentType } from "@/pages/protected/workflow/components/work
 import { PageHeader } from "@/components/layout/page-header";
 import { PageShell } from "@/components/layout/page-shell";
 import { RefreshIcon } from "@/components/finance-ui/loading-mark";
+import { type RequestNames } from "../../../components/workflow/person-flags";
 
 export default function PendingApprovals() {
   const navigate = useNavigate();
@@ -57,7 +58,7 @@ export default function PendingApprovals() {
           i.document_object_id.toLowerCase().includes(q) ||
           humanizeDocumentType(i.document_type, i.document_type_label).toLowerCase().includes(q) ||
           (i.document_title ?? "").toLowerCase().includes(q) ||
-          name(i.requested_by).toLowerCase().includes(q),
+          name(i.requested_by, (i as typeof i & RequestNames).requested_by_name).toLowerCase().includes(q),
       );
     }
     return out;
@@ -151,10 +152,10 @@ export default function PendingApprovals() {
                   <ApprovalRow
                     key={item.id}
                     item={item}
-                    requesterName={name(item.requested_by)}
-                    requesterInitials={initials(item.requested_by)}
+                    requesterName={name(item.requested_by, (item as typeof item & RequestNames).requested_by_name)}
+                    requesterInitials={initials(item.requested_by, (item as typeof item & RequestNames).requested_by_name)}
                     requesterRole={role(item.requested_by)}
-                    delegatorName={item.on_behalf_of ? name(item.on_behalf_of) : null}
+                    delegatorName={item.on_behalf_of ? name(item.on_behalf_of, (item as typeof item & RequestNames).on_behalf_of_name) : null}
                     onReview={() => navigate(routesPath.PROTECTED.WORKFLOW.APPROVAL_DETAIL(item.id))}
                   />
                 ))}

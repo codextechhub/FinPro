@@ -29,6 +29,7 @@ import { AuditTimeline } from "@/pages/protected/workflow/components/audit-timel
 import { PageShell } from "@/components/layout/page-shell";
 import { ApproversSection } from "./stage-approvers";
 import { LoadingMark } from "@/components/finance-ui/loading-mark";
+import { actedBy, type VoteAttribution } from "../../../components/workflow/person-flags";
 
 const TERMINAL = ["APPROVED", "REJECTED", "WITHDRAWN", "CANCELLED"];
 
@@ -162,7 +163,7 @@ export default function InstanceDetail() {
                       <div key={a.id} className="flex flex-wrap items-center gap-3 py-3">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm">
-                            <span className="font-medium text-black-01">{name(a.actor)}</span>{" "}
+                            <span className="font-medium text-black-01">{name(a.actor, actedBy(a as typeof a & VoteAttribution))}</span>{" "}
                             <span className="text-gray-01">
                               {a.action.toLowerCase()} · {a.stageLabel}
                             </span>
@@ -228,7 +229,7 @@ export default function InstanceDetail() {
             <DialogDescription>
               {reverseTarget && (
                 <>
-                  Reverses {name(reverseTarget.actor)}'s {reverseTarget.action.toLowerCase()} on{" "}
+                  Reverses {name(reverseTarget.actor, actedBy(reverseTarget as typeof reverseTarget & VoteAttribution))}'s {reverseTarget.action.toLowerCase()} on{" "}
                   {reverseTarget.stageLabel}. The original vote is preserved and the stage re-opens
                   for a fresh decision.
                 </>

@@ -1,4 +1,5 @@
 import type { WorkflowAuditLog } from "@/redux/services/dashboard/workflow-types";
+import { actedBy, type AuditAttribution } from "../../components/workflow/person-flags";
 
 type DocumentActivity = {
   id: string | number;
@@ -42,6 +43,7 @@ export function mergeActivityItems({ workflowLogs = [], activity = [], created }
       key: `workflow-${log.id}`,
       message: log.message || log.event_type.replaceAll("_", " ").toLowerCase(),
       actorId: log.actor,
+      actorName: actedBy(log as typeof log & AuditAttribution) || undefined,
       occurredAt: log.occurred_at,
       sourceOrder: index,
     })),

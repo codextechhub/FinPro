@@ -6,6 +6,16 @@ import { ActivityFeed } from "./activity-feed";
 import { mergeActivityItems } from "./activity-feed-model";
 
 describe("mergeActivityItems", () => {
+  it("names a workflow entry from the name the server sent beside its actor", () => {
+    const [item] = mergeActivityItems({
+      workflowLogs: [{
+        id: "voted", event_type: "STAGE_APPROVED", actor: "218", stage_instance: null, context: {},
+        message: "approved", occurred_at: "2026-10-21T10:00:00Z", actor_name: "Ngozi Ibekwe", acted_label: "Ngozi Ibekwe",
+      } as never],
+    });
+    expect(item.actorName).toBe("Ngozi Ibekwe");
+  });
+
   it("arranges workflow, document, and creation activity newest first", () => {
     const items = mergeActivityItems({
       workflowLogs: [

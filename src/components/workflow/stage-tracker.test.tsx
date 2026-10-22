@@ -70,3 +70,42 @@ describe("approval history", () => {
     await unmount();
   });
 });
+
+/**
+ * Tolu, a teacher, opens her requisition. She may not read the staff list, so
+ * her directory knows nobody, and the trail still names Mr Bakare, who
+ * approved it, and Mrs Adeyemi, for whom Mr Okon held the queue place, from the
+ * names the server sent.
+ */
+describe("a trail read by someone who may not read the staff list", () => {
+  const nobody = (_id?: string | null, sent?: string | null) => sent || "Unknown user";
+  const nobodyInitials = (_id?: string | null, sent?: string | null) => (sent || "U").slice(0, 2).toUpperCase();
+
+  it("names each voter from the payload", async () => {
+    const { container, unmount } = await render(
+      <StageTracker
+        stages={[stage([vote({ actor: "217", actor_name: "Oluwaseun Bakare", acted_label: "Oluwaseun Bakare",
+          on_behalf_of: "66", on_behalf_of_name: "Mrs Adeyemi", proxied_user_name: null })])] as never}
+        name={nobody}
+        initials={nobodyInitials}
+      />,
+    );
+    expect(container.textContent).toContain("Oluwaseun Bakare");
+    expect(container.textContent).toContain("(for Mrs Adeyemi)");
+    expect(container.textContent).not.toMatch(/User \d|217|\b66\b/);
+    await unmount();
+  });
+
+  it("names the actor of each audit entry from the payload", async () => {
+    const { container, unmount } = await render(
+      <AuditTimeline
+        logs={[{ id: "a2", event_type: "STAGE_APPROVED", actor: "218", stage_instance: null, context: {}, message: "", occurred_at: "2026-10-01T10:00:00Z",
+          actor_name: "Ngozi Ibekwe", acted_label: "Ngozi Ibekwe", proxied_user_name: null }] as never}
+        name={nobody}
+      />,
+    );
+    expect(container.textContent).toContain("Ngozi Ibekwe");
+    expect(container.textContent).not.toContain("218");
+    await unmount();
+  });
+});

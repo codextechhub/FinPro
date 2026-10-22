@@ -6,10 +6,10 @@ import type {
   WorkflowStageStatus,
 } from "@/redux/services/dashboard/workflow-types";
 import { InitialsAvatar, StageStatusBadge } from "./workflow-ui";
-import { proxyLabel, type VoteAttribution } from "./person-flags";
+import { actedBy, proxyLabel, type VoteAttribution } from "./person-flags";
 import { useDates } from "../../lib/display-prefs";
 
-type Resolver = (id?: string | null) => string;
+type Resolver = (id?: string | null, sent?: string | null) => string;
 
 const NODE_STYLES: Record<WorkflowStageStatus, { ring: string; icon: React.ReactNode }> = {
   APPROVED: { ring: "bg-green-01 border-green-01 text-white", icon: <Check className="size-3.5" /> },
@@ -104,10 +104,10 @@ export function StageTracker({
                     return (
                       <li key={a.id} className="text-xs">
                         <div className="flex items-center gap-2">
-                          <InitialsAvatar initials={initials(a.actor)} seed={a.actor} size={20} exited={people.actor_is_exited} />
-                          <span className="text-black-01">{proxied ?? name(a.actor)}</span>
+                          <InitialsAvatar initials={initials(a.actor, people.actor_name)} seed={a.actor} size={20} exited={people.actor_is_exited} />
+                          <span className="text-black-01">{proxied ?? name(a.actor, actedBy(people))}</span>
                           {a.on_behalf_of && (
-                            <span className="text-gray-01">(for {name(a.on_behalf_of)})</span>
+                            <span className="text-gray-01">(for {name(a.on_behalf_of, people.on_behalf_of_name)})</span>
                           )}
                           {vm && (
                             <span className={cn("inline-flex items-center gap-0.5 font-medium", vm.cls)}>
