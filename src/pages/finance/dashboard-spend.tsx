@@ -386,8 +386,8 @@ function ClaimsCard({ claims, windowName, currency }: { claims: NonNullable<S["c
           <p className="font-mont text-[11px] text-gray-05">Waiting longest</p>
           {claims.oldest.map((c) => (
             <div key={c.id} className="flex min-w-0 items-baseline justify-between gap-2 font-mont text-[13px]">
-              <span className="min-w-0 truncate"><span className="font-medium text-gray-01">{c.claimant}</span>
-                {c.title && <span className="text-gray-05"> · {c.title}</span>}</span>
+              <span className="min-w-0 truncate">{c.claimant ? <span className="font-medium text-gray-01">{c.claimant}</span> : null}
+                {c.title && <span className="text-gray-05">{c.claimant ? " · " : ""}{c.title}</span>}</span>
               <span className="shrink-0 text-[11px] tabular-nums text-gray-05">
                 <span className={cn(c.days > 7 && "text-amber-700")}>{plural(c.days, "day")}</span> · {compactMoney(c.amount.kobo, currency)}
               </span>

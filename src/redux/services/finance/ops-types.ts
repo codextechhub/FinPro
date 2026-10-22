@@ -165,8 +165,11 @@ export interface ExpenseClaim {
   // The branch it belongs to; null for a row not yet given one.
   branch_id?: number | null;
   document_number: string;
-  claimant_id: number | null;
-  claimant_name: string;
+  /** The member of staff reimbursed, or null for a name typed for somebody not on the staff list.
+   *  Absent, with `claimant_name`, for a reader who may not read the claimant. */
+  claimant_id?: number | null;
+  /** The name the claim reads under: the staff member's, or the one typed. */
+  claimant_name?: string;
   claim_date: string;
   title: string;
   narration: string;
@@ -187,6 +190,8 @@ export interface ExpenseClaim {
   approval_returned?: boolean;
   /** The latest approval request, null before it is first sent; absent where the read does not name it. */
   workflow_instance_id?: string | number | null;
+  /** On a detail read, the names present that the reader may not change. */
+  _read_only_fields?: string[];
 }
 
 // ── Petty cash ───────────────────────────────────────────────────────────────

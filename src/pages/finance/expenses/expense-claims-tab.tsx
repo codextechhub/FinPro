@@ -4,7 +4,10 @@
  * stepper, line items (cost center + receipt attachment), and Approve / Reject /
  * Pay / Print actions.
  *
- * Claims are by staff and classified by cost center. The list, the figures
+ * Claims are by staff and classified by cost center. The claimant is picked
+ * from the staff list, or typed for somebody not on it (`./claimant`), and
+ * follows its Field Access switch on the list, the drawer, the print and the
+ * New claim form. The list, the figures
  * above it and its export answer for one branch and one stretch of time
  * (`useFinanceListScope`): the branch the app's switcher shows, or the page's
  * own picker where the app has none, and the Year picker beside the search.
@@ -22,7 +25,7 @@ import {
   Plus, Search, Trash2, Check, X, Printer, Wallet, Paperclip, UploadCloud, CircleDashed, CircleCheck, Ban, Send,
 } from "lucide-react";
 import {
-  DataTable, Money, MoneyInput, DetailDrawer, FormField, ConfirmActionModal,
+  DataTable, Money, MoneyInput, DetailDrawer, FormField, ConfirmActionModal, fieldWriteErrors, useFieldAccess, type FieldErrors,
   AccountPicker, TaxCodePicker, CostCenterPicker, BankAccountPicker, toArray, type Column,
   PostingDateField, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
@@ -48,6 +51,10 @@ import type { ExpenseClaim, ExpenseClaimLine } from "@/redux/services/finance/op
 import { sourceDocumentIdFromParams } from "@/lib/source-document-route";
 import { useDates } from "../../../lib/display-prefs";
 import { useFinanceListScope } from "../list-scope";
+import {
+  EXPENSE_CLAIM, NO_CLAIMANT, canNameClaimant, claimantBody, claimantReady, claimantShown, type ClaimantChoice,
+} from "./claimant";
+import { ClaimantField, ClaimantName } from "./claimant-field";
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const thCls = "bg-[#F1F1F1] px-3 py-2 text-left font-mont text-[11px] font-semibold text-gray-01";
@@ -121,7 +128,10 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
-  useActionParam("new", can(P.FIN_CREATE_EXPENSE_CLAIM), () => setCreating(true));
+  const access = useFieldAccess(EXPENSE_CLAIM);
+  const showClaimant = !access.isHidden("claimant_name");
+  const mayRaise = can(P.FIN_CREATE_EXPENSE_CLAIM) && canNameClaimant(access);
+  useActionParam("new", mayRaise, () => setCreating(true));
   const [selected, setSelected] = useState<ExpenseClaim | null>(null);
   const [linkedDocumentDismissed, setLinkedDocumentDismissed] = useState(false);
   const linkedDocumentId = sourceDocumentIdFromParams(searchParams);
@@ -144,7 +154,7 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
 
   const columns: Column<ExpenseClaim>[] = [
     { header: "Claim no.", cell: (c) => <span className="font-semibold tabular-nums">{c.document_number}</span> },
-    { header: "Claimant", cell: (c) => <span className="inline-flex items-center gap-2"><Initials name={c.claimant_name || "-"} /><span className="font-medium text-gray-01">{c.claimant_name || "-"}</span></span> },
+    ...(showClaimant ? [{ header: "Claimant", cell: (c: ExpenseClaim) => <span className="inline-flex min-w-0 items-center gap-2"><Initials name={claimantShown(c)?.name ?? "-"} /><ClaimantName claim={c} className="font-medium text-gray-01" /></span> }] : []),
     { header: "Date", cell: (c) => <span className="tabular-nums text-gray-05">{dates.day(c.claim_date)}</span> },
     { header: "Purpose", cell: (c) => <span className="text-gray-01">{c.title || "-"}</span> },
     { header: "Total", align: "right", cell: (c) => <Money kobo={c.total} currency={currency} align="right" /> },
@@ -163,9 +173,9 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
 
       <div className="flex flex-wrap items-center justify-between gap-3" data-guide="finance-expense-claims.controls">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
-            <Input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); resetPage(); }} placeholder="Search claimant, purpose or no." className="h-9 w-72 bg-white pl-8 font-mont" />
+            <Input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); resetPage(); }} placeholder={showClaimant ? "Search claimant, purpose or no." : "Search purpose or no."} className="h-9 w-full bg-white pl-8 font-mont sm:w-72" />
           </div>
           <select value={status} onChange={(e) => { setStatus(e.target.value); resetPage(); }} className="h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01">
             <option value="">All statuses</option>
@@ -182,9 +192,7 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
             typeface="geist"
             defaultName="Expense claims"
           />
-          <Can permission={P.FIN_CREATE_EXPENSE_CLAIM}>
-            <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New claim</Button>
-          </Can>
+          {mayRaise ? <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New claim</Button> : null}
         </div>
       </div>
 
@@ -205,7 +213,7 @@ export function ExpenseClaimsTab({ entity, currency }: { entity: string; currenc
           setLinkedDocumentDismissed(true);
         }}
       />
-      <NewClaimDrawer open={creating} onClose={() => setCreating(false)} entity={entity} currency={currency} />
+      <NewClaimDrawer open={creating && mayRaise} onClose={() => setCreating(false)} entity={entity} currency={currency} />
     </div>
   );
 }
@@ -242,6 +250,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
   if (!claim || !full) return null;
 
   const d = claimDisplay(full);
+  const claimant = claimantShown(full);
   const isDraft = full.status === "DRAFT" && !standing;
   const isPending = full.status === "PENDING_APPROVAL";
   const isApprovedUnpaid = full.status === "POSTED" && full.payment_status !== "PAID";
@@ -267,7 +276,7 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
       <DetailDrawer
         open={!!claim} onOpenChange={(o) => (o ? undefined : onClose())}
         title={full.document_number}
-        description={`${full.claimant_name || "-"} · ${dates.day(full.claim_date)}${full.title ? ` · ${full.title}` : ""}`}
+        description={[claimant ? `${claimant.name}${claimant.typed ? " (typed name)" : ""}` : null, dates.day(full.claim_date), full.title || null].filter(Boolean).join(" · ")}
         widthClass="sm:max-w-3xl"
         footer={
           <>
@@ -309,10 +318,10 @@ function ClaimDetailDrawer({ claim, entity, currency, onClose }: { claim: Expens
           <div>
             <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Approval workflow</p>
             <div className="space-y-3 rounded-md border border-gray-03 bg-gray-03 px-3 py-3">
-              <Step done title="Submitted" sub={`${full.claimant_name || "Staff"} · ${dates.day(full.claim_date)}`} />
+              <Step done title="Submitted" sub={[claimant?.name, dates.day(full.claim_date)].filter(Boolean).join(" · ")} />
               {d.key === "REJECTED"
                 ? <Step done={false} active title="Rejected" sub="The claim was rejected." />
-                : <Step done={full.status === "POSTED"} active={isDraft || isPending} title="Approved" sub={full.status === "POSTED" ? "Booked as owed to the staff member" : isPending ? "Waiting in the approver queue" : "Ready to submit"} />}
+                : <Step done={full.status === "POSTED"} active={isDraft || isPending} title="Approved" sub={full.status === "POSTED" ? "Booked as owed to the claimant" : isPending ? "Waiting in the approver queue" : "Ready to submit"} />}
               {d.key !== "REJECTED"
                 ? <Step done={full.payment_status === "PAID"} active={isApprovedUnpaid} title="Reimbursed" sub={full.payment_status === "PAID" ? "Paid in full" : full.payment_status === "PARTIAL" ? `Part-paid, ${formatMoney(full.balance_due, currency)} left` : "Pending payment"} />
                 : null}
@@ -444,7 +453,7 @@ function PayDrawer({ claim, entity, currency, onClose }: { claim: ExpenseClaim; 
   return (
     <DetailDrawer
       open onOpenChange={(o) => (o ? undefined : onClose())}
-      title="Reimburse claim" description={`${claim.document_number} · ${claim.claimant_name || "-"}`}
+      title="Reimburse claim" description={[claim.document_number, claim.claimant_name].filter(Boolean).join(" · ")}
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
@@ -453,7 +462,7 @@ function PayDrawer({ claim, entity, currency, onClose }: { claim: ExpenseClaim; 
     >
       <div className="space-y-4">
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
-          {formatMoney(claim.balance_due, currency)} is left to pay {claim.claimant_name || "the staff member"}. Pay all of it, or part now and the rest later.
+          {formatMoney(claim.balance_due, currency)} is left to pay {claim.claimant_name || "the claimant"}. Pay all of it, or part now and the rest later.
         </p>
         <FormField label="Amount to pay">
           <MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} />
@@ -519,7 +528,9 @@ function ReceiptDropzone({ files, onAdd, onRemove }: { files: File[]; onAdd: (fs
 }
 
 function NewClaimDrawer({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {
-  const [claimant, setClaimant] = useState("");
+  const access = useFieldAccess(EXPENSE_CLAIM);
+  const [claimant, setClaimant] = useState<ClaimantChoice>(NO_CLAIMANT);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors | null>(null);
   const [claimDate, setClaimDate] = useState("");
   const [title, setTitle] = useState("");
   const [lines, setLines] = useState<EditLine[]>([emptyLine()]);
@@ -533,15 +544,15 @@ function NewClaimDrawer({ open, onClose, entity, currency }: { open: boolean; on
   const setLine = (i: number, patch: Partial<EditLine>) => setLines((s) => s.map((l, idx) => idx === i ? { ...l, ...patch } : l));
   const total = lines.reduce((s, l) => s + l.unit_price, 0);
   const valid = lines.filter((l) => l.description.trim() && l.expense_account && l.unit_price > 0);
-  const canSubmit = claimant.trim() !== "" && title.trim() !== "" && valid.length > 0 && branch.ready;
+  const canSubmit = claimantReady(claimant) && title.trim() !== "" && valid.length > 0 && branch.ready;
 
-  const reset = () => { setClaimant(""); setClaimDate(""); setTitle(""); setLines([emptyLine()]); setReceipts([]); branch.reset(); };
+  const reset = () => { setClaimant(NO_CLAIMANT); setFieldErrors(null); setClaimDate(""); setTitle(""); setLines([emptyLine()]); setReceipts([]); branch.reset(); };
   const close = () => { reset(); onClose(); };
 
   const persist = async (submitAfterCreate: boolean) => {
     try {
       const res = await create({
-        entity, claimant_name: claimant.trim(), claim_date: claimDate, title: title.trim(), ...branch.body(),
+        entity, ...claimantBody(claimant, access), claim_date: claimDate, title: title.trim(), ...branch.body(),
         lines: valid.map((l) => ({ description: l.description.trim(), expense_account: l.expense_account, quantity: 1, unit_price: l.unit_price, tax_code: l.tax_code || undefined, cost_center: l.cost_center || undefined })),
       }).unwrap();
       // Attach dropped receipts to the created lines in order.
@@ -579,7 +590,9 @@ function NewClaimDrawer({ open, onClose, entity, currency }: { open: boolean; on
         toast.success(res.message || "Claim draft saved.");
       }
       close();
-    } catch { /* central */ }
+    } catch (error) {
+      setFieldErrors(fieldWriteErrors(error));
+    }
   };
 
   return (
@@ -594,8 +607,8 @@ function NewClaimDrawer({ open, onClose, entity, currency }: { open: boolean; on
       </>}
     >
       <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <FormField label="Claimant" required><Input value={claimant} onChange={(e) => setClaimant(e.target.value)} placeholder="Staff name" className="bg-white" /></FormField>
+        <ClaimantField access={access} value={claimant} onChange={(next) => { setClaimant(next); setFieldErrors(null); }} errors={fieldErrors} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <PostingDateField label="Date" entity={entity} value={claimDate} onChange={setClaimDate} />
           <FormField label="Purpose" required><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Travel to workshop" className="bg-white" /></FormField>
         </div>

@@ -197,7 +197,7 @@ export const opsApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/expense-claims/summary/${qs(p)}`, method: "GET" }),
       providesTags: ["FinanceExpenseClaims"],
     }),
-    createExpenseClaim: b.mutation<ApiEnvelope<ExpenseClaim>, { entity: string; branch?: number; claimant_name?: string; claim_date: string; title?: string; narration?: string; lines: { description: string; expense_account: string; quantity: number; unit_price: number; tax_code?: string; cost_center?: string }[] }>({
+    createExpenseClaim: b.mutation<ApiEnvelope<ExpenseClaim>, { entity: string; branch?: number; claimant?: number; claimant_name?: string; claim_date: string; title?: string; narration?: string; lines: { description: string; expense_account: string; quantity: number; unit_price: number; tax_code?: string; cost_center?: string }[] }>({
       query: ({ entity, ...body }) => ({ url: `/finance/expense-claims/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceExpenseClaims"],
     }),

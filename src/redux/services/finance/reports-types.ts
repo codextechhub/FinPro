@@ -635,7 +635,8 @@ export interface SpendDashboard {
     submitted: { count: number; amount: ReportMoney };
     approved: { count: number; amount: ReportMoney };
     paid: { count: number; amount: ReportMoney };
-    oldest: { id: number; claimant: string; title: string; days: number; amount: ReportMoney }[];
+    /** `claimant` is absent for a reader who may not read an expense claim's claimant. */
+    oldest: { id: number; claimant?: string; title: string; days: number; amount: ReportMoney }[];
   } | null;
   petty_cash?: {
     threshold_pct: number;

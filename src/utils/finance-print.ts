@@ -233,6 +233,17 @@ export function buildBankReconciliationPrintDocument(input: {
   };
 }
 
+/**
+ * The claimant as a printed claim names them: the name, marked when it is a
+ * typed name tied to nobody on the staff list, or nothing at all for a reader
+ * the claim was served without a claimant.
+ */
+function claimantPrinted(claim: ExpenseClaim): string | null {
+  if (claim.claimant_name === undefined) return null;
+  const name = claim.claimant_name || "-";
+  return claim.claimant_id == null && claim.claimant_name ? `${name} (typed name)` : name;
+}
+
 export function buildExpenseClaimPrintDocument(
   claim: ExpenseClaim,
   statusLabel: string,
@@ -253,7 +264,9 @@ export function buildExpenseClaimPrintDocument(
     windowFeatures: "width=780,height=900",
     blocks: [
       { kind: "heading", level: 1, text: `Expense claim ${claim.document_number}` },
-      { kind: "text", className: "sub", text: `${claim.claimant_name || "-"} · ${formatDay(claim.claim_date, prefs)} · ${claim.title || ""} · ${statusLabel}` },
+      { kind: "text", className: "sub", text: [
+        claimantPrinted(claim), formatDay(claim.claim_date, prefs), claim.title, statusLabel,
+      ].filter(Boolean).join(" · ") },
       { kind: "table", headings: [cell("Category"), cell("Description"), cell("Cost center"), cell("Amount", "r")], rows },
     ],
   };
