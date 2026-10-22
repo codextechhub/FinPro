@@ -65,17 +65,30 @@ function compactNaira(kobo: number) {
   return `₦${n.toFixed(0)}`;
 }
 
-function heatClass(ratio: number | null) {
+/**
+ * Income lines read the other way round from spending: taking more than the
+ * plan is good news. Lagoon View's fee income of ₦185,000 against no plan is
+ * not an overspend, and a fees target met is green, not a severe overrun.
+ */
+const isIncome = (accountType?: string | null) => accountType === "INCOME";
+
+function heatClass(ratio: number | null, income = false) {
   if (ratio == null) return "bg-white text-gray-05";
+  if (income) {
+    if (ratio >= 1) return "bg-emerald-50 text-emerald-700";
+    if (ratio >= 0.9) return "bg-amber-50 text-amber-700";
+    if (ratio >= 0.5) return "bg-orange-100 text-orange-700";
+    return "bg-red-100 text-red-700";
+  }
   if (ratio <= 0.9) return "bg-emerald-50 text-emerald-700";
   if (ratio <= 1.0) return "bg-amber-50 text-amber-700";
   if (ratio <= 1.2) return "bg-orange-100 text-orange-700";
   return "bg-red-100 text-red-700";
 }
 
-function ConsumedBar({ pct }: { pct: number | null }) {
+function ConsumedBar({ pct, income = false }: { pct: number | null; income?: boolean }) {
   const v = pct == null ? 0 : Math.min(pct, 100);
-  const over = (pct ?? 0) > 100;
+  const over = !income && (pct ?? 0) > 100;
   return (
     <div className="flex items-center justify-end gap-2">
       <div className="h-1.5 w-20 overflow-hidden rounded-full bg-gray-03">
@@ -160,7 +173,7 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
               <h2 className="font-mont text-sm font-semibold text-gray-01">Variance heatmap</h2>
-              <InfoHint ariaLabel="About the budget variance heatmap">Each cell is a GL account's actual spend in that period, coloured by how much of the budgeted amount it consumed. Variance is per account - actuals aren't tracked per cost centre.</InfoHint>
+              <InfoHint ariaLabel="About the budget variance heatmap">Each cell is a GL account's actual spend in that period, coloured by how much of the budgeted amount it consumed. Income lines are coloured the other way round: green once the target is reached. Variance is per account - actuals aren't tracked per cost centre.</InfoHint>
             </div>
             <Select value={String(activeHeatmapId)} onChange={(v) => setHeatmapId(Number(v))} className="w-64">
               {measured.map((b) => <option key={b.id} value={b.id}>{b.code ? `${b.code} · ${b.name}` : b.name}</option>)}
@@ -261,13 +274,13 @@ export function Heatmap({ budgetId, entity }: { budgetId: number; entity: string
                   const ratio = cell && cell.budget && actual != null ? actual / cell.budget : null;
                   const hasActual = actual != null && actual !== 0;
                   return (
-                    <td key={p.period_no} className={cn("border-t border-white-02 px-2 py-1.5 text-right font-mont text-[11px] tabular-nums", heatClass(ratio))}>
+                    <td key={p.period_no} className={cn("border-t border-white-02 px-2 py-1.5 text-right font-mont text-[11px] tabular-nums", heatClass(ratio, isIncome(r.account_type)))}>
                       {hasActual ? compactNaira(actual) : <span className="text-gray-05">-</span>}
                     </td>
                   );
                 })}
                 <td className={cn(tdCls, "text-right")}>
-                  <span className={cn("font-medium tabular-nums", ytd != null && ytd > 1 ? "text-destructive" : "text-gray-05")}>{ytd == null ? "-" : `${Math.round(ytd * 100)}%`}</span>
+                  <span className={cn("font-medium tabular-nums", ytd != null && !isIncome(r.account_type) && ytd > 1 ? "text-destructive" : "text-gray-05")}>{ytd == null ? "-" : `${Math.round(ytd * 100)}%`}</span>
                 </td>
               </tr>
             );
@@ -513,7 +526,9 @@ function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; e
               <tbody>
                 {(v?.rows ?? []).map((r) => {
                   const rowActual = r.actual?.kobo ?? 0;
-                  const rem = r.budget.kobo - rowActual;
+                  const income = isIncome(r.account_type);
+                  // Spending shows what is left of its plan; income shows how far it is past its target.
+                  const rem = income ? rowActual - r.budget.kobo : r.budget.kobo - rowActual;
                   const pct = r.budget.kobo ? (rowActual * 100) / r.budget.kobo : null;
                   return (
                     <tr key={r.account_id}>
@@ -522,7 +537,7 @@ function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; e
                       {actualsWithheld ? null : <>
                         <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(rowActual, currency)}</td>
                         <td className={cn(tdCls, "text-right tabular-nums", rem < 0 ? "text-destructive" : "text-green-01")}>{formatMoney(rem, currency)}</td>
-                        <td className={cn(tdCls)}><ConsumedBar pct={pct} /></td>
+                        <td className={cn(tdCls)}><ConsumedBar pct={pct} income={income} /></td>
                       </>}
                     </tr>
                   );

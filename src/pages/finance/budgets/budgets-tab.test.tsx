@@ -270,4 +270,25 @@ describe("the variance heatmap", () => {
     expect(cells[1]).toBe("-");
     expect(cells[2]).not.toBe("-");
   });
+
+  it("colours a fees target that was beaten green, and a spending line over plan red", () => {
+    mocks.heatmap = {
+      budget_id: 2, fiscal_year_id: 1, total_budget: 100_000, total_actual: 120_000,
+      periods: [{ period_no: 1, name: "2026-09", label: "September 2026" }],
+      rows: [
+        { account_id: 8, code: "4100", name: "Tuition fees", account_type: "INCOME", budget_total: 100_000, actual_total: 120_000,
+          cells: [{ period_no: 1, budget: 100_000, actual: 120_000 }] },
+        { account_id: 7, code: "5100", name: "Salaries", account_type: "EXPENSE", budget_total: 100_000, actual_total: 130_000,
+          cells: [{ period_no: 1, budget: 100_000, actual: 130_000 }] },
+      ],
+    };
+    act(() => root.render(<Heatmap budgetId={2} entity="HOLYCROSS" />));
+    const [fees, salaries] = [...container.querySelectorAll("tbody tr")];
+    const [, feesCell, feesYtd] = [...fees.querySelectorAll("td")];
+    const [, salariesCell, salariesYtd] = [...salaries.querySelectorAll("td")];
+    expect(feesCell.className).toContain("bg-emerald-50");
+    expect(feesYtd.innerHTML).not.toContain("text-destructive");
+    expect(salariesCell.className).toContain("bg-red-100");
+    expect(salariesYtd.innerHTML).toContain("text-destructive");
+  });
 });
