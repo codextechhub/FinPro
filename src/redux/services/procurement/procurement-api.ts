@@ -323,7 +323,12 @@ export const procurementApi = baseApi.injectEndpoints({
       query: ({ id, entity }) => ({ url: `/procurement/vendor-payments/${id}/${qs({ entity })}`, method: "GET" }),
       providesTags: ["ProcVendorPayments"],
     }),
-    getVendorPaymentEligibleInvoices: b.query<ApiEnvelope<VendorPaymentEligibleInvoice[]>, { entity: string; vendor?: string }>({
+    /**
+     * The posted, unpaid bills a payment may settle, oldest due first, a page
+     * of up to 100. `pagination.totalItems` says how many there are in all, so
+     * the payment form can say when more wait behind the ones it lists.
+     */
+    getVendorPaymentEligibleInvoices: b.query<PaginatedEnvelope<VendorPaymentEligibleInvoice>, { entity: string; vendor?: string }>({
       query: (p) => ({ url: `/procurement/vendor-payments/eligible-invoices/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcVendorInvoices"],
     }),

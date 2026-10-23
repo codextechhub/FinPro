@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => {
     workflow: undefined as unknown,
     update: (() => undefined) as (body: unknown) => void,
     resume: (() => undefined) as (id: unknown) => void,
+    eligible: undefined as unknown,
   };
   const query = () => ({ data: undefined, currentData: undefined, isLoading: false, isFetching: false, isError: false, refetch: () => undefined });
   const mutation = (spy?: (body: unknown) => void) => () => [
@@ -76,6 +77,7 @@ vi.mock("./pickers", () => ({ VendorPicker: () => null }));
 vi.mock("./document-attachments", () => ({ DocumentAttachments: () => null, useDocumentAttachmentRows: () => [] }));
 vi.mock("@/redux/services/procurement/procurement-api", () => mocks.api({
   useGetVendorPaymentQuery: () => ({ ...mocks.query(), data: { data: mocks.state.doc } }),
+  useGetVendorPaymentEligibleInvoicesQuery: () => ({ ...mocks.query(), data: mocks.state.eligible }),
   useUpdateVendorPaymentMutation: mocks.mutation((body) => mocks.state.update(body)),
 }));
 vi.mock("@/redux/services/dashboard/workflow-api", () => mocks.api({
@@ -157,6 +159,31 @@ describe("a vendor payment an approver sent back", () => {
     render();
     expect(button("Edit")).toBeUndefined();
     expect(button("Resume")).toBeUndefined();
+  });
+});
+
+/**
+ * A payment's unpaid bills come a page at a time, due first. When Ade
+ * Stationers has more unpaid bills than the page holds, the form says how
+ * many more there are rather than letting the list look complete.
+ */
+describe("the unpaid bills a payment may settle", () => {
+  const BILL = { id: 14, document_number: "VI-0014", vendor_id: 1, vendor_code: "V-001", branch_id: 1, invoice_date: "2026-10-01", due_date: "2026-11-02", subtotal: 9_000_000, tax_total: 0, total: 9_000_000, amount_paid: 0, balance_due: 9_000_000, payment_status: "UNPAID" };
+  afterEach(() => { mocks.state.eligible = undefined; });
+
+  it("says how many more unpaid bills wait behind the page", () => {
+    mocks.state.eligible = { data: [BILL], pagination: { totalItems: 4 } };
+    render();
+    act(() => button("Edit")!.click());
+    expect(document.body.textContent).toContain("3 more unpaid bills are due later than these.");
+  });
+
+  it("says nothing more when the page holds every unpaid bill", () => {
+    mocks.state.eligible = { data: [BILL], pagination: { totalItems: 1 } };
+    render();
+    act(() => button("Edit")!.click());
+    expect(document.body.textContent).toContain("VI-0014");
+    expect(document.body.textContent).not.toContain("more unpaid bill");
   });
 });
 

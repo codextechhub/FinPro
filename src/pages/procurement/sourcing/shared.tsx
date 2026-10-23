@@ -22,6 +22,7 @@ import { toArray } from "@/components/finance-ui";
 import { formatMoney } from "@/utils/money";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDates } from "../../../lib/display-prefs";
+import { RfqPicker } from "../pickers";
 
 // ── Small presentational helpers (match the finance-ui drawer typography) ─────
 export function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -69,9 +70,11 @@ function DetailFetcher({ id, entity, onLoaded }: { id: number; entity: string; o
 }
 
 export function CompareModal({ entity, currency, open, onClose }: { entity: string; currency?: string | null; open: boolean; onClose: () => void }) {
-  const { data: rfqData } = useGetRfqsQuery({ entity, page: 1 }, { skip: !open });
-  // Only RFQs with at least one non-draft quotation are worth comparing.
-  const comparable = toArray(rfqData?.data).filter((r) => r.response_count > 0);
+  // Only RFQs with at least one non-draft quotation are worth comparing; the
+  // server narrows to those, so the newest page is the newest comparable ones.
+  const { data: rfqData } = useGetRfqsQuery({ entity, has_responses: "true" }, { skip: !open });
+  const comparable = toArray(rfqData?.data);
+  const olderComparable = (rfqData?.pagination?.totalItems ?? comparable.length) > comparable.length;
   const [rfqId, setRfqId] = useState<number | null>(null);
   const selected = rfqId ?? comparable[0]?.id ?? null;
 
@@ -106,6 +109,11 @@ export function CompareModal({ entity, currency, open, onClose }: { entity: stri
                     </button>
                   ))}
                 </div>
+                {olderComparable && (
+                  <div className="w-full sm:max-w-sm">
+                    <RfqPicker entity={entity} value={selected != null && !comparable.some((r) => r.id === selected) ? String(selected) : ""} onChange={(id) => setRfqId(id ? Number(id) : null)} withBids placeholder="Find an older RFQ" />
+                  </div>
+                )}
                 {selected != null && <CompareMatrix key={selected} rfqId={selected} entity={entity} currency={currency} onAwarded={onClose} />}
               </div>
             )}

@@ -116,18 +116,22 @@ export function RequisitionPicker({ entity, value, onChange, label, placeholder 
 /**
  * An RFQ, searched on the server by number or title. `status` scopes the list
  * (quotation capture offers only ISSUED RFQs), `branch` follows a list
- * screen's branch lens, and `placeholder` doubles as the "all RFQs" wording
- * when the picker is a filter.
+ * screen's branch lens, `withBids` offers only RFQs a vendor has replied to
+ * and names how many bids each holds, and `placeholder` doubles as the "all
+ * RFQs" wording when the picker is a filter.
  */
-export function RfqPicker({ entity, value, onChange, label, placeholder = "Select RFQ", isRequired, status, branch }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string; isRequired?: boolean; status?: string; branch?: ProcListScope["branch"] }) {
+export function RfqPicker({ entity, value, onChange, label, placeholder = "Select RFQ", isRequired, status, branch, withBids }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string; isRequired?: boolean; status?: string; branch?: ProcListScope["branch"]; withBids?: boolean }) {
   const { onSearchChange, searchArg } = useListSearch();
-  const { data, isLoading } = useGetRfqsQuery({ entity, ...(status ? { status } : {}), ...(branch != null ? { branch } : {}), ...searchArg });
+  const { data, isLoading } = useGetRfqsQuery({ entity, ...(status ? { status } : {}), ...(branch != null ? { branch } : {}), ...(withBids ? { has_responses: "true" as const } : {}), ...searchArg });
   const listed = toArray(data?.data);
   const onPage = listed.find((r) => String(r.id) === value);
   const { data: chosenData } = useGetRfqQuery({ id: Number(value), entity }, { skip: !value || !!onPage });
   const chosen = onPage ?? (chosenData?.data && String(chosenData.data.id) === value ? chosenData.data : undefined);
-  const options = withChosen<{ id: number; document_number: string; title?: string | null }>(listed, chosen, (r) => String(r.id))
-    .map((r) => ({ value: String(r.id), label: `${r.document_number} - ${r.title || "Untitled"}` }));
+  const options = withChosen<{ id: number; document_number: string; title?: string | null; response_count?: number }>(listed, chosen, (r) => String(r.id))
+    .map((r) => ({
+      value: String(r.id),
+      label: `${r.document_number} - ${r.title || "Untitled"}${withBids && r.response_count != null ? ` · ${r.response_count} bid${r.response_count === 1 ? "" : "s"}` : ""}`,
+    }));
   return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} onSearchChange={onSearchChange} loading={isLoading} placeholder={placeholder} isRequired={isRequired} revealOnSearch />;
 }
 

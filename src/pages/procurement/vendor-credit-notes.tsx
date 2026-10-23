@@ -39,9 +39,8 @@ import { P } from "../../permissions";
 import { isForbidden } from "../../lib/api-errors";
 import { useDates } from "../../lib/display-prefs";
 import { useSourceDocumentParam } from "@/lib/source-document-route";
-import { useGetVendorInvoicesQuery } from "@/redux/services/procurement/procurement-api";
 import {
-  useAllocateVendorCreditNoteMutation, useCreateVendorCreditNoteMutation,
+  useAllocateVendorCreditNoteMutation, useCreateVendorCreditNoteMutation, useGetVendorCreditNoteOpenBillsQuery,
   useGetVendorCreditNoteQuery, useGetVendorCreditNotesQuery, usePostVendorCreditNoteMutation,
   useSubmitVendorCreditNoteMutation, useUpdateVendorCreditNoteMutation,
   useVoidVendorCreditNoteMutation,
@@ -273,14 +272,23 @@ export function CreditNoteForm({ entity, currency, bill, note, returned = false,
   </DetailDrawer>;
 }
 
-/** Apply a posted note's leftover credit to the vendor's later bills of the same branch. */
+/**
+ * Apply a posted note's leftover credit to the vendor's later bills of the same branch.
+ *
+ * "Choose bills" lists what the server would settle (its open bills for this
+ * note, due first), not a page of the vendor's posted bills filtered here, so
+ * an old unpaid bill is never hidden behind newer paid ones. When the vendor
+ * has more open bills than one page, the drawer says how many more there are;
+ * "Oldest bills first" settles them all.
+ */
 function ApplyCreditDrawer({ note, entity, currency, onClose }: { note: VendorCreditNote; entity: string; currency?: string | null; onClose: () => void }) {
   const dates = useDates();
   const [mode, setMode] = useState<"auto" | "pick">("auto");
   const [amounts, setAmounts] = useState<Record<number, number>>({});
   const [allocate, { isLoading }] = useAllocateVendorCreditNoteMutation();
-  const { data, isLoading: loadingBills } = useGetVendorInvoicesQuery({ entity, vendor: note.vendor_code, status: "POSTED", page_size: 100 });
-  const bills = useMemo(() => toArray(data?.data).filter((bill) => bill.balance_due > 0 && (bill.branch_id ?? null) === (note.branch_id ?? null)), [data, note.branch_id]);
+  const { data, isLoading: loadingBills } = useGetVendorCreditNoteOpenBillsQuery({ id: note.id, entity });
+  const bills = useMemo(() => toArray(data?.data), [data]);
+  const unlisted = Math.max(0, (data?.pagination?.totalItems ?? bills.length) - bills.length);
   const picked = Object.entries(amounts).filter(([, amount]) => amount > 0).map(([id, amount]) => ({ vendor_invoice: Number(id), amount }));
   const total = picked.reduce((sum, row) => sum + row.amount, 0);
   const canApply = mode === "auto" || (picked.length > 0 && total <= note.advance_remaining);
@@ -296,7 +304,7 @@ function ApplyCreditDrawer({ note, entity, currency, onClose }: { note: VendorCr
       <Segmented value={mode} onChange={setMode} options={[["auto", "Oldest bills first"], ["pick", "Choose bills"]] as const} />
       {mode === "auto" ? <p className="font-mont text-xs text-gray-05">The credit goes on this vendor&rsquo;s open bills of the same branch, the one due first first, until it runs out.</p>
         : loadingBills ? <LoadingState rows={3} />
-          : bills.length ? <div className="space-y-2">{bills.map((bill) => <div key={bill.id} className="grid grid-cols-1 gap-2 rounded-md border border-white-02 p-3 sm:grid-cols-[minmax(0,1fr)_160px]"><div className="min-w-0"><p className="font-mont text-sm font-semibold text-primary">{bill.document_number}</p><p className="mt-1 font-mont text-[11px] text-gray-05">Due {dates.day(bill.due_date)} · owes {formatMoney(bill.balance_due, currency)}</p></div><MoneyInput valueKobo={amounts[bill.id] || 0} onChangeKobo={(amount) => setAmounts((rows) => ({ ...rows, [bill.id]: Math.min(amount, bill.balance_due) }))} currency={currency} /></div>)}{total > note.advance_remaining && <p role="alert" className="font-mont text-[11px] text-destructive">That is more than the {formatMoney(note.advance_remaining, currency)} of credit left.</p>}</div>
+          : bills.length ? <div className="space-y-2">{bills.map((bill) => <div key={bill.id} className="grid grid-cols-1 gap-2 rounded-md border border-white-02 p-3 sm:grid-cols-[minmax(0,1fr)_160px]"><div className="min-w-0"><p className="font-mont text-sm font-semibold text-primary">{bill.document_number}</p><p className="mt-1 font-mont text-[11px] text-gray-05">Due {dates.day(bill.due_date)} · owes {formatMoney(bill.balance_due, currency)}</p></div><MoneyInput valueKobo={amounts[bill.id] || 0} onChangeKobo={(amount) => setAmounts((rows) => ({ ...rows, [bill.id]: Math.min(amount, bill.balance_due) }))} currency={currency} /></div>)}{unlisted > 0 && <p role="status" className="font-mont text-[11px] leading-5 text-gray-05">{unlisted === 1 ? "1 more open bill is" : `${unlisted} more open bills are`} due later than these. Apply to these first, or choose &ldquo;Oldest bills first&rdquo; to settle every one.</p>}{total > note.advance_remaining && <p role="alert" className="font-mont text-[11px] text-destructive">That is more than the {formatMoney(note.advance_remaining, currency)} of credit left.</p>}</div>
             : <p className="rounded-md border border-dashed border-white-02 px-4 py-6 text-center font-mont text-xs text-gray-05">This vendor has no open bill at this branch yet. The credit waits until one is posted.</p>}
     </div>
   </DetailDrawer>;

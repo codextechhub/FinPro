@@ -10,6 +10,11 @@
  * A credit note read that does not name its request cannot tell Mrs Bello she
  * sent it: the drawer then offers neither, and says she resumes it from her
  * approvals.
+ *
+ * Applying a posted note's credit by choosing bills lists the bills the server
+ * would settle for this note, due first, and says how many more wait behind
+ * the page: Ade Stationers bills the school weekly, and an unpaid bill from
+ * March must not vanish behind a hundred newer paid ones.
  */
 import { act } from "react";
 import { MemoryRouter } from "react-router";
@@ -25,6 +30,8 @@ const mocks = vi.hoisted(() => {
     workflow: undefined as unknown,
     update: (() => undefined) as (body: unknown) => void,
     resume: (() => undefined) as (id: unknown) => void,
+    openBills: undefined as unknown,
+    openBillArgs: [] as unknown[],
   };
   const query = () => ({ data: undefined, currentData: undefined, isLoading: false, isFetching: false, isError: false, refetch: () => undefined });
   const mutation = (spy?: (body: unknown) => void) => () => [
@@ -78,6 +85,7 @@ vi.mock("sonner", () => ({ toast: { success: () => undefined, error: () => undef
 vi.mock("@/redux/services/procurement/procurement-api", () => mocks.api({}));
 vi.mock("@/redux/services/procurement/payables-corrections-api", () => mocks.api({
   useGetVendorCreditNoteQuery: () => ({ ...mocks.query(), data: { data: mocks.state.doc } }),
+  useGetVendorCreditNoteOpenBillsQuery: (args: unknown) => { mocks.state.openBillArgs.push(args); return { ...mocks.query(), data: mocks.state.openBills }; },
   useUpdateVendorCreditNoteMutation: mocks.mutation((body) => mocks.state.update(body)),
 }));
 vi.mock("@/redux/services/dashboard/workflow-api", () => mocks.api({
@@ -173,5 +181,39 @@ describe("a vendor credit note with its approver", () => {
     expect(document.body.textContent).toContain("With the approver.");
     expect(button("Edit")).toBeUndefined();
     expect(button("Resume")).toBeUndefined();
+  });
+});
+
+describe("applying a posted note's credit by choosing bills", () => {
+  const POSTED = { ...NOTE, status: "POSTED", approval_state: "APPROVED", approval_returned: false, workflow_instance_id: null, advance_remaining: 4_000_000 };
+  const bill = (id: number, number: string, due: string, owes: number) => ({ id, document_number: number, due_date: due, balance_due: owes, branch_id: 1 });
+
+  beforeEach(() => {
+    mocks.state.held = new Set([P.PROC_ALLOCATE_VENDOR_CREDIT_NOTE]);
+    mocks.state.doc = POSTED;
+    mocks.state.workflow = undefined;
+    mocks.state.openBillArgs = [];
+  });
+
+  const choose = () => {
+    render();
+    act(() => button("Apply credit")?.click());
+    act(() => button("Choose bills")?.click());
+  };
+
+  it("lists the bills the server would settle for this note, due first", () => {
+    mocks.state.openBills = { data: [bill(31, "VI-0031", "2026-03-02", 1_200_000), bill(88, "VI-0088", "2026-09-28", 900_000)], pagination: { totalItems: 2 } };
+    choose();
+    expect(mocks.state.openBillArgs.at(-1)).toEqual({ id: 5, entity: "BSS" });
+    const text = document.body.textContent ?? "";
+    expect(text.indexOf("VI-0031")).toBeGreaterThan(-1);
+    expect(text.indexOf("VI-0031")).toBeLessThan(text.indexOf("VI-0088"));
+    expect(text).not.toContain("more open bill");
+  });
+
+  it("says how many more open bills wait behind a full page", () => {
+    mocks.state.openBills = { data: [bill(31, "VI-0031", "2026-03-02", 1_200_000)], pagination: { totalItems: 3 } };
+    choose();
+    expect(document.body.textContent).toContain("2 more open bills are due later than these.");
   });
 });

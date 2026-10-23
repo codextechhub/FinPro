@@ -23,6 +23,7 @@ import type {
   VendorCreditInstruction,
   VendorCreditNote,
   VendorInvoice,
+  VendorPaymentEligibleInvoice,
 } from "./procurement-types";
 import type { ApprovalParkState } from "@/redux/services/dashboard/workflow-types";
 import type { ProcListScope } from "./procurement-api";
@@ -65,6 +66,15 @@ export const payablesCorrectionsApi = baseApi.injectEndpoints({
     submitVendorCreditNote: b.mutation<ApiEnvelope<VendorCreditNote & { approval?: ApprovalParkState }>, Act & { confirm_without_approval?: boolean; reason?: string }>({
       query: ({ id, entity, ...body }) => ({ url: `/procurement/vendor-credit-notes/${id}/submit/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["ProcVendorCreditNotes", "WorkflowInstances", "WorkflowPending"],
+    }),
+    /**
+     * The bills a posted note's leftover credit may settle for this reader, due
+     * first: exactly what applying it automatically would settle, a page of up
+     * to 100 with `pagination.totalItems` for the rest.
+     */
+    getVendorCreditNoteOpenBills: b.query<PaginatedEnvelope<VendorPaymentEligibleInvoice>, Act>({
+      query: ({ id, entity }) => ({ url: `/procurement/vendor-credit-notes/${id}/open-bills/${qs({ entity })}`, method: "GET" }),
+      providesTags: ["ProcVendorCreditNotes", "ProcVendorInvoices"],
     }),
     postVendorCreditNote: b.mutation<ApiEnvelope<VendorCreditNote>, Act>({
       query: ({ id, entity }) => ({ url: `/procurement/vendor-credit-notes/${id}/post/${qs({ entity })}`, method: "POST" }),
@@ -111,6 +121,7 @@ export const {
   useSubmitVendorCreditNoteMutation,
   usePostVendorCreditNoteMutation,
   useAllocateVendorCreditNoteMutation,
+  useGetVendorCreditNoteOpenBillsQuery,
   useVoidVendorCreditNoteMutation,
   useVoidVendorInvoiceMutation,
   useReturnGoodsMutation,
