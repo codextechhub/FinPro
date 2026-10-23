@@ -122,3 +122,26 @@ describe("the account pickers' chart", () => {
       .toBe("/finance/accounts/?entity=BRIGHTSTAR&is_postable=true&account_type=ASSET&with_tags=true");
   });
 });
+
+describe("adding an account", () => {
+  it("sends a body without a code when the server is to choose one", () => {
+    const sent = request("createAccount", { entity: "BRIGHTSTAR", account_type: "EXPENSE", name: "Science lab supplies" });
+
+    expect(sent.method).toBe("POST");
+    expect(sent.url).toBe("/finance/accounts/?entity=BRIGHTSTAR");
+    expect(sent.body).toEqual({ account_type: "EXPENSE", name: "Science lab supplies" });
+  });
+
+  it("asks for the next free code of a type", () => {
+    const sent = request("getNextAccountCode", { entity: "BRIGHTSTAR", account_type: "EXPENSE" });
+
+    expect(sent.method).toBe("GET");
+    expect(sent.url).toBe("/finance/accounts/next-code/?entity=BRIGHTSTAR&account_type=EXPENSE");
+  });
+
+  it("reads the common accounts that can be added in one click", () => {
+    const sent = request("getAccountSuggestions", { entity: "BRIGHTSTAR" });
+
+    expect(sent.url).toBe("/finance/accounts/suggestions/?entity=BRIGHTSTAR");
+  });
+});

@@ -10,6 +10,15 @@
  * that branch, and its bursar may rename it, while every other account needs
  * whole-school reach. Lekki's bursar sees her bank's ledger account editable and
  * the rest of the chart read-only, with the reason.
+ *
+ * Most of the chart is posted to by the software itself. When the server
+ * classifies accounts (`managed_by` on every row) those accounts fold into one
+ * collapsed "Managed by the system" section under the everyday tree, so a new
+ * bursar reads the accounts they use first; a search still finds them and opens
+ * the section. When a role may not read the classification the key is absent
+ * from every row, and the chart is one plain tree with no section and no
+ * system wording. Each account shows its description as a second line, and how
+ * the viewer left the groups and the section is remembered in their browser.
  */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
@@ -17,22 +26,22 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { ArrowLeft, ChevronDown, ChevronRight, Check, Plus, Printer, Activity, Columns2, Network, Settings2 } from "lucide-react";
 import { cardColumns } from "../bank-account-access";
-import { AccessField, Money, FormField, DetailDrawer, InfoHint, StatusPill, DataTable, TabStrip, toArray, useActiveEntity, useFieldAccess, writableOnlyFollowing, type Column, type TabStripItem } from "@/components/finance-ui";
-import { SearchSelect } from "@/components/custom/search-select";
+import { AccessField, Money, FormField, DetailDrawer, StatusPill, DataTable, TabStrip, toArray, useActiveEntity, useFieldAccess, type Column, type TabStripItem } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/states";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { P } from "../../../permissions";
 import { useBranches } from "../../../host";
 import {
-  useGetChartOfAccountsQuery, useCreateAccountMutation, useGetAccountDetailQuery, useGetAccountActivityQuery, useUpdateAccountMutation,
+  useGetChartOfAccountsQuery, useGetAccountDetailQuery, useGetAccountActivityQuery, useUpdateAccountMutation,
 } from "@/redux/services/finance/setup-api";
 import type { Account, AccountDetail, ConsolidatedAccountActivityLine } from "@/redux/services/finance/setup-types";
-import { ACCOUNT_CODE_LENGTH, ACCOUNT_TYPES, accountCodeError, accountsInCodeLine, accountTypeFromCode, isValidAccountCode } from "@/utils/chart-of-accounts";
+import { ACCOUNT_TYPES } from "@/utils/chart-of-accounts";
 import {
   accountGroupContribution,
   buildAccountTree,
@@ -41,6 +50,10 @@ import {
   type AccountTreeNode,
 } from "./account-group";
 import { getAccountDetailTabKeys, type AccountDetailTabKey } from "./account-detail-tabs";
+import { CHART_GROUP_HEADINGS, KIND_ORDER } from "./account-kinds";
+import { hasManagedSplit, partitionChart, pruneTree } from "./chart-split";
+import { readExpanded, readSystemOpen, writeExpanded, writeSystemOpen } from "./chart-view-state";
+import { CreateAccountDrawer } from "./new-account-drawer";
 import { useDates } from "../../../lib/display-prefs";
 
 type Node = AccountTreeNode;
@@ -65,15 +78,31 @@ const GROUP_VIEW_TABS: TabStripItem<"balances" | "activity">[] = [
   { value: "activity", label: "Consolidated activity" },
 ];
 
+const SYSTEM_SECTION_NOTE = "The software posts to these accounts for you when you record invoices, payments, payroll and stock. You rarely need to open them.";
+
 function Tag({ label }: { label: string }) {
   return <span className="ml-1.5 rounded bg-gray-03/60 px-1.5 py-0.5 font-mont text-[10px] font-semibold uppercase tracking-wide text-gray-05">{label}</span>;
 }
 
-/** One chart row. `showBalance` follows the header: the balance cell leaves with its column. */
-function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showBalance, showSubtype, showActive, showTag, showContra }: {
-  node: Node; depth: number; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; showBalance: boolean;
-  showSubtype: boolean; showActive: boolean; showTag: boolean; showContra: boolean;
+/**
+ * Which parts of the chart the reader's Field Access switches leave on. Each
+ * flag follows one `finance.account` field: a hidden field's column, tag or
+ * line is not drawn, and the header cell leaves with its column. The main table
+ * and the system section read the same flags, so both hide the same columns.
+ */
+type ChartFields = {
+  showBalance: boolean; showSubtype: boolean; showActive: boolean; showTag: boolean; showContra: boolean;
+  showDescription: boolean;
+};
+
+/**
+ * One chart row. `showMovedBy` adds the system section's "Moved by" line under
+ * an account the software keeps.
+ */
+function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showMovedBy, fields }: {
+  node: Node; depth: number; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; showMovedBy: boolean; fields: ChartFields;
 }) {
+  const { showBalance, showSubtype, showActive, showTag, showContra, showDescription } = fields;
   const hasChildren = node.children.length > 0;
   const open = expanded.has(node.id);
   const cell = "border-t border-white-02 px-3 py-2 font-mont text-sm text-black-01";
@@ -81,16 +110,26 @@ function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showBal
     <>
       <tr className="cursor-pointer hover:bg-primary/5" onClick={() => onSelect(node.id)}>
         <td className={cell}>
-          <div className="flex items-center" style={{ paddingLeft: depth * 18 }}>
+          <div className="flex items-start" style={{ paddingLeft: depth * 18 }}>
             {hasChildren ? (
-              <button onClick={(e) => { e.stopPropagation(); toggle(node.id); }} className="mr-1 text-gray-05 hover:text-gray-01" aria-label={open ? "Collapse" : "Expand"}>
+              <button onClick={(e) => { e.stopPropagation(); toggle(node.id); }} className="mr-1 mt-0.5 text-gray-05 hover:text-gray-01" aria-label={open ? "Collapse" : "Expand"}>
                 {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
               </button>
-            ) : <span className="mr-1 inline-block w-4" />}
-            <span className="font-semibold tabular-nums text-gray-01">{node.code}</span>
-            <span className="ml-2 text-black-01">{node.name}</span>
-            {showTag && node.tag && <Tag label={node.tag === "CONTROL" ? "CTRL" : node.tag} />}
-            {showContra && node.is_contra && <Tag label="Contra" />}
+            ) : <span className="mr-1 inline-block w-4 shrink-0" />}
+            <div className="min-w-0">
+              <div className="flex items-center">
+                <span className="font-semibold tabular-nums text-gray-01">{node.code}</span>
+                <span className="ml-2 text-black-01">{node.name}</span>
+                {showTag && node.tag && <Tag label={node.tag === "CONTROL" ? "CTRL" : node.tag} />}
+                {showContra && node.is_contra && <Tag label="Contra" />}
+              </div>
+              {showDescription && node.description ? (
+                <p className="max-w-[22rem] truncate text-xs text-gray-05" title={node.description}>{node.description}</p>
+              ) : null}
+              {showMovedBy && node.managed_by ? (
+                <p className="max-w-[22rem] truncate text-[11px] text-gray-05">Moved by {node.managed_by.moved_by}</p>
+              ) : null}
+            </div>
           </div>
         </td>
         <td className={cell}>
@@ -106,18 +145,93 @@ function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showBal
             {node.rolled === null ? <span className="text-gray-05">-</span> : <Money kobo={node.rolled} currency={currency} align="right" />}
           </td>
         ) : null}
-        {showActive ? <td className={cn(cell, "text-center")}>
-          {node.is_active ? <Check className="mx-auto size-4 text-green-01" /> : <span className="text-gray-05">-</span>}
-        </td> : null}
+        {showActive ? (
+          <td className={cn(cell, "text-center")}>
+            {node.is_active ? <Check className="mx-auto size-4 text-green-01" /> : <span className="text-gray-05">-</span>}
+          </td>
+        ) : null}
       </tr>
       {hasChildren && open && node.children.map((c) => (
-        <AccountRow key={c.id} node={c} depth={depth + 1} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} showBalance={showBalance} showSubtype={showSubtype} showActive={showActive} showTag={showTag} showContra={showContra} />
+        <AccountRow key={c.id} node={c} depth={depth + 1} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} showMovedBy={showMovedBy} fields={fields} />
       ))}
     </>
   );
 }
 
+/** A run of chart rows under an optional heading, such as one account type of the system section. */
+type RowGroup = { heading?: string; rows: Node[] };
+
+/** The chart's table: one header row, then each group's rows. */
+function ChartTable({ groups, expanded, toggle, currency, onSelect, showMovedBy, fields }: {
+  groups: RowGroup[]; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; showMovedBy: boolean; fields: ChartFields;
+}) {
+  const { showBalance, showSubtype, showActive } = fields;
+  const columns = 4 + (showSubtype ? 1 : 0) + (showBalance ? 1 : 0) + (showActive ? 1 : 0);
+  return (
+    <table className="w-full border-collapse">
+      <thead>
+        <tr>
+          <th className={headCls}>Account</th>
+          <th className={headCls}>Type</th>
+          {showSubtype ? <th className={headCls}>Subtype</th> : null}
+          <th className={headCls}>Normal</th>
+          <th className={headCls}>Currency</th>
+          {showBalance ? <th className={cn(headCls, "text-right")}>Balance</th> : null}
+          {showActive ? <th className={cn(headCls, "text-center")}>Active</th> : null}
+        </tr>
+      </thead>
+      <tbody>
+        {groups.map((group) => (
+          <GroupRows key={group.heading ?? "all"} group={group} columns={columns} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} showMovedBy={showMovedBy} fields={fields} />
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function GroupRows({ group, columns, ...rest }: {
+  group: RowGroup; columns: number; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; showMovedBy: boolean; fields: ChartFields;
+}) {
+  return (
+    <>
+      {group.heading ? (
+        <tr>
+          <th colSpan={columns} scope="colgroup" className="border-t border-white-02 bg-gray-02/60 px-3 py-1.5 text-left font-mont text-[11px] font-semibold uppercase tracking-wide text-gray-05">{group.heading}</th>
+        </tr>
+      ) : null}
+      {group.rows.map((n) => <AccountRow key={n.id} node={n} depth={0} {...rest} />)}
+    </>
+  );
+}
+
+/**
+ * The folded section for the accounts the software keeps: a title with its
+ * count, one line saying what they are, and the table once it is open.
+ */
+function SystemSection({ count, matchesOf, open, onToggle, children }: {
+  count: number; matchesOf: number | null; open: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-md border border-white-02 bg-white" aria-label="Managed by the system">
+      <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full items-start gap-2 px-3 py-3 text-left">
+        <span className="mt-0.5 text-gray-05">{open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</span>
+        <span className="min-w-0">
+          <span className="block font-mont text-sm font-semibold text-black-01">
+            Managed by the system ({matchesOf === null ? count : `${matchesOf} of ${count}`})
+          </span>
+          <span className="block font-mont text-xs text-gray-05">{SYSTEM_SECTION_NOTE}</span>
+        </span>
+      </button>
+      {open ? <div className="overflow-x-auto border-t border-white-02">{children}</div> : null}
+    </section>
+  );
+}
+
 export function AccountsTab({ entity }: { entity: string }) {
+  return <ChartOfAccounts key={entity} entity={entity} />;
+}
+
+function ChartOfAccounts({ entity }: { entity: string }) {
   const access = useFieldAccess("finance.account");
   const { currency } = useActiveEntity();
   const { data, isLoading, isFetching, isError, refetch } = useGetChartOfAccountsQuery({ entity });
@@ -126,15 +240,16 @@ export function AccountsTab({ entity }: { entity: string }) {
   const [view, setView] = useState<"tree" | "flat">("tree");
   const [type, setType] = useState("");
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const [touched, setTouched] = useState(false);
+  const [expanded, setExpanded] = useState<Set<number>>(() => readExpanded(entity) ?? new Set());
+  const [touched, setTouched] = useState(() => readExpanded(entity) !== null);
+  const [systemOpen, setSystemOpen] = useState(readSystemOpen);
   const [creating, setCreating] = useState(false);
   const { canWholeSchool } = useWholeSchoolAccess();
   const canCreate = canWholeSchool(P.FIN_CREATE_ACCOUNT);
   useActionParam("new", canCreate, () => { if (canCreate) setCreating(true); });
   const [detailId, setDetailId] = useState<number | null>(null);
 
-  // Default: expand every parent until the user starts toggling.
+  // Default: expand every parent until the viewer starts toggling.
   const allParentIds = useMemo(() => new Set(accounts.filter((a) => !a.is_postable).map((a) => a.id)), [accounts]);
   const effectiveExpanded = touched ? expanded : allParentIds;
   const toggle = (id: number) => {
@@ -142,13 +257,18 @@ export function AccountsTab({ entity }: { entity: string }) {
     if (next.has(id)) next.delete(id); else next.add(id);
     setTouched(true);
     setExpanded(next);
+    writeExpanded(entity, next);
+  };
+  const toggleSystem = () => {
+    setSystemOpen(!systemOpen);
+    writeSystemOpen(!systemOpen);
   };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return accounts.filter((a) =>
       (!type || a.account_type === type) &&
-      (!q || a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)),
+      (!q || a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q) || (a.description ?? "").toLowerCase().includes(q)),
     );
   }, [accounts, type, search]);
 
@@ -160,17 +280,37 @@ export function AccountsTab({ entity }: { entity: string }) {
   );
   // The Balance column stays while at least one account's balance is readable.
   const showBalance = !access.isHidden("balance") && accounts.some((a) => !isBalanceHidden(a));
-  const showSubtype = !access.isHidden("subtype");
-  const showActive = !access.isHidden("is_active");
-  const showTag = !access.isHidden("tag");
-  const showContra = !access.isHidden("is_contra");
+  const fields: ChartFields = {
+    showBalance,
+    showSubtype: !access.isHidden("subtype"),
+    showActive: !access.isHidden("is_active"),
+    showTag: !access.isHidden("tag"),
+    showContra: !access.isHidden("is_contra"),
+    showDescription: !access.isHidden("description"),
+  };
   // Tree view only makes sense unfiltered; an active search/type filter falls back to flat.
-  const rows = view === "tree" && !search && !type ? tree : flat;
+  const filtering = search !== "" || type !== "";
+  const rows = view === "tree" && !filtering ? tree : flat;
+
+  // A reader who may not see the classification gets one plain tree.
+  const hideManaged = access.isHidden("managed_by");
+  const split = useMemo(() => !hideManaged && hasManagedSplit(accounts), [accounts, hideManaged]);
+  const { everyday, system } = useMemo(() => partitionChart(accounts), [accounts]);
+  const mainRows = split ? (rows === tree ? pruneTree(tree, everyday) : flat.filter((n) => everyday.has(n.id))) : rows;
+  const systemRows = split ? (rows === tree ? pruneTree(tree, system) : flat.filter((n) => system.has(n.id))) : [];
+  const systemGroups: RowGroup[] = rows === tree
+    ? KIND_ORDER.map((kind) => ({ heading: CHART_GROUP_HEADINGS[kind], rows: systemRows.filter((n) => n.account_type === kind) })).filter((g) => g.rows.length > 0)
+    : [{ rows: systemRows }];
+  const systemMatches = rows === tree ? system.size : systemRows.length;
+  const showSystem = split && systemMatches > 0;
+  // A text search opens the section so a match is never hidden behind a click.
+  const systemShown = systemOpen || search.trim() !== "";
+  const tableProps = { expanded: effectiveExpanded, toggle, currency, onSelect: setDetailId, fields };
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code or name" className="h-9 max-w-xs font-mont text-sm" />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code, name or purpose" className="h-9 max-w-xs font-mont text-sm" />
         <TabStrip items={VIEW_TABS} value={view} onChange={setView} variant="pill-compact" ariaLabel="Account list shape" />
         <select value={type} onChange={(e) => setType(e.target.value)} className={selectCls} aria-label="Account type">
           <option value="">All types</option>
@@ -187,167 +327,33 @@ export function AccountsTab({ entity }: { entity: string }) {
         <LoadingState rows={8} />
       ) : isError ? (
         <ErrorState onRetry={refetch} />
-      ) : rows.length === 0 ? (
+      ) : mainRows.length === 0 && !showSystem ? (
         <EmptyState title="No accounts" message="The chart of accounts will appear here." />
       ) : (
-        <div className="overflow-x-auto rounded-md border border-white-02 bg-white">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                <th className={headCls}>Account</th>
-                <th className={headCls}>Type</th>
-                {showSubtype ? <th className={headCls}>Subtype</th> : null}
-                <th className={headCls}>Normal</th>
-                <th className={headCls}>Currency</th>
-                {showBalance ? <th className={cn(headCls, "text-right")}>Balance</th> : null}
-                {showActive ? <th className={cn(headCls, "text-center")}>Active</th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((n) => (
-                <AccountRow key={n.id} node={n} depth={0} expanded={effectiveExpanded} toggle={toggle} currency={currency} onSelect={setDetailId} showBalance={showBalance} showSubtype={showSubtype} showActive={showActive} showTag={showTag} showContra={showContra} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {mainRows.length > 0 ? (
+            <div className="overflow-x-auto rounded-md border border-white-02 bg-white">
+              <ChartTable groups={[{ rows: mainRows }]} showMovedBy={false} {...tableProps} />
+            </div>
+          ) : filtering ? (
+            <p className="font-mont text-xs text-gray-05">No everyday account matches.</p>
+          ) : null}
+          {showSystem ? (
+            <SystemSection
+              count={system.size}
+              matchesOf={filtering ? systemMatches : null}
+              open={systemShown}
+              onToggle={toggleSystem}
+            >
+              <ChartTable groups={systemGroups} showMovedBy {...tableProps} />
+            </SystemSection>
+          ) : null}
+        </>
       )}
 
-      <CreateAccountDrawer open={creating} onClose={() => setCreating(false)} entity={entity} parents={accounts} />
+      {canCreate ? <CreateAccountDrawer open={creating} onClose={() => setCreating(false)} entity={entity} parents={accounts} /> : null}
       <AccountDetailDrawer key={detailId ?? "closed"} id={detailId} entity={entity} accounts={accounts} currency={currency} onClose={() => setDetailId(null)} />
     </div>
-  );
-}
-
-function CreateAccountDrawer({ open, onClose, entity, parents }: {
-  open: boolean; onClose: () => void; entity: string; parents: Account[];
-}) {
-  const access = useFieldAccess("finance.account");
-  const [create, { isLoading }] = useCreateAccountMutation();
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [subtype, setSubtype] = useState("");
-  const [parent, setParent] = useState("");
-  const [postable, setPostable] = useState(true);
-  const [contra, setContra] = useState(false);
-  const existingCodes = useMemo(() => new Set(parents.map((account) => account.code)), [parents]);
-  const inferredType = accountTypeFromCode(code);
-  const codeError = accountCodeError(code, existingCodes);
-  const fieldsEnabled = isValidAccountCode(code, existingCodes);
-  const canSubmit = fieldsEnabled && name.trim() !== "" && inferredType !== null;
-  const parentOptions = accountsInCodeLine(parents, code)
-    .map((account) => ({ value: String(account.id), label: `${account.code} - ${account.name}` }));
-
-  const reset = () => { setCode(""); setName(""); setSubtype(""); setParent(""); setPostable(true); setContra(false); };
-  const close = () => { reset(); onClose(); };
-  const changeCode = (nextCode: string) => {
-    if (accountTypeFromCode(nextCode) !== inferredType) setParent("");
-    setCode(nextCode);
-  };
-
-  const submit = async () => {
-    if (!canSubmit) return;
-    try {
-      const r = await create(writableOnlyFollowing(access, {
-        entity, code: code.trim(), name: name.trim(),
-        subtype: subtype.trim() || undefined, parent: parent ? Number(parent) : undefined,
-        is_postable: postable, is_contra: contra,
-      }, { parent: "parent_id" }, { creating: true })).unwrap();
-      toast.success(r.message || "Account created.");
-      close();
-    } catch { /* central toast */ }
-  };
-
-  return (
-    <DetailDrawer
-      open={open}
-      onOpenChange={(o) => (o ? undefined : close())}
-      title="New account"
-      description="Add a node to the chart of accounts."
-      widthClass="sm:max-w-xl"
-      footer={
-        <>
-          <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
-          <Button disabled={isLoading || !canSubmit} onClick={submit} className="gap-1.5">
-            <Plus className="size-4" />{isLoading ? "Saving…" : "Create account"}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
-              <label htmlFor="new-account-code" className="font-mont text-xs text-gray-05">Code *</label>
-              <AccountCodeHint />
-            </div>
-            <Input
-              id="new-account-code"
-              value={code}
-              onChange={(e) => changeCode(e.target.value)}
-              className="bg-white font-mont"
-              placeholder="e.g. 4200"
-              inputMode="numeric"
-              maxLength={ACCOUNT_CODE_LENGTH}
-              pattern="[1-5][0-9]{3}"
-              aria-invalid={!!codeError}
-              aria-describedby={codeError ? "account-code-error" : undefined}
-              autoFocus
-            />
-            {codeError && <p id="account-code-error" className="font-mont text-xs text-destructive">{codeError}</p>}
-          </div>
-          <FormField label="Account type" required>
-            <select value={inferredType ?? ""} disabled className={cn(selectCls, "w-full disabled:bg-gray-02 disabled:text-gray-05")} aria-label="Account type determined by code">
-              <option value="">Set automatically from code</option>
-              {ACCOUNT_TYPES.map((t) => <option key={t} value={t}>{t[0] + t.slice(1).toLowerCase()}</option>)}
-            </select>
-          </FormField>
-        </div>
-        <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} disabled={!fieldsEnabled} className="bg-white" placeholder={fieldsEnabled ? "e.g. Tuition revenue" : "Enter a valid code first"} /></FormField>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <AccessField access={access} name="subtype" creating><FormField label="Subtype"><Input value={subtype} onChange={(e) => setSubtype(e.target.value)} disabled={!fieldsEnabled} placeholder="e.g. Current asset" className="bg-white" /></FormField></AccessField>
-          <AccessField access={access} name="parent_id" creating><FormField label="Parent account">
-            <SearchSelect
-              options={parentOptions}
-              value={parent}
-              onChange={(e) => setParent(e.target.value)}
-              disabled={!fieldsEnabled}
-              placeholder={inferredType ? `None (${inferredType.toLowerCase()} top level)` : "Enter a valid code first"}
-              revealOnSearch
-            />
-          </FormField></AccessField>
-        </div>
-        <div className="flex flex-wrap gap-5 rounded-md bg-gray-50 px-3 py-3 font-mont text-sm text-gray-01">
-          <AccessField access={access} name="is_postable" creating><label className="flex items-center gap-2"><input type="checkbox" checked={postable} onChange={(e) => setPostable(e.target.checked)} disabled={!fieldsEnabled} className="accent-primary" /> Postable (accepts entries)</label></AccessField>
-          <AccessField access={access} name="is_contra" creating><label className="flex items-center gap-2"><input type="checkbox" checked={contra} onChange={(e) => setContra(e.target.checked)} disabled={!fieldsEnabled} className="accent-primary" /> Contra account</label></AccessField>
-        </div>
-      </div>
-    </DetailDrawer>
-  );
-}
-
-function AccountCodeHint() {
-  const lines = [
-    ["1", "Assets"],
-    ["2", "Liabilities"],
-    ["3", "Equity"],
-    ["4", "Income"],
-    ["5", "Expenses"],
-  ];
-
-  return (
-    <InfoHint ariaLabel="View account code rules">
-      <div className="w-52">
-        <p className="mb-1.5 font-semibold">Use exactly four digits.</p>
-        <div className="grid grid-cols-[1rem_1fr] gap-x-2 gap-y-1">
-          {lines.map(([prefix, label]) => (
-            <div key={prefix} className="contents">
-              <span className="font-semibold">{prefix}</span>
-              <span>{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </InfoHint>
   );
 }
 
@@ -368,6 +374,8 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
   const d = data?.data;
   const acc = d?.account;
   const access = useFieldAccess("finance.account", acc);
+  // The detail row carries the classification; the chart row stands in until it does.
+  const managed = acc && !access.isHidden("managed_by") ? (acc.managed_by !== undefined ? acc.managed_by : accounts.find((a) => a.id === acc.id)?.managed_by) : undefined;
   const kids = id ? accounts.filter((a) => a.parent_id === id) : [];
   const availableTabKeys = getAccountDetailTabKeys(acc?.is_postable ?? true);
   const tabItems: TabStripItem<AccountDetailTabKey>[] = DRAWER_TABS
@@ -403,6 +411,18 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
     >
       {isLoading ? <LoadingState rows={6} /> : isError || !d || !acc ? <ErrorState onRetry={refetch} /> : (
         <div className="space-y-4">
+          {acc.description && !access.isHidden("description") ? (
+            <div className="rounded-md bg-gray-02/60 px-3 py-2">
+              <p className="font-mont text-[11px] font-semibold text-gray-05">What it&apos;s for</p>
+              <p className="mt-0.5 font-mont text-sm text-black-01">{acc.description}</p>
+            </div>
+          ) : null}
+          {managed ? (
+            <div className="space-y-1 rounded-md border border-blue-100 bg-blue-50/60 px-3 py-2 font-mont text-xs text-gray-01">
+              <p><span className="font-semibold">Managed by the system:</span> kept by {managed.keeper}. Record it with {managed.moved_by}.</p>
+              {managed.hand_journals === false ? <p>Typed journals cannot post to this account.</p> : null}
+            </div>
+          ) : null}
           {/* KPI cards */}
           <div className={cn("grid gap-3", cardColumns(1 + (balances.current ? 1 : 0) + (balances.opening ? 1 : 0)))}>
             {!balances.current ? null : acc.is_postable ? (
@@ -811,7 +831,6 @@ export function accountReadOnlyReason({ holdsKey, bankBranchId, bankBranchName }
  * bank backs it. Anyone else reads why it is read-only (accountReadOnlyReason).
  */
 export function AccountSettings({ entity, account, onSaved }: { entity: string; account: Account; onSaved: () => void }) {
-  const access = useFieldAccess("finance.account", account);
   const [update, { isLoading }] = useUpdateAccountMutation();
   const { can } = useCan();
   const { canChange } = useWholeSchoolAccess();
@@ -820,15 +839,20 @@ export function AccountSettings({ entity, account, onSaved }: { entity: string; 
   const bankBranchName = account.bank_branch_id == null
     ? null
     : branches?.find((b) => Number(b.id) === account.bank_branch_id)?.name ?? null;
+  const access = useFieldAccess("finance.account", account);
   const [name, setName] = useState(account.name);
   const [subtype, setSubtype] = useState(account.subtype ?? "");
   const [description, setDescription] = useState(account.description ?? "");
   const [active, setActive] = useState(account.is_active);
-  const dirty = name !== account.name || subtype !== (account.subtype ?? "") || description !== (account.description ?? "") || active !== account.is_active;
+  const descriptionChanged = !access.isReadOnly("description") && description.trim() !== (account.description ?? "").trim();
+  const dirty = name !== account.name || subtype !== (account.subtype ?? "") || descriptionChanged || active !== account.is_active;
 
   const save = async () => {
     try {
-      const r = await update(access.writableOnly({ entity, id: account.id, name: name.trim(), subtype: subtype.trim(), description: description.trim(), is_active: active }, { creating: false })).unwrap();
+      const r = await update(access.writableOnly({
+        entity, id: account.id, name: name.trim(), subtype: subtype.trim(), is_active: active,
+        ...(descriptionChanged ? { description: description.trim() } : {}),
+      }, { creating: false })).unwrap();
       toast.success(r.message || "Account updated.");
       onSaved();
     } catch { /* central */ }
@@ -848,7 +872,11 @@ export function AccountSettings({ entity, account, onSaved }: { entity: string; 
     <div className="space-y-3">
       <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} className="bg-white" /></FormField>
       <AccessField access={access} name="subtype"><FormField label="Subtype"><Input value={subtype} onChange={(e) => setSubtype(e.target.value)} placeholder="e.g. Current asset" className="bg-white" /></FormField></AccessField>
-      <AccessField access={access} name="description"><FormField label="Description"><Input value={description} onChange={(e) => setDescription(e.target.value)} className="bg-white" /></FormField></AccessField>
+      {account.description !== undefined ? (
+        <AccessField access={access} name="description" label="What it's for">
+          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="bg-white" placeholder="Say what goes into this account" />
+        </AccessField>
+      ) : null}
       <AccessField access={access} name="is_active"><label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label></AccessField>
       <Button onClick={save} disabled={!dirty || isLoading} className="font-mont text-xs font-semibold">{isLoading ? "Saving…" : "Save changes"}</Button>
     </div>

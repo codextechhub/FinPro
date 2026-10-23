@@ -7,6 +7,7 @@
  * refused without one. The calendar reads take `?branch=` and then report that
  * branch's own state; without it they report the school's.
  *   GET  /finance/accounts/         finance.account.view
+ *   GET  /finance/accounts/next-code/ and /suggestions/  finance.account.create
  *   GET  /finance/periods/          finance.period.view
  *   POST /finance/periods/{id}/close/  finance.period.close (force: finance.period.force_close)
  *   POST /finance/periods/{id}/reopen/ finance.period.reopen
@@ -23,6 +24,9 @@ import type { ApiEnvelope, PaginatedEnvelope } from "./api-types";
 import type {
   Account,
   AccountDetail,
+  AccountSuggestion,
+  CreateAccountBody,
+  NextAccountCode,
   ConsolidatedAccountActivityLine,
   ConsolidatedAccountActivityTotals,
   FxRate,
@@ -105,9 +109,19 @@ export const setupApi = baseApi.injectEndpoints({
       query: (p) => ({ url: `/finance/accounts/${qs({ ...p, with_tags: "true" })}`, method: "GET" }),
       providesTags: ["FinanceAccounts"],
     }),
-    createAccount: b.mutation<ApiEnvelope<Account>, { entity: string; code: string; name: string; subtype?: string; parent?: number; is_postable?: boolean; is_contra?: boolean }>({
+    createAccount: b.mutation<ApiEnvelope<Account>, { entity: string } & CreateAccountBody>({
       query: ({ entity, ...body }) => ({ url: `/finance/accounts/${qs({ entity })}`, method: "POST", body }),
       invalidatesTags: ["FinanceAccounts"],
+    }),
+    /** The code the server would give a new account of this type (`finance.account.create`). */
+    getNextAccountCode: b.query<ApiEnvelope<NextAccountCode>, { entity: string; account_type: string }>({
+      query: (p) => ({ url: `/finance/accounts/next-code/${qs(p)}`, method: "GET" }),
+      providesTags: ["FinanceAccounts"],
+    }),
+    /** Common accounts that can be added in one click (`finance.account.create`). */
+    getAccountSuggestions: b.query<ApiEnvelope<AccountSuggestion[]>, { entity: string }>({
+      query: (p) => ({ url: `/finance/accounts/suggestions/${qs(p)}`, method: "GET" }),
+      providesTags: ["FinanceAccounts"],
     }),
     // Per-account detail + posted ledger activity (the chart's detail drawer).
     getAccountDetail: b.query<ApiEnvelope<AccountDetail>, { entity: string; id: number }>({
@@ -287,6 +301,8 @@ export const {
   useGetChartOfAccountsQuery,
   useGetTaggedAccountsQuery,
   useCreateAccountMutation,
+  useGetNextAccountCodeQuery,
+  useGetAccountSuggestionsQuery,
   useGetAccountDetailQuery,
   useGetAccountActivityQuery,
   useUpdateAccountMutation,

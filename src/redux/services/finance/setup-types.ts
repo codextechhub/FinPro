@@ -1,10 +1,24 @@
 // Setup / master-data + close types - mirror the vs_finance serializers.
 
+/**
+ * What the software does with an account it keeps for itself. `keeper` and
+ * `moved_by` are phrases that finish a sentence ("kept by the receivables
+ * ledger", "record it with an invoice, a receipt or a credit note");
+ * `hand_journals` is false when a typed journal is refused on the account.
+ */
+export interface ManagedBy {
+  keeper: string;
+  moved_by: string;
+  hand_journals: boolean;
+}
+
 export interface Account {
   id: number;
   code: string;
   name: string;
   account_type: string;
+  /** One plain sentence on what the account is for; absent when the role may not read it. */
+  description?: string;
   normal_balance: string;
   is_contra: boolean;
   is_postable: boolean;
@@ -12,7 +26,6 @@ export interface Account {
   parent_id: number | null;
   parent_code: string | null;
   subtype: string;
-  description?: string;
   /**
    * Present only on the chart-of-accounts (`?with_balance=true`) response.
    * For a ledger account behind a bank account the key is absent when the role
@@ -30,6 +43,44 @@ export interface Account {
   bank_account_id?: number | null;
   /** That bank account's branch; null for an account no bank backs or a bank without one. */
   bank_branch_id?: number | null;
+  /**
+   * Null for an everyday account the bursar uses; an object for an account the
+   * software keeps. The key is absent when the role may not read the
+   * classification, and the chart is then shown without a split.
+   */
+  managed_by?: ManagedBy | null;
+}
+
+/** The five kinds of account the server lays the chart out in. */
+export type AccountKind = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+
+/**
+ * The body of a new account. Without `code` the server chooses the next free
+ * one in the type's range and files the account under the type's top header.
+ */
+export interface CreateAccountBody {
+  name: string;
+  account_type?: AccountKind;
+  code?: string;
+  description?: string;
+  parent?: number;
+  is_postable?: boolean;
+  is_contra?: boolean;
+  subtype?: string;
+}
+
+/** A common account an organisation can add in one click. */
+export interface AccountSuggestion {
+  key: string;
+  name: string;
+  account_type: AccountKind;
+  description: string;
+  ifrs_line: string;
+  already_added: boolean;
+}
+
+export interface NextAccountCode {
+  code: string;
 }
 
 export interface AccountActivityLine {
