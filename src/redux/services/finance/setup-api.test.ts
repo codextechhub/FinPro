@@ -104,3 +104,21 @@ describe("a branch's fiscal calendar", () => {
       .toBe("/finance/periods/41/checklist/?entity=HARBOUR");
   });
 });
+
+/**
+ * Every account picker reads the whole chart. Bright Star's chart runs from
+ * 10100 Cash on hand to 50900 Sundry expenses, and the paged list's first page
+ * stopped among the liabilities: a bursar recording a donation typed
+ * "donation" and found no income account to credit.
+ */
+describe("the account pickers' chart", () => {
+  it("asks for the whole tagged chart, never one page of it", () => {
+    expect(request("getAccounts", { entity: "BRIGHTSTAR" }).url)
+      .toBe("/finance/accounts/?entity=BRIGHTSTAR&with_tags=true");
+  });
+
+  it("keeps the server-side type and postable filters", () => {
+    expect(request("getAccounts", { entity: "BRIGHTSTAR", is_postable: true, account_type: "ASSET" }).url)
+      .toBe("/finance/accounts/?entity=BRIGHTSTAR&is_postable=true&account_type=ASSET&with_tags=true");
+  });
+});

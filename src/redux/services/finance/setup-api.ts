@@ -76,8 +76,18 @@ type PeriodTransition = FiscalPeriod | { period: FiscalPeriod; branch_period: Br
 
 export const setupApi = baseApi.injectEndpoints({
   endpoints: (b) => ({
-    getAccounts: b.query<PaginatedEnvelope<Account>, { entity: string; account_type?: string; is_postable?: boolean; page?: number }>({
-      query: (p) => ({ url: `/finance/accounts/${qs(p)}`, method: "GET" }),
+    /**
+     * The entity's whole chart (un-paginated, no balances), optionally narrowed
+     * by type or postability on the server. Every account picker reads it.
+     *
+     * Asks for the tagged tree, never the paged list: the paged list returns 25
+     * accounts in code order, and a picker that searched that page offered only
+     * the 1xxxx and 2xxxx accounts (asset and liability), so a journal had no
+     * income, expense or equity account to post to. The tagged tree is readable
+     * on the same keys as the paged list.
+     */
+    getAccounts: b.query<ApiEnvelope<Account[]>, { entity: string; account_type?: string; is_postable?: boolean }>({
+      query: (p) => ({ url: `/finance/accounts/${qs({ ...p, with_tags: "true" })}`, method: "GET" }),
       providesTags: ["FinanceAccounts"],
     }),
     // Full chart-of-accounts tree (un-paginated) with per-account balance + tag.
