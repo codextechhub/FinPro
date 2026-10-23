@@ -234,7 +234,7 @@ export default function FinanceDashboard() {
         </div>
 
         {viewTabs.length > 1 && (
-          <TabStrip items={viewTabs} value={tab} onChange={showView} variant="underline" ariaLabel="Dashboard views" />
+          <TabStrip items={viewTabs} value={tab} onChange={showView} variant="pill" ariaLabel="Dashboard views" />
         )}
 
         {!entity ? (
