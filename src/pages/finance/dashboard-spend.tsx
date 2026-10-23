@@ -222,6 +222,7 @@ export function budgetTotalLine(rollup: BudgetRollup | undefined) {
   let used = 0;
   for (const row of rollup.rows) {
     if (row.account_type !== "EXPENSE") continue;
+    if (!row.budget || !row.actual) return null;
     plan += row.budget.kobo;
     used += row.actual?.kobo ?? 0;
   }
@@ -261,18 +262,18 @@ function BudgetsCard({ budgets, entity, currency }: { budgets: NonNullable<S["bu
               <div key={b.id} className="flex flex-col gap-1.5">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 font-mont text-[13px]">
                   <span className="min-w-0 truncate">
-                    <span className="font-medium text-gray-01">{b.name}</span>
+                    {b.name ? <span className="font-medium text-gray-01">{b.name}</span> : null}
                     <span className="text-gray-05"> · {b.branch ?? "All branches"}</span>
-                    {!b.approved && <span className="ml-1.5 rounded bg-gray-03/50 px-1.5 py-0.5 text-[10px] font-medium text-gray-01">Draft</span>}
+                    {b.approved === false && <span className="ml-1.5 rounded bg-gray-03/50 px-1.5 py-0.5 text-[10px] font-medium text-gray-01">Draft</span>}
                   </span>
                   {b.used && (
                     <span className="tabular-nums"><span className="font-semibold text-black-01">{compactMoney(b.used.kobo, currency)}</span>
                       <span className="text-gray-05">{b.pct != null && b.plan ? ` of ${compactMoney(b.plan.kobo, currency)}` : " spent"}</span></span>
                   )}
                 </div>
-                {b.plan == null ? (
+                {b.plan === null ? (
                   <span className="font-mont text-[11px] text-gray-05">The school's plan, measured against every branch</span>
-                ) : b.pct == null ? (
+                ) : b.plan === undefined || b.pct === undefined ? null : b.pct === null ? (
                   <span className="font-mont text-[11px] text-gray-05">No spending planned</span>
                 ) : (
                   <>

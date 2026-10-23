@@ -76,7 +76,8 @@ export function BalanceSheetReport({ entity, currency }: { entity: string; curre
     </tr>
   );
 
-  const liabEquity = d.total_liabilities.kobo + d.total_equity.kobo;
+  const liabEquity = d.total_liabilities && d.total_equity
+    ? d.total_liabilities.kobo + d.total_equity.kobo : null;
 
   return (
     <div className="space-y-5">
@@ -108,31 +109,31 @@ export function BalanceSheetReport({ entity, currency }: { entity: string; curre
       </div>
 
       <div className={cn("grid gap-4 lg:grid-cols-2", isFetching && "opacity-60")}>
-        <Column title="Assets">
+        {d.total_assets ? <Column title="Assets">
           {section(byKey["current_assets"], "asset")}
           {section(byKey["non_current_assets"], "asset")}
           {grandRow("TOTAL ASSETS", d.total_assets.kobo)}
-        </Column>
+        </Column> : null}
 
-        <Column title="Liabilities & Equity">
+        {d.total_liabilities || d.total_equity ? <Column title="Liabilities & Equity">
           {section(byKey["current_liabilities"], "liability")}
           {section(byKey["non_current_liabilities"], "liability")}
-          <tr className="border-t border-gray-03 bg-gray-03/30 font-mont text-sm font-semibold text-gray-01">
+          {d.total_liabilities ? <tr className="border-t border-gray-03 bg-gray-03/30 font-mont text-sm font-semibold text-gray-01">
             <td className="px-4 py-2">Total liabilities</td>
             <td className="px-4 py-2 text-right tabular-nums"><Money kobo={d.total_liabilities.kobo} currency={currency} align="right" /></td>
-          </tr>
+          </tr> : null}
           {section(byKey["equity"], "equity")}
-          {grandRow("TOTAL LIAB. & EQUITY", liabEquity)}
-        </Column>
+          {liabEquity != null ? grandRow("TOTAL LIAB. & EQUITY", liabEquity) : null}
+        </Column> : null}
       </div>
 
-      <div className={cn("flex items-center gap-2 rounded-md px-4 py-2.5 font-mont text-sm font-medium",
+      {d.is_balanced !== undefined && d.total_assets && d.total_liabilities && d.total_equity && d.difference ? <div className={cn("flex items-center gap-2 rounded-md px-4 py-2.5 font-mont text-sm font-medium",
         d.is_balanced ? "bg-green-01/10 text-green-01" : "bg-destructive/10 text-destructive")}>
         {d.is_balanced ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}
         {d.is_balanced
           ? <span>Balance sheet balances · {formatMoney(d.total_assets.kobo, currency)} = {formatMoney(d.total_liabilities.kobo, currency)} + {formatMoney(d.total_equity.kobo, currency)}</span>
           : <span>Out of balance by {formatMoney(Math.abs(d.difference.kobo), currency)} - investigate before filing.</span>}
-      </div>
+      </div> : null}
     </div>
   );
 }

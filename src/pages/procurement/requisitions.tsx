@@ -485,11 +485,12 @@ function RequisitionForm({ open, onClose, entity, currency, initial, returned = 
           <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-mont text-sm font-semibold">Budget Availability</p><span className="font-mont text-xs text-gray-05">{budget?.period || "Select a cost centre"}</span></div>
           {!costCenter ? <p className="mt-2 font-mont text-xs text-gray-05">Choose a cost centre to check its approved budget and current commitments.</p>
             : budgetLoading ? <p className="mt-2 font-mont text-xs text-gray-05">Checking budget…</p>
-            : !budget?.has_budget ? <p className="mt-2 font-mont text-xs text-gray-05">No approved budget is configured for this cost centre and period.</p>
+            : budget?.has_budget === undefined ? <BudgetStat label="PO commitments" value={formatMoney(budget?.committed ?? 0, currency)} />
+            : !budget.has_budget ? <p className="mt-2 font-mont text-xs text-gray-05">No approved budget is configured for this cost centre and period.</p>
             : <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <BudgetStat label="Approved budget" value={formatMoney(budget.budget, currency)} />
+              {budget.budget != null ? <BudgetStat label="Approved budget" value={formatMoney(budget.budget, currency)} /> : null}
               <BudgetStat label="PO commitments" value={formatMoney(budget.committed, currency)} />
-              <BudgetStat label="Available" value={formatMoney(budget.available, currency)} tone={budget.available < estimate ? "danger" : "good"} />
+              {budget.available != null ? <BudgetStat label="Available" value={formatMoney(budget.available, currency)} tone={budget.available < estimate ? "danger" : "good"} /> : null}
             </div>}
         </section>
 

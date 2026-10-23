@@ -17,6 +17,7 @@ import type { FiscalPeriod } from "@/redux/services/finance/setup-types";
 import { includeArchivedArg, useShowArchived } from "@/components/finance-ui/archived-years";
 import { Eye } from "lucide-react";
 import { Money } from "@/components/finance-ui";
+import { useFieldAccess } from "@/components/finance-ui/field-access";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { cn } from "@/lib/utils";
 import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
@@ -79,6 +80,7 @@ export function fiscalYearsOf(periods: Pick<FiscalPeriod, "fiscal_year">[]): num
 }
 
 export function IncomeStatementReport({ entity, currency }: { entity: string; currency?: string | null }) {
+  const access = useFieldAccess("finance.report");
   const [span, setSpan] = useState("");          // see incomeWindowParams
   const [wantBudget, setWantBudget] = useState(true);
   const [wantPrior, setWantPrior] = useState(true);
@@ -97,8 +99,8 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
   if (isLoading) return <LoadingState />;
   if (isError || !d) return <ErrorState onRetry={refetch} />;
 
-  const showBudget = d.has_budget && wantBudget;
-  const showPrior = d.has_prior_year && wantPrior;
+  const showBudget = !access.isHidden("income_budget") && d.has_budget && wantBudget;
+  const showPrior = !access.isHidden("income_prior_year") && d.has_prior_year && wantPrior;
   const colCount = 2 + (showBudget ? 2 : 0) + (showPrior ? 1 : 0);
   const periodLabel = d.period_label ?? incomeStatementNoPeriod(d.fiscal_year);
 
@@ -149,8 +151,8 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
               {periods.map((p) => <option key={p.id} value={`p:${p.fiscal_year}:${p.period_no}`}>{p.label}</option>)}
             </optgroup>
           </Select>
-          {d.has_budget ? <CompareToggle label="vs Budget" checked={wantBudget} onChange={setWantBudget} /> : null}
-          {d.has_prior_year ? <CompareToggle label={`vs Prior year${d.prior_fiscal_year ? ` (${d.prior_fiscal_year})` : ""}`} checked={wantPrior} onChange={setWantPrior} /> : null}
+          {!access.isHidden("income_budget") && d.has_budget ? <CompareToggle label="vs Budget" checked={wantBudget} onChange={setWantBudget} /> : null}
+          {!access.isHidden("income_prior_year") && d.has_prior_year ? <CompareToggle label={`vs Prior year${d.prior_fiscal_year ? ` (${d.prior_fiscal_year})` : ""}`} checked={wantPrior} onChange={setWantPrior} /> : null}
         </div>
         <div className="flex items-center gap-2">
           {(["csv", "xlsx", "pdf"] as const).map((f) => (
@@ -174,15 +176,15 @@ export function IncomeStatementReport({ entity, currency }: { entity: string; cu
             </tr>
           </thead>
           <tbody className={cn(isFetching && "opacity-60")}>
-            {band("Revenue", "rev")}
-            {d.income.length ? d.income.map(line) : <tr><td colSpan={colCount} className="px-3 py-4 text-center font-mont text-sm text-gray-05">No revenue in this period.</td></tr>}
-            {totalRow("Total revenue", d.totals.income)}
-            {band("Expenses", "exp")}
-            {d.expense.length ? d.expense.map(line) : <tr><td colSpan={colCount} className="px-3 py-4 text-center font-mont text-sm text-gray-05">No expenses in this period.</td></tr>}
-            {totalRow("Total expenses", d.totals.expense)}
+            {d.income && d.totals.income ? <>{band("Revenue", "rev")}
+              {d.income.length ? d.income.map(line) : <tr><td colSpan={colCount} className="px-3 py-4 text-center font-mont text-sm text-gray-05">No revenue in this period.</td></tr>}
+              {totalRow("Total revenue", d.totals.income)}</> : null}
+            {d.expense && d.totals.expense ? <>{band("Expenses", "exp")}
+              {d.expense.length ? d.expense.map(line) : <tr><td colSpan={colCount} className="px-3 py-4 text-center font-mont text-sm text-gray-05">No expenses in this period.</td></tr>}
+              {totalRow("Total expenses", d.totals.expense)}</> : null}
           </tbody>
           <tfoot>
-            {totalRow("Net income", d.totals.net, { net: true })}
+            {d.totals.net ? totalRow("Net income", d.totals.net, { net: true }) : null}
           </tfoot>
         </table>
       </div>

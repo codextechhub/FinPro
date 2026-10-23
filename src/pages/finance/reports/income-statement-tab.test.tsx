@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ periodLabel: null as string | null, fiscalYear: 2026 as number | null }));
 
 const zero = { kobo: 0, naira: "0" };
+vi.mock("@/hooks/use-permissions", () => ({ usePermissions: () => ({ fieldAccess: {} }) }));
 vi.mock("@/redux/services/finance/reports-api", () => ({
   useGetIncomeStatementQuery: () => ({
     data: {

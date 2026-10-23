@@ -557,7 +557,7 @@ export interface BudgetLine {
   account_id: number;
   cost_center: string | null;
   period_no: number;
-  amount: number;
+  amount?: number;
 }
 
 export interface FiscalYear {
@@ -577,13 +577,13 @@ export interface FiscalYear {
 export interface Budget {
   id: number;
   code: string;
-  name: string;
-  fiscal_year: number;
+  name?: string;
+  fiscal_year?: number;
   fiscal_year_id: number;
-  status: string;
-  is_locked: boolean;
-  approved_at: string | null;
-  lines: BudgetLine[];
+  status?: string;
+  is_locked?: boolean;
+  approved_at?: string | null;
+  lines?: BudgetLine[];
   /** The branch whose plan this is; null for the school's own plan. */
   branch_id: number | null;
   branch_name: string | null;
@@ -616,10 +616,10 @@ export interface BudgetRollup {
   period_no: number | null;
   narrowed: boolean;
   rows: BudgetVarianceRow[];
-  total_budget: KoboNaira;
-  total_actual: KoboNaira | null;
-  total_variance: KoboNaira | null;
-  budgets: { id: number; code: string; name: string; status: string; branch_id: number | null; branch_name: string | null }[];
+  total_budget?: KoboNaira;
+  total_actual?: KoboNaira | null;
+  total_variance?: KoboNaira | null;
+  budgets: { id: number; code: string; name?: string; status?: string; branch_id: number | null; branch_name: string | null }[];
 }
 
 // Payload for creating/replacing budget cells (account × cost-centre × period).
@@ -637,9 +637,9 @@ export interface BudgetVarianceRow {
   code: string;
   name: string;
   account_type: string;
-  budget: KoboNaira;
-  actual: KoboNaira | null;
-  variance: KoboNaira | null;
+  budget?: KoboNaira;
+  actual?: KoboNaira | null;
+  variance?: KoboNaira | null;
 }
 /**
  * A budget set against the ledger: a branch's plan against that branch's own
@@ -654,20 +654,20 @@ export interface BudgetVariance {
   fiscal_year_id: number;
   period_no: number | null;
   rows: BudgetVarianceRow[];
-  total_budget: KoboNaira;
-  total_actual: KoboNaira | null;
-  total_variance: KoboNaira | null;
+  total_budget?: KoboNaira;
+  total_actual?: KoboNaira | null;
+  total_variance?: KoboNaira | null;
 }
 
-export interface BudgetHeatmapCell { period_no: number; budget: number; actual: number | null }
+export interface BudgetHeatmapCell { period_no: number; budget?: number; actual?: number | null }
 export interface BudgetHeatmapRow {
   account_id: number;
   code: string;
   name: string;
   account_type: string;
-  cells: BudgetHeatmapCell[];
-  budget_total: number;
-  actual_total: number | null;
+  cells?: BudgetHeatmapCell[];
+  budget_total?: number;
+  actual_total?: number | null;
 }
 /** The plan per account and period; actuals are `null` where withheld (see BudgetVariance). */
 export interface BudgetHeatmap {
@@ -676,8 +676,8 @@ export interface BudgetHeatmap {
   /** `label` is the month in words ("September 2026"); `name` is the stored name ("2026-09"), never shown. */
   periods: { period_no: number; name: string; label: string }[];
   rows: BudgetHeatmapRow[];
-  total_budget: number;
-  total_actual: number | null;
+  total_budget?: number;
+  total_actual?: number | null;
 }
 
 // ── Fixed assets ─────────────────────────────────────────────────────────────

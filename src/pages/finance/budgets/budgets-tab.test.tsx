@@ -171,6 +171,15 @@ describe("Budgets for a branch bursar", () => {
     const text = render([SCHOOL_PLAN_TO_BRANCH], { branches: [] }, true, "finance.budget.create");
     expect(text).not.toContain("New budget");
   });
+
+  it("omits hidden plan figures and the variance heatmap", () => {
+    mocks.access = { "finance.budget": { hidden: ["amount", "budgeted_total", "variance", "consumed_pct"] } };
+    const text = render([budget({ budgeted_total: undefined, consumed_pct: undefined })], filing, true);
+    expect(text).not.toContain("Budgeted");
+    expect(text).not.toContain("Consumed");
+    expect(text).not.toContain("Variance heatmap");
+    mocks.access = {};
+  });
 });
 
 describe("The fiscal year picker in the New budget drawer", () => {

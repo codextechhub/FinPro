@@ -267,7 +267,7 @@ export function SuppliersTab({ d, currency }: { d: S; currency?: string | null }
           <KpiTile label={`Spend ${windowName}`} value={formatMoney(s.value.kobo, currency)}
             delta={s.plan ? null : s.delta_pct} goodWhenUp={false}
             badge={s.plan?.pct != null ? `${Math.round(s.plan.pct)}% of plan` : undefined}
-            note={s.plan
+            note={s.plan?.spent_ytd && s.plan?.planned
               ? `Year to date ${compactMoney(s.plan.spent_ytd.kobo, currency)} of ${compactMoney(s.plan.planned.kobo, currency)} planned, ${s.plan.year_elapsed_pct}% of the year gone`
               : s.prior_value ? `vs ${compactMoney(s.prior_value.kobo, currency)} at the same point before` : d.window.name} />
         )}

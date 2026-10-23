@@ -217,11 +217,11 @@ export interface RequisitionSummary {
 }
 
 export interface RequisitionBudgetAvailability {
-  has_budget: boolean;
+  has_budget?: boolean;
   period: string | null;
-  budget: number;
+  budget?: number;
   committed: number;
-  available: number;
+  available?: number;
 }
 
 export interface POLine {

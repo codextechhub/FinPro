@@ -91,9 +91,9 @@ export function CashFlowReport({ entity, currency }: { entity: string; currency?
       <div className={cn(INFORMATION_CARD_SURFACE, "overflow-x-auto rounded-md", isFetching && "opacity-60")}>
         <table className="w-full">
           <tbody>
-            {ACTIVITIES.map(({ key, label }) => {
-              const lines = d.activity_lines[key] ?? [];
-              const subtotal = d.by_activity[key]?.kobo ?? 0;
+            {d.activity_lines && d.by_activity ? ACTIVITIES.map(({ key, label }) => {
+              const lines = d.activity_lines?.[key] ?? [];
+              const subtotal = d.by_activity?.[key]?.kobo ?? 0;
               const verb = subtotal < 0 ? "used in" : "from";
               return (
                 <Fragment key={key}>
@@ -112,32 +112,32 @@ export function CashFlowReport({ entity, currency }: { entity: string; currency?
                   </tr>
                 </Fragment>
               );
-            })}
+            }) : null}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-white-02 bg-white-02/50 font-mont text-[15px] font-bold text-black-01">
+            {d.net_change ? <tr className="border-t-2 border-white-02 bg-white-02/50 font-mont text-[15px] font-bold text-black-01">
               <td className="px-4 py-2.5">Net {d.net_change.kobo < 0 ? "decrease" : "increase"} in cash</td>
               <td className={numCell}>{amountCell(d.net_change.kobo)}</td>
-            </tr>
-            <tr className="border-t border-white-02 font-mont text-sm text-gray-01">
+            </tr> : null}
+            {d.opening_cash ? <tr className="border-t border-white-02 font-mont text-sm text-gray-01">
               <td className="px-4 py-2">Cash at start of period</td>
               <td className={cn(numCell, "text-gray-05")}><Money kobo={d.opening_cash.kobo} currency={currency} align="right" /></td>
-            </tr>
-            <tr className="border-t border-white-02 font-mont text-sm font-semibold text-gray-01">
+            </tr> : null}
+            {d.closing_cash ? <tr className="border-t border-white-02 font-mont text-sm font-semibold text-gray-01">
               <td className="px-4 py-2">Cash at end of period</td>
               <td className={numCell}><Money kobo={d.closing_cash.kobo} currency={currency} align="right" /></td>
-            </tr>
+            </tr> : null}
           </tfoot>
         </table>
       </div>
 
-      <div className={cn("flex items-center gap-2 rounded-md px-4 py-2.5 font-mont text-sm font-medium",
+      {d.is_reconciled !== undefined && d.opening_cash && d.net_change && d.closing_cash ? <div className={cn("flex items-center gap-2 rounded-md px-4 py-2.5 font-mont text-sm font-medium",
         d.is_reconciled ? "bg-green-01/10 text-green-01" : "bg-destructive/10 text-destructive")}>
         {d.is_reconciled ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}
         {d.is_reconciled
           ? <span>Reconciles · {formatMoney(d.opening_cash.kobo, currency)} + {signed(d.net_change.kobo, currency)} = {formatMoney(d.closing_cash.kobo, currency)}</span>
           : <span>Does not reconcile - opening plus net change doesn't equal closing cash.</span>}
-      </div>
+      </div> : null}
     </div>
   );
 }

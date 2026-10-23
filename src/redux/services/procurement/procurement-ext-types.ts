@@ -203,10 +203,10 @@ export interface ProcurementSuppliersDashboard {
     prior_value: ReportMoney | null;
     delta_pct: number | null;
     plan: {
-      budget_name: string;
-      planned: ReportMoney;
-      spent_ytd: ReportMoney;
-      pct: number | null;
+      budget_name?: string;
+      planned?: ReportMoney;
+      spent_ytd?: ReportMoney;
+      pct?: number | null;
       year_elapsed_pct: number;
     } | null;
     vendors_with_spend: number;

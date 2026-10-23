@@ -73,15 +73,15 @@ export interface IncomeStatementLine {
   name: string;
   account_type: string;
   amount: ReportMoney;
-  budget: ReportMoney | null;
-  variance: ReportMoney | null;
-  prior_year: ReportMoney | null;
+  budget?: ReportMoney | null;
+  variance?: ReportMoney | null;
+  prior_year?: ReportMoney | null;
 }
 export interface IncomeStatementTotals {
   amount: ReportMoney;
-  budget: ReportMoney | null;
-  variance: ReportMoney | null;
-  prior_year: ReportMoney | null;
+  budget?: ReportMoney | null;
+  variance?: ReportMoney | null;
+  prior_year?: ReportMoney | null;
 }
 export interface IncomeStatement {
   /** True when the figures cover only the entries of the reader's branches. */
@@ -91,15 +91,15 @@ export interface IncomeStatement {
   /** The period in words ("September 2026"), the report's heading; null when it covers every period. */
   period_label: string | null;
   fiscal_year: number | null;
-  prior_fiscal_year: number | null;
-  has_budget: boolean;
-  has_prior_year: boolean;
-  income: IncomeStatementLine[];
-  expense: IncomeStatementLine[];
+  prior_fiscal_year?: number | null;
+  has_budget?: boolean;
+  has_prior_year?: boolean;
+  income?: IncomeStatementLine[];
+  expense?: IncomeStatementLine[];
   totals: {
-    income: IncomeStatementTotals;
-    expense: IncomeStatementTotals;
-    net: IncomeStatementTotals;
+    income?: IncomeStatementTotals;
+    expense?: IncomeStatementTotals;
+    net?: IncomeStatementTotals;
   };
 }
 
@@ -118,9 +118,9 @@ export interface ArAging {
   narrowed?: boolean;
   entity: string;
   as_of: string;
-  rows: ArAgingRow[];
-  bucket_totals: Record<string, ReportMoney>;
-  total_net: ReportMoney;
+  rows?: ArAgingRow[];
+  bucket_totals?: Record<string, ReportMoney>;
+  total_net?: ReportMoney;
 }
 
 // Balance Sheet grouped into IFRS Statement-of-Financial-Position sections.
@@ -142,12 +142,12 @@ export interface BalanceSheet {
   entity: string;
   as_of: string;
   sections: BalanceSheetSection[];
-  total_assets: ReportMoney;
-  total_liabilities: ReportMoney;
-  total_equity: ReportMoney;
-  retained_earnings: ReportMoney;   // current-year (unclosed) earnings
-  is_balanced: boolean;
-  difference: ReportMoney;
+  total_assets?: ReportMoney;
+  total_liabilities?: ReportMoney;
+  total_equity?: ReportMoney;
+  retained_earnings?: ReportMoney;
+  is_balanced?: boolean;
+  difference?: ReportMoney;
 }
 
 export interface CashFlowLine {
@@ -166,12 +166,12 @@ export interface CashFlow {
   /** The fiscal year covered when no period is chosen (the current year to date); null for a chosen period or a school with no fiscal year. */
   fiscal_year: number | null;
   /** Cash held at the window's start: the real earlier balances, not zero, for a chosen month or a later year. */
-  opening_cash: ReportMoney;
-  closing_cash: ReportMoney;
-  by_activity: Record<string, ReportMoney>;
-  activity_lines: Record<string, CashFlowLine[]>;   // operating | investing | financing
-  net_change: ReportMoney;
-  is_reconciled: boolean;
+  opening_cash?: ReportMoney;
+  closing_cash?: ReportMoney;
+  by_activity?: Record<string, ReportMoney>;
+  activity_lines?: Record<string, CashFlowLine[]>;
+  net_change?: ReportMoney;
+  is_reconciled?: boolean;
 }
 
 export interface EquityColumn {
@@ -198,8 +198,8 @@ export interface ChangesInEquity {
   total_profit: ReportMoney;
   total_contributions: ReportMoney;
   total_closing: ReportMoney;
-  balance_sheet_equity: ReportMoney;
-  is_reconciled: boolean;
+  balance_sheet_equity?: ReportMoney;
+  is_reconciled?: boolean;
 }
 
 export interface StatutoryPackHeading {
@@ -263,9 +263,9 @@ export interface DashboardKpi {
 }
 
 export interface BudgetLineMetric {
-  actual: ReportMoney;
-  plan: ReportMoney;
-  pct_of_plan: number | null;
+  actual?: ReportMoney;
+  plan?: ReportMoney;
+  pct_of_plan?: number | null;
 }
 
 /**
@@ -358,9 +358,9 @@ export interface FinanceDashboard {
   }[] | null;
   /** The school's plan line by line, with how much of the year has gone. */
   budget?: {
-    budget_name: string;
+    budget_name?: string;
     year_elapsed_pct: number;
-    lines: { label: string; kind: "income" | "expense"; actual: ReportMoney; plan: ReportMoney; pct: number | null }[];
+    lines: { label: string; kind: "income" | "expense"; actual?: ReportMoney; plan?: ReportMoney; pct?: number | null }[];
   } | null;
   top_payers?: {
     customer_id: number;
@@ -419,10 +419,10 @@ export interface FinanceDashboard {
   };
   revenue_vs_budget?: {
     has_budget: boolean;
-    budget_name: string | null;
+    budget_name?: string | null;
     revenue: BudgetLineMetric;
     expense: BudgetLineMetric;
-    net: { actual: ReportMoney; delta_pct: number | null };
+    net: { actual?: ReportMoney; delta_pct?: number | null };
   } | null;
   ar_aging?: {
     buckets: { key: string; pct: number; amount: ReportMoney }[];
@@ -612,12 +612,12 @@ export interface SpendDashboard {
      *  and `pct` are null on such a plan for a branch-bound reader. */
     items: {
       id: number;
-      name: string;
+      name?: string;
       branch: string | null;
-      approved: boolean;
-      plan: ReportMoney | null;
-      used: ReportMoney | null;
-      pct: number | null;
+      approved?: boolean;
+      plan?: ReportMoney | null;
+      used?: ReportMoney | null;
+      pct?: number | null;
     }[];
   } | null;
   payroll?: {

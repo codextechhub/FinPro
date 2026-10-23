@@ -489,7 +489,7 @@ export function BudgetCard({ budget, title, currency, to }: {
 }) {
   const elapsed = budget.year_elapsed_pct;
   return (
-    <Panel title={title} subtitle={`${budget.budget_name} · ${elapsed}% of the year gone`} action={<LinkAction label="Budgets" to={to} />}>
+    <Panel title={title} subtitle={[budget.budget_name, `${elapsed}% of the year gone`].filter(Boolean).join(" · ")} action={<LinkAction label="Budgets" to={to} />}>
       <div className="flex flex-col gap-4">
         {budget.lines.map((l) => {
           const pct = l.pct ?? 0;
@@ -502,15 +502,15 @@ export function BudgetCard({ budget, title, currency, to }: {
             <div key={l.label} className="flex flex-col gap-1.5">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 font-mont text-[13px]">
                 <span className="text-gray-01">{l.label}</span>
-                <span className="tabular-nums"><span className="font-semibold text-black-01">{compactMoney(l.actual.kobo, currency)}</span>
-                  <span className="text-gray-05"> of {compactMoney(l.plan.kobo, currency)}</span></span>
+                <span className="tabular-nums">{l.actual ? <span className="font-semibold text-black-01">{compactMoney(l.actual.kobo, currency)}</span> : null}
+                  {l.plan ? <span className="text-gray-05"> of {compactMoney(l.plan.kobo, currency)}</span> : null}</span>
               </div>
-              <div className="relative h-2 overflow-hidden rounded-full bg-gray-03/50">
+              {l.pct != null ? <div className="relative h-2 overflow-hidden rounded-full bg-gray-03/50">
                 <span className="block h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`,
                   background: ahead ? DASH_COLORS.orange : l.kind === "income" ? DASH_COLORS.primary : DASH_COLORS.mid }} />
                 <span className="absolute inset-y-0 w-0.5 bg-gray-01/40" style={{ left: `${elapsed}%` }} aria-hidden="true" />
-              </div>
-              <span className={cn("font-mont text-[11px]", ahead ? "text-amber-700" : "text-green-01")}>{note}</span>
+              </div> : null}
+              {l.pct != null ? <span className={cn("font-mont text-[11px]", ahead ? "text-amber-700" : "text-green-01")}>{note}</span> : null}
             </div>
           );
         })}

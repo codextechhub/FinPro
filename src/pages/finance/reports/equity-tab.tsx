@@ -114,13 +114,13 @@ export function EquityReport({ entity, currency }: { entity: string; currency?: 
         </table>
       </div>
 
-      <div className={cn("flex items-center gap-2 rounded-md px-4 py-2.5 font-mont text-sm font-medium",
+      {d.is_reconciled !== undefined && d.balance_sheet_equity ? <div className={cn("flex items-center gap-2 rounded-md px-4 py-2.5 font-mont text-sm font-medium",
         d.is_reconciled ? "bg-green-01/10 text-green-01" : "bg-destructive/10 text-destructive")}>
         {d.is_reconciled ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}
         {d.is_reconciled
           ? <span>Reconciles to balance-sheet equity · {formatMoney(d.total_closing.kobo, currency)}</span>
           : <span>Closing equity {formatMoney(d.total_closing.kobo, currency)} doesn't match the balance sheet ({formatMoney(d.balance_sheet_equity.kobo, currency)}).</span>}
-      </div>
+      </div> : null}
     </div>
   );
 }

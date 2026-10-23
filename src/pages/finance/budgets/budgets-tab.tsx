@@ -31,6 +31,7 @@ import {
 } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { useCalendarFieldAccess, yearStatusArg } from "@/components/finance-ui/calendar-access";
+import { useFieldAccess } from "@/components/finance-ui/field-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -112,6 +113,7 @@ function Select({ value, onChange, children, className }: { value: string; onCha
 const ALL_BRANCHES = "All branches";
 
 export function BudgetsTab({ entity, currency }: { entity: string; currency?: string | null }) {
+  const access = useFieldAccess("finance.budget");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const { can } = useCan();
@@ -126,7 +128,7 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
   const { data: rollupData } = useGetBudgetRollupQuery({ entity });
   const total = schoolTotal(rollupData?.data);
   // A null actual is one the server withheld; see the file's doc block.
-  const withheld = (b: Budget) => b.actual_ytd === null;
+  const withheld = (b: Budget) => b.actual_ytd == null;
   const measured = rows.filter((b) => !withheld(b));
   const allWithheld = rows.length > 0 && measured.length === 0;
   const activeHeatmapId = measured.some((b) => b.id === heatmapId) ? heatmapId : measured[0]?.id ?? null;
@@ -136,15 +138,15 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
 
   const columns: Column<Budget>[] = [
     { header: "Code", cell: (b) => <span className="font-semibold tabular-nums text-gray-01">{b.code || "-"}</span> },
-    { header: "Name", cell: (b) => b.name },
+    ...(!access.isHidden("name") ? [{ header: "Name", cell: (b: Budget) => b.name ?? "" }] : []),
     ...(showBranch ? [{ header: "Branch", cell: (b: Budget) => <span className="text-gray-05">{b.branch_name ?? ALL_BRANCHES}</span> }] : []),
-    { header: "Fiscal year", cell: (b) => <span className="tabular-nums text-gray-05">{b.fiscal_year}</span> },
-    { header: "Budgeted", align: "right", cell: (b) => <Money kobo={b.budgeted_total ?? 0} currency={currency} align="right" /> },
-    ...(allWithheld ? [] : [
+    ...(!access.isHidden("fiscal_year") ? [{ header: "Fiscal year", cell: (b: Budget) => <span className="tabular-nums text-gray-05">{b.fiscal_year}</span> }] : []),
+    ...(!access.isHidden("amount") ? [{ header: "Budgeted", align: "right" as const, cell: (b: Budget) => b.budgeted_total == null ? null : <Money kobo={b.budgeted_total} currency={currency} align="right" /> }] : []),
+    ...(allWithheld || access.isHidden("actual") ? [] : [
       { header: "Actual YTD", align: "right" as const, cell: (b: Budget) => withheld(b) ? <span className="text-gray-05">-</span> : <Money kobo={b.actual_ytd ?? 0} currency={currency} align="right" /> },
-      { header: "Consumed", align: "right" as const, cell: (b: Budget) => withheld(b) ? <span className="block text-right text-gray-05">-</span> : <ConsumedBar pct={b.consumed_pct ?? null} /> },
     ]),
-    { header: "Status", cell: (b) => <StatusPill status={b.status} /> },
+    ...(!access.isHidden("variance") && !allWithheld ? [{ header: "Consumed", align: "right" as const, cell: (b: Budget) => b.consumed_pct == null ? null : <ConsumedBar pct={b.consumed_pct} /> }] : []),
+    ...(!access.isHidden("status") ? [{ header: "Status", cell: (b: Budget) => b.status ? <StatusPill status={b.status} /> : null }] : []),
   ];
 
   return (
@@ -152,7 +154,7 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
       <div className="flex flex-wrap items-center justify-between gap-3" data-guide="finance-budgets.controls">
         <p className="max-w-2xl font-mont text-xs text-gray-05">
           A budget is a plan in the same shape as your chart of accounts - one line per income/expense GL × cost centre × period.
-          {allWithheld ? null : " The system compares it to live postings; red cells in the heatmap are overruns."}
+          {allWithheld || access.isHidden("variance") ? null : " The system compares it to live postings; red cells in the heatmap are overruns."}
         </p>
         {mayFile ? (
           <Can permission={P.FIN_CREATE_BUDGET}>
@@ -168,7 +170,7 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
 
       {total ? <SchoolTotalLine total={total} currency={currency} /> : null}
 
-      {activeHeatmapId != null ? (
+      {activeHeatmapId != null && !access.isHidden("variance") && !access.isHidden("amount") && !access.isHidden("actual") ? (
         <div className="rounded-md border border-white-02 bg-white p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
@@ -176,7 +178,7 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
               <InfoHint ariaLabel="About the budget variance heatmap">Each cell is a GL account's actual spend in that period, coloured by how much of the budgeted amount it consumed. Income lines are coloured the other way round: green once the target is reached. Variance is per account - actuals aren't tracked per cost centre.</InfoHint>
             </div>
             <Select value={String(activeHeatmapId)} onChange={(v) => setHeatmapId(Number(v))} className="w-64">
-              {measured.map((b) => <option key={b.id} value={b.id}>{b.code ? `${b.code} · ${b.name}` : b.name}</option>)}
+              {measured.map((b) => <option key={b.id} value={b.id}>{access.isHidden("name") ? b.code : b.code ? `${b.code} · ${b.name}` : b.name}</option>)}
             </Select>
           </div>
           <Heatmap budgetId={activeHeatmapId} entity={entity} />
@@ -198,7 +200,7 @@ export function BudgetsTab({ entity, currency }: { entity: string; currency?: st
  */
 export function schoolTotal(rollup: BudgetRollup | undefined) {
   if (!rollup || rollup.budgets.length < 2) return null;
-  const budgeted = rollup.total_budget.kobo;
+  const budgeted = rollup.total_budget?.kobo ?? null;
   const actual = rollup.total_actual?.kobo ?? null;
   return {
     label: rollup.narrowed ? "All my branches" : "All branches",
@@ -222,7 +224,7 @@ function SchoolTotalLine({ total, currency }: { total: NonNullable<ReturnType<ty
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1 font-mont text-xs">
-        <span><span className="text-gray-05">Budgeted </span><span className="font-semibold tabular-nums text-black-01">{formatMoney(total.budgeted, currency)}</span></span>
+        {total.budgeted != null ? <span><span className="text-gray-05">Budgeted </span><span className="font-semibold tabular-nums text-black-01">{formatMoney(total.budgeted, currency)}</span></span> : null}
         {total.actual != null ? <span><span className="text-gray-05">Actual YTD </span><span className="font-semibold tabular-nums text-black-01">{formatMoney(total.actual, currency)}</span></span> : null}
         {total.pct != null ? <span className="w-32"><ConsumedBar pct={total.pct} /></span> : null}
       </div>
@@ -248,7 +250,7 @@ export function Heatmap({ budgetId, entity }: { budgetId: number; entity: string
   const hm = data?.data;
   if (isError) return <p className="py-6 text-center font-mont text-xs text-destructive">Couldn't load the heatmap.</p>;
   if (isFetching && !hm) return <p className="py-6 text-center font-mont text-xs text-gray-05">Loading…</p>;
-  if (!hm || hm.rows.length === 0) return <p className="py-6 text-center font-mont text-xs text-gray-05">No budget lines yet - add lines to see the variance heatmap.</p>;
+  if (!hm || hm.rows.length === 0) return <p className="py-6 text-center font-mont text-xs text-gray-05">No visible budget lines.</p>;
 
   return (
     <div className="overflow-x-auto">
@@ -269,7 +271,7 @@ export function Heatmap({ budgetId, entity }: { budgetId: number; entity: string
                   <span className="tabular-nums text-gray-05">{r.code}</span> <span className="text-black-01">{r.name}</span>
                 </td>
                 {hm.periods.map((p) => {
-                  const cell = r.cells.find((c) => c.period_no === p.period_no);
+                  const cell = r.cells?.find((c) => c.period_no === p.period_no);
                   const actual = cell?.actual ?? null;
                   const ratio = cell && cell.budget && actual != null ? actual / cell.budget : null;
                   const hasActual = actual != null && actual !== 0;
@@ -334,6 +336,10 @@ function LinesEditor({ entity, currency, rows, setRows }: { entity: string; curr
  * school's to its only branch.
  */
 function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; onClose: () => void; entity: string; currency?: string | null }) {
+  const access = useFieldAccess("finance.budget");
+  const canName = !access.isReadOnly("name", { creating: true });
+  const canYear = !access.isReadOnly("fiscal_year", { creating: true });
+  const canLines = !access.isReadOnly("lines", { creating: true }) && !access.isReadOnly("amount", { creating: true });
   const [name, setName] = useState("");
   const [year, setYear] = useState("");
   const branch = useRaisingBranchChoice();
@@ -355,7 +361,7 @@ function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; o
   const validRows = rows.filter(lineValid);
   const submit = async () => {
     try {
-      const r = await create({ entity, name: name.trim(), fiscal_year: Number(year), ...branch.body(), lines: validRows.map(toInput) }).unwrap();
+      const r = await create({ entity, name: name.trim(), fiscal_year: Number(year), ...branch.body(), ...(canLines ? { lines: validRows.map(toInput) } : {}) }).unwrap();
       toast.success(r.message || "Budget created.");
       onClose();
     } catch { /* central */ }
@@ -366,7 +372,7 @@ function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; o
       title="New budget" description="Plan income & expense by account, cost centre and period." widthClass="sm:max-w-4xl"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading || !name.trim() || !year || !branch.ready} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create budget"}</Button>
+        <Button disabled={isLoading || !canName || !canYear || !name.trim() || !year || !branch.ready} onClick={submit} className="gap-1.5"><Plus className="size-4" />{isLoading ? "Creating…" : "Create budget"}</Button>
       </>}>
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -380,7 +386,7 @@ function NewBudgetDrawer({ open, onClose, entity, currency }: { open: boolean; o
           </div>
           <RaisingBranchChoiceField choice={branch} />
         </div>
-        <LinesEditor entity={entity} currency={currency} rows={rows} setRows={setRows} />
+        {canLines ? <LinesEditor entity={entity} currency={currency} rows={rows} setRows={setRows} /> : null}
         <p className="rounded-md border border-gray-03 bg-gray-03/40 px-3 py-2 font-mont text-[11px] text-gray-05">A reference code is allocated on save. The budget is a draft you can keep editing until you approve it - approval locks the lines. A budget is measured against its branch’s own postings; the school’s total is its branches’ budgets added together.</p>
       </div>
     </DetailDrawer>
@@ -401,13 +407,16 @@ function BudgetDrawer({ budgetId, entity, currency, onClose }: { budgetId: numbe
 }
 
 function DraftEditor({ budget, entity, currency, onClose }: { budget: Budget; entity: string; currency?: string | null; onClose: () => void }) {
+  const access = useFieldAccess("finance.budget", budget);
+  const canName = !access.isReadOnly("name");
+  const canLines = !access.isReadOnly("lines") && !access.isReadOnly("amount");
   const { can } = useCan();
   // The parent keys this component by budget id, so local edit state is
   // seeded once from props here and reset by remount when a different budget
   // is opened - no effect needed to re-sync.
-  const [name, setName] = useState(budget.name);
+  const [name, setName] = useState(budget.name ?? "");
   const [rows, setRows] = useState<EditLine[]>(() =>
-    budget.lines.map((l) => ({ key: crypto.randomUUID(), account: l.account, cost_center: l.cost_center ?? "", period_no: l.period_no, amount: l.amount })));
+    (budget.lines ?? []).map((l) => ({ key: crypto.randomUUID(), account: l.account, cost_center: l.cost_center ?? "", period_no: l.period_no, amount: l.amount ?? 0 })));
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [update] = useUpdateBudgetMutation();
   const [setLines, { isLoading: saving }] = useSetBudgetLinesMutation();
@@ -417,16 +426,16 @@ function DraftEditor({ budget, entity, currency, onClose }: { budget: Budget; en
   const validRows = rows.filter(lineValid);
   const save = async () => {
     try {
-      if (name.trim() && name.trim() !== budget.name) await update({ id: budget.id, entity, name: name.trim() }).unwrap();
-      await setLines({ id: budget.id, entity, lines: validRows.map(toInput) }).unwrap();
+      if (canName && name.trim() && name.trim() !== budget.name) await update({ id: budget.id, entity, name: name.trim() }).unwrap();
+      if (canLines) await setLines({ id: budget.id, entity, lines: validRows.map(toInput) }).unwrap();
       toast.success("Budget saved.");
       onClose();
     } catch { /* central */ }
   };
   const doApprove = async () => {
     try {
-      if (name.trim() && name.trim() !== budget.name) await update({ id: budget.id, entity, name: name.trim() }).unwrap();
-      await setLines({ id: budget.id, entity, lines: validRows.map(toInput) }).unwrap();
+      if (canName && name.trim() && name.trim() !== budget.name) await update({ id: budget.id, entity, name: name.trim() }).unwrap();
+      if (canLines) await setLines({ id: budget.id, entity, lines: validRows.map(toInput) }).unwrap();
       const r = await approve({ id: budget.id, entity }).unwrap();
       toast.success(r.message || "Budget approved.");
       onClose();
@@ -442,20 +451,28 @@ function DraftEditor({ budget, entity, currency, onClose }: { budget: Budget; en
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
       title={`Edit ${budget.code}`} description="Draft - editable until approved." widthClass="sm:max-w-4xl"
       footer={<>
-        <StatusPill status={budget.status} />
+        {budget.status ? <StatusPill status={budget.status} /> : null}
         {can(P.FIN_DELETE_BUDGET) ? <Button variant="outline" disabled={deleting} onClick={() => setConfirmDelete(true)} className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/5"><Trash2 className="size-4" /> Delete</Button> : null}
         <div className="flex-1" />
-        <Button variant="outline" disabled={saving} onClick={save} className="gap-1.5">{saving ? "Saving…" : "Save"}</Button>
+        {canName || canLines ? <Button variant="outline" disabled={saving} onClick={save} className="gap-1.5">{saving ? "Saving…" : "Save"}</Button> : null}
         {can(P.FIN_APPROVE_BUDGET) ? <Button disabled={approving} onClick={doApprove} className="gap-1.5"><CheckCircle2 className="size-4" />{approving ? "Approving…" : "Save & approve"}</Button> : null}
       </>}>
       <div className="space-y-4">
-        <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 bg-white" /></FormField>
+        {!access.isHidden("name") ? <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canName} className="h-9 bg-white" /></FormField> : null}
         <div className="grid grid-cols-2 gap-3 text-[11px] text-gray-05 sm:grid-cols-4">
           <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont">Code</p><p className="mt-1 font-mont text-xs font-semibold tabular-nums text-black-01">{budget.code}</p></div>
-          <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont">Fiscal year</p><p className="mt-1 font-mont text-xs font-semibold tabular-nums text-black-01">{budget.fiscal_year}</p></div>
+          {budget.fiscal_year != null ? <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont">Fiscal year</p><p className="mt-1 font-mont text-xs font-semibold tabular-nums text-black-01">{budget.fiscal_year}</p></div> : null}
           <div className="rounded-md border border-white-02 bg-white p-3"><p className="font-mont">Branch</p><p className="mt-1 truncate font-mont text-xs font-semibold text-black-01">{budget.branch_name ?? ALL_BRANCHES}</p></div>
         </div>
-        <LinesEditor entity={entity} currency={currency} rows={rows} setRows={setRows} />
+        {canLines ? <LinesEditor entity={entity} currency={currency} rows={rows} setRows={setRows} />
+          : !access.isHidden("lines") ? <div className="space-y-2">
+            <p className="font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Lines</p>
+            {(budget.lines ?? []).map((line) => <div key={line.id} className="rounded-md border border-white-02 bg-gray-03/30 px-3 py-2 font-mont text-xs text-gray-01">
+              {line.account} · Period {line.period_no}
+              {line.cost_center ? ` · ${line.cost_center}` : ""}
+              {line.amount != null ? ` · ${formatMoney(line.amount, currency)}` : ""}
+            </div>)}
+          </div> : null}
       </div>
     </DetailDrawer>
     <ConfirmActionModal
@@ -477,16 +494,16 @@ function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; e
   const v = vd?.data;
   // Withheld actuals come as null; see the file's doc block.
   const actualsWithheld = v != null && v.total_actual == null;
-  const budgeted = v?.total_budget.kobo ?? 0;
+  const budgeted = v?.total_budget?.kobo ?? null;
   const actual = v?.total_actual?.kobo ?? 0;
-  const remaining = budgeted - actual;
+  const remaining = budgeted != null && v?.total_actual ? budgeted - actual : null;
   const consumed = budgeted ? Math.round((actual * 100) / budgeted) : null;
 
   return (
     <DetailDrawer open onOpenChange={(o) => (o ? undefined : onClose())}
-      title={`${budget.code} · ${budget.name}`} description={`${budget.branch_name ?? ALL_BRANCHES} · FY ${budget.fiscal_year} · ${budget.lines.length} lines`} widthClass="sm:max-w-3xl"
+      title={[budget.code, budget.name].filter(Boolean).join(" · ")} description={[budget.branch_name ?? ALL_BRANCHES, budget.fiscal_year != null ? `FY ${budget.fiscal_year}` : null, budget.lines ? `${budget.lines.length} lines` : null].filter(Boolean).join(" · ")} widthClass="sm:max-w-3xl"
       footer={<>
-        <StatusPill status={budget.status} />
+        {budget.status ? <StatusPill status={budget.status} /> : null}
         <div className="flex-1" />
         <span className="inline-flex items-center gap-1.5 font-mont text-[11px] text-gray-05"><Lock className="size-3.5" />
           {budget.is_locked ? " Locked - figures frozen against the actuals" : " Read-only for you"}</span>
@@ -495,54 +512,52 @@ function VarianceView({ budget, entity, currency, onClose }: { budget: Budget; e
         {actualsWithheld ? (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Metric label="Budgeted" kobo={budgeted} currency={currency} />
+              {budgeted != null ? <Metric label="Budgeted" kobo={budgeted} currency={currency} /> : null}
             </div>
             <p className="font-mont text-xs text-gray-05">This budget's actuals are not shown to you.</p>
           </>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Metric label="Budgeted" kobo={budgeted} currency={currency} />
-            <Metric label="Actual YTD" kobo={actual} currency={currency} />
-            <Metric label="Variance (remaining)" kobo={remaining} currency={currency} tone={remaining < 0 ? "bad" : "good"} />
-            <div className="rounded-md border border-white-02 bg-white p-3">
+            {budgeted != null ? <Metric label="Budgeted" kobo={budgeted} currency={currency} /> : null}
+            {v?.total_actual ? <Metric label="Actual YTD" kobo={actual} currency={currency} /> : null}
+            {remaining != null && v?.total_variance ? <Metric label="Variance (remaining)" kobo={remaining} currency={currency} tone={remaining < 0 ? "bad" : "good"} /> : null}
+            {v?.total_variance && budgeted != null ? <div className="rounded-md border border-white-02 bg-white p-3">
               <p className="font-mont text-[11px] text-gray-05">% Consumed</p>
               <p className={cn("mt-1 font-mont text-sm font-semibold tabular-nums", consumed != null && consumed > 100 ? "text-destructive" : "text-black-01")}>{consumed == null ? "-" : `${consumed}%`}</p>
-            </div>
+            </div> : null}
           </div>
         )}
 
         <div>
-          <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">{actualsWithheld ? "Lines · budget" : "Lines · actual vs budget"}</p>
+          <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Budget lines</p>
           <div className="overflow-hidden rounded-md border border-white-02">
             <table className="w-full border-collapse">
               <thead><tr>
                 <th className={thCls}>GL · Account</th>
-                <th className={cn(thCls, "text-right")}>Budget</th>
-                {actualsWithheld ? null : <>
-                  <th className={cn(thCls, "text-right")}>Actual YTD</th>
-                  <th className={cn(thCls, "text-right")}>Variance</th><th className={cn(thCls, "text-right")}>Consumed</th>
-                </>}
+                {v?.total_budget ? <th className={cn(thCls, "text-right")}>Budget</th> : null}
+                {v?.total_actual ? <th className={cn(thCls, "text-right")}>Actual YTD</th> : null}
+                {v?.total_variance ? <><th className={cn(thCls, "text-right")}>Variance</th><th className={cn(thCls, "text-right")}>Consumed</th></> : null}
               </tr></thead>
               <tbody>
                 {(v?.rows ?? []).map((r) => {
                   const rowActual = r.actual?.kobo ?? 0;
                   const income = isIncome(r.account_type);
                   // Spending shows what is left of its plan; income shows how far it is past its target.
-                  const rem = income ? rowActual - r.budget.kobo : r.budget.kobo - rowActual;
-                  const pct = r.budget.kobo ? (rowActual * 100) / r.budget.kobo : null;
+                  const rem = r.budget ? income ? rowActual - r.budget.kobo : r.budget.kobo - rowActual : null;
+                  const pct = r.budget?.kobo ? (rowActual * 100) / r.budget.kobo : null;
                   return (
                     <tr key={r.account_id}>
                       <td className={tdCls}><span className="tabular-nums text-gray-05">{r.code}</span> {r.name}</td>
-                      <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(r.budget.kobo, currency)}</td>
-                      {actualsWithheld ? null : <>
-                        <td className={cn(tdCls, "text-right tabular-nums")}>{formatMoney(rowActual, currency)}</td>
-                        <td className={cn(tdCls, "text-right tabular-nums", rem < 0 ? "text-destructive" : "text-green-01")}>{formatMoney(rem, currency)}</td>
-                        <td className={cn(tdCls)}><ConsumedBar pct={pct} income={income} /></td>
-                      </>}
+                      {v?.total_budget ? <td className={cn(tdCls, "text-right tabular-nums")}>{r.budget ? formatMoney(r.budget.kobo, currency) : null}</td> : null}
+                      {v?.total_actual ? <td className={cn(tdCls, "text-right tabular-nums")}>{r.actual ? formatMoney(rowActual, currency) : null}</td> : null}
+                      {v?.total_variance ? <>
+                        <td className={cn(tdCls, "text-right tabular-nums", rem != null && rem < 0 ? "text-destructive" : "text-green-01")}>{rem != null ? formatMoney(rem, currency) : null}</td>
+                        <td className={tdCls}>{r.variance ? <ConsumedBar pct={pct} income={income} /> : null}</td>
+                      </> : null}
                     </tr>
                   );
                 })}
-                {(v?.rows ?? []).length === 0 ? <tr><td className={cn(tdCls, "text-center text-gray-05")} colSpan={actualsWithheld ? 2 : 5}>No activity yet.</td></tr> : null}
+                {(v?.rows ?? []).length === 0 ? <tr><td className={cn(tdCls, "text-center text-gray-05")} colSpan={1 + Number(!!v?.total_budget) + Number(!!v?.total_actual) + 2 * Number(!!v?.total_variance)}>No visible activity.</td></tr> : null}
               </tbody>
             </table>
           </div>
