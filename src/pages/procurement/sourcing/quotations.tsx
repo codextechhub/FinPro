@@ -27,11 +27,10 @@ import { INFORMATION_CARD_SURFACE } from "@/components/ui/card-surface";
 import { P } from "../../../permissions";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
-  useGetQuotationsQuery, useGetQuotationQuery, useGetRfqsQuery, useGetRfqQuery,
+  useGetQuotationsQuery, useGetQuotationQuery, useGetRfqQuery,
   useCreateQuotationMutation, useUpdateQuotationMutation,
   useSubmitQuotationMutation, useAwardQuotationMutation,
 } from "@/redux/services/procurement/procurement-ext-api";
-import { useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
 import type { Quotation, QuotationDetail } from "@/redux/services/procurement/procurement-types";
 import { formatMoney } from "@/utils/money";
 import { formatQuantity } from "@/utils/quantity";
@@ -82,12 +81,8 @@ export default function QuotationsPage() {
     [entity, page, scope, status, rfqFilter, vendorFilter, debounced],
   );
   const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetQuotationsQuery(params, { skip: !entity });
-  const { data: rfqOptData } = useGetRfqsQuery({ entity: entity!, branch: scope.branch }, { skip: !entity });
-  const { data: vendorOptData } = useGetVendorsQuery({ entity: entity!, page_size: 100 }, { skip: !entity });
   const rows = toArray(data?.data);
 
-  const rfqOptions = [{ value: "", label: "All RFQs" }, ...toArray(rfqOptData?.data).map((r) => ({ value: String(r.id), label: `${r.document_number} - ${r.title || "Untitled"}` }))];
-  const vendorOptions = [{ value: "", label: "All vendors" }, ...toArray(vendorOptData?.data).map((v) => ({ value: v.code, label: `${v.code} - ${v.name}` }))];
 
   const columns: Column<Quotation>[] = [
     { header: "Quote #", cell: (q) => <span className="font-mont text-sm font-semibold text-primary">{q.document_number}</span> },
@@ -129,8 +124,8 @@ export default function QuotationsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2 border-b border-white-02 px-4 py-2.5">
           {filters}
-          <div className="min-w-44 flex-1 sm:max-w-56"><SearchSelect options={rfqOptions} value={rfqFilter} onChange={(e) => { setRfqFilter(e.target.value); setPage(1); }} placeholder="All RFQs" revealOnSearch /></div>
-          <div className="min-w-44 flex-1 sm:max-w-56"><SearchSelect options={vendorOptions} value={vendorFilter} onChange={(e) => { setVendorFilter(e.target.value); setPage(1); }} placeholder="All vendors" revealOnSearch /></div>
+          <div className="min-w-44 flex-1 sm:max-w-56"><RfqPicker entity={entity!} value={rfqFilter} onChange={(id) => { setRfqFilter(id); setPage(1); }} branch={scope.branch} placeholder="All RFQs" /></div>
+          <div className="min-w-44 flex-1 sm:max-w-56"><VendorPicker entity={entity!} value={vendorFilter} onChange={(code) => { setVendorFilter(code); setPage(1); }} placeholder="All vendors" /></div>
           <label className="relative min-w-0 flex-1 sm:max-w-64"><Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-05" /><Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search quote #, vendor or reference" className="h-9 bg-white pl-9" /></label>
         </div>
         <DataTable columns={columns} rows={rows} rowKey={(q) => q.id} loading={isLoading || isFetching} error={isError} forbidden={isForbidden(error)} onRetry={refetch} onRowClick={(q) => setSelectedId(q.id)} page={data?.pagination?.currentPage} totalPages={data?.pagination?.totalPages} onPageChange={setPage} emptyTitle="No quotations" emptyMessage={debounced ? "Try a different search term or filter." : "Capture a vendor's bid against an issued RFQ."} />

@@ -119,7 +119,7 @@ export const procurementExtApi = baseApi.injectEndpoints({
     }),
 
     // RFQs
-    getRfqs: b.query<PaginatedEnvelope<Rfq>, E & { q?: string }>({
+    getRfqs: b.query<PaginatedEnvelope<Rfq>, E & { q?: string; search?: string }>({
       query: (p) => ({ url: `/procurement/rfqs/${qs(p)}`, method: "GET" }),
       providesTags: ["ProcRfqs"],
     }),

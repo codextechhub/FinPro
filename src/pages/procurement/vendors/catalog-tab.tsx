@@ -22,7 +22,7 @@ import { P } from "../../../permissions";
 import {
   useCreateCatalogItemMutation, useGetCatalogItemInsightsQuery,
   useGetCatalogItemQuery, useGetCatalogItemsQuery, useGetCategoriesQuery,
-  useGetVendorsQuery, useUpdateCatalogItemMutation,
+  useUpdateCatalogItemMutation,
 } from "@/redux/services/procurement/procurement-api";
 import type {
   CatalogItem, CatalogItemInsights, VendorCategory,
@@ -111,7 +111,6 @@ export function CatalogTab({ entity, currency }: { entity: string; currency?: st
   }), [entity, page, debouncedSearch, status, category, vendor]);
   const { currentData: data, isLoading, isFetching, isError, error, refetch } = useGetCatalogItemsQuery(params);
   const { data: categoriesResponse, isLoading: categoriesLoading } = useGetCategoriesQuery({ entity, page_size: 100 });
-  const { data: vendorsResponse, isLoading: vendorsLoading } = useGetVendorsQuery({ entity, page_size: 100 });
   const rows = toArray(data?.data);
   const categoryOptions = [
     { value: "", label: "All categories" },
@@ -119,10 +118,6 @@ export function CatalogTab({ entity, currency }: { entity: string; currency?: st
       value: item.code,
       label: `${"- ".repeat(item.level - 1)}${item.code} - ${item.name}`,
     })),
-  ];
-  const vendorOptions = [
-    { value: "", label: "All vendors" },
-    ...toArray(vendorsResponse?.data).map((item) => ({ value: item.code, label: `${item.code} - ${item.name}` })),
   ];
   const columns: Column<CatalogItem>[] = [
     { header: "Item", cell: (item) => <ItemIdentity item={item} /> },
@@ -160,7 +155,7 @@ export function CatalogTab({ entity, currency }: { entity: string; currency?: st
       </div>
       <div className="grid grid-cols-1 gap-2 border-b border-white-02 p-3 sm:grid-cols-2">
         <SearchSelect options={categoryOptions} value={category} loading={categoriesLoading} onChange={(event) => { setCategory(event.target.value); setPage(1); }} placeholder="All categories" />
-        <SearchSelect options={vendorOptions} value={vendor} loading={vendorsLoading} onChange={(event) => { setVendor(event.target.value); setPage(1); }} placeholder="All vendors" />
+        <VendorPicker entity={entity} value={vendor} onChange={(code) => { setVendor(code); setPage(1); }} placeholder="All vendors" />
       </div>
       <DataTable
         columns={columns} rows={rows} rowKey={(item) => item.id}

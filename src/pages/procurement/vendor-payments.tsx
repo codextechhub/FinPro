@@ -16,7 +16,7 @@ import {
   BankAccountPicker, DataTable, DetailDrawer, EmptyState, ErrorState, FormField,
   LoadingState, MoneyInput, PostingRecap, StatusPill, TabStrip, TaxCodePicker,
   toArray, useActiveEntity, useReaderBranchLens, type Column, type TabStripItem,
-  PostingDateField,} from "@/components/finance-ui";
+  PostingDateField, useVendorByCode,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,13 +30,13 @@ import {
   useAllocateVendorAdvanceMutation,
   useReverseVendorPaymentMutation, useSubmitVendorPaymentMutation,
   useAttachVendorPaymentFileMutation, useDeleteVendorPaymentFileMutation,
-  useUpdateVendorPaymentMutation, useGetVendorsQuery, useGetVendorInvoicesQuery,
+  useUpdateVendorPaymentMutation, useGetVendorInvoicesQuery,
 } from "@/redux/services/procurement/procurement-api";
 import { useGetTaxCodesQuery } from "@/redux/services/finance/setup-api";
 import { WHT_KEPT_BACK_LABEL, WHT_PAYABLE_LABEL, computedWht, whtSourceLabel } from "./withholding-tax";
 import { PAYMENT_METHODS, paymentMethodLabel } from "./payment-method";
 import type {
-  VendorPayment, VendorPaymentEligibleInvoice,
+  Vendor, VendorPayment, VendorPaymentEligibleInvoice,
 } from "@/redux/services/procurement/procurement-types";
 import {
   useGetWorkflowInstanceQuery, useRecordWorkflowActionMutation,
@@ -261,8 +261,7 @@ function PaymentForm({ entity, currency, initial, returned = false, onClose }: {
   // then nothing is sent, so the server computes it (see withholding-tax.ts).
   const [typedWht, setTypedWht] = useState<number | null>(initial?.wht_source === "ENTERED" ? initial.wht_amount : null);
   const [whtCode, setWhtCode] = useState(initial?.wht_tax_code_value || "");
-  const { data: vendorRows } = useGetVendorsQuery({ entity, page_size: 100 });
-  const vendorWhtCode = (code: string) => toArray(vendorRows?.data).find((v) => v.code === code)?.default_wht_tax_code_value || "";
+  const chosenVendor = useVendorByCode(entity, vendor);
   const { data: taxCodeRows } = useGetTaxCodesQuery({ entity });
   const whtRate = toArray(taxCodeRows?.data).find((t) => t.code === whtCode)?.rate_bps ?? 0;
   const [amounts, setAmounts] = useState<Record<number, number>>(() => Object.fromEntries((initial?.allocations || []).map((row) => [row.vendor_invoice_id, row.amount])));
@@ -290,7 +289,7 @@ function PaymentForm({ entity, currency, initial, returned = false, onClose }: {
   const wht = typedWht ?? workedOut;
   // With no code chosen the server would fall back to the vendor's own, so a
   // cleared code is sent as an explicit nil figure rather than left to that.
-  const clearedVendorCode = !whtCode && !!vendorWhtCode(vendor);
+  const clearedVendorCode = !whtCode && !!chosenVendor?.default_wht_tax_code_value;
   const whtToSend = typedWht ?? (clearedVendorCode ? 0 : undefined);
   const loading = creating || updating || submitting;
   const canSave = !!vendor && !!paymentDate && !!bank && allocations.length > 0 && gross > 0 && wht <= gross && !mixedBranches;
@@ -306,7 +305,7 @@ function PaymentForm({ entity, currency, initial, returned = false, onClose }: {
       onClose();
     } catch { /* central */ }
   };
-  const setVendorAndReset = (value: string) => { setVendor(value); setAmounts({}); setWhtCode(vendorWhtCode(value)); setTypedWht(null); };
+  const setVendorAndReset = (value: string, row?: Vendor) => { setVendor(value); setAmounts({}); setWhtCode(row?.default_wht_tax_code_value || ""); setTypedWht(null); };
   return <DetailDrawer open onOpenChange={(open) => !open && onClose()} title={initial ? `${returned ? "Correct" : "Edit"} ${initial.document_number}` : "New Payment"} description={returned ? "Your changes reach the approver when you resume the request. The payment stays with its branch." : "Disburse against approved and posted invoices"} widthClass="sm:max-w-[720px]" footer={<><Button variant="outline" disabled={loading} onClick={onClose}>Cancel</Button><Button variant="outline" loading={loading} disabled={!canSave} onClick={() => save(false)}>{returned ? "Save changes" : "Save Draft"}</Button>{!returned && <Button loading={loading} disabled={!canSave} onClick={() => save(true)}>{initial ? "Save & Submit" : "Create & Submit"}</Button>}</>}>
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FormField label="Vendor" required><VendorPicker entity={entity} value={vendor} onChange={setVendorAndReset} /></FormField><FormField label="Method" required><select value={method} onChange={(event) => setMethod(event.target.value)} className="h-9 w-full rounded-md border bg-white px-3 font-mont text-sm">{PAYMENT_METHODS.map((value) => <option key={value} value={value}>{paymentMethodLabel(value)}</option>)}</select></FormField><PostingDateField label="Payment date" entity={entity} value={paymentDate} onChange={setPaymentDate} /><FormField label="Pay from" required><BankAccountPicker entity={entity} value={bank} onChange={setBank} documentBranchId={paymentBranch} disabled={mixedBranches} /></FormField><FormField label="Reference"><Input value={reference} onChange={(event) => setReference(event.target.value)} className="bg-white" /></FormField><FormField label="Withholding tax code"><TaxCodePicker entity={entity} value={whtCode} onChange={setWhtCode} placeholder="No withholding tax" /></FormField></div>

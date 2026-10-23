@@ -15,6 +15,9 @@ import { toArray } from "@/redux/services/finance/api-types";
 import { taxCodeSupportsUsage, type TaxCodeUsage } from "./tax-code-usage";
 import { useBranches } from "../../host";
 import { useFieldAccess } from "./field-access";
+import { useListSearch, withChosen } from "./searched-list";
+import type { Customer } from "@/redux/services/finance/ar-types";
+import type { Vendor } from "@/redux/services/procurement/procurement-types";
 
 interface PickerProps {
   entity: string;
@@ -94,14 +97,13 @@ export function ReceivableAccountPicker({ entity, value, onChange, label, placeh
 }
 
 /**
- * The list CustomerPicker reads; `useCustomerBranch` reads the same cache.
- *
- * Only active customers are asked for, unless the reader's role may not read
- * the active flag: a filter on a hidden field is refused, so the picker then
- * lists every customer rather than naming a field it cannot see.
+ * The arguments of CustomerPicker's list. Only active customers are asked for,
+ * unless the reader's role may not read the active flag: a filter on a hidden
+ * field is refused, so the picker then lists every customer rather than naming
+ * a field it cannot see.
  */
 const customerListArgs = (entity: string, activeOnly: boolean) => ({
-  entity, ...(activeOnly ? { is_active: "true" } : {}), page_size: 100,
+  entity, ...(activeOnly ? { is_active: "true" } : {}),
 });
 
 /** Whether the picker may ask for active customers only (the active flag is readable). */
@@ -110,7 +112,20 @@ function useActiveFilter(): boolean {
 }
 
 /**
- * Customer / payer picker. List-backed (grows per entity) → reveal-on-search.
+ * The customer whose code is `code`: from `listed` when that page holds it,
+ * otherwise asked for by searching the code. Undefined while there is no code
+ * or the answer has not arrived. The lookup sends no active filter, so a
+ * chosen customer since made inactive still shows their name.
+ */
+function useCustomerRow(entity: string, code: string, listed?: Customer[]): Customer | undefined {
+  const onPage = code ? listed?.find((c) => c.code === code) : undefined;
+  const { data } = useGetCustomersQuery({ entity, search: code, page_size: 100 }, { skip: !code || !!onPage });
+  return onPage ?? (code ? toArray(data?.data).find((c) => c.code === code) : undefined);
+}
+
+/**
+ * Customer / payer picker, searched on the server as the reader types (see
+ * searched-list.ts), since a school's payers run to hundreds.
  *
  * `own` lists only the customers the reader may raise a gateway record for:
  * those filed under their branches, or every customer for a whole-school reader.
@@ -120,23 +135,22 @@ function useActiveFilter(): boolean {
  */
 export function CustomerPicker({ entity, value, onChange, label, placeholder = "Select customer", isRequired, disabled, own }: PickerProps & { own?: boolean }) {
   const activeOnly = useActiveFilter();
-  const { data, isLoading } = useGetCustomersQuery({ ...customerListArgs(entity, activeOnly), ...(own ? { own: "true" } : {}) });
-  const options = toArray(data?.data).map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }));
-  return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
+  const { onSearchChange, searchArg } = useListSearch();
+  const { data, isLoading } = useGetCustomersQuery({ ...customerListArgs(entity, activeOnly), ...(own ? { own: "true" } : {}), ...searchArg });
+  const rows = toArray(data?.data);
+  const chosen = useCustomerRow(entity, value, rows);
+  const options = withChosen(rows, chosen, (c) => c.code).map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }));
+  return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} onSearchChange={onSearchChange} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
 }
 
 /**
  * The branch of the customer CustomerPicker has chosen, by code: a number for
  * a customer filed under a branch, null for one every branch shares, and
  * undefined while it is not known (no customer yet, or a server that does not
- * report a customer's branch). Reads the picker's own list, so it costs no
- * request of its own.
+ * report a customer's branch).
  */
 export function useCustomerBranch(entity: string, code: string): number | null | undefined {
-  const activeOnly = useActiveFilter();
-  const { data } = useGetCustomersQuery(customerListArgs(entity, activeOnly), { skip: !code });
-  if (!code) return undefined;
-  return toArray(data?.data).find((c) => c.code === code)?.branch_id;
+  return useCustomerRow(entity, code)?.branch_id;
 }
 
 /**
@@ -149,7 +163,7 @@ export function useCustomerBranch(entity: string, code: string): number | null |
  * server whose rows do not name their branch, or a document not yet given
  * one, falls back to the customer's branch, which is the invoice's whenever
  * the customer is filed under one. Undefined while neither is known, so
- * nothing is narrowed; the customer list is not read when the document
+ * nothing is narrowed; the customer is not looked up when the document
  * answers for itself.
  */
 export function useDocumentBranch(
@@ -161,15 +175,36 @@ export function useDocumentBranch(
   return own ?? customerBranch ?? undefined;
 }
 
-/** Vendor picker - entity's active vendors; reports the vendor code. Used by
- *  payouts (a payout settles a vendor's payable). List-backed → reveal-on-search.
- *  `own` narrows to the vendors the reader may pay out to, as on CustomerPicker. */
-export function VendorPicker({ entity, value, onChange, label, placeholder = "Select vendor", isRequired, disabled, own }: PickerProps & { own?: boolean }) {
-  const { data, isLoading } = useGetVendorsQuery({ entity, page_size: 100, ...(own ? { own: true } : {}) });
-  const options = toArray(data?.data)
-    .filter((v) => v.is_active)
-    .map((v) => ({ value: v.code, label: `${v.code} - ${v.name}` }));
-  return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
+/**
+ * The vendor whose code is `code`: from `listed` when that page holds it,
+ * otherwise asked for by searching the code. Undefined while there is no code
+ * or the answer has not arrived. A screen that needs a chosen vendor's row
+ * (its default withholding tax code, its record for bank details) reads it
+ * here rather than from one page of the vendor list.
+ */
+export function useVendorByCode(entity: string, code: string, listed?: Vendor[]): Vendor | undefined {
+  const onPage = code ? listed?.find((v) => v.code === code) : undefined;
+  const { data } = useGetVendorsQuery({ entity, search: code, page_size: 100 }, { skip: !code || !!onPage });
+  return onPage ?? (code ? toArray(data?.data).find((v) => v.code === code) : undefined);
+}
+
+/**
+ * Vendor picker - the entity's active vendors, searched on the server as the
+ * reader types; reports the vendor code, and the vendor's row beside it for a
+ * screen that needs more of it. Used by payouts (a payout settles a vendor's
+ * payable). `own` narrows to the vendors the reader may pay out to, as on
+ * CustomerPicker. A chosen vendor since deactivated stays on the list so the
+ * field never blanks.
+ */
+export function VendorPicker({ entity, value, onChange, label, placeholder = "Select vendor", isRequired, disabled, own }: Omit<PickerProps, "onChange"> & { onChange: (code: string, vendor?: Vendor) => void; own?: boolean }) {
+  const { onSearchChange, searchArg } = useListSearch();
+  const { data, isLoading } = useGetVendorsQuery({ entity, ...(own ? { own: true } : {}), ...searchArg });
+  const rows = toArray(data?.data);
+  const chosen = useVendorByCode(entity, value, rows);
+  const all = withChosen(rows.filter((v) => v.is_active), chosen, (v) => v.code);
+  const options = all.map((v) => ({ value: v.code, label: `${v.code} - ${v.name}` }));
+  const choose = (code: string) => onChange(code, all.find((v) => v.code === code));
+  return <SearchSelect label={label} options={options} value={value} onChange={adapt(choose)} onSearchChange={onSearchChange} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
 }
 
 export function CurrencyPicker({ value, onChange, label, placeholder = "Default", isRequired, disabled }: Omit<PickerProps, "entity">) {

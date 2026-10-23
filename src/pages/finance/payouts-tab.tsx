@@ -20,7 +20,7 @@ import { useActionParam } from "@/hooks/use-action-param";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Plus, Layers, Banknote } from "lucide-react";
-import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, VendorPicker, AccountPicker, PostingRecap, KpiCard, toArray, useFieldAccess, fieldWriteErrors, type Column, type FieldErrors, type RecapRow } from "@/components/finance-ui";
+import { AccessField, DataTable, Money, MoneyInput, DetailDrawer, FormField, VendorPicker, AccountPicker, PostingRecap, KpiCard, toArray, useFieldAccess, useVendorByCode, fieldWriteErrors, type Column, type FieldErrors, type RecapRow } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../host";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ import { formatMoney } from "@/utils/money";
 import { P } from "../../permissions";
 import { routesPath } from "@/routes/routes-path";
 import { useGetPayoutsQuery, useGetPayoutsSummaryQuery, useInitiatePayoutMutation } from "@/redux/services/payments/payments-api";
-import { useGetVendorQuery, useGetVendorsQuery } from "@/redux/services/procurement/procurement-api";
+import { useGetVendorQuery } from "@/redux/services/procurement/procurement-api";
 import { useGetAccountsQuery } from "@/redux/services/finance/setup-api";
 import type { PayoutInstruction } from "@/redux/services/payments/payments-types";
 import { useDates } from "../../lib/display-prefs";
@@ -235,11 +235,10 @@ export function NewPayoutDrawer({ open, onClose, entity, currency }: { open: boo
   const [initiate, { isLoading }] = useInitiatePayoutMutation();
   const access = useFieldAccess(PAYOUT);
 
-  const { data: vendorsData } = useGetVendorsQuery({ entity });
   const { data: acctData } = useGetAccountsQuery({ entity });
   const acctName = (code: string) => toArray(acctData?.data).find((a) => a.code === code)?.name;
   // The list row carries no bank details, so the picked vendor's record supplies them.
-  const vendorRow = vendor ? toArray(vendorsData?.data).find((x) => x.code === vendor) : undefined;
+  const vendorRow = useVendorByCode(entity, vendor);
   const { data: vendorDetailData } = useGetVendorQuery({ id: vendorRow?.id ?? 0, entity }, { skip: !vendorRow });
   const vendorDetail = vendorRow && vendorDetailData?.data?.id === vendorRow.id ? vendorDetailData.data : undefined;
   const vendorAccess = useFieldAccess("procurement.vendor", vendorDetail);

@@ -26,6 +26,11 @@
  * collection ledger and the cash tin. From a server whose invoice rows do not
  * name their branch it falls back to the customer's, as before.
  *
+ * Customers and vendors run to hundreds, so their pickers search on the
+ * server. Bright Star's bursar types "Adeyemi" and the server is asked for
+ * it; the Okafors, filed past the first page, are still named when a form
+ * opens with them chosen, because the chosen customer is looked up by code.
+ *
  * Field Access: the customer picker asks only for active customers. A role that
  * may not read the active flag would be refused that filter, so the picker lists
  * every customer for it and never names the field; a bank account without the
@@ -44,8 +49,12 @@ const mocks = vi.hoisted(() => ({
   ledgers: [] as Record<string, unknown>[],
   customerArgs: [] as Record<string, unknown>[],
   customerSkips: [] as boolean[],
-  customers: [] as { code: string; branch_id?: number | null }[],
+  customers: [] as { code: string; name?: string; branch_id?: number | null }[],
+  customerPage: Infinity,
+  search: undefined as ((query: string) => void) | undefined,
+  change: undefined as ((e: { target: { value: string } }) => void) | undefined,
   vendorArgs: [] as Record<string, unknown>[],
+  vendors: [] as { id: number; code: string; name: string; is_active: boolean }[],
   banks: [] as { id: number; name: string; bank_name: string; branch_id: number | null; is_active?: boolean }[],
   fieldAccess: {} as Record<string, { hidden?: string[]; read_only?: string[] } | undefined>,
 }));
@@ -62,8 +71,10 @@ vi.mock("../../host", () => ({
 }));
 
 vi.mock("@/components/custom/search-select", () => ({
-  SearchSelect: ({ options }: { options: { value: string; label: string }[] }) => {
+  SearchSelect: ({ options, onSearchChange, onChange }: { options: { value: string; label: string }[]; onSearchChange?: (query: string) => void; onChange: (e: { target: { value: string } }) => void }) => {
     mocks.options = options;
+    mocks.search = onSearchChange;
+    mocks.change = onChange;
     return null;
   },
 }));
@@ -107,13 +118,19 @@ vi.mock("@/redux/services/finance/ops-api", () => ({
 
 vi.mock("@/redux/services/finance/ar-api", () => ({
   useGetCustomersQuery: (args: Record<string, unknown>, opts?: { skip?: boolean }) => {
-    mocks.customerArgs.push(args);
+    if (!opts?.skip) mocks.customerArgs.push(args);
     mocks.customerSkips.push(!!opts?.skip);
-    return { data: opts?.skip ? undefined : { data: mocks.customers }, isLoading: false };
+    const term = typeof args.search === "string" ? args.search : "";
+    const rows = term ? mocks.customers.filter((c) => c.code.includes(term)) : mocks.customers.slice(0, mocks.customerPage);
+    return { data: opts?.skip ? undefined : { data: rows }, isLoading: false };
   },
 }));
 vi.mock("@/redux/services/procurement/procurement-api", () => ({
-  useGetVendorsQuery: (args: Record<string, unknown>) => { mocks.vendorArgs.push(args); return { data: undefined, isLoading: false }; },
+  useGetVendorsQuery: (args: Record<string, unknown>, opts?: { skip?: boolean }) => {
+    if (!opts?.skip) mocks.vendorArgs.push(args);
+    const term = typeof args.search === "string" ? args.search : "";
+    return { data: { data: term ? mocks.vendors.filter((v) => v.code.includes(term)) : mocks.vendors }, isLoading: false };
+  },
 }));
 
 import { BankAccountPicker, CustomerPicker, DepositAccountPicker, ReceivableAccountPicker, VendorPicker, useDocumentBranch } from "./pickers";
@@ -251,6 +268,47 @@ describe("Payments pickers", () => {
     act(() => root.render(<><CustomerPicker entity="CORONA" value="" onChange={() => undefined} /><VendorPicker entity="CORONA" value="" onChange={() => undefined} /></>));
     expect(mocks.customerArgs.at(-1)).not.toHaveProperty("own");
     expect(mocks.vendorArgs.at(-1)).not.toHaveProperty("own");
+  });
+});
+
+describe("Customers and vendors searched on the server", () => {
+  beforeEach(() => {
+    mocks.customerArgs = [];
+    mocks.customers = [{ code: "CADEY", name: "Adeyemi" }, { code: "CBELL", name: "Bello" }, { code: "COKAF", name: "Okafor" }];
+    mocks.customerPage = 2;
+  });
+  afterEach(() => { mocks.customerPage = Infinity; });
+
+  it("asks the server for what the bursar types, after a pause", () => {
+    vi.useFakeTimers();
+    try {
+      act(() => root.render(<CustomerPicker entity="CORONA" value="" onChange={() => undefined} />));
+      expect(mocks.customerArgs.at(-1)).not.toHaveProperty("search");
+      act(() => mocks.search?.("Adeyemi"));
+      act(() => { vi.advanceTimersByTime(300); });
+      expect(mocks.customerArgs.at(-1)).toMatchObject({ search: "Adeyemi" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("names a chosen customer the first page does not hold, by looking up the code", () => {
+    act(() => root.render(<CustomerPicker entity="CORONA" value="COKAF" onChange={() => undefined} />));
+    expect(mocks.customerArgs).toContainEqual({ entity: "CORONA", search: "COKAF", page_size: 100 });
+    expect(mocks.options.map((o) => o.label)).toEqual(["COKAF - Okafor", "CADEY - Adeyemi", "CBELL - Bello"]);
+  });
+
+  it("does not look up a chosen customer the page already holds", () => {
+    act(() => root.render(<CustomerPicker entity="CORONA" value="CBELL" onChange={() => undefined} />));
+    expect(mocks.customerArgs.every((args) => args.search !== "CBELL")).toBe(true);
+  });
+
+  it("hands a payout the vendor row it picked", () => {
+    mocks.vendors = [{ id: 3, code: "VPRIME", name: "Prime Uniforms", is_active: true }];
+    const onChange = vi.fn();
+    act(() => root.render(<VendorPicker entity="CORONA" value="" onChange={onChange} />));
+    act(() => mocks.change?.({ target: { value: "VPRIME" } }));
+    expect(onChange).toHaveBeenLastCalledWith("VPRIME", mocks.vendors[0]);
   });
 });
 

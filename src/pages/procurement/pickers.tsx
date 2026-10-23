@@ -1,16 +1,23 @@
-// Procurement-scoped reference pickers (vendor, category) over SearchSelect.
-// Kept in the procurement feature so finance-ui doesn't import procurement.
+/**
+ * Procurement-scoped reference pickers over SearchSelect, kept in the
+ * procurement feature so finance-ui does not import procurement.
+ *
+ * Vendors, requisitions, RFQs, purchase orders and catalogue items grow with
+ * use, so their pickers search on the server as the reader types and look up
+ * the chosen row on its own when the current page does not hold it
+ * (finance-ui/searched-list.ts). Categories and stores are short, closed lists
+ * and render populated.
+ */
 
 import { useState } from "react";
 import { SearchSelect } from "@/components/custom/search-select";
-import { toArray } from "@/components/finance-ui";
-import { useDebounce } from "@/hooks/use-debounce";
+import { toArray, useListSearch, useVendorByCode, withChosen } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { P } from "../../permissions";
 import { completeFreeLineIds, requisitionSourcing, requisitionSourcingFilter, sourcingNote, type SourcingPurpose } from "./requisition-sourcing";
-import { useGetVendorsQuery, useGetCategoriesQuery, useGetRequisitionsQuery, useGetPurchaseOrdersQuery } from "@/redux/services/procurement/procurement-api";
-import { useGetRfqsQuery, useGetContractsQuery, useGetFreeRequisitionLinesQuery, useGetStockTransferDestinationsQuery } from "@/redux/services/procurement/procurement-ext-api";
-import type { StockLocation, StockTransferDestination, VendorCategory } from "@/redux/services/procurement/procurement-types";
+import { useGetVendorsQuery, useGetCategoriesQuery, useGetRequisitionsQuery, useGetRequisitionQuery, useGetPurchaseOrdersQuery, useGetPurchaseOrderQuery, useGetCatalogItemsQuery, useGetCatalogItemQuery, type ProcListScope } from "@/redux/services/procurement/procurement-api";
+import { useGetRfqsQuery, useGetRfqQuery, useGetContractsQuery, useGetFreeRequisitionLinesQuery, useGetStockTransferDestinationsQuery } from "@/redux/services/procurement/procurement-ext-api";
+import type { CatalogItem, StockLocation, StockTransferDestination, Vendor, VendorCategory } from "@/redux/services/procurement/procurement-types";
 
 const adapt = (onChange: (v: string) => void) =>
   (e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value);
@@ -28,15 +35,27 @@ function categoryTree(rows: VendorCategory[]) {
   return ordered;
 }
 
-export function VendorPicker({ entity, value, onChange, label, placeholder = "Select vendor", isRequired, disabled, purchaseEligible = false }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string; isRequired?: boolean; disabled?: boolean; purchaseEligible?: boolean }) {
-  const { data, isLoading } = useGetVendorsQuery({ entity, page_size: 100 });
-  const options = toArray(data?.data)
-    .filter((v) => !purchaseEligible || v.code === value || (v.is_active && !v.on_hold && v.kyc_status !== "REJECTED"))
-    .map((v) => ({
+/** Whether a vendor may take a new commitment (an order, a contract, an RFQ invitation). */
+export const vendorAvailable = (v: Vendor) => v.is_active && !v.on_hold && v.kyc_status !== "REJECTED";
+
+/**
+ * A vendor, searched on the server. With `purchaseEligible` only vendors that
+ * may take a new commitment are offered, though a chosen one that may not
+ * stays on the list, marked, so an edit never silently drops it. Reports the
+ * vendor's row beside its code, for a form that takes defaults from it.
+ */
+export function VendorPicker({ entity, value, onChange, label, placeholder = "Select vendor", isRequired, disabled, purchaseEligible = false }: { entity: string; value: string; onChange: (code: string, vendor?: Vendor) => void; label?: string; placeholder?: string; isRequired?: boolean; disabled?: boolean; purchaseEligible?: boolean }) {
+  const { onSearchChange, searchArg } = useListSearch();
+  const { data, isLoading } = useGetVendorsQuery({ entity, ...searchArg });
+  const rows = toArray(data?.data);
+  const chosen = useVendorByCode(entity, value, rows);
+  const all = withChosen(rows.filter((v) => !purchaseEligible || vendorAvailable(v)), chosen, (v) => v.code);
+  const options = all.map((v) => ({
       value: v.code,
-      label: `${v.code} - ${v.name}${v.is_active && !v.on_hold && v.kyc_status !== "REJECTED" ? "" : " (Unavailable for new commitments)"}`,
+      label: `${v.code} - ${v.name}${vendorAvailable(v) ? "" : " (Unavailable for new commitments)"}`,
     }));
-  return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
+  const choose = (code: string) => onChange(code, all.find((v) => v.code === code));
+  return <SearchSelect label={label} options={options} value={value} onChange={adapt(choose)} onSearchChange={onSearchChange} loading={isLoading} placeholder={placeholder} isRequired={isRequired} disabled={disabled} revealOnSearch />;
 }
 
 export function CategoryPicker({ entity, value, onChange, label, placeholder = "No category" }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string }) {
@@ -70,36 +89,77 @@ export function CategoryPicker({ entity, value, onChange, label, placeholder = "
  */
 export function RequisitionPicker({ entity, value, onChange, label, placeholder = "Select requisition", isRequired, status, sourcing }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string; isRequired?: boolean; status?: string; sourcing?: SourcingPurpose }) {
   const { can } = useCan();
+  const mayList = can(P.PROC_VIEW_REQUISITIONS);
+  const { onSearchChange, searchArg } = useListSearch();
   const { data, isLoading } = useGetRequisitionsQuery(
-    { entity, page_size: 100, ...(status ? { status } : {}), ...requisitionSourcingFilter(sourcing) },
-    { refetchOnMountOrArgChange: !!sourcing, skip: !can(P.PROC_VIEW_REQUISITIONS) },
+    { entity, ...(status ? { status } : {}), ...requisitionSourcingFilter(sourcing), ...searchArg },
+    { refetchOnMountOrArgChange: !!sourcing, skip: !mayList },
   );
   const canAsk = can(P.PROC_VIEW_RFQS) && sourcing === "rfq";
   const { data: chosenFree } = useGetFreeRequisitionLinesQuery({ entity, page_size: 100, requisition: Number(value) }, { skip: !canAsk || !value });
-  const rows = toArray(data?.data);
-  const options = rows.map((r) => ({ value: String(r.id), label: `${r.document_number} (${r.status})` }));
-  const chosen = rows.find((r) => String(r.id) === value);
+  const listed = toArray(data?.data);
+  const onPage = listed.find((r) => String(r.id) === value);
+  const { data: chosenData } = useGetRequisitionQuery({ id: Number(value), entity }, { skip: !mayList || !value || !!onPage });
+  const chosen = onPage ?? (chosenData?.data && String(chosenData.data.id) === value ? chosenData.data : undefined);
+  const rows = withChosen(listed, chosen, (r) => String(r.id));
+  const options = rows.map((r) => ({ value: String(r.id), label: `${r.document_number}${r.title ? ` - ${r.title}` : ""} (${r.status})` }));
   const chosenIds = completeFreeLineIds(chosenFree?.data ? toArray(chosenFree.data) : undefined, chosenFree?.pagination?.totalItems);
   const note = sourcing && chosen && chosenIds
     ? sourcingNote(requisitionSourcing(chosen.lines.map((line) => line.id), chosenIds), sourcing, chosen.document_number)
     : null;
   return <>
-    <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} revealOnSearch />
+    <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} onSearchChange={onSearchChange} loading={isLoading} placeholder={placeholder} isRequired={isRequired} revealOnSearch />
     {note ? <p role="status" className="mt-1 font-mont text-[11px] leading-5 text-amber-700">{note}</p> : null}
   </>;
 }
 
-export function RfqPicker({ entity, value, onChange, label, placeholder = "Select RFQ", isRequired, status }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string; isRequired?: boolean; status?: string }) {
-  // Quotation capture only makes sense against ISSUED RFQs; pass status to scope the list.
-  const { data, isLoading } = useGetRfqsQuery({ entity, ...(status ? { status } : {}) });
-  const options = toArray(data?.data).map((r) => ({ value: String(r.id), label: `${r.document_number} - ${r.title || "Untitled"}` }));
-  return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} isRequired={isRequired} revealOnSearch />;
+/**
+ * An RFQ, searched on the server by number or title. `status` scopes the list
+ * (quotation capture offers only ISSUED RFQs), `branch` follows a list
+ * screen's branch lens, and `placeholder` doubles as the "all RFQs" wording
+ * when the picker is a filter.
+ */
+export function RfqPicker({ entity, value, onChange, label, placeholder = "Select RFQ", isRequired, status, branch }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string; isRequired?: boolean; status?: string; branch?: ProcListScope["branch"] }) {
+  const { onSearchChange, searchArg } = useListSearch();
+  const { data, isLoading } = useGetRfqsQuery({ entity, ...(status ? { status } : {}), ...(branch != null ? { branch } : {}), ...searchArg });
+  const listed = toArray(data?.data);
+  const onPage = listed.find((r) => String(r.id) === value);
+  const { data: chosenData } = useGetRfqQuery({ id: Number(value), entity }, { skip: !value || !!onPage });
+  const chosen = onPage ?? (chosenData?.data && String(chosenData.data.id) === value ? chosenData.data : undefined);
+  const options = withChosen<{ id: number; document_number: string; title?: string | null }>(listed, chosen, (r) => String(r.id))
+    .map((r) => ({ value: String(r.id), label: `${r.document_number} - ${r.title || "Untitled"}` }));
+  return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} onSearchChange={onSearchChange} loading={isLoading} placeholder={placeholder} isRequired={isRequired} revealOnSearch />;
 }
 
+/** A purchase order, searched on the server by number, vendor or requisition. */
 export function PurchaseOrderPicker({ entity, value, onChange, label, placeholder = "No PO" }: { entity: string; value: string; onChange: (v: string) => void; label?: string; placeholder?: string }) {
-  const { data, isLoading } = useGetPurchaseOrdersQuery({ entity, page_size: 100 });
-  const options = toArray(data?.data).map((o) => ({ value: String(o.id), label: `${o.document_number} - ${o.vendor_code}` }));
-  return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} loading={isLoading} placeholder={placeholder} revealOnSearch />;
+  const { onSearchChange, searchArg } = useListSearch();
+  const { data, isLoading } = useGetPurchaseOrdersQuery({ entity, ...searchArg });
+  const listed = toArray(data?.data);
+  const onPage = listed.find((o) => String(o.id) === value);
+  const { data: chosenData } = useGetPurchaseOrderQuery({ id: Number(value), entity }, { skip: !value || !!onPage });
+  const chosen = onPage ?? (chosenData?.data && String(chosenData.data.id) === value ? chosenData.data : undefined);
+  const options = withChosen<{ id: number; document_number: string; vendor_code: string }>(listed, chosen, (o) => String(o.id))
+    .map((o) => ({ value: String(o.id), label: `${o.document_number} - ${o.vendor_code}` }));
+  return <SearchSelect label={label} options={options} value={value} onChange={adapt(onChange)} onSearchChange={onSearchChange} loading={isLoading} placeholder={placeholder} revealOnSearch />;
+}
+
+/**
+ * A catalogue item for a requisition line, searched on the server by code or
+ * name. Reports the id and the item's row, so the line can take its
+ * description, unit and standard price at the moment it is chosen.
+ */
+export function CatalogItemPicker({ entity, value, onChange, placeholder = "Catalog item (optional)" }: { entity: string; value: string; onChange: (id: string, item?: CatalogItem) => void; placeholder?: string }) {
+  const { onSearchChange, searchArg } = useListSearch();
+  const { data, isLoading } = useGetCatalogItemsQuery({ entity, ...searchArg });
+  const listed = toArray(data?.data);
+  const onPage = listed.find((item) => String(item.id) === value);
+  const { data: chosenData } = useGetCatalogItemQuery({ id: Number(value), entity }, { skip: !value || !!onPage });
+  const chosen = onPage ?? (chosenData?.data && String(chosenData.data.id) === value ? chosenData.data : undefined);
+  const rows = withChosen(listed, chosen, (item) => String(item.id));
+  const options = rows.map((item) => ({ value: String(item.id), label: `${item.code} - ${item.name}` }));
+  const choose = (id: string) => onChange(id, rows.find((item) => String(item.id) === id));
+  return <SearchSelect options={options} value={value} onChange={adapt(choose)} onSearchChange={onSearchChange} loading={isLoading} placeholder={placeholder} revealOnSearch />;
 }
 
 // A PO's optional call-off link - only the selected vendor's ACTIVE contracts are
@@ -145,10 +205,9 @@ export function StockTransferDestinationPicker({ entity, value, onChange, exclud
   label?: string;
   isRequired?: boolean;
 }) {
-  const [search, setSearch] = useState("");
-  const term = useDebounce(search.trim(), 250);
+  const { onSearchChange, searchArg } = useListSearch();
   const [picked, setPicked] = useState<StockTransferDestination | null>(null);
-  const { data, isFetching } = useGetStockTransferDestinationsQuery({ entity, page_size: 50, ...(term ? { search: term } : {}) });
+  const { data, isLoading } = useGetStockTransferDestinationsQuery({ entity, page_size: 50, ...searchArg });
   const listed = toArray(data?.data);
   const rows = listed.filter((r) => String(r.id) !== exclude);
   const all = picked && String(picked.id) === value && !rows.some((r) => r.id === picked.id) ? [picked, ...rows] : rows;
@@ -164,8 +223,8 @@ export function StockTransferDestinationPicker({ entity, value, onChange, exclud
   };
   return (
     <SearchSelect
-      label={label} options={options} value={value} onChange={adapt(choose)} onSearchChange={setSearch}
-      loading={isFetching} placeholder="Search stores by code or name" isRequired={isRequired}
+      label={label} options={options} value={value} onChange={adapt(choose)} onSearchChange={onSearchChange}
+      loading={isLoading} placeholder="Search stores by code or name" isRequired={isRequired}
     />
   );
 }

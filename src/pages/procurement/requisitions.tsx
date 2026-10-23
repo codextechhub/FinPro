@@ -45,12 +45,13 @@ import { P as HOST_P } from "@/permissions";
 import { useCan } from "@/components/finance-ui/can";
 import { useAppSelector } from "@/redux/store";
 import {
-  useCreateRequisitionMutation, useGetCatalogItemsQuery,
+  useCreateRequisitionMutation,
   useGetRequisitionBudgetAvailabilityQuery, useGetRequisitionQuery,
   useGetRequisitionSummaryQuery, useGetRequisitionsQuery,
   useSubmitRequisitionMutation, useUpdateRequisitionMutation,
 } from "@/redux/services/procurement/procurement-api";
-import type { Requisition } from "@/redux/services/procurement/procurement-types";
+import type { CatalogItem, Requisition } from "@/redux/services/procurement/procurement-types";
+import { CatalogItemPicker } from "./pickers";
 import {
   useGetWorkflowInstanceQuery, useRecordWorkflowActionMutation,
 } from "@/redux/services/dashboard/workflow-api";
@@ -422,7 +423,6 @@ function RequisitionForm({ open, onClose, entity, currency, initial, returned = 
   const [update, { isLoading: updating }] = useUpdateRequisitionMutation();
   const [submitReq, { isLoading: submitting }] = useSubmitRequisitionMutation();
   const { data: costCenterData } = useGetCostCentersQuery({ entity, is_active: true });
-  const { data: catalogData, isLoading: catalogLoading } = useGetCatalogItemsQuery({ entity, page_size: 100 });
   const { data: budgetData, isFetching: budgetLoading } = useGetRequisitionBudgetAvailabilityQuery(
     { entity, cost_center: costCenter, date: requestDate }, { skip: !costCenter },
   );
@@ -430,16 +430,13 @@ function RequisitionForm({ open, onClose, entity, currency, initial, returned = 
   // A draft keeps the branch it was raised for.
   const branch = useRaisingBranchChoice({ unless: !!initial });
 
-  const catalog = toArray(catalogData?.data);
   const costCenters = toArray(costCenterData?.data).map((center) => ({ value: center.code, label: `${center.code} - ${center.name}` }));
-  const catalogOptions = catalog.map((item) => ({ value: String(item.id), label: `${item.code} - ${item.name}` }));
   const apiLines = requisitionApiLines(lines);
   const estimate = apiLines.reduce((total, line) => total + Math.round(line.quantity * line.estimated_unit_price), 0);
   const canSave = !!title.trim() && !!requestDate && apiLines.length > 0 && branch.ready;
 
   const setLine = (index: number, patch: Partial<FormLine>) => setLines((current) => current.map((line, i) => i === index ? { ...line, ...patch } : line));
-  const chooseCatalog = (index: number, id: string) => {
-    const item = catalog.find((candidate) => String(candidate.id) === id);
+  const chooseCatalog = (index: number, id: string, item?: CatalogItem) => {
     setLine(index, item ? {
       catalogItem: id, description: item.description || item.name,
       unit: item.unit_of_measure || "Unit", unitPriceKobo: item.standard_unit_price,
@@ -511,7 +508,7 @@ function RequisitionForm({ open, onClose, entity, currency, initial, returned = 
             {lines.map((line, index) => <div key={index} className="rounded-md border border-white-02 p-3">
               <div className="mb-2 flex items-center justify-between"><p className="font-mont text-xs font-semibold text-gray-05">Item {index + 1}</p><button type="button" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((_, i) => i !== index))} className="text-gray-05 hover:text-destructive disabled:opacity-30"><Trash2 className="size-4" /></button></div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.5fr)_80px_100px_minmax(130px,0.7fr)]">
-                <div className="space-y-2"><SearchSelect options={catalogOptions} loading={catalogLoading} value={line.catalogItem} onChange={(e) => chooseCatalog(index, e.target.value)} placeholder="Catalog item (optional)" /><Input value={line.description} onChange={(e) => setLine(index, { description: e.target.value })} placeholder="Item description" /></div>
+                <div className="space-y-2"><CatalogItemPicker entity={entity} value={line.catalogItem} onChange={(id, item) => chooseCatalog(index, id, item)} /><Input value={line.description} onChange={(e) => setLine(index, { description: e.target.value })} placeholder="Item description" /></div>
                 <Input type="number" min={0.0001} step="any" value={line.quantity} onChange={(e) => setLine(index, { quantity: Number(e.target.value) })} aria-label="Quantity" />
                 <Input value={line.unit} onChange={(e) => setLine(index, { unit: e.target.value })} placeholder="Unit" aria-label="Unit" />
                 <MoneyInput valueKobo={line.unitPriceKobo} onChangeKobo={(value) => setLine(index, { unitPriceKobo: value })} currency={currency} />

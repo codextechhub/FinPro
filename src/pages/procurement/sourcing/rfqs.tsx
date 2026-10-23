@@ -10,11 +10,11 @@ import { toast } from "sonner";
 
 import { ProcurementShell } from "../procurement-shell";
 import { ProcurementPageHeader } from "../screen-help";
-import { RequisitionPicker } from "../pickers";
+import { RequisitionPicker, vendorAvailable } from "../pickers";
 import { SearchSelect } from "@/components/custom/search-select";
 import {
   DataTable, DetailDrawer, EmptyState, ErrorState, FormField, LineEditor,
-  LoadingState, Money, MoneyInput, StatCard, StatusPill, ActionButton, TabStrip, emptyLine, toArray,
+  LoadingState, Money, MoneyInput, StatCard, StatusPill, ActionButton, TabStrip, emptyLine, toArray, useListSearch,
   useActiveEntity, useFieldAccess, type Column, type TabStripItem,
   RaisingBranchChoiceField, useRaisingBranchChoice, useReaderBranchLens, Segmented,
 } from "@/components/finance-ui";
@@ -414,11 +414,12 @@ function DeadlineInput({
  * ✕ is disabled - matching the backend's responded-vendor protection.
  */
 function InviteVendorsEditor({ entity, invited, onChange }: { entity: string; invited: InviteRow[]; onChange: (rows: InviteRow[]) => void }) {
-  const { data, isLoading } = useGetVendorsQuery({ entity, page_size: 100 });
+  const { onSearchChange, searchArg } = useListSearch();
+  const { data, isLoading } = useGetVendorsQuery({ entity, ...searchArg });
   const vendors = toArray(data?.data);
   const invitedCodes = new Set(invited.map((v) => v.code));
   const options = vendors
-    .filter((v) => v.is_active && !v.on_hold && v.kyc_status !== "REJECTED" && !invitedCodes.has(v.code))
+    .filter((v) => vendorAvailable(v) && !invitedCodes.has(v.code))
     .map((v) => ({ value: v.code, label: `${v.code} - ${v.name}` }));
   const add = (code: string) => {
     if (!code || invitedCodes.has(code)) return;
@@ -427,7 +428,7 @@ function InviteVendorsEditor({ entity, invited, onChange }: { entity: string; in
   };
   return (
     <div className="space-y-2">
-      <SearchSelect options={options} value="" onChange={(e) => add(e.target.value)} loading={isLoading} placeholder="Add a vendor to invite" revealOnSearch />
+      <SearchSelect options={options} value="" onChange={(e) => add(e.target.value)} onSearchChange={onSearchChange} loading={isLoading} placeholder="Add a vendor to invite" revealOnSearch />
       {invited.length === 0 ? (
         <p className="font-mont text-xs text-gray-05">No vendors invited yet. Add at least one before issuing.</p>
       ) : (

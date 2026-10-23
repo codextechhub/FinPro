@@ -8,6 +8,12 @@
  * for requisitions with a free line, an order for those whose every line is
  * free. A buyer who picks PR-0004 for an RFQ, whose chairs already sit on
  * RFQ-0007, reads that some of its lines are held before saving.
+ *
+ * The lists that grow with use are searched on the server. A buyer at a school
+ * with 140 vendors types "Prime" and the server is asked for it, rather than
+ * the first page being filtered in the browser. A requisition or catalogue item
+ * the form opens with, but which is not on the page the server sent, is read on
+ * its own so its field still names it.
  */
 
 import { act } from "react";
@@ -16,11 +22,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   destinations: vi.fn(), select: vi.fn(), free: vi.fn(), requisitionArgs: vi.fn(), requisitions: undefined as unknown, held: new Set<string>(), vendors: undefined as unknown,
+  vendorArgs: [] as Record<string, unknown>[], requisition: vi.fn(), catalog: undefined as unknown, catalogItem: vi.fn(),
 }));
 
 vi.mock("@/redux/services/procurement/procurement-ext-api", () => ({
   useGetStockTransferDestinationsQuery: (args: unknown) => mocks.destinations(args),
   useGetRfqsQuery: () => ({ data: undefined }),
+  useGetRfqQuery: () => ({ data: undefined }),
   useGetContractsQuery: () => ({ data: undefined }),
   useGetFreeRequisitionLinesQuery: (args: unknown, options: { skip?: boolean }) => mocks.free(args, options),
 }));
@@ -34,13 +42,20 @@ vi.mock("@/hooks/use-permissions", () => ({
   }),
 }));
 vi.mock("@/redux/services/procurement/procurement-api", () => ({
-  useGetVendorsQuery: () => ({ data: mocks.vendors, isLoading: false }),
+  useGetVendorsQuery: (args: Record<string, unknown>, options?: { skip?: boolean }) => {
+    if (!options?.skip) mocks.vendorArgs.push(args);
+    return { data: mocks.vendors, isLoading: false };
+  },
   useGetCategoriesQuery: () => ({ data: undefined }),
   useGetRequisitionsQuery: (args: unknown, options: unknown) => { mocks.requisitionArgs(args, options); return { data: mocks.requisitions }; },
+  useGetRequisitionQuery: (args: unknown, options: { skip?: boolean }) => mocks.requisition(args, options) ?? { data: undefined },
   useGetPurchaseOrdersQuery: () => ({ data: undefined }),
+  useGetPurchaseOrderQuery: () => ({ data: undefined }),
+  useGetCatalogItemsQuery: () => ({ data: mocks.catalog, isLoading: false }),
+  useGetCatalogItemQuery: (args: unknown, options: { skip?: boolean }) => mocks.catalogItem(args, options) ?? { data: undefined },
 }));
 vi.mock("@/components/custom/search-select", () => ({
-  SearchSelect: (props: { options: { value: string; label: string }[]; onChange: (e: { target: { value: string } }) => void }) => {
+  SearchSelect: (props: { options: { value: string; label: string }[]; onChange: (e: { target: { value: string } }) => void; onSearchChange?: (query: string) => void }) => {
     mocks.select(props);
     return (
       <select aria-label="To store" onChange={(e) => props.onChange({ target: { value: e.target.value } })}>
@@ -51,7 +66,7 @@ vi.mock("@/components/custom/search-select", () => ({
 }));
 
 import { P } from "../../permissions";
-import { RequisitionPicker, StockTransferDestinationPicker, VendorPicker, destinationLabel } from "./pickers";
+import { CatalogItemPicker, RequisitionPicker, StockTransferDestinationPicker, VendorPicker, destinationLabel } from "./pickers";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -63,6 +78,9 @@ let root: Root;
 beforeEach(() => {
   mocks.destinations.mockReset();
   mocks.select.mockReset();
+  mocks.requisition.mockReset();
+  mocks.catalogItem.mockReset();
+  mocks.vendorArgs = [];
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -114,7 +132,7 @@ describe("the requisition an order or RFQ is raised from", () => {
     mocks.held = new Set([P.PROC_VIEW_RFQS, P.PROC_VIEW_REQUISITIONS]);
     act(() => root.render(<RequisitionPicker entity="BSS" value="" onChange={vi.fn()} status="APPROVED" sourcing="order" />));
     expect(mocks.requisitionArgs).toHaveBeenLastCalledWith(
-      { entity: "BSS", page_size: 100, status: "APPROVED", all_lines_free: "true" }, { refetchOnMountOrArgChange: true, skip: false },
+      { entity: "BSS", status: "APPROVED", all_lines_free: "true" }, { refetchOnMountOrArgChange: true, skip: false },
     );
     expect(mocks.free.mock.calls.every(([, options]) => options?.skip)).toBe(true);
   });
@@ -123,7 +141,7 @@ describe("the requisition an order or RFQ is raised from", () => {
     mocks.held = new Set([P.PROC_VIEW_RFQS, P.PROC_VIEW_REQUISITIONS]);
     act(() => root.render(<RequisitionPicker entity="BSS" value="4" onChange={vi.fn()} status="APPROVED" sourcing="rfq" />));
     expect(mocks.requisitionArgs).toHaveBeenLastCalledWith(
-      { entity: "BSS", page_size: 100, status: "APPROVED", has_free_lines: "true" }, { refetchOnMountOrArgChange: true, skip: false },
+      { entity: "BSS", status: "APPROVED", has_free_lines: "true" }, { refetchOnMountOrArgChange: true, skip: false },
     );
     expect(mocks.free).toHaveBeenLastCalledWith({ entity: "BSS", page_size: 100, requisition: 4 }, { skip: false });
     expect(container.textContent).toContain("Some lines of PR-0004 are already on an RFQ or purchase order. Remove them from this RFQ before you save.");
@@ -139,7 +157,23 @@ describe("the requisition an order or RFQ is raised from", () => {
   it("leaves the plain list alone without a purpose", () => {
     mocks.held = new Set([P.PROC_VIEW_REQUISITIONS]);
     act(() => root.render(<RequisitionPicker entity="BSS" value="" onChange={vi.fn()} status="APPROVED" />));
-    expect(mocks.requisitionArgs).toHaveBeenLastCalledWith({ entity: "BSS", page_size: 100, status: "APPROVED" }, { refetchOnMountOrArgChange: false, skip: false });
+    expect(mocks.requisitionArgs).toHaveBeenLastCalledWith({ entity: "BSS", status: "APPROVED" }, { refetchOnMountOrArgChange: false, skip: false });
+  });
+
+  it("reads a chosen requisition the page does not hold on its own, and names it", () => {
+    mocks.held = new Set([P.PROC_VIEW_REQUISITIONS]);
+    mocks.requisition.mockImplementation((_args: unknown, options: { skip?: boolean }) => (
+      options?.skip ? undefined : { data: { data: { ...requisition(9, "PR-0009", [901]), title: "Science lab stools" } } }
+    ));
+    act(() => root.render(<RequisitionPicker entity="BSS" value="9" onChange={vi.fn()} status="APPROVED" />));
+    expect(mocks.requisition).toHaveBeenLastCalledWith({ id: 9, entity: "BSS" }, { skip: false });
+    expect([...container.querySelectorAll("option")].map((o) => o.textContent)[0]).toBe("PR-0009 - Science lab stools (APPROVED)");
+  });
+
+  it("does not read the chosen requisition again when the page holds it", () => {
+    mocks.held = new Set([P.PROC_VIEW_REQUISITIONS]);
+    act(() => root.render(<RequisitionPicker entity="BSS" value="4" onChange={vi.fn()} status="APPROVED" />));
+    expect(mocks.requisition.mock.calls.every(([, options]) => options?.skip)).toBe(true);
   });
 
   it("does not ask for requisitions without the key to view them", () => {
@@ -176,11 +210,54 @@ describe("the vendor picker", () => {
     expect(labels()).toEqual(["ADE - Ade Stationers", "PRIME - Prime Uniforms"]);
   });
 
+  it("asks the server for what the buyer types, after a pause", () => {
+    vi.useFakeTimers();
+    try {
+      mocks.vendors = { data: [ADE] };
+      act(() => root.render(<VendorPicker entity="BSS" value="" onChange={vi.fn()} />));
+      expect(mocks.vendorArgs.at(-1)).toEqual({ entity: "BSS" });
+      act(() => mocks.select.mock.lastCall?.[0].onSearchChange?.("Prime"));
+      act(() => { vi.advanceTimersByTime(300); });
+      expect(mocks.vendorArgs.at(-1)).toEqual({ entity: "BSS", search: "Prime" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a chosen vendor no longer eligible on the list, and reports the row picked", () => {
+    mocks.vendors = { data: [ADE, PRIME] };
+    const onChange = vi.fn();
+    act(() => root.render(<VendorPicker entity="BSS" value="PRIME" onChange={onChange} purchaseEligible />));
+    expect(labels()).toEqual(["PRIME - Prime Uniforms (Unavailable for new commitments)", "ADE - Ade Stationers"]);
+    act(() => mocks.select.mock.lastCall?.[0].onChange({ target: { value: "ADE" } }));
+    expect(onChange).toHaveBeenLastCalledWith("ADE", ADE);
+  });
+
   it("still marks an inactive vendor, which is not behind a switch", () => {
     const { on_hold: _hold, kyc_status: _kyc, ...rest } = PRIME;
     void [_hold, _kyc];
     mocks.vendors = { data: [{ ...rest, is_active: false }] };
     act(() => root.render(<VendorPicker entity="BSS" value="" onChange={vi.fn()} />));
     expect(labels()).toEqual(["PRIME - Prime Uniforms (Unavailable for new commitments)"]);
+  });
+});
+
+describe("the catalogue item on a requisition line", () => {
+  const PENS = { id: 7, code: "CAT-0007", name: "Blue pens (box)", description: "Box of 50", unit_of_measure: "Box", standard_unit_price: 450000 };
+
+  it("hands the line the item it picked, so it takes the description, unit and price", () => {
+    mocks.catalog = { data: [PENS] };
+    const onChange = vi.fn();
+    act(() => root.render(<CatalogItemPicker entity="BSS" value="" onChange={onChange} />));
+    act(() => mocks.select.mock.lastCall?.[0].onChange({ target: { value: "7" } }));
+    expect(onChange).toHaveBeenLastCalledWith("7", PENS);
+  });
+
+  it("names a saved line's item the page does not hold", () => {
+    mocks.catalog = { data: [] };
+    mocks.catalogItem.mockImplementation((_args: unknown, options: { skip?: boolean }) => (options?.skip ? undefined : { data: { data: { ...PENS, id: 312, code: "CAT-0312", name: "Lab goggles" } } }));
+    act(() => root.render(<CatalogItemPicker entity="BSS" value="312" onChange={vi.fn()} />));
+    expect(mocks.catalogItem).toHaveBeenLastCalledWith({ id: 312, entity: "BSS" }, { skip: false });
+    expect([...container.querySelectorAll("option")].map((o) => o.textContent)).toEqual(["CAT-0312 - Lab goggles"]);
   });
 });
