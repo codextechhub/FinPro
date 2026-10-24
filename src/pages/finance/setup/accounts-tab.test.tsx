@@ -572,7 +572,7 @@ describe("Chart split into everyday and system accounts", () => {
       act(() => root.render(<AccountsTab entity="BSS" />));
       act(() => findButton("New account", container)!.click());
     };
-    const nameInput = () => document.body.querySelector("input[placeholder='e.g. Science lab supplies']") as HTMLInputElement;
+    const nameInput = () => document.body.querySelector("input[placeholder='e.g. Generator fuel']") as HTMLInputElement;
     const created = () => mocks.create.mock.calls.map((c) => c[0] as Record<string, unknown>);
 
     it("asks what the account is for in plain words, not for a code", () => {

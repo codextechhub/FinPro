@@ -7,7 +7,7 @@ import { ACCOUNT_TYPES } from "@/utils/chart-of-accounts";
  * term, and the order puts the everyday kinds, money in and money out, first.
  */
 export const KIND_CHOICES: ReadonlyArray<{ value: AccountKind; label: string; hint: string }> = [
-  { value: "INCOME", label: "Money coming in", hint: "Fees, grants, donations and other money the school receives." },
+  { value: "INCOME", label: "Money coming in", hint: "Fees, grants, donations and other money you receive." },
   { value: "EXPENSE", label: "Money going out", hint: "Salaries, utilities, repairs and other running costs." },
   { value: "ASSET", label: "Something we own", hint: "Cash, bank balances, equipment and money owed to us." },
   { value: "LIABILITY", label: "Something we owe", hint: "Loans, unpaid bills and money held for others." },

@@ -204,7 +204,7 @@ export function CreateAccountDrawer({ open, onClose, entity, parents }: {
           </div>
 
           <FormField label="Name" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="bg-white" placeholder="e.g. Science lab supplies" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="bg-white" placeholder="e.g. Generator fuel" />
           </FormField>
 
           <AccessField access={access} name="description" label="Description" creating errors={fieldErrors}>
@@ -213,7 +213,7 @@ export function CreateAccountDrawer({ open, onClose, entity, parents }: {
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               className="bg-white"
-              placeholder="Say what goes into it, e.g. chemicals and equipment bought for the science lab"
+              placeholder="Say what goes into it, e.g. diesel and servicing for the generator"
             />
           </AccessField>
 
