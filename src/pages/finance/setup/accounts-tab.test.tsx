@@ -333,7 +333,8 @@ describe("Bank ledger accounts when the book balance is hidden", () => {
 /**
  * The software posts to most of the chart itself. Where the server classifies
  * accounts, Mrs Adeyemi opens the chart and reads the accounts she uses; the
- * rest wait folded under "Managed by the system". A role that may not read the
+ * rest wait folded under "Managed by the system", unless one holds a balance,
+ * in which case it stays in the tree. A role that may not read the
  * classification gets the chart exactly as it always was.
  */
 describe("Chart split into everyday and system accounts", () => {
@@ -343,15 +344,18 @@ describe("Chart split into everyday and system accounts", () => {
     is_postable: true, is_active: true, parent_id: null, parent_code: null, subtype: "", tag: null,
     balance: { kobo: 100000, naira: "1,000.00" }, description: "", managed_by: null, ...over,
   });
+  const NOTHING = { kobo: 0, naira: "0.00" };
   const kept = (over: Record<string, unknown> = {}) => ({ keeper: "the receivables ledger", moved_by: MOVED, hand_journals: false, ...over });
   const chart = () => [
     row(1, "1000", "Assets", { is_postable: false }),
     row(2, "1100", "Cash in hand", { parent_id: 1, parent_code: "1000", description: "Notes and coins kept in the bursar's safe." }),
-    row(3, "1200", "Fees owed by parents", { parent_id: 1, parent_code: "1000", tag: "CONTROL", managed_by: kept() }),
-    row(4, "2195", "Unidentified receipts", { account_type: "LIABILITY", normal_balance: "CREDIT", managed_by: kept({ keeper: "the receipts desk" }) }),
-    row(5, "5100", "Salaries", { account_type: "EXPENSE", managed_by: kept({ keeper: "payroll", moved_by: "a payroll run" }) }),
+    row(3, "1200", "Fees owed by parents", { parent_id: 1, parent_code: "1000", tag: "CONTROL", balance: NOTHING, managed_by: kept() }),
+    row(4, "2195", "Unidentified receipts", { account_type: "LIABILITY", normal_balance: "CREDIT", balance: NOTHING, managed_by: kept({ keeper: "the receipts desk" }) }),
+    row(5, "5100", "Salaries", { account_type: "EXPENSE", balance: NOTHING, managed_by: kept({ keeper: "payroll", moved_by: "a payroll run" }) }),
   ];
   const text = () => container.textContent ?? "";
+  const hint = () => document.body.querySelector("[aria-label='What this account is for']") as HTMLElement | null;
+  const openHint = () => { act(() => hint()!.click()); return document.body.querySelector("[aria-label='What this account is for details']")?.textContent ?? ""; };
   const sectionButton = () => [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Managed by the system"))!;
   const typeInto = (el: HTMLInputElement | HTMLTextAreaElement, value: string) => {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -373,35 +377,88 @@ describe("Chart split into everyday and system accounts", () => {
     expect(sectionButton().getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("shows each account's description as a muted line under its name", () => {
+  it("draws each row on one line, with no description under the name", () => {
     mocks.chart = chart();
     act(() => root.render(<AccountsTab entity="BSS" />));
-    expect(text()).toContain("Notes and coins kept in the bursar's safe.");
+    expect(text()).toContain("Cash in hand");
+    expect(text()).not.toContain("Notes and coins kept in the bursar's safe.");
+    expect(container.querySelector("[aria-label='What this account is for']")).toBeNull();
   });
 
-  it("opens to the system's accounts, grouped by type, each saying what moves it", () => {
+  it("opens to the system's accounts, grouped by type, with no explanation on the rows", () => {
     mocks.chart = chart();
     act(() => root.render(<AccountsTab entity="BSS" />));
     act(() => sectionButton().click());
     expect(sectionButton().getAttribute("aria-expanded")).toBe("true");
     expect(text()).toContain("Fees owed by parents");
     expect(text()).toContain("Unidentified receipts");
-    expect(text()).toContain(`Moved by ${MOVED}`);
-    expect(text()).toContain("Moved by a payroll run");
+    expect(text()).not.toContain("Moved by");
+    expect(text()).not.toContain(MOVED);
     expect(text()).toContain("CTRL");
     const headings = [...container.querySelectorAll("th[scope=colgroup]")].map((th) => th.textContent);
     expect(headings).toEqual(["Assets", "Liabilities", "Expenses"]);
   });
 
-  it("keeps balances and opens the drawer from a system row", () => {
+  it("opens the drawer from a system row", () => {
     mocks.chart = chart();
-    mocks.detail = { data: { account: chart()[2], type_label: "Asset", summary: { line_count: 0, journal_count: 0, fiscal_year_start: "2026-01-01", as_of: "2026-10-12" }, activity: [] } };
+    mocks.detail = { data: { account: { ...chart()[2], description: "What parents still owe." }, type_label: "Asset", summary: { line_count: 0, journal_count: 0, fiscal_year_start: "2026-01-01", as_of: "2026-10-12" }, activity: [] } };
     act(() => root.render(<AccountsTab entity="BSS" />));
     act(() => sectionButton().click());
     const systemRow = [...container.querySelectorAll("tbody tr")].find((tr) => tr.textContent?.includes("Fees owed by parents")) as HTMLElement;
-    expect(systemRow.textContent).toContain("1,000.00");
     act(() => systemRow.click());
-    expect(document.body.textContent).toContain("Managed by the system: kept by the receivables ledger.");
+    expect(document.body.textContent).toContain("1200 · Fees owed by parents");
+    expect(hint()).not.toBeNull();
+  });
+
+  describe("a system account that holds a balance", () => {
+    const withBalances = () => chart().map((r) => {
+      if (r.code === "1200") return { ...r, balance: { kobo: 250000, naira: "2,500.00" } };
+      if (r.code === "2195") return { ...r, balance: { kobo: -4000, naira: "-40.00" } };
+      return r;
+    });
+
+    it("moves into the main tree, whether the balance is positive or negative, and drops out of the section's count", () => {
+      mocks.chart = withBalances();
+      act(() => root.render(<AccountsTab entity="BSS" />));
+      expect(text()).toContain("Managed by the system (1)");
+      const [main] = [...container.querySelectorAll("table")];
+      expect(main.textContent).toContain("Fees owed by parents");
+      expect(main.textContent).toContain("Unidentified receipts");
+      expect(main.textContent).toContain("2,500.00");
+      expect(main.textContent).not.toContain("Salaries");
+      act(() => sectionButton().click());
+      const system = container.querySelectorAll("table")[1];
+      expect(system.textContent).toContain("Salaries");
+      expect(system.textContent).not.toContain("Fees owed by parents");
+      expect(system.textContent).not.toContain("Unidentified receipts");
+    });
+
+    it("leaves a system account at zero folded", () => {
+      mocks.chart = chart();
+      act(() => root.render(<AccountsTab entity="BSS" />));
+      const [main] = [...container.querySelectorAll("table")];
+      expect(main.textContent).not.toContain("Fees owed by parents");
+      expect(text()).toContain("Managed by the system (3)");
+    });
+
+    it("leaves a system account with no readable balance folded", () => {
+      mocks.chart = chart().map((r) => {
+        if (r.code !== "1200") return r;
+        const { balance: _hidden, ...rest } = r;
+        return rest;
+      });
+      act(() => root.render(<AccountsTab entity="BSS" />));
+      const [main] = [...container.querySelectorAll("table")];
+      expect(main.textContent).not.toContain("Fees owed by parents");
+      expect(text()).toContain("Managed by the system (3)");
+    });
+
+    it("shows no section at all when every system account holds a balance", () => {
+      mocks.chart = chart().map((r) => (r.managed_by ? { ...r, balance: { kobo: 100, naira: "1.00" } } : r));
+      act(() => root.render(<AccountsTab entity="BSS" />));
+      expect(text()).not.toContain("Managed by the system");
+      expect(text()).toContain("Salaries");
+    });
   });
 
   it("shows the old single tree, with no section and no system wording, when the key is absent", () => {
@@ -422,10 +479,14 @@ describe("Chart split into everyday and system accounts", () => {
     expect(sectionButton().getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("finds an account by what it is for", () => {
+  it("searches by code or name only, not by description", () => {
     mocks.chart = chart().map((r) => (r.code === "5100" ? { ...r, description: "Monthly pay for teachers and staff." } : r));
     act(() => root.render(<AccountsTab entity="BSS" />));
-    typeInto(container.querySelector("input[placeholder^='Search']") as HTMLInputElement, "teachers");
+    const search = container.querySelector("input[placeholder='Search code or name']") as HTMLInputElement;
+    expect(search).not.toBeNull();
+    typeInto(search, "teachers");
+    expect(text()).not.toContain("Salaries");
+    typeInto(search, "salar");
     expect(text()).toContain("Salaries");
   });
 
@@ -468,7 +529,7 @@ describe("Chart split into everyday and system accounts", () => {
   describe("Field Access", () => {
     const headers = () => [...container.querySelectorAll("thead")].map((t) => [...t.querySelectorAll("th")].map((th) => th.textContent));
 
-    it("hides the same columns, tags and lines in the system section as in the main table", () => {
+    it("hides the same columns and tags in the system section as in the main table", () => {
       mocks.fieldAccess = { "finance.account": { hidden: ["subtype", "is_active", "tag", "description", "balance"] } };
       mocks.chart = chart();
       act(() => root.render(<AccountsTab entity="BSS" />));
@@ -478,7 +539,6 @@ describe("Chart split into everyday and system accounts", () => {
       expect(system).toEqual(main);
       expect(text()).not.toContain("CTRL");
       expect(text()).not.toContain("Notes and coins kept");
-      expect(text()).toContain(`Moved by ${MOVED}`);
       const cells = [...container.querySelectorAll("tbody tr")].filter((tr) => tr.querySelector("td")).map((tr) => tr.querySelectorAll("td").length);
       expect(cells.every((n) => n === 4)).toBe(true);
       const heading = container.querySelector("th[scope=colgroup]") as HTMLElement;
@@ -505,36 +565,56 @@ describe("Chart split into everyday and system accounts", () => {
       act(() => { (container.querySelector("tbody tr.cursor-pointer") as HTMLElement).click(); });
     };
 
-    it("says what the account is for and, for a system account, who keeps it", () => {
+    it("keeps the description and the system's keeper out of the drawer body", () => {
       open(row(3, "1200", "Fees owed by parents", { description: "What parents still owe the school.", managed_by: kept() }));
       const body = document.body.textContent ?? "";
-      expect(body).toContain("What it's for");
-      expect(body).toContain("What parents still owe the school.");
-      expect(body).toContain(`Managed by the system: kept by the receivables ledger. Record it with ${MOVED}.`);
-      expect(body).toContain("Typed journals cannot post to this account.");
+      expect(body).toContain("1200 · Fees owed by parents");
+      expect(body).not.toContain("What it's for");
+      expect(body).not.toContain("What parents still owe the school.");
+      expect(body).not.toContain("Managed by the system:");
     });
 
-    it("leaves out the typed-journal line when a typed journal is allowed", () => {
-      open(row(3, "1200", "Fees owed by parents", { managed_by: kept({ hand_journals: true }) }));
-      const body = document.body.textContent ?? "";
-      expect(body).toContain("Managed by the system: kept by");
-      expect(body).not.toContain("Typed journals cannot post");
+    it("puts the description behind the info icon beside the title, with no label", () => {
+      open(row(2, "1100", "Cash in hand", { description: "Notes and coins." }));
+      const icon = hint()!;
+      expect(icon).not.toBeNull();
+      expect(icon.closest("[data-slot=sheet-title]")?.textContent).toContain("1100 · Cash in hand");
+      const content = openHint();
+      expect(content).toBe("Notes and coins.");
+      expect(content).not.toContain("Managed by the system");
     });
 
-    it("leaves out the purpose and the system panel when their switches are hidden", () => {
+    it("shows only the description in the icon, never the system's keeper", () => {
+      open(row(3, "1200", "Fees owed by parents", { description: "What parents still owe the school.", managed_by: kept() }));
+      expect(openHint()).toBe("What parents still owe the school.");
+    });
+
+    it("shows no icon for a system account that has no description", () => {
+      open(row(3, "1200", "Fees owed by parents", { description: "", managed_by: kept() }));
+      expect(hint()).toBeNull();
+    });
+
+    it("shows no icon when the description is hidden and the account is everyday", () => {
+      mocks.fieldAccess = { "finance.account": { hidden: ["description"] } };
+      const { description: _d, ...rest } = row(2, "1100", "Cash in hand");
+      open(rest);
+      expect(document.body.textContent).toContain("1100 · Cash in hand");
+      expect(hint()).toBeNull();
+    });
+
+    it("shows no icon for an everyday account without a description", () => {
+      open(row(2, "1100", "Cash in hand", { description: "" }));
+      expect(hint()).toBeNull();
+    });
+
+    it("leaves out the icon and the system wording when both switches are hidden", () => {
       mocks.fieldAccess = { "finance.account": { hidden: ["description", "managed_by"] } };
       const hiddenRow = (() => { const { description: _d, managed_by: _m, ...rest } = row(3, "1200", "Fees owed by parents"); return rest; })();
       mocks.chart = [hiddenRow];
       mocks.detail = { data: { account: hiddenRow, type_label: "Asset", summary, activity: [] } };
       act(() => root.render(<AccountsTab entity="BSS" />));
       act(() => { (container.querySelector("tbody tr.cursor-pointer") as HTMLElement).click(); });
-      const body = document.body.textContent ?? "";
-      expect(body).not.toContain("What it's for");
-      expect(body).not.toContain("Managed by the system");
-    });
-
-    it("shows no system panel for an everyday account", () => {
-      open(row(2, "1100", "Cash in hand", { description: "Notes and coins." }));
+      expect(hint()).toBeNull();
       expect(document.body.textContent).not.toContain("Managed by the system");
     });
 
@@ -543,6 +623,8 @@ describe("Chart split into everyday and system accounts", () => {
       act(() => root.render(<AccountSettings entity="BSS" account={account as unknown as Account} onSaved={vi.fn()} />));
       const box = container.querySelector("textarea") as HTMLTextAreaElement;
       expect(box.value).toBe("Notes and coins.");
+      expect(container.querySelector("fieldset[data-field=description]")?.textContent).toContain("Description");
+      expect(container.textContent).not.toContain("What it's for");
       expect(button("Save changes")!.hasAttribute("disabled")).toBe(true);
       typeInto(box, "Notes and coins in the bursar's safe.");
       expect(button("Save changes")!.hasAttribute("disabled")).toBe(false);

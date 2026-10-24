@@ -15,10 +15,15 @@
  * classifies accounts (`managed_by` on every row) those accounts fold into one
  * collapsed "Managed by the system" section under the everyday tree, so a new
  * bursar reads the accounts they use first; a search still finds them and opens
- * the section. When a role may not read the classification the key is absent
+ * the section. A system account that holds a balance stays in the main tree,
+ * because the bursar needs to see where the money sits; the section holds only
+ * system accounts with nothing in them (see `chart-split.ts`). When a role may not read the classification the key is absent
  * from every row, and the chart is one plain tree with no section and no
- * system wording. Each account shows its description as a second line, and how
- * the viewer left the groups and the section is remembered in their browser.
+ * system wording. A chart row is one line: code, name and tags. An account's
+ * description sits behind the info icon beside the title of its detail drawer
+ * (absent when there is no readable description), so the chart itself carries
+ * no explanatory text. How the viewer left the groups and the
+ * section is remembered in their browser.
  */
 import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
@@ -26,7 +31,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { ArrowLeft, ChevronDown, ChevronRight, Check, Plus, Printer, Activity, Columns2, Network, Settings2 } from "lucide-react";
 import { cardColumns } from "../bank-account-access";
-import { AccessField, Money, FormField, DetailDrawer, StatusPill, DataTable, TabStrip, toArray, useActiveEntity, useFieldAccess, type Column, type TabStripItem } from "@/components/finance-ui";
+import { AccessField, Money, FormField, DetailDrawer, InfoHint, StatusPill, DataTable, TabStrip, toArray, useActiveEntity, useFieldAccess, type Column, type TabStripItem } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { EmptyState, ErrorState, LoadingState } from "@/components/finance-ui/states";
@@ -92,17 +97,13 @@ function Tag({ label }: { label: string }) {
  */
 type ChartFields = {
   showBalance: boolean; showSubtype: boolean; showActive: boolean; showTag: boolean; showContra: boolean;
-  showDescription: boolean;
 };
 
-/**
- * One chart row. `showMovedBy` adds the system section's "Moved by" line under
- * an account the software keeps.
- */
-function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showMovedBy, fields }: {
-  node: Node; depth: number; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; showMovedBy: boolean; fields: ChartFields;
+/** One chart row: code, name and tags on a single line. */
+function AccountRow({ node, depth, expanded, toggle, currency, onSelect, fields }: {
+  node: Node; depth: number; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; fields: ChartFields;
 }) {
-  const { showBalance, showSubtype, showActive, showTag, showContra, showDescription } = fields;
+  const { showBalance, showSubtype, showActive, showTag, showContra } = fields;
   const hasChildren = node.children.length > 0;
   const open = expanded.has(node.id);
   const cell = "border-t border-white-02 px-3 py-2 font-mont text-sm text-black-01";
@@ -123,12 +124,6 @@ function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showMov
                 {showTag && node.tag && <Tag label={node.tag === "CONTROL" ? "CTRL" : node.tag} />}
                 {showContra && node.is_contra && <Tag label="Contra" />}
               </div>
-              {showDescription && node.description ? (
-                <p className="max-w-[22rem] truncate text-xs text-gray-05" title={node.description}>{node.description}</p>
-              ) : null}
-              {showMovedBy && node.managed_by ? (
-                <p className="max-w-[22rem] truncate text-[11px] text-gray-05">Moved by {node.managed_by.moved_by}</p>
-              ) : null}
             </div>
           </div>
         </td>
@@ -152,7 +147,7 @@ function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showMov
         ) : null}
       </tr>
       {hasChildren && open && node.children.map((c) => (
-        <AccountRow key={c.id} node={c} depth={depth + 1} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} showMovedBy={showMovedBy} fields={fields} />
+        <AccountRow key={c.id} node={c} depth={depth + 1} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} fields={fields} />
       ))}
     </>
   );
@@ -162,8 +157,8 @@ function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showMov
 type RowGroup = { heading?: string; rows: Node[] };
 
 /** The chart's table: one header row, then each group's rows. */
-function ChartTable({ groups, expanded, toggle, currency, onSelect, showMovedBy, fields }: {
-  groups: RowGroup[]; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; showMovedBy: boolean; fields: ChartFields;
+function ChartTable({ groups, expanded, toggle, currency, onSelect, fields }: {
+  groups: RowGroup[]; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; fields: ChartFields;
 }) {
   const { showBalance, showSubtype, showActive } = fields;
   const columns = 4 + (showSubtype ? 1 : 0) + (showBalance ? 1 : 0) + (showActive ? 1 : 0);
@@ -182,7 +177,7 @@ function ChartTable({ groups, expanded, toggle, currency, onSelect, showMovedBy,
       </thead>
       <tbody>
         {groups.map((group) => (
-          <GroupRows key={group.heading ?? "all"} group={group} columns={columns} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} showMovedBy={showMovedBy} fields={fields} />
+          <GroupRows key={group.heading ?? "all"} group={group} columns={columns} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} fields={fields} />
         ))}
       </tbody>
     </table>
@@ -190,7 +185,7 @@ function ChartTable({ groups, expanded, toggle, currency, onSelect, showMovedBy,
 }
 
 function GroupRows({ group, columns, ...rest }: {
-  group: RowGroup; columns: number; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; showMovedBy: boolean; fields: ChartFields;
+  group: RowGroup; columns: number; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; fields: ChartFields;
 }) {
   return (
     <>
@@ -268,7 +263,7 @@ function ChartOfAccounts({ entity }: { entity: string }) {
     const q = search.trim().toLowerCase();
     return accounts.filter((a) =>
       (!type || a.account_type === type) &&
-      (!q || a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q) || (a.description ?? "").toLowerCase().includes(q)),
+      (!q || a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)),
     );
   }, [accounts, type, search]);
 
@@ -286,7 +281,6 @@ function ChartOfAccounts({ entity }: { entity: string }) {
     showActive: !access.isHidden("is_active"),
     showTag: !access.isHidden("tag"),
     showContra: !access.isHidden("is_contra"),
-    showDescription: !access.isHidden("description"),
   };
   // Tree view only makes sense unfiltered; an active search/type filter falls back to flat.
   const filtering = search !== "" || type !== "";
@@ -310,7 +304,7 @@ function ChartOfAccounts({ entity }: { entity: string }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code, name or purpose" className="h-9 max-w-xs font-mont text-sm" />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code or name" className="h-9 max-w-xs font-mont text-sm" />
         <TabStrip items={VIEW_TABS} value={view} onChange={setView} variant="pill-compact" ariaLabel="Account list shape" />
         <select value={type} onChange={(e) => setType(e.target.value)} className={selectCls} aria-label="Account type">
           <option value="">All types</option>
@@ -333,7 +327,7 @@ function ChartOfAccounts({ entity }: { entity: string }) {
         <>
           {mainRows.length > 0 ? (
             <div className="overflow-x-auto rounded-md border border-white-02 bg-white">
-              <ChartTable groups={[{ rows: mainRows }]} showMovedBy={false} {...tableProps} />
+              <ChartTable groups={[{ rows: mainRows }]} {...tableProps} />
             </div>
           ) : filtering ? (
             <p className="font-mont text-xs text-gray-05">No everyday account matches.</p>
@@ -345,7 +339,7 @@ function ChartOfAccounts({ entity }: { entity: string }) {
               open={systemShown}
               onToggle={toggleSystem}
             >
-              <ChartTable groups={systemGroups} showMovedBy {...tableProps} />
+              <ChartTable groups={systemGroups} {...tableProps} />
             </SystemSection>
           ) : null}
         </>
@@ -374,8 +368,8 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
   const d = data?.data;
   const acc = d?.account;
   const access = useFieldAccess("finance.account", acc);
-  // The detail row carries the classification; the chart row stands in until it does.
-  const managed = acc && !access.isHidden("managed_by") ? (acc.managed_by !== undefined ? acc.managed_by : accounts.find((a) => a.id === acc.id)?.managed_by) : undefined;
+  // The text behind the title's info icon; the icon is absent when there is none.
+  const description = acc && !access.isHidden("description") ? acc.description : undefined;
   const kids = id ? accounts.filter((a) => a.parent_id === id) : [];
   const availableTabKeys = getAccountDetailTabKeys(acc?.is_postable ?? true);
   const tabItems: TabStripItem<AccountDetailTabKey>[] = DRAWER_TABS
@@ -404,25 +398,20 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
     <DetailDrawer
       open={id != null}
       onOpenChange={(o) => !o && onClose()}
-      title={acc ? `${acc.code} · ${acc.name}` : "Account"}
+      title={acc ? (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="min-w-0 break-words">{acc.code} · {acc.name}</span>
+          {description ? (
+            <InfoHint ariaLabel="What this account is for" className="-my-2">{description}</InfoHint>
+          ) : null}
+        </span>
+      ) : "Account"}
       description={acc ? `${acc.subtype || d?.type_label || acc.account_type} · Normal: ${acc.normal_balance === "DEBIT" ? "Debit" : "Credit"}` : undefined}
       widthClass="sm:max-w-4xl"
       footer={<Button variant="outline" onClick={() => window.print()} className="gap-1.5"><Printer className="size-4" /> Print</Button>}
     >
       {isLoading ? <LoadingState rows={6} /> : isError || !d || !acc ? <ErrorState onRetry={refetch} /> : (
         <div className="space-y-4">
-          {acc.description && !access.isHidden("description") ? (
-            <div className="rounded-md bg-gray-02/60 px-3 py-2">
-              <p className="font-mont text-[11px] font-semibold text-gray-05">What it&apos;s for</p>
-              <p className="mt-0.5 font-mont text-sm text-black-01">{acc.description}</p>
-            </div>
-          ) : null}
-          {managed ? (
-            <div className="space-y-1 rounded-md border border-blue-100 bg-blue-50/60 px-3 py-2 font-mont text-xs text-gray-01">
-              <p><span className="font-semibold">Managed by the system:</span> kept by {managed.keeper}. Record it with {managed.moved_by}.</p>
-              {managed.hand_journals === false ? <p>Typed journals cannot post to this account.</p> : null}
-            </div>
-          ) : null}
           {/* KPI cards */}
           <div className={cn("grid gap-3", cardColumns(1 + (balances.current ? 1 : 0) + (balances.opening ? 1 : 0)))}>
             {!balances.current ? null : acc.is_postable ? (
@@ -873,7 +862,7 @@ export function AccountSettings({ entity, account, onSaved }: { entity: string; 
       <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} className="bg-white" /></FormField>
       <AccessField access={access} name="subtype"><FormField label="Subtype"><Input value={subtype} onChange={(e) => setSubtype(e.target.value)} placeholder="e.g. Current asset" className="bg-white" /></FormField></AccessField>
       {account.description !== undefined ? (
-        <AccessField access={access} name="description" label="What it's for">
+        <AccessField access={access} name="description" label="Description">
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="bg-white" placeholder="Say what goes into this account" />
         </AccessField>
       ) : null}

@@ -13,19 +13,30 @@ export function hasManagedSplit(accounts: readonly Account[]): boolean {
 }
 
 /**
+ * Whether an account holds money of its own. A balance that is absent (not
+ * annotated, or withheld by Field Access or the bank book-balance rule) counts
+ * as nothing: a hidden figure is never inferred.
+ */
+function holdsBalance(account: Account): boolean {
+  return (account.balance?.kobo ?? 0) !== 0;
+}
+
+/**
  * The ids that belong in the main tree and the ids folded under "Managed by the
  * system".
  *
- * An everyday account is one the server calls `managed_by: null`. Every
- * ancestor of an everyday account stays with it, even a system-kept header, so
- * the tree never loses the group an everyday account hangs from. Everything
- * else is the system's.
+ * An everyday account is one the server calls `managed_by: null`, or a
+ * system-kept account that holds a balance (positive or negative), since a
+ * bursar must see where money sits whoever posts to it. Every ancestor of an
+ * everyday account stays with it, even a system-kept header, so the tree never
+ * loses the group an everyday account hangs from. Everything else, the
+ * system-kept accounts with nothing in them, is the system's.
  */
 export function partitionChart(accounts: readonly Account[]): { everyday: Set<number>; system: Set<number> } {
   const byId = new Map(accounts.map((account) => [account.id, account]));
   const everyday = new Set<number>();
   for (const account of accounts) {
-    if (account.managed_by != null) continue;
+    if (account.managed_by != null && !holdsBalance(account)) continue;
     let current: Account | undefined = account;
     while (current && !everyday.has(current.id)) {
       everyday.add(current.id);
