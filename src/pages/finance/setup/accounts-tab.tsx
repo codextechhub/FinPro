@@ -17,7 +17,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { toast } from "sonner";
 import { ArrowLeft, ChevronDown, ChevronRight, Check, Plus, Printer, Activity, Columns2, Network, Settings2 } from "lucide-react";
 import { cardColumns } from "../bank-account-access";
-import { Money, FormField, DetailDrawer, InfoHint, StatusPill, DataTable, TabStrip, toArray, useActiveEntity, type Column, type TabStripItem } from "@/components/finance-ui";
+import { AccessField, Money, FormField, DetailDrawer, InfoHint, StatusPill, DataTable, TabStrip, toArray, useActiveEntity, useFieldAccess, writableOnlyFollowing, type Column, type TabStripItem } from "@/components/finance-ui";
 import { SearchSelect } from "@/components/custom/search-select";
 import { useCan } from "@/components/finance-ui/can";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
@@ -70,8 +70,9 @@ function Tag({ label }: { label: string }) {
 }
 
 /** One chart row. `showBalance` follows the header: the balance cell leaves with its column. */
-function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showBalance }: {
+function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showBalance, showSubtype, showActive, showTag, showContra }: {
   node: Node; depth: number; expanded: Set<number>; toggle: (id: number) => void; currency?: string | null; onSelect: (id: number) => void; showBalance: boolean;
+  showSubtype: boolean; showActive: boolean; showTag: boolean; showContra: boolean;
 }) {
   const hasChildren = node.children.length > 0;
   const open = expanded.has(node.id);
@@ -88,8 +89,8 @@ function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showBal
             ) : <span className="mr-1 inline-block w-4" />}
             <span className="font-semibold tabular-nums text-gray-01">{node.code}</span>
             <span className="ml-2 text-black-01">{node.name}</span>
-            {node.tag && <Tag label={node.tag === "CONTROL" ? "CTRL" : node.tag} />}
-            {node.is_contra && <Tag label="Contra" />}
+            {showTag && node.tag && <Tag label={node.tag === "CONTROL" ? "CTRL" : node.tag} />}
+            {showContra && node.is_contra && <Tag label="Contra" />}
           </div>
         </td>
         <td className={cell}>
@@ -97,7 +98,7 @@ function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showBal
             {node.account_type.toLowerCase()}
           </span>
         </td>
-        <td className={cn(cell, "text-gray-05")}>{node.subtype || "-"}</td>
+        {showSubtype ? <td className={cn(cell, "text-gray-05")}>{node.subtype || "-"}</td> : null}
         <td className={cn(cell, "text-gray-05")}>{node.normal_balance === "DEBIT" ? "Dr" : "Cr"}</td>
         <td className={cn(cell, "text-gray-05")}>{currency ?? "NGN"}</td>
         {showBalance ? (
@@ -105,18 +106,19 @@ function AccountRow({ node, depth, expanded, toggle, currency, onSelect, showBal
             {node.rolled === null ? <span className="text-gray-05">-</span> : <Money kobo={node.rolled} currency={currency} align="right" />}
           </td>
         ) : null}
-        <td className={cn(cell, "text-center")}>
+        {showActive ? <td className={cn(cell, "text-center")}>
           {node.is_active ? <Check className="mx-auto size-4 text-green-01" /> : <span className="text-gray-05">-</span>}
-        </td>
+        </td> : null}
       </tr>
       {hasChildren && open && node.children.map((c) => (
-        <AccountRow key={c.id} node={c} depth={depth + 1} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} showBalance={showBalance} />
+        <AccountRow key={c.id} node={c} depth={depth + 1} expanded={expanded} toggle={toggle} currency={currency} onSelect={onSelect} showBalance={showBalance} showSubtype={showSubtype} showActive={showActive} showTag={showTag} showContra={showContra} />
       ))}
     </>
   );
 }
 
 export function AccountsTab({ entity }: { entity: string }) {
+  const access = useFieldAccess("finance.account");
   const { currency } = useActiveEntity();
   const { data, isLoading, isFetching, isError, refetch } = useGetChartOfAccountsQuery({ entity });
   const accounts = toArray<Account>(data?.data);
@@ -157,7 +159,11 @@ export function AccountsTab({ entity }: { entity: string }) {
     [filtered],
   );
   // The Balance column stays while at least one account's balance is readable.
-  const showBalance = useMemo(() => accounts.some((a) => !isBalanceHidden(a)), [accounts]);
+  const showBalance = !access.isHidden("balance") && accounts.some((a) => !isBalanceHidden(a));
+  const showSubtype = !access.isHidden("subtype");
+  const showActive = !access.isHidden("is_active");
+  const showTag = !access.isHidden("tag");
+  const showContra = !access.isHidden("is_contra");
   // Tree view only makes sense unfiltered; an active search/type filter falls back to flat.
   const rows = view === "tree" && !search && !type ? tree : flat;
 
@@ -190,16 +196,16 @@ export function AccountsTab({ entity }: { entity: string }) {
               <tr>
                 <th className={headCls}>Account</th>
                 <th className={headCls}>Type</th>
-                <th className={headCls}>Subtype</th>
+                {showSubtype ? <th className={headCls}>Subtype</th> : null}
                 <th className={headCls}>Normal</th>
                 <th className={headCls}>Currency</th>
                 {showBalance ? <th className={cn(headCls, "text-right")}>Balance</th> : null}
-                <th className={cn(headCls, "text-center")}>Active</th>
+                {showActive ? <th className={cn(headCls, "text-center")}>Active</th> : null}
               </tr>
             </thead>
             <tbody>
               {rows.map((n) => (
-                <AccountRow key={n.id} node={n} depth={0} expanded={effectiveExpanded} toggle={toggle} currency={currency} onSelect={setDetailId} showBalance={showBalance} />
+                <AccountRow key={n.id} node={n} depth={0} expanded={effectiveExpanded} toggle={toggle} currency={currency} onSelect={setDetailId} showBalance={showBalance} showSubtype={showSubtype} showActive={showActive} showTag={showTag} showContra={showContra} />
               ))}
             </tbody>
           </table>
@@ -215,6 +221,7 @@ export function AccountsTab({ entity }: { entity: string }) {
 function CreateAccountDrawer({ open, onClose, entity, parents }: {
   open: boolean; onClose: () => void; entity: string; parents: Account[];
 }) {
+  const access = useFieldAccess("finance.account");
   const [create, { isLoading }] = useCreateAccountMutation();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -240,11 +247,11 @@ function CreateAccountDrawer({ open, onClose, entity, parents }: {
   const submit = async () => {
     if (!canSubmit) return;
     try {
-      const r = await create({
+      const r = await create(writableOnlyFollowing(access, {
         entity, code: code.trim(), name: name.trim(),
         subtype: subtype.trim() || undefined, parent: parent ? Number(parent) : undefined,
         is_postable: postable, is_contra: contra,
-      }).unwrap();
+      }, { parent: "parent_id" }, { creating: true })).unwrap();
       toast.success(r.message || "Account created.");
       close();
     } catch { /* central toast */ }
@@ -297,8 +304,8 @@ function CreateAccountDrawer({ open, onClose, entity, parents }: {
         </div>
         <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} disabled={!fieldsEnabled} className="bg-white" placeholder={fieldsEnabled ? "e.g. Tuition revenue" : "Enter a valid code first"} /></FormField>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Subtype"><Input value={subtype} onChange={(e) => setSubtype(e.target.value)} disabled={!fieldsEnabled} placeholder="e.g. Current asset" className="bg-white" /></FormField>
-          <FormField label="Parent account">
+          <AccessField access={access} name="subtype" creating><FormField label="Subtype"><Input value={subtype} onChange={(e) => setSubtype(e.target.value)} disabled={!fieldsEnabled} placeholder="e.g. Current asset" className="bg-white" /></FormField></AccessField>
+          <AccessField access={access} name="parent_id" creating><FormField label="Parent account">
             <SearchSelect
               options={parentOptions}
               value={parent}
@@ -307,11 +314,11 @@ function CreateAccountDrawer({ open, onClose, entity, parents }: {
               placeholder={inferredType ? `None (${inferredType.toLowerCase()} top level)` : "Enter a valid code first"}
               revealOnSearch
             />
-          </FormField>
+          </FormField></AccessField>
         </div>
         <div className="flex flex-wrap gap-5 rounded-md bg-gray-50 px-3 py-3 font-mont text-sm text-gray-01">
-          <label className="flex items-center gap-2"><input type="checkbox" checked={postable} onChange={(e) => setPostable(e.target.checked)} disabled={!fieldsEnabled} className="accent-primary" /> Postable (accepts entries)</label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={contra} onChange={(e) => setContra(e.target.checked)} disabled={!fieldsEnabled} className="accent-primary" /> Contra account</label>
+          <AccessField access={access} name="is_postable" creating><label className="flex items-center gap-2"><input type="checkbox" checked={postable} onChange={(e) => setPostable(e.target.checked)} disabled={!fieldsEnabled} className="accent-primary" /> Postable (accepts entries)</label></AccessField>
+          <AccessField access={access} name="is_contra" creating><label className="flex items-center gap-2"><input type="checkbox" checked={contra} onChange={(e) => setContra(e.target.checked)} disabled={!fieldsEnabled} className="accent-primary" /> Contra account</label></AccessField>
         </div>
       </div>
     </DetailDrawer>
@@ -360,11 +367,13 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
   const [groupView, setGroupView] = useState<"balances" | "activity" | null>(null);
   const d = data?.data;
   const acc = d?.account;
+  const access = useFieldAccess("finance.account", acc);
   const kids = id ? accounts.filter((a) => a.parent_id === id) : [];
   const availableTabKeys = getAccountDetailTabKeys(acc?.is_postable ?? true);
-  const activeTab = availableTabKeys.includes(tab) ? tab : availableTabKeys[0];
   const tabItems: TabStripItem<AccountDetailTabKey>[] = DRAWER_TABS
-    .filter((candidate) => availableTabKeys.includes(candidate.key))
+    .filter((candidate) => availableTabKeys.includes(candidate.key) && (
+      !["activity", "taccount"].includes(candidate.key) || !access.isHidden("activity")
+    ))
     .map((candidate) => ({
       value: candidate.key,
       label: (
@@ -374,6 +383,7 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
         </>
       ),
     }));
+  const activeTab = tabItems.some((item) => item.value === tab) ? tab : (tabItems[0]?.value ?? "settings");
 
   // A bank account's balance figures leave the summary and the activity together.
   const balances = { current: d?.summary.current_balance, opening: d?.summary.opening_balance };
@@ -455,8 +465,8 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
             buttonClassName="inline-flex items-center gap-1.5 px-3 py-2 font-semibold"
           />
 
-          {activeTab === "activity" && (
-            d.activity.length === 0 ? <EmptyState title="No postings" message="Posted journal lines hitting this account will appear here." /> : (
+          {activeTab === "activity" && !access.isHidden("activity") && (
+            (d.activity ?? []).length === 0 ? <EmptyState title="No postings" message="Posted journal lines hitting this account will appear here." /> : (
               <div className="overflow-x-auto rounded-md border border-white-02">
                 <table className="w-full border-collapse">
                   <thead><tr>
@@ -466,7 +476,7 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
                     {showRunning ? <th className={cn(th, "text-right")}>Balance</th> : null}
                   </tr></thead>
                   <tbody>
-                    {d.activity.map((a, i) => (
+                    {(d.activity ?? []).map((a, i) => (
                       <tr key={`${a.journal_no}-${i}`}>
                         <td className={cn(cell, "text-gray-05")}>{dates.day(a.date)}</td>
                         <td className={cn(cell, "font-semibold")}>{a.journal_no}</td>
@@ -487,17 +497,17 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
             )
           )}
 
-          {activeTab === "taccount" && (
+          {activeTab === "taccount" && !access.isHidden("activity") && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded-md border border-white-02">
                 <p className="border-b border-white-02 bg-[#F1F1F1] px-3 py-2 font-mont text-xs font-semibold">Debits</p>
-                {d.activity.filter((a) => a.debit.kobo).map((a, i) => (
+                {(d.activity ?? []).filter((a) => a.debit?.kobo).map((a, i) => (
                   <div key={i} className="flex justify-between px-3 py-1.5 font-mont text-xs"><span className="truncate text-gray-05">{a.journal_no}</span><Money kobo={a.debit.kobo} currency={currency} /></div>
                 ))}
               </div>
               <div className="rounded-md border border-white-02">
                 <p className="border-b border-white-02 bg-[#F1F1F1] px-3 py-2 font-mont text-xs font-semibold">Credits</p>
-                {d.activity.filter((a) => a.credit.kobo).map((a, i) => (
+                {(d.activity ?? []).filter((a) => a.credit?.kobo).map((a, i) => (
                   <div key={i} className="flex justify-between px-3 py-1.5 font-mont text-xs"><span className="truncate text-gray-05">{a.journal_no}</span><Money kobo={a.credit.kobo} currency={currency} /></div>
                 ))}
               </div>
@@ -510,7 +520,7 @@ function AccountDetailDrawer({ id, entity, accounts, currency, onClose }: {
                 {kids.map((k) => (
                   <div key={k.id} className="flex items-center justify-between border-t border-white-02 px-3 py-2 font-mont text-sm first:border-t-0">
                     <span><span className="font-semibold tabular-nums">{k.code}</span><span className="ml-2">{k.name}</span></span>
-                    <StatusPill status={k.is_active ? "ACTIVE" : "INACTIVE"} />
+                    {!access.isHidden("is_active") ? <StatusPill status={k.is_active ? "ACTIVE" : "INACTIVE"} /> : null}
                   </div>
                 ))}
               </div>
@@ -801,6 +811,7 @@ export function accountReadOnlyReason({ holdsKey, bankBranchId, bankBranchName }
  * bank backs it. Anyone else reads why it is read-only (accountReadOnlyReason).
  */
 export function AccountSettings({ entity, account, onSaved }: { entity: string; account: Account; onSaved: () => void }) {
+  const access = useFieldAccess("finance.account", account);
   const [update, { isLoading }] = useUpdateAccountMutation();
   const { can } = useCan();
   const { canChange } = useWholeSchoolAccess();
@@ -811,12 +822,13 @@ export function AccountSettings({ entity, account, onSaved }: { entity: string; 
     : branches?.find((b) => Number(b.id) === account.bank_branch_id)?.name ?? null;
   const [name, setName] = useState(account.name);
   const [subtype, setSubtype] = useState(account.subtype ?? "");
+  const [description, setDescription] = useState(account.description ?? "");
   const [active, setActive] = useState(account.is_active);
-  const dirty = name !== account.name || subtype !== (account.subtype ?? "") || active !== account.is_active;
+  const dirty = name !== account.name || subtype !== (account.subtype ?? "") || description !== (account.description ?? "") || active !== account.is_active;
 
   const save = async () => {
     try {
-      const r = await update({ entity, id: account.id, name: name.trim(), subtype: subtype.trim(), is_active: active }).unwrap();
+      const r = await update(access.writableOnly({ entity, id: account.id, name: name.trim(), subtype: subtype.trim(), description: description.trim(), is_active: active }, { creating: false })).unwrap();
       toast.success(r.message || "Account updated.");
       onSaved();
     } catch { /* central */ }
@@ -835,8 +847,9 @@ export function AccountSettings({ entity, account, onSaved }: { entity: string; 
   return (
     <div className="space-y-3">
       <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} className="bg-white" /></FormField>
-      <FormField label="Subtype"><Input value={subtype} onChange={(e) => setSubtype(e.target.value)} placeholder="e.g. Current asset" className="bg-white" /></FormField>
-      <label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label>
+      <AccessField access={access} name="subtype"><FormField label="Subtype"><Input value={subtype} onChange={(e) => setSubtype(e.target.value)} placeholder="e.g. Current asset" className="bg-white" /></FormField></AccessField>
+      <AccessField access={access} name="description"><FormField label="Description"><Input value={description} onChange={(e) => setDescription(e.target.value)} className="bg-white" /></FormField></AccessField>
+      <AccessField access={access} name="is_active"><label className="flex items-center gap-2 font-mont text-sm text-gray-01"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label></AccessField>
       <Button onClick={save} disabled={!dirty || isLoading} className="font-mont text-xs font-semibold">{isLoading ? "Saving…" : "Save changes"}</Button>
     </div>
   );

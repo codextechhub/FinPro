@@ -31,7 +31,7 @@ export interface CreditNoteChanges {
 }
 
 /** Whether the note's line can be corrected here: it has exactly one. */
-export const singleLine = (note: CreditNote) => note.lines.length === 1;
+export const singleLine = (note: CreditNote) => note.lines?.length === 1;
 
 /** The form a saved note opens with. */
 export function creditNoteCorrection(note: CreditNote): CreditNoteCorrection {
@@ -41,7 +41,7 @@ export function creditNoteCorrection(note: CreditNote): CreditNoteCorrection {
     reason: note.reason ?? "",
     reference: note.reference ?? "",
     account: line?.revenue_account ?? "",
-    amount: line ? Math.round(Number(line.quantity) * line.unit_price) : note.subtotal,
+    amount: line ? Math.round(Number(line.quantity) * (line.unit_price ?? 0)) : (note.subtotal ?? 0),
     costCenter: line?.cost_center ?? "",
   };
 }
@@ -68,9 +68,9 @@ export function creditNoteChanges(note: CreditNote, form: CreditNoteCorrection):
 }
 
 /** Why the form cannot be saved yet, or null. The line is checked only where it is corrected here. */
-export function creditNoteCorrectionProblem(form: CreditNoteCorrection, lineEditable: boolean): string | null {
-  if (!form.date) return "Choose the date.";
-  if (!form.reason.trim()) return "Say why.";
+export function creditNoteCorrectionProblem(form: CreditNoteCorrection, lineEditable: boolean, required = { date: true, reason: true }): string | null {
+  if (required.date && !form.date) return "Choose the date.";
+  if (required.reason && !form.reason.trim()) return "Say why.";
   if (lineEditable && !form.account) return "Choose the account.";
   if (lineEditable && form.amount <= 0) return "Enter an amount above zero.";
   return null;

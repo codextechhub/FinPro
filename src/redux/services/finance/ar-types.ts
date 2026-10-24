@@ -122,7 +122,7 @@ export interface Refund {
   status: string;
   amount: number;
   amount_naira: string;
-  bank_account_id: number | null;
+  bank_account_id?: number | null;
   reference: string;
   narration: string;
   /** See {@link Concession.approval_required} - same rule, same caveat. */

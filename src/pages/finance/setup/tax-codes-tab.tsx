@@ -17,7 +17,7 @@ import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
-import { DataTable, StatusPill, FormDrawer, FormField, AccountPicker, toArray, type Column } from "@/components/finance-ui";
+import { AccessField, DataTable, StatusPill, FormDrawer, FormField, AccountPicker, toArray, useFieldAccess, type Column } from "@/components/finance-ui";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont
 const taxType = (code: string) => (code.split(/[-_ ]/)[0] || code).toUpperCase();
 
 export function TaxCodesTab({ entity }: { entity: string }) {
+  const access = useFieldAccess("finance.taxcode");
   const { data, isLoading, isFetching, isError, refetch } = useGetTaxCodesQuery({ entity });
   const codes = toArray<TaxCode>(data?.data);
   const { canWholeSchool } = useWholeSchoolAccess();
@@ -48,12 +49,12 @@ export function TaxCodesTab({ entity }: { entity: string }) {
     { header: "Code", cell: (t) => <span className="font-semibold">{t.code}</span> },
     { header: "Name", cell: (t) => t.name },
     { header: "Type", cell: (t) => <span className="rounded bg-pry-01 px-1.5 py-0.5 font-mont text-[10px] font-semibold uppercase text-primary">{taxType(t.code)}</span> },
-    { header: "Rate", align: "right", cell: (t) => <span className="tabular-nums">{(t.rate_bps / 100).toFixed(2)}%</span> },
-    { header: "Treatment", cell: (t) => treatmentLabel(t.treatment, t.rate_bps) },
-    { header: "Recoverable", cell: (t) => (t.is_recoverable ? "Yes" : "No") },
-    { header: "Collected a/c", cell: (t) => t.collected_account ?? "-" },
-    { header: "Paid a/c", cell: (t) => t.paid_account ?? "-" },
-    { header: "Status", cell: (t) => <StatusPill status={t.is_active ? "ACTIVE" : "INACTIVE"} /> },
+    ...(!access.isHidden("rate_bps") ? [{ header: "Rate", align: "right" as const, cell: (t: TaxCode) => <span className="tabular-nums">{(t.rate_bps / 100).toFixed(2)}%</span> }] : []),
+    ...(!access.isHidden("treatment") && !access.isHidden("rate_bps") ? [{ header: "Treatment", cell: (t: TaxCode) => treatmentLabel(t.treatment, t.rate_bps) }] : []),
+    ...(!access.isHidden("is_recoverable") ? [{ header: "Recoverable", cell: (t: TaxCode) => (t.is_recoverable ? "Yes" : "No") }] : []),
+    ...(!access.isHidden("collected_account") ? [{ header: "Collected a/c", cell: (t: TaxCode) => t.collected_account ?? "-" }] : []),
+    ...(!access.isHidden("paid_account") ? [{ header: "Paid a/c", cell: (t: TaxCode) => t.paid_account ?? "-" }] : []),
+    ...(!access.isHidden("is_active") ? [{ header: "Status", cell: (t: TaxCode) => <StatusPill status={t.is_active ? "ACTIVE" : "INACTIVE"} /> }] : []),
   ];
 
   return (
@@ -83,6 +84,7 @@ export function TaxCodesTab({ entity }: { entity: string }) {
 }
 
 function TaxCodeModal({ existing, onClose, entity }: { existing: TaxCode | null; onClose: () => void; entity: string }) {
+  const access = useFieldAccess("finance.taxcode", existing);
   const [upsert, { isLoading }] = useUpsertTaxCodeMutation();
   const initial = taxCodeFormValues(existing);
   const [code, setCode] = useState(initial.code);
@@ -99,10 +101,17 @@ function TaxCodeModal({ existing, onClose, entity }: { existing: TaxCode | null;
 
   const submit = async () => {
     try {
-      const r = await upsert(taxCodeUpsertPayload(entity, {
+      const payload = taxCodeUpsertPayload(entity, {
         code, name, treatment, percentage: pct, recoverable,
         collectedAccount: collected, paidAccount: paid, active,
-      })).unwrap();
+      });
+      const r = await upsert({ entity: payload.entity, code: payload.code, name: payload.name,
+        ...access.writableOnly({
+          treatment: payload.treatment, rate_bps: payload.rate_bps,
+          is_recoverable: payload.is_recoverable,
+          collected_account: payload.collected_account,
+          paid_account: payload.paid_account, is_active: payload.is_active,
+        }, { creating: !existing }) }).unwrap();
       toast.success(r.message || "Tax code saved.");
       onClose();
     } catch { /* central */ }
@@ -114,28 +123,28 @@ function TaxCodeModal({ existing, onClose, entity }: { existing: TaxCode | null;
       loading={isLoading} canSubmit={canSubmit} widthClass="sm:max-w-lg">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Code" required><Input value={code} onChange={(e) => setCode(e.target.value)} disabled={!!existing} placeholder="e.g. VAT-7.5" className="bg-white font-mont" /></FormField>
-        <FormField label="Treatment" required>
+        <AccessField access={access} name="treatment" creating={!existing}><FormField label="Treatment" required>
           <select value={treatment} onChange={(e) => setTreatment(e.target.value as TaxTreatment)} className={`${selectCls} w-full`} aria-label="Treatment">
             {TAX_TREATMENTS.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
           </select>
-        </FormField>
+        </FormField></AccessField>
       </div>
-      <FormField label="Rate (%)" required={standard}>
+      <AccessField access={access} name="rate_bps" creating={!existing}><FormField label="Rate (%)" required={standard}>
         <Input value={standard ? pct : "0"} onChange={(e) => setPct(e.target.value)} type="number" step="0.01" placeholder="7.5" disabled={!standard} className="bg-white font-mont disabled:opacity-60" />
         {!standard ? <span className="mt-1 block font-mont text-[11px] text-gray-05">{zeroRateHint(treatment)}</span> : null}
-      </FormField>
+      </FormField></AccessField>
       <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="VAT 7.5%" className="bg-white" /></FormField>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField label="Collected a/c (output)"><AccountPicker entity={entity} value={collected} onChange={setCollected} placeholder="None" /></FormField>
-        <FormField label="Paid a/c (input)"><AccountPicker entity={entity} value={paid} onChange={setPaid} placeholder="None" /></FormField>
+        <AccessField access={access} name="collected_account" creating={!existing}><FormField label="Collected a/c (output)"><AccountPicker entity={entity} value={collected} onChange={setCollected} placeholder="None" /></FormField></AccessField>
+        <AccessField access={access} name="paid_account" creating={!existing}><FormField label="Paid a/c (input)"><AccountPicker entity={entity} value={paid} onChange={setPaid} placeholder="None" /></FormField></AccessField>
       </div>
       <div className="space-y-2">
-        <label className="flex items-center gap-2 font-mont text-sm text-gray-01">
+        <AccessField access={access} name="is_recoverable" creating={!existing}><label className="flex items-center gap-2 font-mont text-sm text-gray-01">
           <input type="checkbox" checked={recoverable} onChange={(e) => setRecoverable(e.target.checked)} className="accent-primary" /> Recoverable (input tax offsets output)
-        </label>
-        <label className="flex items-center gap-2 font-mont text-sm text-gray-01">
+        </label></AccessField>
+        <AccessField access={access} name="is_active" creating={!existing}><label className="flex items-center gap-2 font-mont text-sm text-gray-01">
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active
-        </label>
+        </label></AccessField>
       </div>
     </FormDrawer>
   );

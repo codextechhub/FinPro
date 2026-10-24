@@ -273,7 +273,7 @@ const hide = (...names: string[]) => {
     metrics: detail.metrics && without(detail.metrics, ...names),
     ...(names.includes("transactions") ? {} : { transactions: detail.transactions?.map((t) => without(t, ...names)) }),
     reconciliations: detail.reconciliations.map((r) => without(r, ...names)),
-    // The server withholds a statement's opening and closing figures with the statement balance.
+    // Hide statement figures when the account balance switch is closed.
     statements: detail.statements.map((s) => (
       names.includes("statement_balance")
         ? without(s, "opening_balance", "opening_balance_naira", "closing_balance", "closing_balance_naira")
@@ -533,10 +533,10 @@ describe("the helpers", () => {
 /**
  * Mrs Bello corrects September's statement for GTBank Operations. A reader of
  * the statement balance sees the opening balance and the recalculated closing
- * balance, and the correction sends the opening balance. Mr Eze, an auditor
- * whose role may not read statement balances, corrects the same statement's
- * lines: the form has no opening balance and the request carries none, so the
- * server keeps the stored one. A refusal of the opening balance shows beside it.
+ * balance, and the correction sends the opening balance. Mr Eze cannot read
+ * the account balance but may correct the opening balance; he enters a new
+ * figure without seeing the stored one. A role lacking its Write switch leaves
+ * that figure untouched. A refusal appears beside the field.
  */
 describe("correcting a statement", () => {
   const FULL_STATEMENT = {
@@ -576,18 +576,34 @@ describe("correcting a statement", () => {
   });
 
   it("omits the opening balance for a role that cannot read it, and still saves the lines", async () => {
-    hide(...HIDDEN_BALANCES);
+    hide(...HIDDEN_BALANCES, "opening_balance_naira");
     mocks.statement = without(FULL_STATEMENT, "opening_balance", "opening_balance_naira", "closing_balance", "closing_balance_naira");
     openEdit();
     expect(editDrawer().textContent).not.toContain("Calculated closing balance");
     expect(editDrawer().querySelector("input[type=number][value='850000']")).toBeNull();
-    expect(editDrawer().textContent).toContain("Your role cannot read this statement");
+    expect(editDrawer().textContent).toContain("cannot read or change this statement");
     expect(editDrawer().textContent).not.toMatch(/undefined|NaN/);
     await save();
     expect(mocks.correct).toHaveBeenCalledTimes(1);
     const body = mocks.correct.mock.calls[0][0];
     expect("opening_balance" in body).toBe(false);
     expect(body.lines).toHaveLength(1);
+  });
+
+  it("lets a writer replace an opening balance hidden by the account switch", async () => {
+    hide(...HIDDEN_BALANCES);
+    mocks.statement = without(FULL_STATEMENT, "opening_balance", "opening_balance_naira", "closing_balance", "closing_balance_naira");
+    openEdit();
+    const input = [...editDrawer().querySelectorAll<HTMLInputElement>("input[type=number]")]
+      .find((node) => node.closest("label")?.textContent?.includes("Opening balance"))!;
+    expect(input.value).toBe("");
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "900000");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(editDrawer().textContent).not.toContain("Calculated closing balance");
+    await save();
+    expect(mocks.correct.mock.calls[0][0]).toMatchObject({ opening_balance: 90_000_000 });
   });
 
   it("shows a refused opening balance beside its field", async () => {

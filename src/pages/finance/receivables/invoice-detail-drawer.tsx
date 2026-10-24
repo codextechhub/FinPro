@@ -107,7 +107,8 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
   const d = data?.data;
   const inv = d?.invoice;
   const s = d?.summary;
-  const overdue = !!(s?.due_date && s.due_date < dates.today() && (s?.balance.kobo ?? 0) > 0);
+  const access = useFieldAccess("finance.invoice", inv);
+  const overdue = !!(s?.due_date && s.due_date < dates.today() && (s?.balance?.kobo ?? 0) > 0);
   const canAct = !!inv && inv.status === "POSTED" && inv.balance_due > 0;
 
   const openPdf = async () => {
@@ -131,12 +132,14 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
   // Tabs that stand for a list carry its size; Activity has nothing to count.
   const tabItems = useMemo<TabStripItem<(typeof TABS)[number]["key"]>[]>(() => {
     const count = (key: string) =>
-      key === "lines" ? d?.lines.length : key === "settlements" ? d?.settlements.length : key === "gl" ? d?.gl_journals.length : key === "reminders" ? d?.reminders.length : undefined;
-    return TABS.map((t) => ({
+      key === "lines" ? d?.lines?.length : key === "settlements" ? d?.settlements?.length : key === "gl" ? d?.gl_journals?.length : key === "reminders" ? d?.reminders?.length : undefined;
+    return TABS.filter((t) => !access.isHidden(
+      t.key === "gl" ? "postings" : t.key === "lines" ? "lines" : t.key,
+    )).map((t) => ({
       value: t.key,
       label: <><t.icon className="size-3.5" />{t.label}{count(t.key) ? ` (${count(t.key)})` : ""}</>,
     }));
-  }, [d]);
+  }, [d, access]);
 
   return (
     <DetailDrawer
@@ -204,7 +207,7 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
     >
       {isLoading ? <LoadingState rows={6} /> : isError || !d || !inv || !s ? <ErrorState onRetry={refetch} /> : (
         <div className="space-y-4">
-          <div><StatusPill status={inv.status} label={statusWord(inv.status)} /> <span className="ml-1"><StatusPill status={inv.payment_status} label={statusWord(inv.payment_status, PAYMENT_PROGRESS_WORDS)} /></span></div>
+          {!access.isHidden("status") && inv.status ? <div><StatusPill status={inv.status} label={statusWord(inv.status)} /> {inv.payment_status ? <span className="ml-1"><StatusPill status={inv.payment_status} label={statusWord(inv.payment_status, PAYMENT_PROGRESS_WORDS)} /></span> : null}</div> : null}
 
           {inv.billing_period_label || inv.billing_period || inv.beneficiary_name ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -225,14 +228,14 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
           {/* stat cards - Paid (cash) and Credited (notes/concessions/write-offs) are
               distinct legs of Settled; Balance is the real outstanding. */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Stat label="Total"><Money kobo={s.total.kobo} currency={currency} /></Stat>
-            <Stat label="Paid (cash)"><Money kobo={s.paid.kobo} currency={currency} /></Stat>
-            <Stat label="Credited"><Money kobo={s.credited.kobo} currency={currency} /></Stat>
-            <Stat label="Settled"><Money kobo={s.settled.kobo} currency={currency} /></Stat>
-            <Stat label="Balance due"><Money kobo={s.balance.kobo} currency={currency} /></Stat>
-            <Stat label="Aging">
+            {s.total && !access.isHidden("total") ? <Stat label="Total"><Money kobo={s.total.kobo} currency={currency} /></Stat> : null}
+            {s.paid && !access.isHidden("settlement") ? <Stat label="Paid (cash)"><Money kobo={s.paid.kobo} currency={currency} /></Stat> : null}
+            {s.credited && !access.isHidden("settlement") ? <Stat label="Credited"><Money kobo={s.credited.kobo} currency={currency} /></Stat> : null}
+            {s.settled && !access.isHidden("settlement") ? <Stat label="Settled"><Money kobo={s.settled.kobo} currency={currency} /></Stat> : null}
+            {s.balance && !access.isHidden("settlement") ? <Stat label="Balance due"><Money kobo={s.balance.kobo} currency={currency} /></Stat> : null}
+            {s.due_date && !access.isHidden("due_date") ? <Stat label="Aging">
               {s.due_date ? <span className={cn(overdue && "text-destructive")}>{overdue ? "Overdue · " : "Due "}{dates.day(s.due_date)}</span> : "-"}
-            </Stat>
+            </Stat> : null}
           </div>
 
           <TabStrip
@@ -247,17 +250,18 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
 
           {tab === "lines" ? <DeferredIncomeNote block={d.deferred_income} currency={currency} /> : null}
 
-          {tab === "lines" && (
-            d.lines.length === 0 ? <EmptyState title="No lines" /> : (
+          {tab === "lines" && !access.isHidden("lines") && (
+            (d.lines ?? []).length === 0 ? <EmptyState title="No lines" /> : (
               <div className="overflow-x-auto rounded-md border border-white-02">
                 <table className="w-full border-collapse">
                   <thead><tr>
                     <th className={th}>Description</th><th className={th}>GL account</th>
-                    <th className={cn(th, "text-right")}>Qty</th><th className={cn(th, "text-right")}>Unit price</th>
-                    <th className={cn(th, "text-right")}>Tax</th><th className={cn(th, "text-right")}>Line total</th>
+                    <th className={cn(th, "text-right")}>Qty</th>
+                    {!access.isHidden("unit_price") ? <th className={cn(th, "text-right")}>Unit price</th> : null}
+                    {!access.isHidden("total") && !access.isHidden("unit_price") ? <><th className={cn(th, "text-right")}>Tax</th><th className={cn(th, "text-right")}>Line total</th></> : null}
                   </tr></thead>
                   <tbody>
-                    {d.lines.map((l, i) => (
+                    {(d.lines ?? []).map((l, i) => (
                       <tr key={i}>
                         <td className={td}>
                           {l.description}
@@ -268,41 +272,41 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
                         </td>
                         <td className={cn(td, "text-gray-05")}><span className="font-semibold tabular-nums text-gray-01">{l.account_code}</span> {l.account_name}</td>
                         <td className={cn(td, "text-right tabular-nums")}>{Number(l.quantity)}</td>
-                        <td className={cn(td, "text-right tabular-nums")}><Money kobo={l.unit_price.kobo} currency={currency} align="right" /></td>
-                        <td className={cn(td, "text-right tabular-nums")}>
+                        {!access.isHidden("unit_price") && l.unit_price ? <td className={cn(td, "text-right tabular-nums")}><Money kobo={l.unit_price.kobo} currency={currency} align="right" /></td> : null}
+                        {!access.isHidden("total") && !access.isHidden("unit_price") && l.tax_amount ? <td className={cn(td, "text-right tabular-nums")}>
                           {l.tax_amount.kobo ? <Money kobo={l.tax_amount.kobo} currency={currency} align="right" /> : "-"}
                           <span className="block text-[11px] text-gray-05">{lineTreatment(l.tax_code, taxCodes)}</span>
-                        </td>
-                        <td className={cn(td, "text-right font-medium tabular-nums")}><Money kobo={l.line_total.kobo} currency={currency} align="right" /></td>
+                        </td> : null}
+                        {!access.isHidden("total") && !access.isHidden("unit_price") && l.line_total ? <td className={cn(td, "text-right font-medium tabular-nums")}><Money kobo={l.line_total.kobo} currency={currency} align="right" /></td> : null}
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="font-mont text-xs">
+                  {!access.isHidden("total") && !access.isHidden("unit_price") && s.subtotal && s.tax && s.total ? <tfoot className="font-mont text-xs">
                     <tr><td className={cn(td, "border-t-2")} colSpan={5}>Subtotal</td><td className={cn(td, "border-t-2 text-right tabular-nums")}><Money kobo={s.subtotal.kobo} currency={currency} align="right" /></td></tr>
                     <tr><td className={cn(td, "border-t-0")} colSpan={5}>Tax</td><td className={cn(td, "border-t-0 text-right tabular-nums")}><Money kobo={s.tax.kobo} currency={currency} align="right" /></td></tr>
                     <tr className="font-semibold"><td className={cn(td, "border-t-0")} colSpan={5}>Grand total</td><td className={cn(td, "border-t-0 text-right tabular-nums")}><Money kobo={s.total.kobo} currency={currency} align="right" /></td></tr>
-                  </tfoot>
+                  </tfoot> : null}
                 </table>
               </div>
             )
           )}
 
-          {tab === "settlements" && (
-            d.settlements.length === 0 ? <EmptyState title="No settlements" message="Cash receipts, credit notes, concessions and write-offs applied to this invoice appear here." /> : (
-              <SimpleTable head={["Date", "Type", "Reference", "Method", "Amount"]} rows={d.settlements.map((st) => [
+          {tab === "settlements" && !access.isHidden("settlements") && (
+            (d.settlements ?? []).length === 0 ? <EmptyState title="No settlements" message="Cash receipts, credit notes, concessions and write-offs applied to this invoice appear here." /> : (
+              <SimpleTable head={["Date", "Type", "Reference", "Method", "Amount"]} rows={(d.settlements ?? []).map((st) => [
                 st.date,
                 <TypeBadge key="t" type={st.type} />,
                 st.reference,
                 st.method || "-",
-                <Money key="a" kobo={st.amount.kobo} currency={currency} align="right" />,
+                st.amount ? <Money key="a" kobo={st.amount.kobo} currency={currency} align="right" /> : null,
               ])} rightCols={[4]} />
             )
           )}
 
-          {tab === "gl" && (
-            d.gl_journals.length === 0 ? <EmptyState title="No GL postings" message="The journal posts when the invoice is posted." /> : (
+          {tab === "gl" && !access.isHidden("postings") && (
+            (d.gl_journals ?? []).length === 0 ? <EmptyState title="No GL postings" message="The journal posts when the invoice is posted." /> : (
               <div className="space-y-3">
-                {d.gl_journals.map((j, i) => (
+                {(d.gl_journals ?? []).map((j, i) => (
                   <div key={i} className="overflow-hidden rounded-md border border-white-02">
                     <div className="flex items-center justify-between gap-2 bg-[#F1F1F1] px-3 py-2">
                       <span className="flex items-center gap-2"><TypeBadge type={j.document_type} /><span className="font-mont text-xs font-semibold text-gray-01">{j.reference}</span></span>
@@ -328,17 +332,17 @@ export function InvoiceDetailDrawer({ id, entity, currency, onClose, onWriteOff 
             )
           )}
 
-          {tab === "reminders" && (
-            d.reminders.length === 0 ? <EmptyState title="No reminders" message="Dunning reminders for this invoice will appear here." /> : (
-              <SimpleTable head={["Date", "Level", "Channel", "Status"]} rows={d.reminders.map((r) => [
+          {tab === "reminders" && !access.isHidden("reminders") && (
+            (d.reminders ?? []).length === 0 ? <EmptyState title="No reminders" message="Dunning reminders for this invoice will appear here." /> : (
+              <SimpleTable head={["Date", "Level", "Channel", "Status"]} rows={(d.reminders ?? []).map((r) => [
                 r.date, r.level ?? "-", r.channel || "-", <StatusPill key="s" status={r.status} />,
               ])} />
             )
           )}
 
-          {tab === "activity" && (
+          {tab === "activity" && !access.isHidden("activity") && (
             <ol className="space-y-2">
-              {d.activity.map((a, i) => (
+              {(d.activity ?? []).map((a, i) => (
                 <li key={i} className="flex items-start gap-2 font-mont text-xs">
                   <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-green-01 text-white"><Check className="size-3" /></span>
                   <span><span className="tabular-nums text-gray-05">{dates.day(a.date)}</span> - <span className="text-gray-01">{a.label}</span></span>

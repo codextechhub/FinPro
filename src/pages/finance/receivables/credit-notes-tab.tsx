@@ -24,7 +24,7 @@ import { FilePenLine, Plus, Printer, Check, Search, Send } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, ConfirmActionModal, DetailDrawer, FormField,
   CustomerPicker, AccountPicker, CostCenterPicker, PostingRecap, Segmented, toArray, type Column, type RecapRow,
-  PostingDateField, customerBranchHint, RaisingBranchChoiceField, useCustomerBranch, useRaisingBranchChoice,} from "@/components/finance-ui";
+  PostingDateField, customerBranchHint, RaisingBranchChoiceField, useCustomerBranch, useFieldAccess, useRaisingBranchChoice, AccessField, writableOnlyFollowing,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -115,7 +115,7 @@ function Initials({ name }: { name: string }) {
 // (+ tax), Cr AR for the applied portion and Cr 2140 customer-credit for the rest.
 function noteRecap(n: CreditNote): { dr: RecapRow[]; cr: RecapRow[] } {
   const debit = n.kind === "DEBIT";
-  const lines = n.lines.length
+  const lines = n.lines?.length
     ? n.lines
     : [{ revenue_account: "-", net_amount: n.total, tax_amount: 0, cost_center: null } as CreditNote["lines"][number]];
   const rev: RecapRow[] = [];
@@ -136,6 +136,7 @@ function noteRecap(n: CreditNote): { dr: RecapRow[]; cr: RecapRow[] } {
 
 export function CreditNotesTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
+  const access = useFieldAccess("finance.creditnote");
   const [searchParams] = useSearchParams();
   const [typeFilter, setTypeFilter] = useState("");   // "" | CREDIT | DEBIT
   const [statusFilter, setStatusFilter] = useState(""); // "" | a CREDIT_NOTE_FILTER_STATUSES value | SENT_BACK
@@ -165,23 +166,23 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
 
   const columns: Column<CreditNote>[] = [
     { header: "Note no.", cell: (r) => <span className="font-semibold tabular-nums">{r.document_number}</span> },
-    { header: "Type", cell: (r) => <TypeChip kind={r.kind} /> },
-    { header: "Date", cell: (r) => <span className="tabular-nums">{dates.day(r.note_date)}</span> },
+    ...(!access.isHidden("kind") ? [{ header: "Type", cell: (r: CreditNote) => <TypeChip kind={r.kind} /> }] : []),
+    ...(!access.isHidden("note_date") ? [{ header: "Date", cell: (r: CreditNote) => <span className="tabular-nums">{dates.day(r.note_date)}</span> }] : []),
     { header: "Customer", cell: (r) => (
       <span className="inline-flex items-center gap-2"><Initials name={r.customer_name} /><span className="font-medium text-gray-01">{r.customer_name}</span></span>
     ) },
-    { header: "Against invoice", cell: (r) => <span className="tabular-nums text-gray-05">{r.invoice_number ?? "-"}</span> },
-    { header: "Reason", cell: (r) => <span className="block max-w-[240px] truncate text-gray-01" title={r.reason}>{r.reason ? shortenReason(r.reason) : "-"}</span> },
-    { header: "Amount", align: "right", cell: (r) => (
+    ...(!access.isHidden("invoice") ? [{ header: "Against invoice", cell: (r: CreditNote) => <span className="tabular-nums text-gray-05">{r.invoice_number ?? "-"}</span> }] : []),
+    ...(!access.isHidden("reason") ? [{ header: "Reason", cell: (r: CreditNote) => <span className="block max-w-[240px] truncate text-gray-01" title={r.reason}>{r.reason ? shortenReason(r.reason) : "-"}</span> }] : []),
+    ...(!access.isHidden("total") ? [{ header: "Amount", align: "right" as const, cell: (r: CreditNote) => (
       // Credit notes reduce the balance (green); debit notes increase it (red) -
       // the same colour convention as the DR/CR posting recap.
       <Money kobo={r.total} currency={currency} align="right"
         className={r.kind === "DEBIT" ? "text-destructive" : "text-green-01"} />
-    ) },
-    { header: "Status", cell: (r) => {
+    ) }] : []),
+    ...(!access.isHidden("status") ? [{ header: "Status", cell: (r: CreditNote) => {
       const s = noteStatus(r);
       return <span className={cn("inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[s])}>{STATUS_LABEL[s]}</span>;
-    } },
+    } }] : []),
   ];
 
   return (
@@ -193,16 +194,16 @@ export function CreditNotesTab({ entity, currency }: { entity: string; currency?
             <Input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); resetPage(); }}
               placeholder="Search note no., customer, reason" className="h-9 w-64 bg-white pl-8 font-mont" />
           </div>
-          <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); resetPage(); }} className={selectCls}>
+          {!access.isHidden("kind") ? <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); resetPage(); }} className={selectCls}>
             <option value="">All notes</option>
             <option value="CREDIT">Credit notes</option>
             <option value="DEBIT">Debit notes</option>
-          </select>
-          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }} className={selectCls} aria-label="Status">
+          </select> : null}
+          {!access.isHidden("status") ? <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }} className={selectCls} aria-label="Status">
             <option value="">All status</option>
             {CREDIT_NOTE_FILTER_STATUSES.map((code) => <option key={code} value={code}>{STATUS_LABEL[code]}</option>)}
             <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
-          </select>
+          </select> : null}
           {filters}
         </div>
         <Can permission={P.FIN_CREATE_CREDIT_NOTE}>
@@ -249,31 +250,33 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
   const { promptIfParked, noApproverDialog } = useNoApproverPrompt({ documentLabel: "credit note" });
   const { standing, request, workflowId, requestNamed } = useFinanceReturned(note, { path: "credit-notes", entity });
   const [editing, setEditing] = useState(false);
+  const access = useFieldAccess("finance.creditnote", note);
 
   if (!note) return null;
+  const noteName = access.isHidden("kind") ? "Note" : kindLabel(note.kind);
   const status = noteStatus(note);
   const isDraft = note.status === "DRAFT" && !standing;
   const gated = note.approval_required === true;
-  const canSend = isDraft && can(gated ? P.FIN_SUBMIT_CREDIT_NOTE : P.FIN_POST_CREDIT_NOTE);
+  const canSend = !access.isHidden("status") && isDraft && can(gated ? P.FIN_SUBMIT_CREDIT_NOTE : P.FIN_POST_CREDIT_NOTE);
   const doSend = async () => {
     try {
       if (gated) {
         const res = await submitNote({ id: note.id, entity }).unwrap();
-        toast.success(res.message || `${kindLabel(note.kind)} submitted for approval.`);
+        toast.success(res.message || `${noteName} submitted for approval.`);
         promptIfParked(res.data?.approval);
         setConfirmSend(false);
         if (!res.data?.approval?.parked) onClose();
         return;
       }
       const res = await postNote({ id: note.id, entity }).unwrap();
-      toast.success(res.message || `${kindLabel(note.kind)} posted.`);
+      toast.success(res.message || `${noteName} posted.`);
       setConfirmSend(false);
       onClose();
     } catch { /* central */ }
   };
-  const canApply =
+  const canApply = !access.isHidden("status") && !access.isHidden("credit_use") &&
     can(P.FIN_ALLOCATE_CREDIT_NOTE) && note.kind === "CREDIT" && status === "ISSUED" && note.unallocated_amount > 0;
-  const recap = noteRecap(note);
+  const recap = !access.isHidden("lines") && !access.isHidden("total") && !access.isHidden("unit_price") ? noteRecap(note) : null;
 
   const doApply = async () => {
     try {
@@ -292,7 +295,7 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
       <DetailDrawer
         open={!!note} onOpenChange={(o) => (o ? undefined : onClose())}
         title={note.document_number}
-        description={`${kindLabel(note.kind)} · ${note.customer_name}`}
+        description={`${noteName} · ${note.customer_name}`}
         widthClass={DRAWER_W}
         footer={
           <>
@@ -310,7 +313,7 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
             {canApply ? (
               <Button onClick={() => setConfirmApply(true)} className="gap-1.5"><Check className="size-4" /> Apply to balance</Button>
             ) : null}
-            {(isDraft || standing === "sender") && can(P.FIN_CREATE_CREDIT_NOTE) ? (
+            {!access.isHidden("status") && (isDraft || standing === "sender") && can(P.FIN_CREATE_CREDIT_NOTE) ? (
               <Button variant="outline" onClick={() => setEditing(true)} className="gap-1.5"><FilePenLine className="size-4" /> Edit</Button>
             ) : null}
             {standing === "sender" ? <ResumeButton workflowId={workflowId} tags={["FinanceCreditNotes"]} onResumed={onClose} /> : null}
@@ -324,12 +327,12 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
       >
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Amount"><Money kobo={note.total} currency={currency} /></Field>
-            <Field label="Status"><span className={cn("inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[status])}>{STATUS_LABEL[status]}</span></Field>
-            <Field label="Against invoice">{note.invoice_number ?? "-"}</Field>
-            <Field label="Date">{dates.day(note.note_date)}</Field>
+            {!access.isHidden("total") && note.total != null ? <Field label="Amount"><Money kobo={note.total} currency={currency} /></Field> : null}
+            {!access.isHidden("status") ? <Field label="Status"><span className={cn("inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[status])}>{STATUS_LABEL[status]}</span></Field> : null}
+            {!access.isHidden("invoice") ? <Field label="Against invoice">{note.invoice_number ?? "-"}</Field> : null}
+            {!access.isHidden("note_date") ? <Field label="Date">{dates.day(note.note_date)}</Field> : null}
           </div>
-          <Field label="Reason"><span className="font-normal">{note.reason || "-"}</span></Field>
+          {!access.isHidden("reason") ? <Field label="Reason"><span className="font-normal">{note.reason || "-"}</span></Field> : null}
           {standing ? (
             <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} />
           ) : isDraft && gated && !can(P.FIN_SUBMIT_CREDIT_NOTE) ? (
@@ -338,20 +341,20 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
             </p>
           ) : null}
 
-          {note.kind === "CREDIT" && note.allocated_amount > 0 ? (
+          {!access.isHidden("credit_use") && note.kind === "CREDIT" && note.allocated_amount > 0 ? (
             <div className="grid grid-cols-2 gap-4">
               <Field label="Applied"><Money kobo={note.allocated_amount} currency={currency} /></Field>
               <Field label="Unapplied"><Money kobo={note.unallocated_amount} currency={currency} /></Field>
             </div>
           ) : null}
 
-          <IncomeGivenBack rows={note.income_given_back} currency={currency} />
+          {!access.isHidden("income_given_back") ? <IncomeGivenBack rows={note.income_given_back} currency={currency} /> : null}
 
-          {status !== "DRAFT" && status !== "SENT_BACK" ? (
+          {recap && status !== "DRAFT" && status !== "SENT_BACK" ? (
             <div>
               <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">GL posting</p>
               <PostingRecap
-                title={`${kindLabel(note.kind)} posting`} dr={recap.dr} cr={recap.cr} currency={currency}
+                title={`${noteName} posting`} dr={recap.dr} cr={recap.cr} currency={currency}
                 helper="This recaps the journal booked when the note was posted. Applying the credit to invoices moves it from customer credit (2140) to AR (what customers owe) - a new journal posts."
               />
             </div>
@@ -369,7 +372,7 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
       />
       <ConfirmActionModal
         open={confirmSend} onOpenChange={(o) => !o && setConfirmSend(false)}
-        title={gated ? `Submit this ${kindLabel(note.kind).toLowerCase()} for approval?` : `Post this ${kindLabel(note.kind).toLowerCase()}?`}
+        title={gated ? `Submit this ${noteName.toLowerCase()} for approval?` : `Post this ${noteName.toLowerCase()}?`}
         description={gated
           ? `Sends ${note.document_number} for approval. Nothing reaches the ledger until it is approved.`
           : `Posts ${note.document_number} to the ledger.`}
@@ -390,6 +393,7 @@ export function NoteDetailDrawer({ note, entity, currency, onClose }: {
 function CorrectNoteDrawer({ note, entity, currency, onClose, onSaved }: {
   note: CreditNote; entity: string; currency?: string | null; onClose: () => void; onSaved: () => void;
 }) {
+  const access = useFieldAccess("finance.creditnote", note);
   const saved = creditNoteCorrection(note);
   const [date, setDate] = useState(saved.date);
   const [reason, setReason] = useState(saved.reason);
@@ -398,12 +402,15 @@ function CorrectNoteDrawer({ note, entity, currency, onClose, onSaved }: {
   const [amount, setAmount] = useState(saved.amount);
   const [costCenter, setCostCenter] = useState(saved.costCenter);
   const [update, { isLoading }] = useUpdateCreditNoteMutation();
-  const lineEditable = singleLine(note);
+  const lineEditable = singleLine(note) && !access.isReadOnly("lines") && !access.isReadOnly("unit_price");
   const form = { date, reason, reference, account, amount, costCenter };
-  const problem = creditNoteCorrectionProblem(form, lineEditable);
+  const problem = creditNoteCorrectionProblem(form, lineEditable, {
+    date: !access.isReadOnly("note_date"), reason: !access.isReadOnly("reason"),
+  });
   const save = async () => {
     if (problem) return;
-    const changes = creditNoteChanges(note, form);
+    const changes = writableOnlyFollowing(access, creditNoteChanges(note, form), {});
+    if (!lineEditable) delete changes.lines;
     // Nothing changed: nothing to send.
     if (!Object.keys(changes).length) { onClose(); return; }
     try {
@@ -426,8 +433,8 @@ function CorrectNoteDrawer({ note, entity, currency, onClose, onSaved }: {
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
-          <FormField label="Reference"><Input aria-label="Reference" value={reference} onChange={(e) => setReference(e.target.value)} className="bg-white" /></FormField>
+          <AccessField access={access} name="note_date"><PostingDateField label="Date" entity={entity} value={date} onChange={setDate} /></AccessField>
+          <AccessField access={access} name="reference"><FormField label="Reference"><Input aria-label="Reference" value={reference} onChange={(e) => setReference(e.target.value)} className="bg-white" /></FormField></AccessField>
         </div>
         {lineEditable ? <>
           <FormField label={note.kind === "DEBIT" ? "Income account" : "Revenue account"} required>
@@ -440,7 +447,7 @@ function CorrectNoteDrawer({ note, entity, currency, onClose, onSaved }: {
         </> : (
           <p className="rounded-md border border-white-02 bg-gray-50 px-3 py-2 font-mont text-xs leading-5 text-gray-05">This note has several lines, which stay as they are: {formatMoney(note.total, currency)}.</p>
         )}
-        <FormField label="Reason" required><Input aria-label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} className="bg-white" /></FormField>
+        <AccessField access={access} name="reason"><FormField label="Reason" required><Input aria-label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} className="bg-white" /></FormField></AccessField>
       </div>
     </DetailDrawer>
   );
@@ -458,6 +465,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function IssueNoteDrawer({ open, onClose, entity, currency }: {
   open: boolean; onClose: () => void; entity: string; currency?: string | null;
 }) {
+  const access = useFieldAccess("finance.creditnote");
   const [kind, setKind] = useState("CREDIT");
   const [date, setDate] = useState("");
   const [customer, setCustomer] = useState("");
@@ -489,8 +497,9 @@ function IssueNoteDrawer({ open, onClose, entity, currency }: {
   const invQ = useGetInvoicesQuery({ entity, search: customer, status: "POSTED" }, { skip: !customer });
   const invoiceOptions = useMemo(() =>
     toArray(invQ.data?.data)
-      .filter((i) => i.customer_code === customer && i.balance_due > 0)
-      .map((i) => ({ value: String(i.id), label: `${i.document_number} · ${formatMoney(i.balance_due, currency)} due` })),
+      .filter((i) => i.customer_code === customer && (i.balance_due === undefined || i.balance_due > 0))
+      .map((i) => ({ value: String(i.id), label: i.balance_due === undefined
+        ? i.document_number : `${i.document_number} · ${formatMoney(i.balance_due, currency)} due` })),
   [invQ.data, customer, currency]);
 
   const recap = useMemo(() => {
@@ -504,7 +513,9 @@ function IssueNoteDrawer({ open, onClose, entity, currency }: {
     return { dr: [rev], cr: [target] };
   }, [debit, account, amount, costCenter, applyNow]);
 
-  const canSubmit = !!customer && !!account && amount > 0 && reason.trim() !== "" && branch.ready;
+  const canSubmit = !!customer && !!account && amount > 0 && reason.trim() !== "" && branch.ready &&
+    ["kind", "note_date", "reason", "lines", "unit_price"].every((name) =>
+      !access.isReadOnly(name, { creating: true }));
 
   const reset = () => { setKind("CREDIT"); setDate(""); setCustomer(""); setAccount(""); setInvoice(""); setAmount(0); setCostCenter(""); setReason(""); setApplyNow(false); branch.reset(); };
   const close = () => { reset(); onClose(); };
@@ -512,11 +523,11 @@ function IssueNoteDrawer({ open, onClose, entity, currency }: {
 
   const submit = async () => {
     try {
-      const res = await create({
+      const res = await create(writableOnlyFollowing(access, {
         entity, customer: customer.trim().toUpperCase(), kind, note_date: date,
         invoice: invoice ? Number(invoice) : undefined, reason: reason.trim(), ...branch.body(),
         lines: [{ revenue_account: account, description: reason.trim(), quantity: 1, unit_price: amount, cost_center: costCenter || undefined }],
-      }).unwrap();
+      }, { invoice: "invoice_id" }, { creating: true })).unwrap();
       // Post immediately. For credit notes the toggle decides: auto-allocate
       // oldest-first ("Applied") or leave the credit unapplied ("Issued").
       // Above the threshold the ledger is out of reach until somebody approves, so
@@ -566,40 +577,40 @@ function IssueNoteDrawer({ open, onClose, entity, currency }: {
               : ""}
           </p>
         ) : null}
-        <Segmented label="Note type" value={kind} onChange={changeKind} options={[["CREDIT", "Credit note"], ["DEBIT", "Debit note"]]} />
+        <AccessField access={access} name="kind" creating><Segmented label="Note type" value={kind} onChange={changeKind} options={[["CREDIT", "Credit note"], ["DEBIT", "Debit note"]]} /></AccessField>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
+          <AccessField access={access} name="note_date" creating><PostingDateField label="Date" entity={entity} value={date} onChange={setDate} /></AccessField>
           <FormField label="Customer" required><CustomerPicker entity={entity} value={customer} onChange={(v) => { setCustomer(v); setInvoice(""); }} /></FormField>
         </div>
 
-        <FormField label={debit ? "Income account" : "Revenue account"} required>
+        <AccessField access={access} name="lines" creating><FormField label={debit ? "Income account" : "Revenue account"} required>
           <AccountPicker entity={entity} value={account} onChange={setAccount} accountType="INCOME" postableOnly
             placeholder={debit ? "Account to credit" : "Revenue account to reverse"} />
-        </FormField>
+        </FormField></AccessField>
 
-        <FormField label="Against invoice">
+        <AccessField access={access} name="invoice_id" creating><FormField label="Against invoice">
           <SearchSelect options={invoiceOptions} value={invoice} onChange={(e) => setInvoice(e.target.value)}
             loading={invQ.isFetching} disabled={!customer}
             placeholder={customer ? "Optional - search this customer's invoices" : "Select a customer first"} />
-        </FormField>
+        </FormField></AccessField>
         <RaisingBranchChoiceField choice={branch} hint={customerBranchHint(customerBranch)} />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} /></FormField>
-          <FormField label="Cost centre"><CostCenterPicker entity={entity} value={costCenter} onChange={setCostCenter} /></FormField>
+          <AccessField access={access} name="unit_price" creating><FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} /></FormField></AccessField>
+          <AccessField access={access} name="lines" creating><FormField label="Cost centre"><CostCenterPicker entity={entity} value={costCenter} onChange={setCostCenter} /></FormField></AccessField>
         </div>
 
-        <FormField label="Reason" required><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why this adjustment?" className="bg-white" /></FormField>
+        <AccessField access={access} name="reason" creating><FormField label="Reason" required><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why this adjustment?" className="bg-white" /></FormField></AccessField>
 
-        <div data-guide="finance-credit-notes.posting">
+        {!access.isHidden("unit_price", { creating: true }) ? <div data-guide="finance-credit-notes.posting">
           <PostingRecap
             title={`${kindLabel(kind)} posting`} dr={recap.dr} cr={recap.cr} currency={currency}
             helper={debit
               ? "A debit note raises an additional charge and increases the customer's balance."
               : "A credit note lowers the customer's balance and reverses recognised revenue."}
           />
-        </div>
+        </div> : null}
 
         {!debit ? (
           <Segmented

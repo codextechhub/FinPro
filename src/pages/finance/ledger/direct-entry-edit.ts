@@ -47,7 +47,7 @@ export function directEntryForm(j: JournalDetail): DirectEntryForm {
     date: j.date ?? "",
     narration: j.narration ?? "",
     reference: j.reference ?? "",
-    rows: j.lines.map((l) => ({
+    rows: (j.lines ?? []).map((l) => ({
       account: l.account_code,
       amountKobo: l.debit || l.credit,
       side: l.debit ? "debit" : "credit",

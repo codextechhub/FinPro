@@ -14,7 +14,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Link2, RefreshCw, CheckCircle2, Printer, FilePlus2, Unlink, Check, EyeOff, RotateCcw } from "lucide-react";
 import { FinanceShell } from "./finance-shell";
-import { DetailDrawer, FormField, AccountPicker, InfoHint, PostingDateField, usePostingWindow, useActiveEntity, useFieldAccess, toArray } from "@/components/finance-ui";
+import { AccessField, DetailDrawer, FormField, AccountPicker, InfoHint, PostingDateField, usePostingWindow, useActiveEntity, useFieldAccess, toArray } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { EmptyState } from "@/components/finance-ui/states";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ function Kpi({ label, value, danger, children }: { label: string; value: string;
 
 export default function BankReconciliationPage() {
   const { code: entity, currency } = useActiveEntity();
+  const access = useFieldAccess(BANK_ACCOUNT);
   const { data: listData } = useGetBankAccountsQuery({ entity: entity! }, { skip: !entity });
   const accounts = useMemo(() => toArray(listData?.data), [listData]);
   const [accountId, setAccountId] = useState<number | null>(null);
@@ -75,7 +76,7 @@ export default function BankReconciliationPage() {
             <select
               value={account?.id ?? ""} onChange={(e) => setAccountId(Number(e.target.value))}
               className="h-9 rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-gray-01">
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.is_primary ? " · Primary" : ""}</option>)}
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{!access.isHidden("is_primary") && a.is_primary ? " · Primary" : ""}</option>)}
             </select>
           ) : null}
         />
@@ -92,6 +93,7 @@ export default function BankReconciliationPage() {
 
 function Workbench({ account, entity, currency }: { account: BankAccount; entity: string; currency?: string | null }) {
   const dates = useDates();
+  const access = useFieldAccess(BANK_ACCOUNT);
   const { can } = useCan();
   // Both columns are multi-select; the selection shape decides the match kind:
   //   1 bank + 1 book (equal)      → 1:1 match
@@ -141,7 +143,12 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
   const book = shown.book ? (detail?.metrics?.book_balance ?? account.book_balance ?? 0) : undefined;
   const statement = shown.statement ? (detail?.metrics?.statement_balance ?? 0) : undefined;
   const difference = shown.difference && book !== undefined && statement !== undefined ? book - statement : undefined;
-  const balanceCards = [shown.statement, shown.book, shown.difference].filter(Boolean).length + 1;
+  const canSeeStatementLines = !access.isHidden("lines") && !access.isHidden("txn_date")
+    && !access.isHidden("amount") && !access.isHidden("match_source");
+  const canSeeBookLines = !access.isHidden("book_lines");
+  const canMatchLines = canSeeStatementLines && canSeeBookLines;
+  const balanceCards = [shown.statement, shown.book, shown.difference].filter(Boolean).length
+    + Number(canSeeStatementLines);
   const totalLines = matched.length + unmatched.length;
   const progress = totalLines ? Math.round((matched.length / totalLines) * 100) : 0;
 
@@ -198,7 +205,7 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
           ...(detail?.statements?.[0]?.period_label ? [detail.statements[0].period_label] : []),
         ].join(" · ")}</p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => printBankReconciliation({ account, currency, book, statement, difference, matched, unmatched, prefs: dates.prefs })} className="gap-1.5"><Printer className="size-4" /> Reconciliation report</Button>
+          {canSeeStatementLines ? <Button variant="outline" onClick={() => printBankReconciliation({ account, currency, book, statement, difference, matched, unmatched, prefs: dates.prefs })} className="gap-1.5"><Printer className="size-4" /> Reconciliation report</Button> : null}
           <Can permission={P.FIN_RECONCILE_BANK}>
             <Button onClick={doComplete} disabled={completing} className="gap-1.5"><CheckCircle2 className="size-4" />{completing ? "Saving…" : "Complete reconciliation"}</Button>
           </Can>
@@ -209,11 +216,11 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
         {statement !== undefined ? <Kpi label="Statement balance" value={formatMoney(statement, currency)} /> : null}
         {book !== undefined ? <Kpi label="Book balance" value={formatMoney(book, currency)} /> : null}
         {difference !== undefined ? <Kpi label="Difference" value={formatMoney(difference, currency)} danger={difference !== 0} /> : null}
-        <Kpi label="Match progress" value={`${matched.length} / ${totalLines}`}>
+        {canSeeStatementLines ? <Kpi label="Match progress" value={`${matched.length} / ${totalLines}`}>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-03">
             <div className="h-full rounded-full bg-green-01" style={{ width: `${progress}%` }} />
           </div>
-        </Kpi>
+        </Kpi> : null}
       </div>
 
       {difference !== undefined && difference !== 0 ? (
@@ -223,7 +230,7 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
         </div>
       ) : null}
 
-      <div className="grid items-start gap-4 lg:grid-cols-2" data-guide="finance-bank-reconciliation.matching">
+      {canMatchLines ? <div className="grid items-start gap-4 lg:grid-cols-2" data-guide="finance-bank-reconciliation.matching">
         {/* Bank statement unmatched */}
         <Column title="Bank statement (unmatched)" count={`${unmatched.length} of ${totalLines}`}>
           {unmatched.length === 0 ? <ColEmpty msg="Every statement line is matched." /> : unmatched.map((l) => {
@@ -250,9 +257,9 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
             );
           })}
         </Column>
-      </div>
+      </div> : null}
 
-      <Can permission={P.FIN_RECONCILE_BANK}>
+      {canMatchLines ? <Can permission={P.FIN_RECONCILE_BANK}>
         <div className="flex flex-wrap items-center gap-2" data-guide="finance-bank-reconciliation.exceptions">
           <Button onClick={doMatch} disabled={!canMatch || matchBusy} className="gap-1.5"><Link2 className="size-4" />{matchBusy ? "Matching…" : selBanks.length >= 2 && selBooks.length === 1 ? `Split match (${selBanks.length})` : selBanks.length === 1 && selBooks.length >= 2 ? `Match group (${selBooks.length})` : "Match selected"}</Button>
           <Button variant="outline" onClick={() => setAdjusting(true)} disabled={soleBank == null} className="gap-1.5"><FilePlus2 className="size-4" /> Add adjusting entry</Button>
@@ -266,9 +273,9 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
             <span className="font-mont text-[11px] text-gray-05">Select bank + book lines that sum to the same total, then Match. One line each side, or many-to-one either way.</span>
           )}
         </div>
-      </Can>
+      </Can> : null}
 
-      <div>
+      {canSeeStatementLines ? <div>
         <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Matched lines · {matched.length} pair(s)</p>
         {matched.length === 0 ? <ColEmpty msg="Matched pairs will appear here." /> : (
           <div className="overflow-hidden rounded-md border border-white-02">
@@ -300,9 +307,9 @@ function Workbench({ account, entity, currency }: { account: BankAccount; entity
             </table>
           </div>
         )}
-      </div>
+      </div> : null}
 
-      {ignored.length > 0 && (
+      {canSeeStatementLines && ignored.length > 0 && (
         <div>
           <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Ignored lines · {ignored.length}</p>
           <div className="overflow-hidden rounded-md border border-white-02">
@@ -453,6 +460,7 @@ function AdjustDrawer({ line, entity, currency, onClose, onDone }: {
   line: BankStatementLine; entity: string; currency?: string | null; onClose: () => void; onDone: () => void;
 }) {
   const dates = useDates();
+  const access = useFieldAccess(BANK_ACCOUNT);
   const [counter, setCounter] = useState("");
   const [narration, setNarration] = useState(line.description || "");
   // Unlike the import, an adjustment posts - so it needs a date in an open period:
@@ -481,11 +489,10 @@ function AdjustDrawer({ line, entity, currency, onClose, onDone }: {
 
   const submit = async () => {
     try {
-      await adjust({
-        id: line.id, entity, counter_account: counter || undefined,
-        narration: narration.trim() || undefined,
+      await adjust({ id: line.id, entity, ...access.writableOnly({
+        counter_account: counter || undefined, narration: narration.trim() || undefined,
         posting_date: postingDate || undefined,
-      }).unwrap();
+      }) }).unwrap();
       toast.success("Adjusting entry booked and matched.");
       onDone();
     } catch { /* central */ }
@@ -498,7 +505,7 @@ function AdjustDrawer({ line, entity, currency, onClose, onDone }: {
       widthClass="sm:max-w-lg"
       footer={<>
         <Button variant="outline" disabled={isLoading} onClick={onClose}>Cancel</Button>
-        <Button disabled={isLoading} onClick={submit} className="gap-1.5"><FilePlus2 className="size-4" />{isLoading ? "Posting…" : "Post & match"}</Button>
+        <Button disabled={isLoading || access.isReadOnly("counter_account")} onClick={submit} className="gap-1.5"><FilePlus2 className="size-4" />{isLoading ? "Posting…" : "Post & match"}</Button>
       </>}
     >
       <div className="space-y-4">
@@ -512,17 +519,17 @@ function AdjustDrawer({ line, entity, currency, onClose, onDone }: {
             as the bank’s value date.
           </p>
         )}
-        <FormField label="Counter account">
+        <AccessField access={access} name="counter_account"><FormField label="Counter account">
           <AccountPicker entity={entity} value={counter} onChange={setCounter} postableOnly placeholder="Defaults to 5500 Bank Charges" />
-        </FormField>
-        <PostingDateField
+        </FormField></AccessField>
+        <AccessField access={access} name="posting_date"><PostingDateField
           label="Posting date" entity={entity} value={postingDate} onChange={setChosen}
           hint={deferred ? `Books in this period; ${dates.day(line.txn_date)} stays as the bank’s value date.` : undefined}
-        />
-        <FormField label="Narration">
+        /></AccessField>
+        <AccessField access={access} name="narration"><FormField label="Narration">
           <textarea value={narration} onChange={(e) => setNarration(e.target.value)} rows={2}
             className="w-full rounded-md border border-white-02 bg-white px-3 py-2 font-mont text-sm" />
-        </FormField>
+        </FormField></AccessField>
       </div>
     </DetailDrawer>
   );

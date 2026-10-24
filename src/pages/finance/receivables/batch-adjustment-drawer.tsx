@@ -3,6 +3,7 @@ import { Plus, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   AccountPicker,
+  AccessField,
   BankAccountPicker,
   DetailDrawer,
   FormField,
@@ -83,6 +84,9 @@ export function BatchAdjustmentDrawer({
   currency?: string | null;
 }) {
   const { can } = useCan();
+  const refundAccess = useFieldAccess("finance.refund");
+  const writeOffAccess = useFieldAccess("finance.writeoff");
+  const invoiceAccess = useFieldAccess("finance.invoice");
   const defaultAccount = useDefaultWriteOffAccount(open ? entity : null);
   const dates = useDates();
   const canCreateRefund = can(P.FIN_CREATE_REFUND);
@@ -129,13 +133,13 @@ export function BatchAdjustmentDrawer({
     () => writeOff
       ? invoiceTargets.map((invoice) => ({
           value: String(invoice.id),
-          label: `${invoice.document_number} - ${invoice.customer_name} · ${formatMoney(invoice.balance_due, currency)} due`,
+          label: `${invoice.document_number} - ${invoice.customer_name}${invoiceAccess.isHidden("balance_due") ? "" : ` · ${formatMoney(invoice.balance_due, currency)} due`}`,
         }))
       : refundTargets.map((customer) => ({
           value: refundCreditKey(customer),
           label: `${customer.customer_code} - ${customer.customer_name}${refundCreditSpansBranches(refundTargets) ? ` · ${refundCreditBranchLabel(customer)}` : ""} · ${formatMoney(customer.refundable_credit, currency)} available`,
         })),
-    [writeOff, invoiceTargets, refundTargets, currency],
+    [writeOff, invoiceTargets, refundTargets, currency, invoiceAccess],
   );
 
   const actionOptions = useMemo(() => {
@@ -184,7 +188,11 @@ export function BatchAdjustmentDrawer({
   // A batch pays one branch's refunds; see refundBatchBranches.
   const lineBranches = writeOff ? [] : refundBatchBranches(lines.map((line) => refundTargetFor(line.target)));
   const spansBranches = lineBranches.length > 1;
-  const canSubmit = canCreateKind && valid && !!date && (writeOff || (!!bankAccount && !spansBranches));
+  const canSubmit = canCreateKind && valid && !!date && (writeOff || (!!bankAccount && !spansBranches))
+    && (writeOff || !refundAccess.isReadOnly("bank_account", { creating: true }))
+    && !(writeOff ? writeOffAccess : refundAccess).isReadOnly("amount", { creating: true })
+    && !(writeOff ? writeOffAccess : refundAccess).isReadOnly(
+      writeOff ? "write_off_date" : "refund_date", { creating: true });
 
   const recap = useMemo<{ dr: RecapRow[]; cr: RecapRow[] }>(() => writeOff
     ? {
@@ -230,11 +238,11 @@ export function BatchAdjustmentDrawer({
       kind,
       action,
       date,
-      reason: reason.trim() || undefined,
-      narration: reason.trim() || undefined,
+      reason: writeOff && !writeOffAccess.isReadOnly("reason", { creating: true }) ? reason.trim() || undefined : undefined,
+      narration: !(writeOff ? writeOffAccess : refundAccess).isReadOnly("narration", { creating: true }) ? reason.trim() || undefined : undefined,
       ...(writeOff
         ? { write_off_account: writeOffAccount || undefined }
-        : { bank_account: bankAccount }),
+        : refundAccess.writableOnly({ bank_account: bankAccount }, { creating: true })),
       items: writeOff
         ? lines.map((line) => ({ invoice: Number(line.target), amount: line.amount }))
         : lines.map((line) => {
@@ -323,21 +331,21 @@ export function BatchAdjustmentDrawer({
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Metric label="Lines" value={String(lines.length)} />
-          <Metric label="Batch total" value={formatMoney(total, currency)} />
+          {!(writeOff ? writeOffAccess : refundAccess).isHidden("amount", { creating: true }) ? <Metric label="Batch total" value={formatMoney(total, currency)} /> : null}
           <div className="col-span-2 sm:col-span-1">
             <Metric label="Processing" value="All or nothing" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <PostingDateField
+          <AccessField access={writeOff ? writeOffAccess : refundAccess} name={writeOff ? "write_off_date" : "refund_date"} creating><PostingDateField
             label="Posting date" entity={entity} value={date} onChange={setDate}
             hint={writeOff
               ? "Only invoices raised on or before this date can be written off."
               : "Refundable credit is measured on this date."}
-          />
+          /></AccessField>
           {writeOff ? (
-            <FormField label="Write-off expense account">
+            <AccessField access={writeOffAccess} name="write_off_account" creating><FormField label="Write-off expense account">
               <AccountPicker
                 entity={entity}
                 value={writeOffAccount}
@@ -346,31 +354,33 @@ export function BatchAdjustmentDrawer({
                 postableOnly
                 placeholder={writeOffAccountHint(defaultAccount)}
               />
-            </FormField>
+            </FormField></AccessField>
           ) : (
-            <FormField label="Refund bank account" required>
-              <BankAccountPicker
-                entity={entity} value={bankAccount} onChange={setBankAccount}
-                documentBranchIds={lineBranches.map((branch) => branch.id)}
-                disabled={spansBranches}
-              />
-              {spansBranches ? (
-                <p role="alert" className="font-mont text-[11px] leading-5 text-destructive">
-                  These lines belong to {joinNames(lineBranches.map((branch) => branch.name ?? "credit not yet given a branch"))}.
-                  A batch pays one branch&rsquo;s refunds from that branch&rsquo;s account, so run each branch as its own batch.
-                </p>
-              ) : null}
-            </FormField>
+            <AccessField access={refundAccess} name="bank_account" creating>
+              <FormField label="Refund bank account" required>
+                <BankAccountPicker
+                  entity={entity} value={bankAccount} onChange={setBankAccount}
+                  documentBranchIds={lineBranches.map((branch) => branch.id)}
+                  disabled={spansBranches}
+                />
+                {spansBranches ? (
+                  <p role="alert" className="font-mont text-[11px] leading-5 text-destructive">
+                    These lines belong to {joinNames(lineBranches.map((branch) => branch.name ?? "credit not yet given a branch"))}.
+                    A batch pays one branch&rsquo;s refunds from that branch&rsquo;s account, so run each branch as its own batch.
+                  </p>
+                ) : null}
+              </FormField>
+            </AccessField>
           )}
         </div>
-        <FormField label="Reason">
+        <AccessField access={writeOff ? writeOffAccess : refundAccess} name={writeOff ? "reason" : "narration"} creating><FormField label="Reason">
           <Input
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             placeholder="Applied to every line"
             className="bg-white"
           />
-        </FormField>
+        </FormField></AccessField>
 
         <div>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -412,7 +422,7 @@ export function BatchAdjustmentDrawer({
                         revealOnSearch
                       />
                     </div>
-                    <div className="min-w-0">
+                    <AccessField access={writeOff ? writeOffAccess : refundAccess} name="amount" creating><div className="min-w-0">
                       <p className="mb-1 font-mont text-[11px] text-gray-05">Amount</p>
                       <MoneyInput
                         valueKobo={line.amount}
@@ -421,7 +431,7 @@ export function BatchAdjustmentDrawer({
                         disabled={!line.target}
                         className="[&_input]:h-9"
                       />
-                    </div>
+                    </div></AccessField>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -464,14 +474,14 @@ export function BatchAdjustmentDrawer({
           ) : null}
         </div>
 
-        <PostingRecap
+        {!(writeOff ? writeOffAccess : refundAccess).isHidden("amount", { creating: true }) ? <PostingRecap
           title={writeOff ? "Combined write-off posting" : "Combined refund posting"}
           dr={recap.dr}
           cr={recap.cr}
           currency={currency}
           stackOnMobile
           helper="Each line keeps its own document and audit trail; the batch only commits when every line succeeds."
-        />
+        /> : null}
 
         <FormField label="Next action">
           <select

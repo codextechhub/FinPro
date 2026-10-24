@@ -149,6 +149,12 @@ const render = () => act(() => root.render(<AdjustmentDetailDrawer row={ROW} ent
 const button = (label: string) => [...document.body.querySelectorAll("button")].find((b) => b.textContent?.trim().endsWith(label));
 
 describe("a refund an approver sent back", () => {
+  it("does not render an amount withheld by Field Access", () => {
+    mocks.fieldAccess = { "finance.refund": { hidden: ["amount"] } };
+    act(() => root.render(<AdjustmentDetailDrawer row={{ ...ROW, amount: undefined } as unknown as ArAdjustment} entity="BSS" currency="NGN" onClose={vi.fn()} />));
+    expect(document.body.textContent).not.toContain("20,000.00");
+    expect(document.body.textContent).not.toContain("Amount");
+  });
   it("reads Sent back and offers its sender Resume, and no Submit", async () => {
     render();
     expect(document.body.textContent).toContain("Sent back by Mr Eze on 03/10/2026: Add the bank reference");
@@ -201,6 +207,19 @@ describe("the refund picker for a role that may not read customer balances", () 
     await act(async () => { button("Pick date")!.click(); });
     expect(document.body.querySelector("[data-testid=refund-credit-hidden]")).toBeNull();
     expect(mocks.availabilityAsked.at(-1)).toBe(false);
+  });
+});
+
+describe("the refund bank account switch", () => {
+  it("removes a hidden account and disables a locked account", () => {
+    mocks.fieldAccess = { "finance.refund": { hidden: ["bank_account"] } };
+    act(() => root.render(<NewActionDrawer open onClose={vi.fn()} entity="BSS" currency="NGN" />));
+    expect(document.body.querySelector("[data-field=bank_account]")).toBeNull();
+
+    mocks.fieldAccess = { "finance.refund": { read_only: ["bank_account"] } };
+    act(() => root.render(<NewActionDrawer open onClose={vi.fn()} entity="BSS" currency="NGN" />));
+    expect(document.body.querySelector("[data-field=bank_account] fieldset")).toBeNull();
+    expect(document.body.querySelector("[data-field=bank_account]")?.hasAttribute("disabled")).toBe(true);
   });
 });
 

@@ -12,6 +12,7 @@ export interface Account {
   parent_id: number | null;
   parent_code: string | null;
   subtype: string;
+  description?: string;
   /**
    * Present only on the chart-of-accounts (`?with_balance=true`) response.
    * For a ledger account behind a bank account the key is absent when the role

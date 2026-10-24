@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
-import { DataTable, StatusPill, FormDrawer, FormField, toArray, type Column } from "@/components/finance-ui";
+import { AccessField, DataTable, StatusPill, FormDrawer, FormField, toArray, useFieldAccess, writableOnlyFollowing, type Column } from "@/components/finance-ui";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ const selectCls = "h-9 rounded-md border border-white-02 bg-white px-2 font-mont
 const branchOf = (code: string) => { const p = code.split(/[-_]/); return (p[1] || "").toUpperCase(); };
 
 export function CostCentersTab({ entity }: { entity: string }) {
+  const access = useFieldAccess("finance.costcenter");
   const { data, isLoading, isFetching, isError, refetch } = useGetCostCentersQuery({ entity });
   const centres = toArray<CostCenter>(data?.data);
   const [branch, setBranch] = useState("");
@@ -45,8 +46,8 @@ export function CostCentersTab({ entity }: { entity: string }) {
     { header: "Code", cell: (c) => <span className="font-semibold">{c.code}</span> },
     { header: "Name", cell: (c) => c.name },
     { header: "Branch", cell: (c) => branchOf(c.code) ? <span className="rounded bg-pry-01 px-1.5 py-0.5 font-mont text-[10px] font-semibold uppercase text-primary">{branchOf(c.code)}</span> : "-" },
-    { header: "Parent", cell: (c) => c.parent_code ?? "-" },
-    { header: "Status", cell: (c) => <StatusPill status={c.is_active ? "ACTIVE" : "INACTIVE"} /> },
+    ...(!access.isHidden("parent_code") ? [{ header: "Parent", cell: (c: CostCenter) => c.parent_code ?? "-" }] : []),
+    ...(!access.isHidden("is_active") ? [{ header: "Status", cell: (c: CostCenter) => <StatusPill status={c.is_active ? "ACTIVE" : "INACTIVE"} /> }] : []),
   ];
   return (
     <div className="space-y-5">
@@ -80,6 +81,7 @@ export function CostCentersTab({ entity }: { entity: string }) {
 }
 
 function CostCentreModal({ existing, onClose, entity, parents }: { existing: CostCenter | null; onClose: () => void; entity: string; parents: CostCenter[] }) {
+  const access = useFieldAccess("finance.costcenter", existing);
   const [create, { isLoading }] = useCreateCostCenterMutation();
   const initial = costCenterFormValues(existing);
   const [code, setCode] = useState(initial.code);
@@ -90,12 +92,12 @@ function CostCentreModal({ existing, onClose, entity, parents }: { existing: Cos
 
   const submit = async () => {
     try {
-      const r = await create(costCenterUpsertPayload(entity, {
+      const r = await create(writableOnlyFollowing(access, costCenterUpsertPayload(entity, {
         code,
         name,
         parent,
         active,
-      })).unwrap();
+      }), { parent: "parent_code" }, { creating: !existing })).unwrap();
       toast.success(r.message || "Cost centre saved.");
       onClose();
     } catch { /* central */ }
@@ -107,17 +109,17 @@ function CostCentreModal({ existing, onClose, entity, parents }: { existing: Cos
       loading={isLoading} canSubmit={canSubmit} widthClass="sm:max-w-lg">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Code" required><Input value={code} onChange={(e) => setCode(e.target.value)} disabled={!!existing} placeholder="e.g. CC-LAG-FAC" className="bg-white font-mont" /></FormField>
-        <FormField label="Parent">
+        <AccessField access={access} name="parent_code" creating={!existing}><FormField label="Parent">
           <select value={parent} onChange={(e) => setParent(e.target.value)} className={`${selectCls} w-full`}>
             <option value="">None</option>
             {parents.filter((centre) => centre.id !== existing?.id).map((c) => <option key={c.id} value={c.code}>{c.code} - {c.name}</option>)}
           </select>
-        </FormField>
+        </FormField></AccessField>
       </div>
       <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Lekki - Facilities" className="bg-white" /></FormField>
-      <label className="flex items-center gap-2 font-mont text-sm text-gray-01">
+      <AccessField access={access} name="is_active" creating={!existing}><label className="flex items-center gap-2 font-mont text-sm text-gray-01">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active
-      </label>
+      </label></AccessField>
     </FormDrawer>
   );
 }

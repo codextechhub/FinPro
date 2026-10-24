@@ -13,7 +13,7 @@ import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus, TrendingUp, TrendingDown } from "lucide-react";
-import { DataTable, StatusPill, Sparkline, FormDrawer, FormField, TabStrip, CHART_COLORS, toArray, type Column, type TabStripItem } from "@/components/finance-ui";
+import { AccessField, DataTable, StatusPill, Sparkline, FormDrawer, FormField, TabStrip, CHART_COLORS, toArray, useFieldAccess, type Column, type TabStripItem } from "@/components/finance-ui";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,8 @@ function Delta({ pct }: { pct: number | null }) {
 
 export function CurrenciesTab() {
   const dates = useDates();
+  const fxAccess = useFieldAccess("finance.fxrate");
+  const currencyAccess = useFieldAccess("finance.currency");
   const [tab, setTab] = useState<"fx" | "currencies">("fx");
   const cur = useGetCurrenciesQuery();
   const fx = useGetFxRatesQuery();
@@ -54,10 +56,11 @@ export function CurrenciesTab() {
   useActionParam("new", canCreate, () => { if (canCreate) setCreating(true); });
 
   const bases = useMemo(() => [...new Set(rates.map((r) => r.base))].sort(), [rates]);
-  const sources = useMemo(() => [...new Set(rates.map((r) => r.source).filter(Boolean))].sort(), [rates]);
+  const sources = useMemo(() => fxAccess.isHidden("source") ? [] : [...new Set(rates.map((r) => r.source).filter(Boolean))].sort(), [rates, fxAccess]);
 
   // Per-pair latest rate + delta vs the prior capture + sparkline of recent rates.
   const cards = useMemo(() => {
+    if (fxAccess.isHidden("rate") || fxAccess.isHidden("as_of")) return [];
     const map = new Map<string, FxRate[]>();
     for (const r of rates) {
       const k = `${r.base}→${r.quote}`;
@@ -72,25 +75,25 @@ export function CurrenciesTab() {
       const pr = prior ? Number(prior.rate) : lr;
       return { pair, latest, deltaPct: pr ? ((lr - pr) / pr) * 100 : null, spark: sorted.slice(-8).map((r) => Number(r.rate)) };
     }).slice(0, 4);
-  }, [rates]);
+  }, [rates, fxAccess]);
 
   const fxRows = useMemo(() => rates
     .filter((r) => (!base || r.base === base) && (!source || r.source === source))
-    .slice().sort((a, b) => b.as_of.localeCompare(a.as_of)), [rates, base, source]);
+    .slice().sort((a, b) => (b.as_of ?? "").localeCompare(a.as_of ?? "")), [rates, base, source]);
 
   const fxCols: Column<FxRate>[] = [
-    { header: "Date", cell: (r) => <span className="tabular-nums">{dates.day(r.as_of)}</span> },
+    ...(!fxAccess.isHidden("as_of") ? [{ header: "Date", cell: (r: FxRate) => <span className="tabular-nums">{dates.day(r.as_of)}</span> }] : []),
     { header: "Pair", cell: (r) => <span className="font-semibold">{r.base} → {r.quote}</span> },
-    { header: "Rate", align: "right", cell: (r) => <span className="tabular-nums">{fmtRate(r.rate)}</span> },
+    ...(!fxAccess.isHidden("rate") ? [{ header: "Rate", align: "right" as const, cell: (r: FxRate) => <span className="tabular-nums">{fmtRate(r.rate)}</span> }] : []),
     // The source is the feed's name as somebody typed it ("CBN"), shown as typed.
-    { header: "Source", cell: (r) => r.source ? <span className="rounded bg-pry-01 px-1.5 py-0.5 font-mont text-[10px] font-semibold text-primary">{r.source}</span> : "-" },
+    ...(!fxAccess.isHidden("source") ? [{ header: "Source", cell: (r: FxRate) => r.source ? <span className="rounded bg-pry-01 px-1.5 py-0.5 font-mont text-[10px] font-semibold text-primary">{r.source}</span> : "-" }] : []),
   ];
   const currencyCols: Column<Currency>[] = [
     { header: "Code", cell: (c) => <span className="font-semibold">{c.code}</span> },
     { header: "Name", cell: (c) => c.name },
-    { header: "Symbol", cell: (c) => c.symbol || "-" },
-    { header: "Minor unit", align: "right", cell: (c) => c.minor_unit },
-    { header: "Status", cell: (c) => <StatusPill status={c.is_active ? "ACTIVE" : "INACTIVE"} /> },
+    ...(!currencyAccess.isHidden("symbol") ? [{ header: "Symbol", cell: (c: Currency) => c.symbol || "-" }] : []),
+    ...(!currencyAccess.isHidden("minor_unit") ? [{ header: "Minor unit", align: "right" as const, cell: (c: Currency) => c.minor_unit }] : []),
+    ...(!currencyAccess.isHidden("is_active") ? [{ header: "Status", cell: (c: Currency) => <StatusPill status={c.is_active ? "ACTIVE" : "INACTIVE"} /> }] : []),
   ];
 
   return (
@@ -109,7 +112,7 @@ export function CurrenciesTab() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {cards.map((c) => (
                 <div key={c.pair} className="rounded-md bg-white p-4 ring-1 ring-white-02">
-                  <p className="font-mont text-xs text-gray-05">{c.pair.replace("→", " / ")}{c.latest.source ? ` · ${c.latest.source}` : ""}</p>
+                  <p className="font-mont text-xs text-gray-05">{c.pair.replace("→", " / ")}{!fxAccess.isHidden("source") && c.latest.source ? ` · ${c.latest.source}` : ""}</p>
                   <div className="mt-1 flex items-end justify-between gap-2">
                     <p className="font-mont text-xl font-semibold tabular-nums text-black-01">{fmtRate(c.latest.rate)}<span className="ml-1 text-xs font-normal text-gray-05">{c.latest.quote}</span></p>
                     <Sparkline data={c.spark} color={CHART_COLORS.primary} />
@@ -125,10 +128,10 @@ export function CurrenciesTab() {
               <option value="">All bases</option>
               {bases.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
-            <select value={source} onChange={(e) => setSource(e.target.value)} className={selectCls} aria-label="Source">
+            {!fxAccess.isHidden("source") ? <select value={source} onChange={(e) => setSource(e.target.value)} className={selectCls} aria-label="Source">
               <option value="">All sources</option>
               {sources.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            </select> : null}
           </div>
 
           <DataTable columns={fxCols} rows={fxRows} rowKey={(r) => r.id}
@@ -147,17 +150,20 @@ export function CurrenciesTab() {
 
 function NewFxRateModal({ open, onClose, currencies }: { open: boolean; onClose: () => void; currencies: Currency[] }) {
   const dates = useDates();
+  const access = useFieldAccess("finance.fxrate");
   const [create, { isLoading }] = useCreateFxRateMutation();
   const [baseC, setBaseC] = useState("");
   const [quoteC, setQuoteC] = useState("");
   const [rate, setRate] = useState("");
   const [asOf, setAsOf] = useState(() => dates.today());
   const [src, setSrc] = useState("");
-  const canSubmit = baseC !== "" && quoteC !== "" && baseC !== quoteC && Number(rate) > 0 && !!asOf;
+  const canSubmit = baseC !== "" && quoteC !== "" && baseC !== quoteC && Number(rate) > 0 && !!asOf
+    && !access.isReadOnly("rate", { creating: true }) && !access.isReadOnly("as_of", { creating: true });
 
   const submit = async () => {
     try {
-      const r = await create({ base: baseC, quote: quoteC, rate, as_of: asOf, source: src.trim() || undefined }).unwrap();
+      const r = await create({ base: baseC, quote: quoteC,
+        ...access.writableOnly({ rate, as_of: asOf, source: src.trim() || undefined }, { creating: true }) }).unwrap();
       toast.success(r.message || "FX rate saved.");
       setRate(""); setSrc("");
       onClose();
@@ -182,10 +188,10 @@ function NewFxRateModal({ open, onClose, currencies }: { open: boolean; onClose:
           </select>
         </FormField>
       </div>
-      <FormField label="Rate" required><Input value={rate} onChange={(e) => setRate(e.target.value)} type="number" step="0.0001" placeholder="e.g. 1612.40" className="bg-white font-mont" /></FormField>
+      <AccessField access={access} name="rate" creating><FormField label="Rate" required><Input value={rate} onChange={(e) => setRate(e.target.value)} type="number" step="0.0001" placeholder="e.g. 1612.40" className="bg-white font-mont" /></FormField></AccessField>
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="As of" required><DatePickerInput value={asOf} onChange={(e) => setAsOf(e.target.value)} className="bg-white" /></FormField>
-        <FormField label="Source"><Input value={src} onChange={(e) => setSrc(e.target.value)} placeholder="e.g. CBN" className="bg-white" /></FormField>
+        <AccessField access={access} name="as_of" creating><FormField label="As of" required><DatePickerInput value={asOf} onChange={(e) => setAsOf(e.target.value)} className="bg-white" /></FormField></AccessField>
+        <AccessField access={access} name="source" creating><FormField label="Source"><Input value={src} onChange={(e) => setSrc(e.target.value)} placeholder="e.g. CBN" className="bg-white" /></FormField></AccessField>
       </div>
     </FormDrawer>
   );

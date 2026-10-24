@@ -21,7 +21,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { Plus, Search } from "lucide-react";
 import { FinanceShell } from "../finance-shell";
-import { DataTable, InfoHint, Money, StatusPill, TabStrip, useActiveEntity, type Column, type TabStripItem } from "@/components/finance-ui";
+import { DataTable, InfoHint, Money, StatusPill, TabStrip, useActiveEntity, useFieldAccess, type Column, type TabStripItem } from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,7 @@ const cap = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 
 export default function GeneralLedgerPage() {
   const dates = useDates();
+  const access = useFieldAccess("finance.journal");
   const [searchParams] = useSearchParams();
   const { code: entity, currency } = useActiveEntity();
   const [status, setStatus] = useState<JournalStatus | typeof SENT_BACK_FILTER | "">("");
@@ -108,18 +109,18 @@ export default function GeneralLedgerPage() {
 
   const columns: Column<JournalListItem>[] = [
     { header: "Journal No.", cell: (j) => <span className="font-semibold">{j.document_number}</span> },
-    { header: "Date", cell: (j) => dates.day(j.date) },
-    { header: "Period", cell: (j) => j.period_label ?? "-" },
-    { header: "Source", cell: (j) => cap(j.source) },
-    { header: "Reference", cell: (j) => <span className="block max-w-xs truncate text-gray-01">{j.narration || j.reference || "-"}</span> },
-    { header: "Total Debit", align: "right", cell: (j) => <Money kobo={j.total_debit} currency={currency} align="right" /> },
-    { header: "Status", cell: (j) => <StatusPill {...sentBackPill(j, j.status, undefined, true)} /> },
-    { header: "Created By", cell: (j) => (
+    ...(!access.isHidden("date") ? [{ header: "Date", cell: (j: JournalListItem) => dates.day(j.date) }] : []),
+    ...(!access.isHidden("period_label") ? [{ header: "Period", cell: (j: JournalListItem) => j.period_label ?? "-" }] : []),
+    ...(!access.isHidden("source") ? [{ header: "Source", cell: (j: JournalListItem) => cap(j.source) }] : []),
+    ...(access.anyVisible("narration", "reference") ? [{ header: "Reference", cell: (j: JournalListItem) => <span className="block max-w-xs truncate text-gray-01">{(!access.isHidden("narration") && j.narration) || (!access.isHidden("reference") && j.reference) || "-"}</span> }] : []),
+    ...(!access.isHidden("total_debit") ? [{ header: "Total Debit", align: "right" as const, cell: (j: JournalListItem) => <Money kobo={j.total_debit} currency={currency} align="right" /> }] : []),
+    ...(!access.isHidden("status") ? [{ header: "Status", cell: (j: JournalListItem) => <StatusPill {...sentBackPill(j, j.status, undefined, true)} /> }] : []),
+    ...(!access.isHidden("created_by") ? [{ header: "Created By", cell: (j: JournalListItem) => (
       <span className="inline-flex items-center gap-2" title={exitedTitle(j.created_by_is_exited)}>
         <UserAvatar userId={j.created_by_id ?? undefined} name={j.created_by} className={cn("size-6 rounded-full", exitedOutline(j.created_by_is_exited))} fallbackClassName="text-[9px] font-semibold" />
         <span className="text-gray-01">{j.created_by}</span>
       </span>
-    ) },
+    ) }] : []),
   ];
 
   if (!entity) {
@@ -159,20 +160,20 @@ export default function GeneralLedgerPage() {
         {/* The status strip sizes to its tabs, so the filters share its line on a
             wide screen and wrap under it when the row runs out of width. */}
         <div className="flex flex-wrap items-center gap-2">
-          <TabStrip
+          {!access.isHidden("status") ? <TabStrip
             items={statusTabs}
             value={status}
             onChange={(next) => { setStatus(next); setPage(1); }}
             ariaLabel="Journal status"
-          />
+          /> : null}
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-05" />
             <Input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); setPage(1); }} placeholder="Search journal no / reference" className="h-9 w-64 pl-8 font-mont text-sm" />
           </div>
-          <select value={source} onChange={(e) => { setSource(e.target.value as JournalSource | ""); setPage(1); }} className={selectCls} aria-label="Source">
+          {!access.isHidden("source") ? <select value={source} onChange={(e) => { setSource(e.target.value as JournalSource | ""); setPage(1); }} className={selectCls} aria-label="Source">
             <option value="">All sources</option>
             {SOURCES.map((s) => <option key={s} value={s}>{cap(s)}</option>)}
-          </select>
+          </select> : null}
           {scopeFilters}
         </div>
 
@@ -188,8 +189,8 @@ export default function GeneralLedgerPage() {
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white px-4 py-2.5 font-mont text-xs text-gray-05">
             <span>{summary.total} entries</span>
             <span className="flex gap-4">
-              <span>Posted total: <span className="font-semibold text-black-01">{formatMoney(summary.posted_total.kobo, currency)}</span></span>
-              <span>Reversed total: <span className="font-semibold text-black-01">{formatMoney(summary.reversed_total.kobo, currency)}</span></span>
+              {!access.isHidden("posted_total") && summary.posted_total ? <span>Posted total: <span className="font-semibold text-black-01">{formatMoney(summary.posted_total.kobo, currency)}</span></span> : null}
+              {!access.isHidden("reversed_total") && summary.reversed_total ? <span>Reversed total: <span className="font-semibold text-black-01">{formatMoney(summary.reversed_total.kobo, currency)}</span></span> : null}
             </span>
           </div>
         )}

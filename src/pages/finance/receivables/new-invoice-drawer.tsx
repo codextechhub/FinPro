@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { toKobo } from "@/utils/money";
 import { Plus, Trash2 } from "lucide-react";
 import {
-  DetailDrawer, Money, CustomerPicker, AccountPicker, TaxCodePicker, toArray, PostingDateField,
+  AccessField, DetailDrawer, Money, CustomerPicker, AccountPicker, TaxCodePicker, toArray, PostingDateField, useFieldAccess,
   customerBranchHint, RaisingBranchChoiceField, useCustomerBranch, useRaisingBranchChoice,
 } from "@/components/finance-ui";
 import { SearchSelect } from "@/components/custom/search-select";
@@ -37,6 +37,7 @@ const periodOk = (l: Line) => (!l.start && !l.end) || (!!l.start && !!l.end && l
 export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
   open: boolean; onOpenChange: (o: boolean) => void; entity: string; currency?: string | null;
 }) {
+  const access = useFieldAccess("finance.invoice");
   // Tax rates for the live preview (the picker itself loads its own options).
   const { data: taxData } = useGetTaxCodesQuery({ entity }, { skip: !open });
   const taxByCode = useMemo(
@@ -92,7 +93,10 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
 
   const validLines = lines.filter((l) => l.account && toKobo(l.price) > 0);
   const canSubmit = !!customer && !!invoiceDate && validLines.length > 0 && branch.ready
-    && lines.every(periodOk) && beneficiary !== customer;
+    && lines.every(periodOk) && beneficiary !== customer
+    && !access.isReadOnly("invoice_date", { creating: true })
+    && !access.isReadOnly("lines", { creating: true })
+    && !access.isReadOnly("unit_price", { creating: true });
 
   const reset = () => {
     setStructure(""); setCustomer(""); setBeneficiary(""); setDueDate(""); setReference(""); setNarration("");
@@ -102,7 +106,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
 
   const submit = async () => {
     try {
-      const res = await create({
+      const res = await create(access.writableOnly({
         entity, customer, invoice_date: invoiceDate,
         due_date: dueDate || undefined, reference: reference || undefined,
         narration: narration || undefined, post, ...branch.body(),
@@ -116,7 +120,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
           ...(l.deposit ? { kind: "DEPOSIT" as const } : {}),
           ...(!l.deposit && l.start && l.end ? { service_start: l.start, service_end: l.end } : {}),
         })),
-      }).unwrap();
+      }, { creating: true })).unwrap();
       toast.success(res.message || "Invoice created.");
       close();
     } catch { /* central */ }
@@ -142,26 +146,26 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
         {/* customer & dates */}
         <div className="space-y-3">
           <CustomerPicker entity={entity} value={customer} onChange={setCustomer} label="Customer" isRequired placeholder="Type a customer name…" />
-          <CustomerPicker entity={entity} value={beneficiary} onChange={setBeneficiary} label="On behalf of (optional)" placeholder="The customer this payer is billed for" />
+          <AccessField access={access} name="beneficiary" creating><CustomerPicker entity={entity} value={beneficiary} onChange={setBeneficiary} label="On behalf of (optional)" placeholder="The customer this payer is billed for" /></AccessField>
           {beneficiary && beneficiary === customer
             ? <p className="font-mont text-[11px] text-destructive">A customer cannot be billed on its own behalf.</p>
             : beneficiary ? <p className="font-mont text-[11px] text-gray-05">The customer above owes this invoice, and their statement names this customer on it.</p> : null}
           <RaisingBranchChoiceField choice={branch} hint={customerBranchHint(customerBranch)} />
           <div className="grid grid-cols-2 gap-3">
-            <PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} />
-            <label className="block space-y-1">
+            <AccessField access={access} name="invoice_date" creating><PostingDateField label="Invoice date" entity={entity} value={invoiceDate} onChange={setInvoiceDate} /></AccessField>
+            <AccessField access={access} name="due_date" creating><label className="block space-y-1">
               <span className={fieldLabel}>Due date</span>
               <DatePickerInput value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="bg-white" />
-            </label>
+            </label></AccessField>
           </div>
-          <label className="block space-y-1">
+          <AccessField access={access} name="reference" creating><label className="block space-y-1">
             <span className={fieldLabel}>Reference</span>
             <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. PO-1024" className="bg-white" />
-          </label>
+          </label></AccessField>
         </div>
 
         {/* fee structure shortcut - prefills the lines below */}
-        {fsOptions.length > 0 && (
+        {fsOptions.length > 0 && !access.isReadOnly("lines", { creating: true }) && !access.isReadOnly("unit_price", { creating: true }) && (
           <div className="rounded-md bg-pry-01/40 p-3">
             <SearchSelect
               label="Start from a fee structure (optional)"
@@ -175,7 +179,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
         )}
 
         {/* lines */}
-        <div className="space-y-2">
+        <AccessField access={access} name="lines" creating><div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-mont text-sm font-semibold text-black-01">Lines</span>
             <Button type="button" variant="outline" size="sm" onClick={addLine} className="h-7 gap-1 px-2 text-xs"><Plus className="size-3.5" /> Add line</Button>
@@ -196,7 +200,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
                 <Input value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} placeholder="Description" className="h-9 bg-white" />
                 <div className="grid grid-cols-12 items-center gap-2">
                   <Input value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value })} type="number" min="0" step="1" placeholder="Qty" className="col-span-3 h-9 bg-white" aria-label="Quantity" />
-                  <Input value={l.price} onChange={(e) => setLine(i, { price: e.target.value })} type="number" min="0" step="0.01" placeholder="Unit price (₦)" className="col-span-5 h-9 bg-white" aria-label="Unit price" />
+                  <AccessField access={access} name="unit_price" creating className="col-span-5"><Input value={l.price} onChange={(e) => setLine(i, { price: e.target.value })} type="number" min="0" step="0.01" placeholder="Unit price (₦)" className="h-9 bg-white" aria-label="Unit price" /></AccessField>
                   <div className="col-span-4">
                     <TaxCodePicker entity={entity} value={l.tax} onChange={(v) => setLine(i, { tax: v })} placeholder="No tax" usage="sales" />
                   </div>
@@ -220,16 +224,16 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
               </div>
             );
           })}
-        </div>
+        </div></AccessField>
 
         {/* narration */}
-        <label className="block space-y-1">
+        <AccessField access={access} name="narration" creating><label className="block space-y-1">
           <span className={fieldLabel}>Narration</span>
           <Input value={narration} onChange={(e) => setNarration(e.target.value)} placeholder="Optional note shown on the invoice" className="bg-white" />
-        </label>
+        </label></AccessField>
 
         {/* totals + issue toggle */}
-        <div className="space-y-2 rounded-md bg-gray-50 px-3 py-3 font-mont text-xs">
+        {!access.isHidden("unit_price", { creating: true }) ? <div className="space-y-2 rounded-md bg-gray-50 px-3 py-3 font-mont text-xs">
           <div className="flex items-center justify-between">
             <span className="text-gray-05">Subtotal</span>
             <span className="font-semibold text-black-01"><Money kobo={totals.net} currency={currency} /></span>
@@ -246,7 +250,7 @@ export function NewInvoiceDrawer({ open, onOpenChange, entity, currency }: {
             <input type="checkbox" checked={post} onChange={(e) => setPost(e.target.checked)} className="size-3.5 accent-primary" />
             Issue now (post it to the books)
           </label>
-        </div>
+        </div> : null}
       </div>
     </DetailDrawer>
   );

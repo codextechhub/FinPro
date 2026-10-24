@@ -18,9 +18,9 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Ban, Plus, Send } from "lucide-react";
 import {
-  ConfirmActionModal, CustomerPicker, DataTable, DetailDrawer, FormField, Money, MoneyInput,
+  AccessField, ConfirmActionModal, CustomerPicker, DataTable, DetailDrawer, FormField, Money, MoneyInput,
   PostingDateField, RaisingBranchChoiceField, StatusPill, customerBranchHint, toArray,
-  useCustomerBranch, useFieldAccess, useRaisingBranchChoice, type Column,
+  useCustomerBranch, useFieldAccess, useRaisingBranchChoice, writableOnlyFollowing, type Column,
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
@@ -55,6 +55,7 @@ const FILTER_STATUSES = ["DRAFT", "PENDING_APPROVAL", "POSTED", "REVERSED"] as c
 
 export function CreditTransfersTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
+  const access = useFieldAccess("finance.credittransfer");
   const { can } = useCan();
   const branches = useBranchColumn();
   const [status, setStatus] = useState("");
@@ -70,23 +71,23 @@ export function CreditTransfersTab({ entity, currency }: { entity: string; curre
 
   const columns: Column<CustomerCreditTransfer>[] = [
     { header: "Ref", cell: (t) => <span className="font-semibold tabular-nums">{t.document_number}</span> },
-    { header: "From", cell: (t) => <span className="font-medium text-gray-01">{t.from_customer_name}</span> },
-    { header: "To", cell: (t) => <span className="font-medium text-gray-01">{t.to_customer_name}</span> },
+    ...(!access.isHidden("from_customer_name") ? [{ header: "From", cell: (t: CustomerCreditTransfer) => <span className="font-medium text-gray-01">{t.from_customer_name}</span> }] : []),
+    ...(!access.isHidden("to_customer_name") ? [{ header: "To", cell: (t: CustomerCreditTransfer) => <span className="font-medium text-gray-01">{t.to_customer_name}</span> }] : []),
     ...(branches.show && branchView.selected === "all" ? [{ header: "Branch", cell: (t: CustomerCreditTransfer) => branches.name(t.branch_id) }] : []),
-    { header: "Amount", align: "right", cell: (t) => <Money kobo={t.amount} currency={currency} align="right" /> },
-    { header: "Date", cell: (t) => <span className="tabular-nums">{dates.day(t.transfer_date)}</span> },
-    { header: "Status", cell: (t) => <StatusPill {...sentBackPill(t, t.status, CREDIT_TRANSFER_STATUS[t.status], true)} /> },
+    ...(!access.isHidden("amount") ? [{ header: "Amount", align: "right" as const, cell: (t: CustomerCreditTransfer) => <Money kobo={t.amount} currency={currency} align="right" /> }] : []),
+    ...(!access.isHidden("transfer_date") ? [{ header: "Date", cell: (t: CustomerCreditTransfer) => <span className="tabular-nums">{dates.day(t.transfer_date)}</span> }] : []),
+    ...(!access.isHidden("status") ? [{ header: "Status", cell: (t: CustomerCreditTransfer) => <StatusPill {...sentBackPill(t, t.status, CREDIT_TRANSFER_STATUS[t.status], true)} /> }] : []),
   ];
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectCls} aria-label="Status">
+          {!access.isHidden("status") ? <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectCls} aria-label="Status">
             <option value="">All statuses</option>
             {FILTER_STATUSES.map((code) => <option key={code} value={code}>{CREDIT_TRANSFER_STATUS[code]}</option>)}
             <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
-          </select>
+          </select> : null}
           {filters}
         </div>
         {can(P.FIN_CREATE_CREDIT_TRANSFER) ? (
@@ -124,6 +125,7 @@ function useAvailableCredit(entity: string, customer: string) {
 function NewTransferDrawer({ open, onClose, entity, currency }: {
   open: boolean; onClose: () => void; entity: string; currency?: string | null;
 }) {
+  const access = useFieldAccess("finance.credittransfer");
   const { can } = useCan();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -137,16 +139,20 @@ function NewTransferDrawer({ open, onClose, entity, currency }: {
   const branch = useRaisingBranchChoice({ unless: fromBranch != null });
   const credit = useAvailableCredit(entity, from);
   const busy = creating || submitting;
-  const ready = !!from && !!to && from !== to && amount > 0 && !!date && reason.trim() !== "" && branch.ready;
+  const ready = !!from && !!to && from !== to && amount > 0 && !!date && reason.trim() !== "" && branch.ready
+    && !access.isReadOnly("amount", { creating: true })
+    && !access.isReadOnly("from_customer", { creating: true })
+    && !access.isReadOnly("transfer_date", { creating: true })
+    && !access.isReadOnly("reason", { creating: true });
 
   const reset = () => { setFrom(""); setTo(""); setAmount(0); setDate(""); setReason(""); branch.reset(); };
   const close = () => { reset(); onClose(); };
   const save = async (send: boolean) => {
     try {
-      const res = await create({
+      const res = await create(writableOnlyFollowing(access, {
         entity, from_customer: from, to_customer: to, amount, transfer_date: date,
         reason: reason.trim(), ...branch.body(),
-      }).unwrap();
+      }, { from_customer: "from_customer_name", to_customer: "to_customer_name" }, { creating: true })).unwrap();
       if (!send) {
         toast.success(res.message || "Credit transfer saved as draft.");
         close();
@@ -175,8 +181,8 @@ function NewTransferDrawer({ open, onClose, entity, currency }: {
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="From customer" required><CustomerPicker entity={entity} value={from} onChange={setFrom} /></FormField>
-          <FormField label="To customer" required><CustomerPicker entity={entity} value={to} onChange={setTo} /></FormField>
+          <AccessField access={access} name="from_customer_name" creating><FormField label="From customer" required><CustomerPicker entity={entity} value={from} onChange={setFrom} /></FormField></AccessField>
+          <AccessField access={access} name="to_customer_name" creating><FormField label="To customer" required><CustomerPicker entity={entity} value={to} onChange={setTo} /></FormField></AccessField>
         </div>
         {from && to && from === to ? <p className="font-mont text-[11px] text-destructive">Choose a different customer to receive the credit.</p> : null}
         {from && credit.known ? (
@@ -184,12 +190,12 @@ function NewTransferDrawer({ open, onClose, entity, currency }: {
         ) : null}
         <RaisingBranchChoiceField choice={branch} hint={customerBranchHint(fromBranch)} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} /></FormField>
-          <PostingDateField label="Transfer date" entity={entity} value={date} onChange={setDate} />
+          <AccessField access={access} name="amount" creating><FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} /></FormField></AccessField>
+          <AccessField access={access} name="transfer_date" creating><PostingDateField label="Transfer date" entity={entity} value={date} onChange={setDate} /></AccessField>
         </div>
-        <FormField label="Reason" required>
+        <AccessField access={access} name="reason" creating><FormField label="Reason" required>
           <Input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={255} placeholder="e.g. Family asked for Tunde's overpayment to pay Ada's fees" className="bg-white" />
-        </FormField>
+        </FormField></AccessField>
         <Note>Approve it under Workflow, Approvals. Until then neither customer&apos;s credit changes.</Note>
       </div>
       {noApproverDialog}
@@ -201,6 +207,7 @@ function TransferDrawer({ transfer, entity, currency, onClose }: {
   transfer: CustomerCreditTransfer | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
+  const access = useFieldAccess("finance.credittransfer", transfer);
   const { can } = useCan();
   const branches = useBranchColumn();
   const [confirm, setConfirm] = useState<"submit" | "void" | null>(null);
@@ -233,7 +240,7 @@ function TransferDrawer({ transfer, entity, currency, onClose }: {
       <DetailDrawer
         open onOpenChange={(o) => (o ? undefined : onClose())}
         title={transfer.document_number}
-        description={`${transfer.from_customer_name} to ${transfer.to_customer_name}`}
+        description={access.isHidden("from_customer_name") ? undefined : `${transfer.from_customer_name} to ${transfer.to_customer_name}`}
         widthClass="sm:max-w-lg"
         footer={<>
           {transfer.status === "POSTED" && can(P.FIN_REVERSE_CREDIT_TRANSFER) ? (
@@ -248,15 +255,15 @@ function TransferDrawer({ transfer, entity, currency, onClose }: {
         <div className="space-y-4">
           <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={RETURNED_HINT.resumeOnly} />
           <div className="grid grid-cols-2 gap-4">
-            <DetailField label="Amount"><Money kobo={transfer.amount} currency={currency} /></DetailField>
-            <DetailField label="Status"><StatusPill {...sentBackPill(transfer, transfer.status, CREDIT_TRANSFER_STATUS[transfer.status], true)} /></DetailField>
-            <DetailField label="From">{transfer.from_customer_name} <span className="font-normal text-gray-05">{transfer.from_customer_code}</span></DetailField>
-            <DetailField label="To">{transfer.to_customer_name} <span className="font-normal text-gray-05">{transfer.to_customer_code}</span></DetailField>
-            <DetailField label="Date">{dates.day(transfer.transfer_date)}</DetailField>
+            {!access.isHidden("amount") ? <DetailField label="Amount"><Money kobo={transfer.amount} currency={currency} /></DetailField> : null}
+            {!access.isHidden("status") ? <DetailField label="Status"><StatusPill {...sentBackPill(transfer, transfer.status, CREDIT_TRANSFER_STATUS[transfer.status], true)} /></DetailField> : null}
+            {!access.isHidden("from_customer_name") ? <DetailField label="From">{transfer.from_customer_name} <span className="font-normal text-gray-05">{transfer.from_customer_code}</span></DetailField> : null}
+            {!access.isHidden("to_customer_name") ? <DetailField label="To">{transfer.to_customer_name} <span className="font-normal text-gray-05">{transfer.to_customer_code}</span></DetailField> : null}
+            {!access.isHidden("transfer_date") ? <DetailField label="Date">{dates.day(transfer.transfer_date)}</DetailField> : null}
             {branches.show ? <DetailField label="Branch">{branches.name(transfer.branch_id)}</DetailField> : null}
-            {transfer.receipt_number ? <DetailField label="Receipt to the new customer">{transfer.receipt_number}</DetailField> : null}
+            {!access.isHidden("receipt_number") && transfer.receipt_number ? <DetailField label="Receipt to the new customer">{transfer.receipt_number}</DetailField> : null}
           </div>
-          <DetailField label="Reason"><span className="font-normal">{transfer.reason || "-"}</span></DetailField>
+          {!access.isHidden("reason") ? <DetailField label="Reason"><span className="font-normal">{transfer.reason || "-"}</span></DetailField> : null}
           {transfer.status === "DRAFT" || transfer.status === "PENDING_APPROVAL" ? (
             <Note>A credit transfer always needs a second person&apos;s approval. Nothing moves until it is approved.</Note>
           ) : null}
@@ -266,7 +273,7 @@ function TransferDrawer({ transfer, entity, currency, onClose }: {
         open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}
         title={confirm === "void" ? "Void this credit transfer?" : "Submit this credit transfer for approval?"}
         description={confirm === "void"
-          ? `Gives ${formatMoney(transfer.amount, currency)} of credit back to ${transfer.from_customer_name}. Any bill of ${transfer.to_customer_name}'s it paid is reopened.`
+          ? `Returns the transferred credit to its source customer. Any bill it paid is reopened.`
           : `Sends ${transfer.document_number} for approval. Nothing moves until it is approved.`}
         confirmText={confirm === "void" ? "Void transfer" : "Submit"} destructive={confirm === "void"}
         loading={submitting || voiding} onConfirm={act}

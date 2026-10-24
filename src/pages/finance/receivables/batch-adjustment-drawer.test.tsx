@@ -65,6 +65,16 @@ const open = async () => {
 };
 
 describe("the batch refunds drawer", () => {
+  it("removes a hidden bank account and disables a locked one", async () => {
+    mocks.fieldAccess = { "finance.refund": { hidden: ["bank_account"] } };
+    await open();
+    expect(document.body.querySelector("[data-field=bank_account]")).toBeNull();
+
+    mocks.fieldAccess = { "finance.refund": { read_only: ["bank_account"] } };
+    await act(async () => root.render(<BatchAdjustmentDrawer open onClose={() => undefined} entity="BSS" currency="NGN" />));
+    expect(document.body.querySelector("[data-field=bank_account]")?.hasAttribute("disabled")).toBe(true);
+  });
+
   it("asks for the customers holding credit when the balance is readable", async () => {
     await open();
     expect(document.body.querySelector("[data-testid=refund-credit-hidden]")).toBeNull();

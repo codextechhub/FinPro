@@ -31,7 +31,7 @@ import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField, Segmented,
   CustomerPicker, AccountPicker, BankAccountPicker, PostingRecap, toArray,
   type Column, type RecapRow,
-  PostingDateField, InfoHint, useFieldAccess,
+  PostingDateField, InfoHint, AccessField, useFieldAccess,
 } from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -154,6 +154,8 @@ const KPI_COLUMNS: Record<2 | 3 | 4, string> = { 2: "lg:grid-cols-2", 3: "lg:gri
 
 export function RefundsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
+  const refundAccess = useFieldAccess("finance.refund");
+  const writeOffAccess = useFieldAccess("finance.writeoff");
   const [searchParams] = useSearchParams();
   const { can, canAny } = useCan();
   const [filter, setFilter] = useState<"" | Mode>("");
@@ -192,13 +194,13 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
   const columns: Column<ArAdjustment>[] = [
     { header: "Ref", cell: (r) => <span className="font-semibold tabular-nums">{r.reference || "-"}</span> },
     { header: "Type", cell: (r) => <TypeChip kind={r.kind} /> },
-    { header: "Date", cell: (r) => <span className="tabular-nums">{dates.day(r.date)}</span> },
+    { header: "Date", cell: (r) => r.date ? <span className="tabular-nums">{dates.day(r.date)}</span> : null },
     { header: "Customer", cell: (r) => <span className="text-gray-01">{r.customer_name}</span> },
-    { header: "Reason", cell: (r) => <span className="block max-w-[260px] truncate text-gray-01" title={r.reason}>{r.reason || "-"}</span> },
-    { header: "Amount", align: "right", cell: (r) => <Money kobo={r.amount} currency={currency} align="right" /> },
+    { header: "Reason", cell: (r) => r.reason !== undefined ? <span className="block max-w-[260px] truncate text-gray-01" title={r.reason}>{r.reason || "-"}</span> : null },
+    { header: "Amount", align: "right", cell: (r) => r.amount !== undefined ? <Money kobo={r.amount} currency={currency} align="right" /> : null },
     { header: "Status", cell: (r) => (
       <span className="inline-flex flex-col items-start">
-        <StatusPill status={isSentBack(r, true) ? SENT_BACK_STATUS : r.status || "DRAFT"} />
+        {r.status !== undefined ? <StatusPill status={isSentBack(r, true) ? SENT_BACK_STATUS : r.status} /> : null}
         {r.kind === "REFUND" && r.refund_id ? <ProviderRefundChip link={providerRefunds.get(r.refund_id)} /> : null}
       </span>
     ) },
@@ -207,14 +209,14 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
   return (
     <>
       <div className={cn("mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2", KPI_COLUMNS[kpiCount])}>
-        {showCredit && (
+        {showCredit && data?.kpis.refundable_credit !== undefined && (
           <Stat label="Refundable credit" hint="Total customer credit available to refund." value={formatMoney(data?.kpis.refundable_credit ?? 0, currency)} />
         )}
-        {showWrittenOff && (
+        {showWrittenOff && data?.kpis.written_off_ytd !== undefined && (
           <Stat label={writtenOffLabel(scope)} value={formatMoney(data?.kpis.written_off_ytd ?? 0, currency)} />
         )}
-        <Stat label={DOCUMENT_STATUS_WORDS.PENDING_APPROVAL} value={String(data?.kpis.pending ?? 0)} />
-        <Stat label={SENT_BACK_WORD} value={String(data?.kpis.sent_back ?? 0)} />
+        {data?.kpis.pending !== undefined ? <Stat label={DOCUMENT_STATUS_WORDS.PENDING_APPROVAL} value={String(data.kpis.pending)} /> : null}
+        {data?.kpis.sent_back !== undefined ? <Stat label={SENT_BACK_WORD} value={String(data.kpis.sent_back)} /> : null}
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -231,10 +233,10 @@ export function RefundsTab({ entity, currency }: { entity: string; currency?: st
               <option value="WRITEOFF">Write-offs</option>
             </select>
           )}
-          <select value={approval} onChange={(e) => { setApproval(e.target.value); resetPage(); }} className={selectCls} aria-label="Status">
+          {(!refundAccess.isHidden("status") || !writeOffAccess.isHidden("status")) ? <select value={approval} onChange={(e) => { setApproval(e.target.value); resetPage(); }} className={selectCls} aria-label="Status">
             <option value="">All statuses</option>
             <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
-          </select>
+          </select> : null}
           {filters}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -268,6 +270,8 @@ export function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
   row: ArAdjustment | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
+  const refundAccess = useFieldAccess("finance.refund", row?.kind === "REFUND" ? row : null);
+  const writeOffAccess = useFieldAccess("finance.writeoff", row?.kind === "WRITEOFF" ? row : null);
   const { can } = useCan();
   const defaultAccount = useDefaultWriteOffAccount(row ? entity : null);
   const [post, { isLoading: posting }] = usePostRefundMutation();
@@ -291,6 +295,7 @@ export function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
   if (!row || !doc) return null;
 
   const wo = row.kind === "WRITEOFF";
+  const access = wo ? writeOffAccess : refundAccess;
   const posted = row.status === "POSTED";
   const isDraft = row.status === "DRAFT" && !standing;
   // Server-computed. Refunds and write-offs are gated at any amount once the
@@ -385,23 +390,23 @@ export function AdjustmentDetailDrawer({ row, entity, currency, onClose }: {
           </p>
         ) : null}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Amount"><Money kobo={row.amount} currency={currency} /></Field>
-          <Field label="Status"><StatusPill status={isSentBack(doc, true) ? SENT_BACK_STATUS : row.status || "DRAFT"} /></Field>
+          {!access.isHidden("amount") && row.amount !== undefined ? <Field label="Amount"><Money kobo={row.amount} currency={currency} /></Field> : null}
+          {!access.isHidden("status") && row.status !== undefined ? <Field label="Status"><StatusPill status={isSentBack(doc, true) ? SENT_BACK_STATUS : row.status} /></Field> : null}
           <Field label={wo ? "Against invoice" : "Reference"}>{row.reference || "-"}</Field>
-          <Field label="Date">{dates.day(row.date)}</Field>
+          {!access.isHidden(wo ? "write_off_date" : "refund_date") && row.date ? <Field label="Date">{dates.day(row.date)}</Field> : null}
         </div>
-        <Field label="Reason"><span className="font-normal">{row.reason || "-"}</span></Field>
-        {!wo && row.refund_id ? (
+        {row.reason !== undefined ? <Field label="Reason"><span className="font-normal">{row.reason || "-"}</span></Field> : null}
+        {!wo && row.refund_id && !access.isHidden("amount") && !access.isHidden("method") ? (
           <ProviderRefundPanel
             refundId={row.refund_id} refundStatus={row.status} method={row.method} customerCode={row.customer_code}
             entity={entity} currency={currency} amount={row.amount}
             onSend={sendDraft} sending={posting || submittingRefund}
           />
         ) : null}
-        <div>
+        {!access.isHidden("amount") ? <div>
           <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">GL posting</p>
           <PostingRecap title={wo ? "Write-off posting" : "Refund posting"} dr={recap.dr} cr={recap.cr} currency={currency} helper={helper} stackOnMobile />
-        </div>
+        </div> : null}
       </div>
       {noApproverDialog}
       {wo && row.write_off_id ? (
@@ -418,6 +423,9 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
   open: boolean; onClose: () => void; entity: string; currency?: string | null;
 }) {
   const { can } = useCan();
+  const refundAccess = useFieldAccess("finance.refund");
+  const writeOffAccess = useFieldAccess("finance.writeoff");
+  const invoiceAccess = useFieldAccess("finance.invoice");
   const defaultAccount = useDefaultWriteOffAccount(open ? entity : null);
   const dates = useDates();
   const [mode, setMode] = useState<Mode>("REFUND");
@@ -515,7 +523,7 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
     () => toArray(invQ.data?.data).filter((i) => i.customer_code === customer && i.balance_due > 0),
     [invQ.data, customer],
   );
-  const invoiceOptions = openInvoices.map((i) => ({ value: String(i.id), label: `${i.document_number} · ${formatMoney(i.balance_due, currency)} due` }));
+  const invoiceOptions = openInvoices.map((i) => ({ value: String(i.id), label: `${i.document_number}${invoiceAccess.isHidden("balance_due") ? "" : ` · ${formatMoney(i.balance_due, currency)} due`}` }));
   // A write-off cannot be dated before the debt it concedes exists.
   const selectedInvoice = openInvoices.find((i) => String(i.id) === invoice) ?? null;
 
@@ -536,8 +544,13 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
 
   const canSubmit = wo
     ? !!customer && !!invoice && amount > 0 && !!date
+      && !writeOffAccess.isReadOnly("amount", { creating: true })
+      && !writeOffAccess.isReadOnly("write_off_date", { creating: true })
     : !!customer && paymentChoiceReady(onlineChoice, bankAccount) && refundAmountIsValid && !!date
-      && !paymentAmountError(amount, onlineChoice.payment);
+      && (onlineChoice.online || !refundAccess.isReadOnly("bank_account", { creating: true }))
+      && !paymentAmountError(amount, onlineChoice.payment)
+      && !refundAccess.isReadOnly("amount", { creating: true })
+      && !refundAccess.isReadOnly("refund_date", { creating: true });
 
   const reset = () => {
     setMode("REFUND"); setDate(""); setCustomer(""); setAmount(0); setReason("");
@@ -570,10 +583,11 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
   const submit = async () => {
     try {
       if (wo) {
-        const res = await createWriteOff({
-          entity, invoice: Number(invoice), amount, write_off_account: expenseAccount || undefined,
-          write_off_date: date, narration: reason.trim() || undefined, reason: reason.trim() || undefined,
-        }).unwrap();
+        const res = await createWriteOff({ entity, ...writeOffAccess.writableOnly({
+          invoice: Number(invoice), amount, write_off_account: expenseAccount || undefined,
+          write_off_date: date, narration: reason.trim() || undefined,
+          reason: reason.trim() || undefined,
+        }, { creating: true }) }).unwrap();
         // The draft's own answer, not the chooser's: a write-off that turns out to
         // be gated is submitted rather than sent to a post that would refuse it.
         if (nextAction === "submit" || (nextAction === "post" && res.data.approval_required)) {
@@ -591,8 +605,11 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
         const res = await createRefund({
           entity, customer: customer.trim().toUpperCase(),
           branch: refundRequestBranch(activeRefundCustomer),
-          refund_date: date, method: onlineChoice.online ? ONLINE_REFUND_METHOD : BANK_REFUND_METHOD,
-          amount, bank_account: !onlineChoice.online && bankAccount ? Number(bankAccount) : undefined, narration: reason.trim() || undefined,
+          ...refundAccess.writableOnly({
+            refund_date: date, method: onlineChoice.online ? ONLINE_REFUND_METHOD : BANK_REFUND_METHOD,
+            amount, bank_account: !onlineChoice.online && bankAccount ? Number(bankAccount) : undefined,
+            narration: reason.trim() || undefined,
+          }, { creating: true }),
         }).unwrap();
         // Tie an online refund to its payment before posting.
         if (onlineChoice.online && !(await tieRefund(res.data.id, onlineChoice.collection))) {
@@ -642,12 +659,12 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
         />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <PostingDateField
+          <AccessField access={wo ? writeOffAccess : refundAccess} name={wo ? "write_off_date" : "refund_date"} creating><PostingDateField
             label="Date" entity={entity} value={date} onChange={setDate}
             notBefore={wo ? selectedInvoice?.invoice_date : undefined}
             notBeforeLabel={wo && selectedInvoice ? `invoice ${selectedInvoice.document_number}` : undefined}
             hint={wo ? undefined : "Credit available is measured on this date."}
-          />
+          /></AccessField>
           <FormField label="Customer" required>
             {wo ? (
               <CustomerPicker entity={entity} value={customer} onChange={(v) => { setCustomer(v); setInvoice(""); }} />
@@ -685,11 +702,11 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
         ) : null}
 
         {wo ? (
-          <FormField label="Against invoice" required>
+          <AccessField access={writeOffAccess} name="invoice" creating><FormField label="Against invoice" required>
             <SearchSelect options={invoiceOptions} value={invoice} onChange={(e) => pickInvoice(e.target.value)}
               loading={invQ.isFetching} disabled={!customer}
               placeholder={customer ? "Select an open invoice" : "Select a customer first"} />
-          </FormField>
+          </FormField></AccessField>
         ) : (
           <div className="space-y-4">
             <OnlineRefundFields
@@ -698,16 +715,18 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
               amount={amount} value={onlineChoice} onChange={setOnlineChoice}
             />
             {onlineChoice.online ? null : (
-              <FormField label="Refund to bank account" required>
-                <BankAccountPicker entity={entity} value={bankAccount} onChange={setBankAccount}
-                  documentBranchId={(liveRefundCustomer ?? selectedRefundCustomer)?.branch_id} />
-              </FormField>
+              <AccessField access={refundAccess} name="bank_account" creating>
+                <FormField label="Refund to bank account" required>
+                  <BankAccountPicker entity={entity} value={bankAccount} onChange={setBankAccount}
+                    documentBranchId={(liveRefundCustomer ?? selectedRefundCustomer)?.branch_id} />
+                </FormField>
+              </AccessField>
             )}
           </div>
         )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Amount" required>
+          <AccessField access={wo ? writeOffAccess : refundAccess} name="amount" creating><FormField label="Amount" required>
             <div className="space-y-1">
               <MoneyInput
                 valueKobo={amount}
@@ -726,18 +745,18 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
                 </p>
               ) : null}
             </div>
-          </FormField>
+          </FormField></AccessField>
           {wo ? (
-            <FormField label="Write-off expense account">
+            <AccessField access={writeOffAccess} name="write_off_account" creating><FormField label="Write-off expense account">
               <AccountPicker entity={entity} value={expenseAccount} onChange={setExpenseAccount} accountType="EXPENSE" postableOnly
                 placeholder={writeOffAccountHint(defaultAccount)} />
-            </FormField>
+            </FormField></AccessField>
           ) : null}
         </div>
 
-        <FormField label="Reason"><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why this action?" className="bg-white" /></FormField>
+        <AccessField access={wo ? writeOffAccess : refundAccess} name={wo ? "reason" : "narration"} creating><FormField label="Reason"><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why this action?" className="bg-white" /></FormField></AccessField>
 
-        <div data-guide="finance-refunds.posting">
+        {!(wo ? writeOffAccess : refundAccess).isHidden("amount", { creating: true }) ? <div data-guide="finance-refunds.posting">
           <PostingRecap
             title={wo ? "Write-off posting" : "Refund posting"} dr={recap.dr} cr={recap.cr} currency={currency}
             stackOnMobile
@@ -747,7 +766,7 @@ export function NewActionDrawer({ open, onClose, entity, currency }: {
                 ? "The refund goes back through the payment provider and is booked when the provider confirms it."
                 : "A refund pays out a credit balance - cash leaves the bank."}
           />
-        </div>
+        </div> : null}
 
         <FormField label="Next action">
           <select value={nextAction} onChange={(e) => setNextAction(e.target.value as "post" | "submit" | "draft")} className="h-9 w-full rounded-md border border-white-02 bg-white px-3 font-mont text-sm text-black-01 focus:border-primary focus:outline-none">

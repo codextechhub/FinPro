@@ -756,13 +756,10 @@ function EditStatementDrawer({
 /**
  * The correction form for a manually keyed statement.
  *
- * The opening balance is the bank's own figure and is read under the account's
- * statement balance switch. A role that may read it sees the field and the
- * recalculated closing balance, and sends the opening balance it typed. A role
- * that may not has neither on screen and sends no opening balance at all, so
- * the server keeps the stored one; sending it anyway is refused with 403
- * `field_write_denied`, and that refusal shows beside the field when it is on
- * screen and above the lines when it is not.
+ * The opening balance can be corrected under its own Write switch. Its stored
+ * value is shown only when both its Read switch and the account's statement
+ * balance Read switch permit it. A writer without that account-level read sees
+ * a blank input and can enter a replacement without learning the old value.
  */
 function EditStatementForm({
   id,
@@ -780,8 +777,11 @@ function EditStatementForm({
   const [statementDate, setStatementDate] = useState(statement.statement_date);
   const [periodLabel, setPeriodLabel] = useState(statement.period_label);
   const access = useFieldAccess(BANK_ACCOUNT);
-  const openingReadable = statement.opening_balance !== undefined && !access.isHidden("statement_balance");
-  const [opening, setOpening] = useState(String((statement.opening_balance ?? 0) / 100));
+  const openingReadable = statement.opening_balance !== undefined;
+  const openingWritable = !access.isHidden("opening_balance_naira") && !access.isReadOnly("opening_balance_naira");
+  const [opening, setOpening] = useState(
+    statement.opening_balance !== undefined ? String(statement.opening_balance / 100) : "",
+  );
   const [denied, setDenied] = useState<FieldErrors | null>(null);
   const [rows, setRows] = useState<CorrectionRow[]>(
     statement.lines.map((line) => ({
@@ -813,7 +813,7 @@ function EditStatementForm({
   const canSave = (
     statement.can_edit
     && statementDate
-    && (!openingReadable || (opening.trim() !== "" && !Number.isNaN(Number(opening))))
+    && (!openingWritable || opening.trim() === "" || !Number.isNaN(Number(opening)))
     && validRows.length === rows.length
     && rows.length > 0
   );
@@ -828,7 +828,7 @@ function EditStatementForm({
         entity,
         statement_date: statementDate,
         period_label: periodLabel.trim() || undefined,
-        ...(openingReadable ? { opening_balance: openingKobo } : {}),
+        ...(openingWritable && opening.trim() !== "" ? { opening_balance: openingKobo } : {}),
         lines: rows.map((row) => ({
           ...(row.id ? { id: row.id } : {}),
           txn_date: row.txn_date,
@@ -861,18 +861,18 @@ function EditStatementForm({
           <Input value={periodLabel} onChange={(event) => setPeriodLabel(event.target.value)} disabled={!statement.can_edit} placeholder="e.g. Apr 2026" className="bg-white" />
         </FormField>
       </div>
-      {openingReadable ? (
+      {openingReadable || openingWritable ? (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FormField label="Opening balance" required>
-              <Input type="number" value={opening} onChange={(event) => setOpening(event.target.value)} disabled={!statement.can_edit} className="bg-white font-mont" />
+            <FormField label="Opening balance">
+              <Input type="number" value={opening} onChange={(event) => setOpening(event.target.value)} disabled={!statement.can_edit || !openingWritable} className="bg-white font-mont" />
               {denied?.opening_balance ? <p role="alert" className="mt-1 font-mont text-[11px] text-destructive">{denied.opening_balance}</p> : null}
             </FormField>
-            <FormField label="Calculated closing balance">
+            {opening.trim() !== "" && !access.isHidden("closing_balance") && !access.isHidden("statement_balance") ? <FormField label="Calculated closing balance">
               <div className="flex h-9 items-center rounded-md border border-gray-03 bg-gray-03 px-3 font-mont text-sm font-medium tabular-nums text-gray-01">
                 {formatMoney(closingKobo, currency)}
               </div>
-            </FormField>
+            </FormField> : null}
           </div>
           <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
             The closing balance is recalculated as opening balance plus all corrected statement lines. Every correction is recorded in the finance audit trail.
@@ -880,7 +880,7 @@ function EditStatementForm({
         </>
       ) : (
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
-          Your role cannot read this statement&apos;s balances, so its opening balance stays as it was recorded and is not shown here. Every correction is recorded in the finance audit trail.
+          Your role cannot read or change this statement&apos;s opening balance. Corrections to the other fields keep its stored value.
         </p>
       )}
       <div>

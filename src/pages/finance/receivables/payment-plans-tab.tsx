@@ -15,7 +15,7 @@ import { Plus, Search, Receipt, Ban } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, DetailDrawer, FormField, Segmented,
   CustomerPicker, DepositAccountPicker, toArray, type Column,
-  PostingDateField, useDocumentBranch,} from "@/components/finance-ui";
+  PostingDateField, AccessField, useDocumentBranch, useFieldAccess,} from "@/components/finance-ui";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,8 +36,8 @@ import { useDates } from "../../../lib/display-prefs";
 const METHODS = ["BANK_TRANSFER", "CASH", "CARD", "CHEQUE", "ONLINE", "OTHER"];
 const FREQS: [string, string][] = [["WEEKLY", "Weekly"], ["FORTNIGHTLY", "Fortnightly"], ["MONTHLY", "Monthly"], ["QUARTERLY", "Quarterly"]];
 
-const nextUnpaid = (p: PaymentPlan) => p.installments.find((i) => i.balance > 0) ?? null;
-const paidCount = (p: PaymentPlan) => p.installments.filter((i) => i.balance <= 0).length;
+const nextUnpaid = (p: PaymentPlan) => p.installments?.find((i) => i.balance > 0) ?? null;
+const paidCount = (p: PaymentPlan) => p.installments?.filter((i) => i.balance <= 0).length ?? 0;
 
 const PILL = "inline-flex rounded px-2 py-0.5 font-mont text-[11px] font-medium";
 const GREEN = "bg-green-01/10 text-green-01", AMBER = "bg-amber-50 text-amber-700", GRAY = "bg-gray-03/60 text-gray-05", BLUE = "bg-blue-50 text-blue-700";
@@ -92,6 +92,7 @@ function previewSchedule(total: number, count: number, start: string, freq: stri
 
 export function PaymentPlansTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
+  const access = useFieldAccess("finance.paymentplan");
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput.trim(), 350);
   const [page, setPage] = useState(1);
@@ -114,14 +115,14 @@ export function PaymentPlansTab({ entity, currency }: { entity: string; currency
   const columns: Column<PaymentPlan>[] = [
     { header: "Plan no.", cell: (p) => <span className="font-semibold tabular-nums">{p.document_number}</span> },
     { header: "Customer", cell: (p) => <span className="text-gray-01">{p.customer_name}</span> },
-    { header: "Invoice", cell: (p) => <span className="tabular-nums text-gray-05">{p.invoice_number ?? "-"}</span> },
-    { header: "Total", align: "right", cell: (p) => <Money kobo={p.total_amount} currency={currency} align="right" /> },
-    { header: "Progress", cell: (p) => <ProgressBar paid={paidCount(p)} total={p.installment_count} /> },
-    { header: "Next due", cell: (p) => {
+    ...(!access.isHidden("invoice_number") ? [{ header: "Invoice", cell: (p: PaymentPlan) => <span className="tabular-nums text-gray-05">{p.invoice_number ?? "-"}</span> }] : []),
+    ...(!access.isHidden("total_amount") ? [{ header: "Total", align: "right" as const, cell: (p: PaymentPlan) => <Money kobo={p.total_amount} currency={currency} align="right" /> }] : []),
+    ...(!access.isHidden("balance") && !access.isHidden("installments") && !access.isHidden("installment_count") ? [{ header: "Progress", cell: (p: PaymentPlan) => <ProgressBar paid={paidCount(p)} total={p.installment_count} /> }] : []),
+    ...(!access.isHidden("balance") && !access.isHidden("installments") ? [{ header: "Next due", cell: (p: PaymentPlan) => {
       const n = nextUnpaid(p);
       return n ? <span className="font-mont text-sm text-gray-01">{dates.day(n.due_date)} · <span className="tabular-nums">{formatMoney(n.balance, currency)}</span></span> : <span className="text-gray-05">-</span>;
-    } },
-    { header: "Status", cell: (p) => { const h = planHealth(p, dates.today()); return <span className={cn(PILL, h.cls)}>{h.label}</span>; } },
+    } }] : []),
+    ...(!access.isHidden("plan_status") ? [{ header: "Status", cell: (p: PaymentPlan) => { const h = planHealth(p, dates.today()); return <span className={cn(PILL, h.cls)}>{h.label}</span>; } }] : []),
   ];
 
   return (
@@ -167,6 +168,7 @@ function PlanDetailDrawer({ plan, entity, currency, onClose }: {
   plan: PaymentPlan | null; entity: string; currency?: string | null; onClose: () => void;
 }) {
   const dates = useDates();
+  const access = useFieldAccess("finance.paymentplan", plan);
   const { can } = useCan();
   const [recording, setRecording] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -202,43 +204,43 @@ function PlanDetailDrawer({ plan, entity, currency, onClose }: {
       >
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Status"><span className={cn(PILL, health.cls)}>{health.label}</span></Field>
-            <Field label="Against invoice">{plan.invoice_number ?? "-"}</Field>
-            <Field label="Total"><Money kobo={plan.total_amount} currency={currency} /></Field>
-            <Field label="Outstanding"><Money kobo={plan.outstanding_total} currency={currency} /></Field>
-            <Field label="Settled">
+            {!access.isHidden("plan_status") ? <Field label="Status"><span className={cn(PILL, health.cls)}>{health.label}</span></Field> : null}
+            {!access.isHidden("invoice_number") ? <Field label="Against invoice">{plan.invoice_number ?? "-"}</Field> : null}
+            {!access.isHidden("total_amount") ? <Field label="Total"><Money kobo={plan.total_amount} currency={currency} /></Field> : null}
+            {!access.isHidden("outstanding_total") ? <Field label="Outstanding"><Money kobo={plan.outstanding_total} currency={currency} /></Field> : null}
+            {!access.isHidden("settled_total") ? <Field label="Settled">
               <Money kobo={plan.settled_total} currency={currency} />
               {plan.baseline_settled > 0 ? <span className="ml-1 font-mont text-[11px] font-normal text-gray-05">(incl. {formatMoney(plan.baseline_settled, currency)} pre-plan credit)</span> : null}
-            </Field>
-            <Field label="Scheduled"><Money kobo={plan.scheduled_total} currency={currency} /></Field>
-            <Field label="Frequency"><span className="font-normal capitalize">{plan.frequency.toLowerCase()}</span></Field>
-            <Field label="Installments">{plan.installment_count}</Field>
+            </Field> : null}
+            {!access.isHidden("scheduled_total") ? <Field label="Scheduled"><Money kobo={plan.scheduled_total} currency={currency} /></Field> : null}
+            {!access.isHidden("frequency") ? <Field label="Frequency"><span className="font-normal capitalize">{plan.frequency.toLowerCase()}</span></Field> : null}
+            {!access.isHidden("installment_count") ? <Field label="Installments">{plan.installment_count}</Field> : null}
           </div>
 
-          <div>
+          {!access.isHidden("installments") ? <div>
             <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Schedule</p>
             <div className="overflow-hidden rounded-md border border-white-02">
               <table className="w-full border-collapse">
                 <thead><tr>
                   <th className={thCls}>#</th><th className={thCls}>Due date</th>
-                  <th className={cn(thCls, "text-right")}>Amount</th><th className={thCls}>Status</th>
+                  <th className={cn(thCls, "text-right")}>Amount</th>{!access.isHidden("status") ? <th className={thCls}>Status</th> : null}
                 </tr></thead>
                 <tbody>
-                  {plan.installments.map((inst) => {
+                  {plan.installments?.map((inst) => {
                     const s = instLabel(inst, next?.id === inst.id);
                     return (
                       <tr key={inst.id}>
                         <td className={cn(tdCls, "tabular-nums text-gray-05")}>{inst.seq_no}</td>
                         <td className={cn(tdCls, "tabular-nums")}>{dates.day(inst.due_date)}</td>
                         <td className={cn(tdCls, "text-right tabular-nums")}><Money kobo={inst.amount} currency={currency} align="right" /></td>
-                        <td className={tdCls}><span className={cn(PILL, s.cls)}>{s.label}</span></td>
+                        {!access.isHidden("status") ? <td className={tdCls}><span className={cn(PILL, s.cls)}>{s.label}</span></td> : null}
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-          </div>
+          </div> : null}
         </div>
       </DetailDrawer>
 
@@ -299,7 +301,7 @@ function RecordInstallmentDrawer({ plan, installment, entity, currency, onClose 
     >
       <div className="space-y-4">
         <p className="rounded-md border border-gray-03 bg-gray-03 px-3 py-2 font-mont text-[11px] text-gray-05">
-          Records a receipt against invoice {plan.invoice_number}; the plan's progress updates automatically.
+          Records a receipt against the invoice; the plan's progress updates automatically.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField label="Amount" required><MoneyInput valueKobo={amount} onChangeKobo={setAmount} currency={currency} /></FormField>
@@ -322,6 +324,8 @@ function NewPlanDrawer({ open, onClose, entity, currency }: {
   open: boolean; onClose: () => void; entity: string; currency?: string | null;
 }) {
   const dates = useDates();
+  const access = useFieldAccess("finance.paymentplan");
+  const invoiceAccess = useFieldAccess("finance.invoice");
   const [customer, setCustomer] = useState("");
   const [invoice, setInvoice] = useState("");
   const [total, setTotal] = useState(0);
@@ -337,10 +341,15 @@ function NewPlanDrawer({ open, onClose, entity, currency }: {
     () => toArray(invQ.data?.data).filter((i) => i.customer_code === customer && i.balance_due > 0),
     [invQ.data, customer],
   );
-  const invoiceOptions = openInvoices.map((i) => ({ value: String(i.id), label: `${i.document_number} · ${formatMoney(i.balance_due, currency)} due` }));
+  const invoiceOptions = openInvoices.map((i) => ({ value: String(i.id),
+    label: `${i.document_number}${invoiceAccess.isHidden("balance_due") ? "" : ` · ${formatMoney(i.balance_due, currency)} due`}` }));
 
   const schedule = useMemo(() => previewSchedule(total, count, startDate, frequency), [total, count, startDate, frequency]);
-  const canSubmit = !!customer && !!invoice && total > 0 && count >= 1 && !!startDate;
+  const canSubmit = !!customer && !!invoice && total > 0 && count >= 1 && !!startDate
+    && !access.isReadOnly("total_amount", { creating: true })
+    && !access.isReadOnly("start_date", { creating: true })
+    && !access.isReadOnly("frequency", { creating: true })
+    && !access.isReadOnly("installment_count", { creating: true });
 
   const reset = () => { setCustomer(""); setInvoice(""); setTotal(0); setStartDate(dates.today()); setFrequency("MONTHLY"); setCount(3); };
   const close = () => { reset(); onClose(); };
@@ -352,9 +361,9 @@ function NewPlanDrawer({ open, onClose, entity, currency }: {
 
   const submit = async () => {
     try {
-      const res = await create({
-        entity, customer: customer.trim().toUpperCase(), invoice: Number(invoice),
-        start_date: startDate, frequency, installment_count: count, total_amount: total,
+      const res = await create({ entity, customer: customer.trim().toUpperCase(),
+        ...access.writableOnly({ invoice: Number(invoice), start_date: startDate,
+          frequency, installment_count: count, total_amount: total }, { creating: true }),
       }).unwrap();
       await activate({ id: res.data.id, entity }).unwrap(); // activate so it tracks immediately
       toast.success("Payment plan created.");
@@ -377,20 +386,20 @@ function NewPlanDrawer({ open, onClose, entity, currency }: {
       <div className="space-y-4" data-guide="finance-payment-plans.form">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField label="Customer" required><CustomerPicker entity={entity} value={customer} onChange={(v) => { setCustomer(v); setInvoice(""); setTotal(0); }} /></FormField>
-          <FormField label="Against invoice" required>
+          <AccessField access={access} name="invoice" creating><FormField label="Against invoice" required>
             <SearchSelect options={invoiceOptions} value={invoice} onChange={(e) => pickInvoice(e.target.value)}
               loading={invQ.isFetching} disabled={!customer}
               placeholder={customer ? "Select an open invoice" : "Select a customer first"} />
-          </FormField>
+          </FormField></AccessField>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <FormField label="Total" required><MoneyInput valueKobo={total} onChangeKobo={setTotal} currency={currency} /></FormField>
-          <FormField label="Start date" required><DatePickerInput value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white" /></FormField>
-          <FormField label="Installments" required><Input type="number" min={1} max={60} value={count} onChange={(e) => setCount(Math.max(1, Number(e.target.value) || 1))} className="bg-white tabular-nums" /></FormField>
+          <AccessField access={access} name="total_amount" creating><FormField label="Total" required><MoneyInput valueKobo={total} onChangeKobo={setTotal} currency={currency} /></FormField></AccessField>
+          <AccessField access={access} name="start_date" creating><FormField label="Start date" required><DatePickerInput value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white" /></FormField></AccessField>
+          <AccessField access={access} name="installment_count" creating><FormField label="Installments" required><Input type="number" min={1} max={60} value={count} onChange={(e) => setCount(Math.max(1, Number(e.target.value) || 1))} className="bg-white tabular-nums" /></FormField></AccessField>
         </div>
-        <Segmented label="Frequency" value={frequency} onChange={setFrequency} options={FREQS} />
+        <AccessField access={access} name="frequency" creating><Segmented label="Frequency" value={frequency} onChange={setFrequency} options={FREQS} /></AccessField>
 
-        <div data-guide="finance-payment-plans.schedule">
+        {!access.isHidden("installments", { creating: true }) && !access.isHidden("total_amount", { creating: true }) ? <div data-guide="finance-payment-plans.schedule">
           <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">Schedule preview</p>
           <div className="overflow-hidden rounded-md border border-white-02">
             <table className="w-full border-collapse">
@@ -410,7 +419,7 @@ function NewPlanDrawer({ open, onClose, entity, currency }: {
               </tbody>
             </table>
           </div>
-        </div>
+        </div> : null}
       </div>
     </DetailDrawer>
   );

@@ -12,7 +12,7 @@ import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Plus, Search } from "lucide-react";
-import { DataTable, StatusPill, FormDrawer, FormField, toArray, type Column } from "@/components/finance-ui";
+import { AccessField, DataTable, StatusPill, FormDrawer, FormField, toArray, useFieldAccess, type Column } from "@/components/finance-ui";
 import { useWholeSchoolAccess } from "@/components/finance-ui/whole-school-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import { useGetDimensionsQuery, useUpsertDimensionMutation } from "@/redux/servi
 import type { Dimension } from "@/redux/services/finance/setup-types";
 
 export function DimensionsTab({ entity }: { entity: string }) {
+  const access = useFieldAccess("finance.dimension");
   const { data, isLoading, isFetching, isError, refetch } = useGetDimensionsQuery({ entity });
   const dims = toArray<Dimension>(data?.data);
   const [editing, setEditing] = useState<Dimension | null>(null);
@@ -34,16 +35,16 @@ export function DimensionsTab({ entity }: { entity: string }) {
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return q ? dims.filter((d) => d.code.toLowerCase().includes(q) || d.name.toLowerCase().includes(q)
-      || d.allowed_values.some((v) => v.toLowerCase().includes(q))) : dims;
-  }, [dims, search]);
+      || (!access.isHidden("allowed_values") && d.allowed_values?.some((v) => v.toLowerCase().includes(q)))) : dims;
+  }, [dims, search, access]);
 
   const columns: Column<Dimension>[] = [
     { header: "Code", cell: (d) => <span className="font-semibold tabular-nums">{d.code}</span> },
     { header: "Name", cell: (d) => d.name },
-    { header: "Allowed values", cell: (d) => d.allowed_values.length
+    ...(!access.isHidden("allowed_values") ? [{ header: "Allowed values", cell: (d: Dimension) => d.allowed_values?.length
       ? <span className="flex flex-wrap gap-1">{d.allowed_values.map((v) => <span key={v} className="rounded bg-gray-02/70 px-1.5 py-0.5 font-mont text-[11px] text-gray-01">{v}</span>)}</span>
-      : <span className="text-gray-05">Any value</span> },
-    { header: "Status", cell: (d) => <StatusPill status={d.is_active ? "ACTIVE" : "INACTIVE"} /> },
+      : <span className="text-gray-05">Any value</span> }] : []),
+    ...(!access.isHidden("is_active") ? [{ header: "Status", cell: (d: Dimension) => <StatusPill status={d.is_active ? "ACTIVE" : "INACTIVE"} /> }] : []),
   ];
 
   return (
@@ -70,6 +71,7 @@ export function DimensionsTab({ entity }: { entity: string }) {
 }
 
 function DimensionModal({ open, existing, entity, onClose }: { open: boolean; existing: Dimension | null; entity: string; onClose: () => void }) {
+  const access = useFieldAccess("finance.dimension", existing);
   const [upsert, { isLoading }] = useUpsertDimensionMutation();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -91,7 +93,8 @@ function DimensionModal({ open, existing, entity, onClose }: { open: boolean; ex
   const submit = async () => {
     try {
       const allowed_values = values.split(",").map((v) => v.trim()).filter(Boolean);
-      const r = await upsert({ entity, code: code.trim().toUpperCase(), name: name.trim(), allowed_values, is_active: active }).unwrap();
+      const r = await upsert({ entity, code: code.trim().toUpperCase(), name: name.trim(),
+        ...access.writableOnly({ allowed_values, is_active: active }, { creating: !existing }) }).unwrap();
       toast.success(r.message || "Dimension saved.");
       setSeeded(null);
       onClose();
@@ -107,10 +110,10 @@ function DimensionModal({ open, existing, entity, onClose }: { open: boolean; ex
         <FormField label="Code" required><Input value={code} onChange={(e) => setCode(e.target.value)} disabled={!!existing} placeholder="e.g. FUND" className={cn("bg-white font-mont", existing && "opacity-60")} /></FormField>
         <FormField label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Funding source" className="bg-white" /></FormField>
       </div>
-      <FormField label="Allowed values"><Input value={values} onChange={(e) => setValues(e.target.value)} placeholder="GRANT-A, TUITION, INTERNAL" className="bg-white" /></FormField>
-      <label className="flex items-center gap-2 font-mont text-xs text-gray-01">
+      <AccessField access={access} name="allowed_values" creating={!existing}><FormField label="Allowed values"><Input value={values} onChange={(e) => setValues(e.target.value)} placeholder="GRANT-A, TUITION, INTERNAL" className="bg-white" /></FormField></AccessField>
+      <AccessField access={access} name="is_active" creating={!existing}><label className="flex items-center gap-2 font-mont text-xs text-gray-01">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-primary" /> Active
-      </label>
+      </label></AccessField>
     </FormDrawer>
   );
 }

@@ -16,7 +16,7 @@ import { Plus, Search, Printer, Check, Send, FilePenLine } from "lucide-react";
 import {
   DataTable, Money, MoneyInput, ConfirmActionModal, DetailDrawer, FormField, Segmented,
   CustomerPicker, AccountPicker, InfoHint, PostingRecap, toArray, type Column, type RecapRow,
-  PostingDateField, StatusPill,} from "@/components/finance-ui";
+  PostingDateField, StatusPill, AccessField, useFieldAccess,} from "@/components/finance-ui";
 import { noAccessMessage } from "@/components/finance-ui/no-access";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,7 @@ function concessionRecap(allowance: string | null, amount: number): { dr: RecapR
 
 export function ConcessionsTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
+  const access = useFieldAccess("finance.concession");
   const [searchParams] = useSearchParams();
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -112,20 +113,20 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
   const columns: Column<Concession>[] = [
     { header: "Ref", cell: (c) => <span className="font-semibold tabular-nums">{c.document_number}</span> },
     { header: "Customer", cell: (c) => <span className="inline-flex items-center gap-2"><Initials name={c.customer_name} /><span className="font-medium text-gray-01">{c.customer_name}</span></span> },
-    { header: "Invoice", cell: (c) => <span className="tabular-nums text-gray-05">{c.invoice_number ?? "-"}</span> },
-    { header: "Type", cell: (c) => <TypeChip kind={c.kind} /> },
-    { header: "Amount", align: "right", cell: (c) => <Money kobo={c.amount} currency={currency} align="right" /> },
-    { header: "Date", cell: (c) => <span className="tabular-nums">{dates.day(c.concession_date)}</span> },
-    { header: "Status", cell: (c) => <StatusPill {...sentBackPill(c, c.status, statusWord(c.status), true)} /> },
+    ...(!access.isHidden("invoice_number") ? [{ header: "Invoice", cell: (c: Concession) => <span className="tabular-nums text-gray-05">{c.invoice_number ?? "-"}</span> }] : []),
+    ...(!access.isHidden("kind") ? [{ header: "Type", cell: (c: Concession) => <TypeChip kind={c.kind} /> }] : []),
+    ...(!access.isHidden("amount") ? [{ header: "Amount", align: "right" as const, cell: (c: Concession) => <Money kobo={c.amount} currency={currency} align="right" /> }] : []),
+    ...(!access.isHidden("concession_date") ? [{ header: "Date", cell: (c: Concession) => <span className="tabular-nums">{dates.day(c.concession_date)}</span> }] : []),
+    ...(!access.isHidden("status") ? [{ header: "Status", cell: (c: Concession) => <StatusPill {...sentBackPill(c, c.status, statusWord(c.status), true)} /> }] : []),
   ];
 
   return (
     <>
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Posted (YTD)" value={formatMoney(summary?.posted_ytd ?? 0, currency)} />
-        <Stat label="Draft (pending)" value={formatMoney(summary?.draft_pending ?? 0, currency)} />
-        <Stat label={SENT_BACK_WORD} value={formatMoney(summary?.sent_back ?? 0, currency)} />
-        <Stat label="Active concessions" value={String(summary?.active_count ?? 0)} hint="Concessions in force: posted and not voided." />
+        {!access.isHidden("amount") && summary?.posted_ytd !== undefined ? <Stat label="Posted (YTD)" value={formatMoney(summary.posted_ytd, currency)} /> : null}
+        {!access.isHidden("amount") && summary?.draft_pending !== undefined ? <Stat label="Draft (pending)" value={formatMoney(summary.draft_pending, currency)} /> : null}
+        {!access.isHidden("amount") && summary?.sent_back !== undefined ? <Stat label={SENT_BACK_WORD} value={formatMoney(summary.sent_back, currency)} /> : null}
+        {!access.isHidden("status") ? <Stat label="Active concessions" value={String(summary?.active_count ?? 0)} hint="Concessions in force: posted and not voided." /> : null}
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -135,15 +136,15 @@ export function ConcessionsTab({ entity, currency }: { entity: string; currency?
             <Input value={searchInput} onChange={(e) => { setSearchInput(e.target.value); resetPage(); }}
               placeholder="Search ref, customer, invoice" className="h-9 w-64 bg-white pl-8 font-mont" />
           </div>
-          <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); resetPage(); }} className={selectCls}>
+          {!access.isHidden("kind") ? <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); resetPage(); }} className={selectCls}>
             <option value="">All types</option>
             {KINDS.map(([v, lbl]) => <option key={v} value={v}>{lbl}</option>)}
-          </select>
-          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }} className={selectCls} aria-label="Status">
+          </select> : null}
+          {!access.isHidden("status") ? <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }} className={selectCls} aria-label="Status">
             <option value="">All statuses</option>
             {CONCESSION_FILTER_STATUSES.map((code) => <option key={code} value={code}>{DOCUMENT_STATUS_WORDS[code]}</option>)}
             <option value={SENT_BACK_FILTER}>{SENT_BACK_WORD}</option>
-          </select>
+          </select> : null}
         </div>
         <Can permission={P.FIN_CREATE_CONCESSION}>
           <Button data-guide="finance-concessions.new" onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New concession</Button>
@@ -180,6 +181,7 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
   onCorrected?: (next: Concession) => void;
 }) {
   const dates = useDates();
+  const access = useFieldAccess("finance.concession", concession);
   const { can } = useCan();
   const [confirmPost, setConfirmPost] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -219,7 +221,7 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
     <>
       <DetailDrawer
         open={!!concession} onOpenChange={(o) => (o ? undefined : onClose())}
-        title={concession.document_number} description={`${kindLabel(concession.kind)} · ${concession.customer_name}`}
+        title={concession.document_number} description={`${access.isHidden("kind") ? "Concession" : kindLabel(concession.kind)} · ${concession.customer_name}`}
         widthClass="sm:max-w-2xl"
         footer={
           <>
@@ -247,10 +249,10 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
       >
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Amount"><Money kobo={concession.amount} currency={currency} /></Field>
-            <Field label="Status"><StatusPill {...sentBackPill(concession, concession.status, statusWord(concession.status), true)} /></Field>
-            <Field label="Against invoice">{concession.invoice_number ?? "-"}</Field>
-            <Field label="Date">{dates.day(concession.concession_date)}</Field>
+            {!access.isHidden("amount") ? <Field label="Amount"><Money kobo={concession.amount} currency={currency} /></Field> : null}
+            {!access.isHidden("status") ? <Field label="Status"><StatusPill {...sentBackPill(concession, concession.status, statusWord(concession.status), true)} /></Field> : null}
+            {!access.isHidden("invoice_number") ? <Field label="Against invoice">{concession.invoice_number ?? "-"}</Field> : null}
+            {!access.isHidden("concession_date") ? <Field label="Date">{dates.day(concession.concession_date)}</Field> : null}
           </div>
           <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} />
           {isDraft && gated ? (
@@ -265,9 +267,9 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
                 : ""}
             </p>
           ) : null}
-          <Field label="Basis"><span className="font-normal">{concession.reason || "-"}</span></Field>
-          <IncomeGivenBack rows={concession.income_given_back} currency={currency} />
-          <div>
+          {!access.isHidden("reason") ? <Field label="Basis"><span className="font-normal">{concession.reason || "-"}</span></Field> : null}
+          {!access.isHidden("income_given_back") ? <IncomeGivenBack rows={concession.income_given_back} currency={currency} /> : null}
+          {!access.isHidden("amount") && !access.isHidden("allowance_account") ? <div>
             <p className="mb-2 font-mont text-xs font-semibold uppercase tracking-wide text-gray-05">GL posting</p>
             <PostingRecap
               title={`${kindLabel(concession.kind)} posting`} dr={recap.dr} cr={recap.cr} currency={currency}
@@ -275,7 +277,7 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
                 ? "The journal that will post when this concession is posted - recognised revenue reduced, the customer's balance cleared."
                 : "Recaps the journal booked when the concession was posted - recognised revenue reduced, the customer's balance cleared."}
             />
-          </div>
+          </div> : null}
         </div>
       </DetailDrawer>
 
@@ -284,7 +286,7 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
         title={gated ? "Submit this concession for approval?" : "Post this concession?"}
         description={gated
           ? `Sends ${concession.document_number} for approval. Nothing reaches the ledger until it is approved.`
-          : `Posts ${concession.document_number} - reduces ${concession.invoice_number}'s balance.`}
+          : `Posts ${concession.document_number} and reduces the invoice balance.`}
         confirmText={gated ? "Submit" : "Post"} loading={busy} onConfirm={doAct}
       />
       {editing ? (
@@ -303,11 +305,17 @@ export function ConcessionDetailDrawer({ concession, entity, currency, onClose, 
 function EditConcessionDrawer({ concession, entity, currency, onClose, onSaved }: {
   concession: Concession; entity: string; currency?: string | null; onClose: () => void; onSaved: (next: Concession) => void;
 }) {
+  const access = useFieldAccess("finance.concession", concession);
   const [form, setForm] = useState<ConcessionForm>(() => concessionForm(concession));
   const [update, { isLoading }] = useUpdateConcessionMutation();
   const set = <K extends keyof ConcessionForm>(key: K, value: ConcessionForm[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const changes = concessionChanges(concession, form);
-  const problem = concessionFormProblem(form);
+  const changes = access.writableOnly(concessionChanges(concession, form));
+  const problem = concessionFormProblem({
+    ...form,
+    date: access.isHidden("concession_date") ? "2000-01-01" : form.date,
+    amount: access.isHidden("amount") ? 1 : form.amount,
+    reason: access.isHidden("reason") ? "Restricted" : form.reason,
+  });
   const changed = Object.keys(changes).length > 0;
   const save = async () => {
     if (!changed || problem) return;
@@ -321,7 +329,7 @@ function EditConcessionDrawer({ concession, entity, currency, onClose, onSaved }
     <DetailDrawer
       open onOpenChange={(o) => { if (!o && !isLoading) onClose(); }}
       title={`Edit ${concession.document_number}`}
-      description={`${concession.customer_name} · against ${concession.invoice_number ?? "its invoice"}. The customer and invoice stay as they are.`}
+      description={`${concession.customer_name}. The customer and invoice stay as they are.`}
       widthClass="sm:max-w-xl"
       footer={<>
         <Button variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
@@ -329,17 +337,17 @@ function EditConcessionDrawer({ concession, entity, currency, onClose, onSaved }
       </>}
     >
       <div className="space-y-4">
-        <Segmented label="Type" value={form.kind} onChange={(v) => set("kind", v)} options={KINDS} />
+        <AccessField access={access} name="kind"><Segmented label="Type" value={form.kind} onChange={(v) => set("kind", v)} options={KINDS} /></AccessField>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <PostingDateField label="Date" entity={entity} value={form.date} onChange={(v) => set("date", v)} />
-          <FormField label="Amount" required><MoneyInput valueKobo={form.amount} onChangeKobo={(v) => set("amount", v)} currency={currency} /></FormField>
+          <AccessField access={access} name="concession_date"><PostingDateField label="Date" entity={entity} value={form.date} onChange={(v) => set("date", v)} /></AccessField>
+          <AccessField access={access} name="amount"><FormField label="Amount" required><MoneyInput valueKobo={form.amount} onChangeKobo={(v) => set("amount", v)} currency={currency} /></FormField></AccessField>
         </div>
-        <FormField label="Allowance account">
+        <AccessField access={access} name="allowance_account"><FormField label="Allowance account">
           <AccountPicker entity={entity} value={form.allowance} onChange={(v) => set("allowance", v)} accountType="INCOME" postableOnly
             placeholder="Defaults to discounts & allowances (4910)" />
-        </FormField>
-        <FormField label="Basis / reason" required><Input aria-label="Basis / reason" value={form.reason} onChange={(e) => set("reason", e.target.value)} className="bg-white" /></FormField>
-        <FormField label="Reference"><Input aria-label="Reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="bg-white" /></FormField>
+        </FormField></AccessField>
+        <AccessField access={access} name="reason"><FormField label="Basis / reason" required><Input aria-label="Basis / reason" value={form.reason} onChange={(e) => set("reason", e.target.value)} className="bg-white" /></FormField></AccessField>
+        <AccessField access={access} name="reference"><FormField label="Reference"><Input aria-label="Reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="bg-white" /></FormField></AccessField>
         {problem && changed ? <p role="alert" className="font-mont text-[11px] text-destructive">{problem}</p> : null}
       </div>
     </DetailDrawer>
@@ -349,6 +357,8 @@ function EditConcessionDrawer({ concession, entity, currency, onClose, onSaved }
 function NewConcessionDrawer({ open, onClose, entity, currency }: {
   open: boolean; onClose: () => void; entity: string; currency?: string | null;
 }) {
+  const access = useFieldAccess("finance.concession");
+  const invoiceAccess = useFieldAccess("finance.invoice");
   const [kind, setKind] = useState("DISCOUNT");
   const [date, setDate] = useState("");
   const [customer, setCustomer] = useState("");
@@ -376,7 +386,7 @@ function NewConcessionDrawer({ open, onClose, entity, currency }: {
     () => toArray(invQ.data?.data).filter((i) => i.customer_code === customer && i.balance_due > 0),
     [invQ.data, customer],
   );
-  const invoiceOptions = openInvoices.map((i) => ({ value: String(i.id), label: `${i.document_number} · ${formatMoney(i.balance_due, currency)} due` }));
+  const invoiceOptions = openInvoices.map((i) => ({ value: String(i.id), label: `${i.document_number}${invoiceAccess.isHidden("balance_due") ? "" : ` · ${formatMoney(i.balance_due, currency)} due`}` }));
   // A discount cannot predate the charge it discounts - conceding before the invoice
   // date would credit AR before the invoice ever debited it.
   const selectedInvoice = openInvoices.find((i) => String(i.id) === invoice) ?? null;
@@ -397,7 +407,9 @@ function NewConcessionDrawer({ open, onClose, entity, currency }: {
   const onPct = (v: string) => { setPct(v); setAmount(pctToKobo(v, invoiceBalance)); };
 
   const recap = useMemo(() => concessionRecap(allowance || null, amount), [allowance, amount]);
-  const canSubmit = !!customer && !!invoice && amount > 0 && reason.trim() !== "";
+  const canSubmit = !!customer && !!invoice && amount > 0 && reason.trim() !== ""
+    && !access.isReadOnly("amount", { creating: true })
+    && !access.isReadOnly("reason", { creating: true });
 
   const reset = () => {
     setKind("DISCOUNT"); setDate(""); setCustomer(""); setInvoice(""); setInvoiceBalance(0);
@@ -407,10 +419,10 @@ function NewConcessionDrawer({ open, onClose, entity, currency }: {
 
   const submit = async (asDraft: boolean) => {
     try {
-      const res = await create({
-        entity, customer: customer.trim().toUpperCase(), invoice: Number(invoice), kind,
-        concession_date: date, amount, allowance_account: allowance || undefined, reason: reason.trim(),
-      }).unwrap();
+      const res = await create({ entity, customer: customer.trim().toUpperCase(),
+        ...access.writableOnly({ invoice: Number(invoice), kind, concession_date: date,
+          amount, allowance_account: allowance || undefined, reason: reason.trim() },
+        { creating: true }) }).unwrap();
       if (asDraft) {
         toast.success("Concession saved as draft.");
         close();
@@ -460,24 +472,24 @@ function NewConcessionDrawer({ open, onClose, entity, currency }: {
             {gateNote}
           </p>
         ) : null}
-        <Segmented label="Type" value={kind} onChange={setKind} options={KINDS} />
+        <AccessField access={access} name="kind" creating><Segmented label="Type" value={kind} onChange={setKind} options={KINDS} /></AccessField>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <PostingDateField
+          <AccessField access={access} name="concession_date" creating><PostingDateField
             label="Date" entity={entity} value={date} onChange={setDate}
             notBefore={selectedInvoice?.invoice_date}
             notBeforeLabel={selectedInvoice ? `invoice ${selectedInvoice.document_number}` : undefined}
-          />
+          /></AccessField>
           <FormField label="Customer" required><CustomerPicker entity={entity} value={customer} onChange={(v) => { setCustomer(v); setInvoice(""); setInvoiceBalance(0); }} /></FormField>
         </div>
 
-        <FormField label="Against invoice" required>
+        <AccessField access={access} name="invoice" creating><FormField label="Against invoice" required>
           <SearchSelect options={invoiceOptions} value={invoice} onChange={(e) => pickInvoice(e.target.value)}
             loading={invQ.isFetching} disabled={!customer}
             placeholder={customer ? "Select an open invoice" : "Select a customer first"} />
-        </FormField>
+        </FormField></AccessField>
 
-        <div className="space-y-2">
+        <AccessField access={access} name="amount" creating><div className="space-y-2">
           <Segmented label="Enter as" value={entryMode} onChange={switchEntry} options={[["amount", "Amount"], ["pct", "% of balance"]]} />
           <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
             {entryMode === "amount" ? (
@@ -499,21 +511,21 @@ function NewConcessionDrawer({ open, onClose, entity, currency }: {
                 : "Pick an invoice to base the amount on its balance."}
             </p>
           </div>
-        </div>
+        </div></AccessField>
 
-        <FormField label="Allowance account">
+        <AccessField access={access} name="allowance_account" creating><FormField label="Allowance account">
           <AccountPicker entity={entity} value={allowance} onChange={setAllowance} accountType="INCOME" postableOnly
             placeholder="Defaults to discounts & allowances (4910)" />
-        </FormField>
+        </FormField></AccessField>
 
-        <FormField label="Basis / reason" required><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Sibling discount 10%" className="bg-white" /></FormField>
+        <AccessField access={access} name="reason" creating><FormField label="Basis / reason" required><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Sibling discount 10%" className="bg-white" /></FormField></AccessField>
 
-        <div data-guide="finance-concessions.posting">
+        {!access.isHidden("amount") && !access.isHidden("allowance_account") ? <div data-guide="finance-concessions.posting">
           <PostingRecap
             title={`${kindLabel(kind)} posting`} dr={recap.dr} cr={recap.cr} currency={currency}
             helper="A concession reduces recognised revenue and the customer's outstanding balance."
           />
-        </div>
+        </div> : null}
       </div>
       {noApproverDialog}
     </DetailDrawer>

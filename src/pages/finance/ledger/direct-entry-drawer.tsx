@@ -21,7 +21,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, BookCheck } from "lucide-react";
-import { DetailDrawer, MoneyInput, Money, AccountPicker, CostCenterPicker, toArray, PostingDateField, RaisingBranchChoiceField, useRaisingBranchChoice,} from "@/components/finance-ui";
+import { AccessField, DetailDrawer, MoneyInput, Money, AccountPicker, CostCenterPicker, toArray, PostingDateField, RaisingBranchChoiceField, useFieldAccess, useRaisingBranchChoice,} from "@/components/finance-ui";
 import { useCan } from "@/components/finance-ui/can";
 import { useNoApproverPrompt } from "@/components/finance-ui/no-approver-prompt";
 import { P } from "../../../permissions";
@@ -41,6 +41,7 @@ const fieldLabel = "font-mont text-xs text-gray-05";
 export function DirectEntryDrawer({ open, onClose, entity, currency, existing }: {
   open: boolean; onClose: () => void; entity: string; currency?: string | null; existing?: JournalDetail;
 }) {
+  const access = useFieldAccess("finance.journal", existing);
   const saved = existing ? directEntryForm(existing) : null;
   const [date, setDate] = useState(saved?.date ?? "");
   const [narration, setNarration] = useState(saved?.narration ?? "");
@@ -60,7 +61,7 @@ export function DirectEntryDrawer({ open, onClose, entity, currency, existing }:
   const { can } = useCan();
   const canDimensions = can(P.FIN_VIEW_DIMENSIONS);
   const { data: dimsData } = useGetDimensionsQuery({ entity }, { skip: !canDimensions });
-  const dims = toArray<Dimension>(dimsData?.data).filter((d) => d.is_active);
+  const dims = toArray<Dimension>(dimsData?.data).filter((d) => d.is_active && Array.isArray(d.allowed_values));
 
   const totalDebit = rows.reduce((s, r) => s + (r.side === "debit" ? r.amountKobo : 0), 0);
   const totalCredit = rows.reduce((s, r) => s + (r.side === "credit" ? r.amountKobo : 0), 0);
@@ -75,7 +76,7 @@ export function DirectEntryDrawer({ open, onClose, entity, currency, existing }:
   const submit = async () => {
     try {
       if (existing) {
-        const changes = directEntryChanges(existing, { date, narration, reference, rows });
+        const changes = access.writableOnly(directEntryChanges(existing, { date, narration, reference, rows }));
         // Nothing changed: nothing to send.
         if (!Object.keys(changes).length) { onClose(); return; }
         const res = await update({ id: existing.id, entity, ...changes }).unwrap();
@@ -84,7 +85,8 @@ export function DirectEntryDrawer({ open, onClose, entity, currency, existing }:
         return;
       }
       const lines = directEntryLines(rows);
-      const res = await post({ entity, date: date || undefined, narration, reference, lines, ...branch.body() }).unwrap();
+      const res = await post({ entity, ...access.writableOnly({ date: date || undefined,
+        narration, reference, lines }, { creating: true }), ...branch.body() }).unwrap();
       const waiting = res.data?.status === "PENDING_APPROVAL";
       toast.success(res.message || (waiting ? "Journal entry sent for approval." : "Direct entry posted."));
       close();
@@ -103,7 +105,7 @@ export function DirectEntryDrawer({ open, onClose, entity, currency, existing }:
         footer={
           <>
             <Button variant="outline" disabled={isLoading} onClick={close}>Cancel</Button>
-            <Button data-guide="finance-journal.post" disabled={isLoading || !balanced || hasBlankAccount || !branch.ready} onClick={submit} className="gap-1.5">
+            <Button data-guide="finance-journal.post" disabled={isLoading || (!existing && (!balanced || hasBlankAccount || !branch.ready || access.isReadOnly("lines", { creating: true })))} onClick={submit} className="gap-1.5">
               <BookCheck className="size-4" />{existing ? (isLoading ? "Saving…" : "Save changes") : isLoading ? "Posting…" : "Post entry"}
             </Button>
           </>
@@ -113,21 +115,21 @@ export function DirectEntryDrawer({ open, onClose, entity, currency, existing }:
           {/* header fields */}
           <div data-guide="finance-journal.header-fields" className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <PostingDateField label="Date" entity={entity} value={date} onChange={setDate} />
-              <label className="block space-y-1">
+              <AccessField access={access} name="date" creating={!existing}><PostingDateField label="Date" entity={entity} value={date} onChange={setDate} /></AccessField>
+              <AccessField access={access} name="reference" creating={!existing}><label className="block space-y-1">
                 <span className={fieldLabel}>Reference</span>
                 <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Optional" className="bg-white" />
-              </label>
+              </label></AccessField>
             </div>
-            <label className="block space-y-1">
+            <AccessField access={access} name="narration" creating={!existing}><label className="block space-y-1">
               <span className={fieldLabel}>Narration</span>
               <Input value={narration} onChange={(e) => setNarration(e.target.value)} placeholder="What is this entry for?" className="bg-white" />
-            </label>
+            </label></AccessField>
             <RaisingBranchChoiceField choice={branch} hint="The branch whose books this entry belongs to." />
           </div>
 
           {/* postings */}
-          <div data-guide="finance-journal.postings" className="space-y-2">
+          <AccessField access={access} name="lines" creating={!existing}><div data-guide="finance-journal.postings" className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-mont text-sm font-semibold text-black-01">Postings</span>
               <Button type="button" variant="outline" size="sm" onClick={() => setRows((rs) => [...rs, emptyRow()])} className="h-7 gap-1 px-2 text-xs"><Plus className="size-3.5" /> Add line</Button>
@@ -170,10 +172,10 @@ export function DirectEntryDrawer({ open, onClose, entity, currency, existing }:
                 )}
               </div>
             ))}
-          </div>
+          </div></AccessField>
 
           {/* balance check */}
-          <div data-guide="finance-journal.balance" className="flex items-center justify-between rounded-md bg-gray-50 px-4 py-3 font-mont text-sm">
+          {!access.isHidden("lines", { creating: !existing }) ? <div data-guide="finance-journal.balance" className="flex items-center justify-between rounded-md bg-gray-50 px-4 py-3 font-mont text-sm">
             <span className={cn("font-semibold", balanced ? "text-green-01" : "text-destructive")}>
               {balanced ? "Balanced" : "Must balance"}
             </span>
@@ -181,7 +183,7 @@ export function DirectEntryDrawer({ open, onClose, entity, currency, existing }:
               <span className="text-gray-05">Dr <Money kobo={totalDebit} currency={currency} className="ml-1 font-semibold text-black-01" /></span>
               <span className="text-gray-05">Cr <Money kobo={totalCredit} currency={currency} className="ml-1 font-semibold text-black-01" /></span>
             </div>
-          </div>
+          </div> : null}
         </div>
       </DetailDrawer>
       {noApproverDialog}

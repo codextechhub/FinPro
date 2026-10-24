@@ -15,7 +15,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Check, FilePenLine, Printer, Send } from "lucide-react";
-import { DetailDrawer, Money, StatusPill, ConfirmActionModal, InfoHint } from "@/components/finance-ui";
+import { DetailDrawer, Money, StatusPill, ConfirmActionModal, InfoHint, useFieldAccess } from "@/components/finance-ui";
 import { Can } from "@/components/finance-ui/can";
 import { LoadingState, ErrorState } from "@/components/finance-ui/states";
 import { RETURNED_HINT, sentBackPill } from "@/components/finance-ui/returned-correction";
@@ -55,11 +55,13 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmReverse, setConfirmReverse] = useState(false);
   const j = data?.data;
+  const access = useFieldAccess("finance.journal", j);
   const { standing, request, workflowId, requestNamed } = useFinanceReturned(j);
   const [editing, setEditing] = useState(false);
   // Only a direct entry has an edit route; another document's journal is corrected through it.
   const directEntry = j?.source === "MANUAL" || j?.source === "OPENING";
-  const diff = j ? j.total_debit - j.total_credit : 0;
+  const diff = j && !access.isHidden("total_debit") && !access.isHidden("total_credit")
+    ? j.total_debit - j.total_credit : null;
   const reversalAction = j?.reversal_action;
   const guidance = sourceDocumentGuidance(reversalAction);
 
@@ -87,12 +89,17 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
         open={open}
         onOpenChange={(o) => !o && onClose()}
         title={j ? j.document_number : "Journal"}
-        description={j ? `${dates.day(j.date)}${j.period_label ? ` · ${j.period_label}` : ""} · ${cap(j.source)} journal` : undefined}
+        description={j ? [
+          !access.isHidden("date") ? dates.day(j.date) : null,
+          !access.isHidden("period_label") && j.period_label ? j.period_label : null,
+          !access.isHidden("source") ? `${cap(j.source)} journal` : null,
+        ].filter(Boolean).join(" · ") : undefined}
         widthClass="sm:max-w-3xl"
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
             <span className="font-mont text-xs text-gray-05">
-              Created by {j?.created_by ?? "-"}{j?.posted_at ? ` · Posted ${dates.day(j.posted_at)}` : ""}
+              {!access.isHidden("created_by") && j?.created_by ? `Created by ${j.created_by}` : ""}
+              {!access.isHidden("posted_at") && j?.posted_at ? ` · Posted ${dates.day(j.posted_at)}` : ""}
             </span>
             <div className="flex flex-wrap items-center gap-2">
               {standing === "sender" && directEntry && (
@@ -140,22 +147,22 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
             <ReturnedNote standing={standing} request={request} requestNamed={requestNamed} senderHint={directEntry ? undefined : RETURNED_HINT.resumeOnly} />
             {/* stat cards */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Status"><StatusPill {...sentBackPill(j, j.status, undefined, true)} /></Stat>
-              <Stat label="Total Dr"><Money kobo={j.total_debit} currency={currency} /></Stat>
-              <Stat label="Total Cr"><Money kobo={j.total_credit} currency={currency} /></Stat>
-              <Stat label="Difference">
+              {!access.isHidden("status") ? <Stat label="Status"><StatusPill {...sentBackPill(j, j.status, undefined, true)} /></Stat> : null}
+              {!access.isHidden("total_debit") ? <Stat label="Total Dr"><Money kobo={j.total_debit} currency={currency} /></Stat> : null}
+              {!access.isHidden("total_credit") ? <Stat label="Total Cr"><Money kobo={j.total_credit} currency={currency} /></Stat> : null}
+              {diff !== null ? <Stat label="Difference">
                 {diff === 0
                   ? <span className="inline-flex items-center gap-1 text-green-01"><Check className="size-4" /> Balanced</span>
                   : <span className="text-destructive"><Money kobo={diff} currency={currency} /></span>}
-              </Stat>
+              </Stat> : null}
             </div>
 
-            {j.reverses_id && <p className="font-mont text-xs text-gray-05">Reverses journal #{j.reverses_id}</p>}
+            {!access.isHidden("status") && j.reverses_id ? <p className="font-mont text-xs text-gray-05">Reverses journal #{j.reverses_id}</p> : null}
 
             {guidance && <p data-testid="journal-correction-guidance" className="rounded-md bg-gray-02/50 px-3 py-2 font-mont text-xs leading-5 text-gray-01">{guidance.message}</p>}
 
             {/* lines */}
-            <div>
+            {!access.isHidden("lines") ? <div>
               <div className="mb-2 flex items-center gap-1.5">
                 <p className="font-mont text-sm font-semibold text-gray-01">Lines</p>
                 <InfoHint ariaLabel="About journal lines">Each line targets one GL account; the cost centre tags the spending department. Manual journals can be reversed with a mirror entry. Journals created by invoices, receipts and other documents must be voided with their source document so the sub-ledger (each customer or supplier record) and the ledger stay together.</InfoHint>
@@ -181,16 +188,16 @@ export function JournalDetailDrawer({ journalId, entity, currency, onClose }: {
                       );
                     })}
                   </tbody>
-                  <tfoot>
+                  {!access.isHidden("total_debit") && !access.isHidden("total_credit") ? <tfoot>
                     <tr className="border-t-2 border-white-02 font-semibold">
                       <td className={cn(td, "border-t-0")} colSpan={4}>Totals</td>
                       <td className={cn(td, "border-t-0 text-right tabular-nums")}><Money kobo={j.total_debit} currency={currency} align="right" /></td>
                       <td className={cn(td, "border-t-0 text-right tabular-nums")}><Money kobo={j.total_credit} currency={currency} align="right" /></td>
                     </tr>
-                  </tfoot>
+                  </tfoot> : null}
                 </table>
               </div>
-            </div>
+            </div> : null}
 
           </div>
         )}

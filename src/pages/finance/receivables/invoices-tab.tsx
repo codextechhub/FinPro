@@ -13,7 +13,7 @@ import { useMemo, useState } from "react";
 import { useActionParam } from "@/hooks/use-action-param";
 import { toast } from "sonner";
 import { Search, ArrowUp, ArrowDown, Layers, Plus } from "lucide-react";
-import { DataTable, Money, ConfirmActionModal, InfoHint, TabStrip, toArray, kpiValueClass, type Column, type TabStripItem } from "@/components/finance-ui";
+import { DataTable, Money, ConfirmActionModal, InfoHint, TabStrip, toArray, kpiValueClass, useFieldAccess, type Column, type TabStripItem } from "@/components/finance-ui";
 import { FINANCE_HELP } from "../screen-help";
 import { Can, useCan } from "@/components/finance-ui/can";
 import { QuickExportButton } from "../../../host";
@@ -95,6 +95,7 @@ function Kpi({ label, value, delta, deltaIsPoints }: {
 
 export function InvoicesTab({ entity, currency }: { entity: string; currency?: string | null }) {
   const dates = useDates();
+  const access = useFieldAccess("finance.invoice");
   const [bucket, setBucket] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput.trim(), 350);
@@ -118,11 +119,11 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
 
   const rows = toArray<Invoice>(data?.data);
   const pg = data?.pagination;
-  const count = (key: string) => key ? (summary?.by_status?.[key as "draft"] ?? 0) : (summary?.totals.count ?? summary?.by_status?.total ?? 0);
+  const count = (key: string) => key ? (summary?.by_status?.[key as "draft"] ?? 0) : (summary?.totals?.count ?? summary?.by_status?.total ?? 0);
 
-  const inv = summary?.monthly.map((m) => m.invoiced) ?? [];
-  const col = summary?.monthly.map((m) => m.collected) ?? [];
-  const rate = summary?.monthly.map((m) => (m.invoiced ? (m.collected / m.invoiced) * 100 : 0)) ?? [];
+  const inv = summary?.monthly?.map((m) => m.invoiced) ?? [];
+  const col = summary?.monthly?.map((m) => m.collected) ?? [];
+  const rate = summary?.monthly?.map((m) => (m.invoiced ? (m.collected / m.invoiced) * 100 : 0)) ?? [];
 
   const submitWriteOff = async () => {
     if (!selected) return;
@@ -146,12 +147,14 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
         <span className="font-medium text-gray-01">{r.customer_name}</span>
       </span>
     ) },
-    { header: "Invoice date", cell: (r) => <span className="tabular-nums">{dates.day(r.invoice_date)}</span> },
-    { header: "Due date", cell: (r) => <span className="tabular-nums">{dates.day(r.due_date)}</span> },
-    { header: "Total", align: "right", cell: (r) => <Money kobo={r.total} currency={currency} align="right" /> },
-    { header: "Paid", align: "right", cell: (r) => r.amount_paid ? <Money kobo={r.amount_paid} currency={currency} align="right" /> : <span className="text-gray-05">-</span> },
-    { header: "Balance", align: "right", cell: (r) => <Money kobo={r.balance_due} currency={currency} align="right" /> },
-    { header: "Status", cell: (r) => { const s = derivedStatus(r, dates.today()); return <span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[s] ?? "bg-gray-03/60 text-gray-05")}>{INVOICE_STATUS_LABEL[s] ?? s}</span>; } },
+    ...(!access.isHidden("invoice_date") ? [{ header: "Invoice date", cell: (r: Invoice) => <span className="tabular-nums">{dates.day(r.invoice_date)}</span> }] : []),
+    ...(!access.isHidden("due_date") ? [{ header: "Due date", cell: (r: Invoice) => <span className="tabular-nums">{dates.day(r.due_date)}</span> }] : []),
+    ...(!access.isHidden("total") ? [{ header: "Total", align: "right" as const, cell: (r: Invoice) => <Money kobo={r.total} currency={currency} align="right" /> }] : []),
+    ...(!access.isHidden("settlement") ? [
+      { header: "Paid", align: "right" as const, cell: (r: Invoice) => r.amount_paid ? <Money kobo={r.amount_paid} currency={currency} align="right" /> : <span className="text-gray-05">-</span> },
+      { header: "Balance", align: "right" as const, cell: (r: Invoice) => <Money kobo={r.balance_due} currency={currency} align="right" /> },
+    ] : []),
+    ...(!access.isHidden("status") ? [{ header: "Status", cell: (r: Invoice) => { const s = derivedStatus(r, dates.today()); return <span className={cn("rounded px-2 py-0.5 font-mont text-[11px] font-medium", STATUS_PILL[s] ?? "bg-gray-03/60 text-gray-05")}>{INVOICE_STATUS_LABEL[s] ?? s}</span>; } }] : []),
   ];
 
   return (
@@ -163,12 +166,12 @@ export function InvoicesTab({ entity, currency }: { entity: string; currency?: s
       />
 
       {/* KPI cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Total invoiced" value={formatMoney(summary?.kpis.total_invoiced.kobo ?? 0, currency)} delta={pctChange(inv)} />
-        <Kpi label="Total collected" value={formatMoney(summary?.kpis.total_collected.kobo ?? 0, currency)} delta={pctChange(col)} />
-        <Kpi label="Collection rate" value={`${(summary?.kpis.collection_rate ?? 0).toFixed(1)}%`} delta={rate.length > 1 ? rate[rate.length - 1] - rate[rate.length - 2] : null} deltaIsPoints />
-        <Kpi label="Overdue balance" value={formatMoney(summary?.kpis.overdue_balance.kobo ?? 0, currency)} delta={null} />
-      </div>
+      {!access.isHidden("summary") && summary?.kpis ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {summary.kpis.total_invoiced ? <Kpi label="Total invoiced" value={formatMoney(summary.kpis.total_invoiced.kobo, currency)} delta={pctChange(inv)} /> : null}
+        {summary.kpis.total_collected ? <Kpi label="Total collected" value={formatMoney(summary.kpis.total_collected.kobo, currency)} delta={pctChange(col)} /> : null}
+        {summary.kpis.collection_rate != null ? <Kpi label="Collection rate" value={`${summary.kpis.collection_rate.toFixed(1)}%`} delta={rate.length > 1 ? rate[rate.length - 1] - rate[rate.length - 2] : null} deltaIsPoints /> : null}
+        {summary.kpis.overdue_balance ? <Kpi label="Overdue balance" value={formatMoney(summary.kpis.overdue_balance.kobo, currency)} delta={null} /> : null}
+      </div> : null}
 
       {/* The bucket strip sizes to its tabs, so search and the actions share its line. */}
       <div className="flex flex-wrap items-center gap-2">
